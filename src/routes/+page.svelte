@@ -1,156 +1,130 @@
 <script lang="ts">
-  import { invoke } from "@tauri-apps/api/core";
+  import GameList from "$lib/components/GameList.svelte";
+  import GameForm from "$lib/components/GameForm.svelte";
+  import RunnerList from "$lib/components/RunnerList.svelte";
+  import PrefixManager from "$lib/components/PrefixManager.svelte";
+  import Modal from "$lib/components/Modal.svelte";
+  import type { Game } from "$lib/types";
 
-  let name = $state("");
-  let greetMsg = $state("");
+  let view = $state<"library" | "settings">("library");
+  let editing = $state<Game | "new" | null>(null);
 
-  async function greet(event: Event) {
-    event.preventDefault();
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    greetMsg = await invoke("greet", { name });
-  }
+  let modalGame = $derived(editing && editing !== "new" ? editing : undefined);
+  let modalTitle = $derived(editing === "new" ? "Spiel hinzufügen" : "Spiel bearbeiten");
 </script>
 
-<main class="container">
-  <h1>Welcome to Tauri + Svelte</h1>
+<div class="shell">
+  <nav class="sidebar">
+    <div class="brand">Prefixr</div>
+    <button
+      type="button"
+      class="nav-item"
+      class:active={view === "library"}
+      onclick={() => (view = "library")}
+    >
+      Bibliothek
+    </button>
+    <button
+      type="button"
+      class="nav-item"
+      class:active={view === "settings"}
+      onclick={() => (view = "settings")}
+    >
+      Prefixe & Runner
+    </button>
+  </nav>
 
-  <div class="row">
-    <a href="https://vite.dev" target="_blank">
-      <img src="/vite.svg" class="logo vite" alt="Vite Logo" />
-    </a>
-    <a href="https://tauri.app" target="_blank">
-      <img src="/tauri.svg" class="logo tauri" alt="Tauri Logo" />
-    </a>
-    <a href="https://svelte.dev" target="_blank">
-      <img src="/svelte.svg" class="logo svelte-kit" alt="SvelteKit Logo" />
-    </a>
-  </div>
-  <p>Click on the Tauri, Vite, and SvelteKit logos to learn more.</p>
+  <main>
+    {#if view === "library"}
+      <div class="page-header">
+        <h1>Bibliothek</h1>
+        <button type="button" class="primary" onclick={() => (editing = "new")}>
+          + Spiel hinzufügen
+        </button>
+      </div>
+      <GameList onEdit={(game) => (editing = game)} />
+    {:else}
+      <div class="page-header">
+        <h1>Prefixe & Runner</h1>
+      </div>
+      <div class="settings-grid">
+        <RunnerList />
+        <PrefixManager />
+      </div>
+    {/if}
+  </main>
+</div>
 
-  <form class="row" onsubmit={greet}>
-    <input id="greet-input" placeholder="Enter a name..." bind:value={name} />
-    <button type="submit">Greet</button>
-  </form>
-  <p>{greetMsg}</p>
-</main>
+<Modal open={editing !== null} title={modalTitle} onClose={() => (editing = null)}>
+  <GameForm existingGame={modalGame} onSuccess={() => (editing = null)} />
+</Modal>
 
 <style>
-.logo.vite:hover {
-  filter: drop-shadow(0 0 2em #747bff);
-}
-
-.logo.svelte-kit:hover {
-  filter: drop-shadow(0 0 2em #ff3e00);
-}
-
-:root {
-  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
-  font-size: 16px;
-  line-height: 24px;
-  font-weight: 400;
-
-  color: #0f0f0f;
-  background-color: #f6f6f6;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  -webkit-text-size-adjust: 100%;
-}
-
-.container {
-  margin: 0;
-  padding-top: 10vh;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  text-align: center;
-}
-
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: 0.75s;
-}
-
-.logo.tauri:hover {
-  filter: drop-shadow(0 0 2em #24c8db);
-}
-
-.row {
-  display: flex;
-  justify-content: center;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-
-a:hover {
-  color: #535bf2;
-}
-
-h1 {
-  text-align: center;
-}
-
-input,
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  color: #0f0f0f;
-  background-color: #ffffff;
-  transition: border-color 0.25s;
-  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
-}
-
-button {
-  cursor: pointer;
-}
-
-button:hover {
-  border-color: #396cd8;
-}
-button:active {
-  border-color: #396cd8;
-  background-color: #e8e8e8;
-}
-
-input,
-button {
-  outline: none;
-}
-
-#greet-input {
-  margin-right: 5px;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: #f6f6f6;
-    background-color: #2f2f2f;
+  .shell {
+    display: flex;
+    min-height: 100vh;
   }
 
-  a:hover {
-    color: #24c8db;
+  .sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 1em 0.8em;
+    gap: 0.3em;
   }
 
-  input,
-  button {
-    color: #ffffff;
-    background-color: #0f0f0f98;
+  .brand {
+    font-weight: 700;
+    font-size: 1.2em;
+    padding: 0.5em 0.6em 1em;
   }
-  button:active {
-    background-color: #0f0f0f69;
-  }
-}
 
+  .nav-item {
+    text-align: left;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-muted);
+    padding: 0.6em 0.8em;
+    border-radius: 8px;
+  }
+
+  .nav-item:hover {
+    background: var(--surface-raised);
+    border-color: transparent;
+  }
+
+  .nav-item.active {
+    background: var(--surface-raised);
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  main {
+    flex: 1;
+    padding: 2em;
+    max-width: 1100px;
+  }
+
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5em;
+  }
+
+  .settings-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.4fr;
+    gap: 1.5em;
+    align-items: start;
+  }
+
+  @media (max-width: 720px) {
+    .settings-grid {
+      grid-template-columns: 1fr;
+    }
+  }
 </style>
