@@ -24,9 +24,8 @@ pub struct Runner {
 }
 
 /// A Wine prefix known to the app, tracked in the config file. Not tied to a
-/// runner — the runner used to initialize it is only needed transiently by
-/// `create_prefix`; which runner launches a game living in this prefix is
-/// decided per-game via `Game::runner_id`.
+/// runner — the runner that (lazily) initializes it is decided per-game, via
+/// `Game::runner_id`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrefixInfo {
     pub path: PathBuf,
@@ -42,6 +41,11 @@ pub struct Game {
     pub runner_id: String,
     #[serde(default)]
     pub env_vars: HashMap<String, String>,
+    /// The exe's embedded icon, as a `data:image/png;base64,...` URI.
+    /// Extracted once when the game is added/updated; `None` if the exe has
+    /// no icon resource or it couldn't be parsed.
+    #[serde(default)]
+    pub icon: Option<String>,
 }
 
 /// Payload for `add_game`; the id is assigned by the backend.

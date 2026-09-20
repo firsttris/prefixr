@@ -8,6 +8,7 @@
     removeGame,
     launchGame,
     initGameEvents,
+    createDesktopShortcut,
   } from "$lib/stores/games";
   import GameCard from "./GameCard.svelte";
   import type { Game } from "$lib/types";
@@ -48,6 +49,7 @@
         onEdit={() => onEdit(game)}
         onRemove={() => removeGame(game.id)}
         onShowLog={showLog}
+        onCreateShortcut={() => createDesktopShortcut(game.id)}
       />
     {/each}
   </div>

@@ -4,11 +4,23 @@ mod models;
 
 use tauri::Manager;
 
-use commands::games::{add_game, launch_game, list_games, remove_game, update_game};
+use commands::games::{
+    add_game, create_desktop_shortcut, launch_game, list_games, remove_game, take_pending_launch,
+    update_game, PendingLaunch,
+};
 use commands::prefixes::{add_prefix, delete_prefix, list_prefixes};
 use commands::runner_downloads::{download_runner, list_proton_ge_releases};
 use commands::runners::list_runners;
 use config::load_config;
+
+/// Looks for `--launch <game-id>` among the process args, as invoked by a
+/// desktop shortcut created via `create_desktop_shortcut`.
+fn find_launch_arg() -> Option<String> {
+    let args: Vec<String> = std::env::args().collect();
+    args.windows(2)
+        .find(|pair| pair[0] == "--launch")
+        .map(|pair| pair[1].clone())
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -18,6 +30,7 @@ pub fn run() {
         .setup(|app| {
             let config = load_config(app.handle())?;
             app.manage(std::sync::Mutex::new(config));
+            app.manage(PendingLaunch(std::sync::Mutex::new(find_launch_arg())));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -27,6 +40,8 @@ pub fn run() {
             update_game,
             remove_game,
             launch_game,
+            take_pending_launch,
+            create_desktop_shortcut,
             add_prefix,
             delete_prefix,
             list_prefixes,

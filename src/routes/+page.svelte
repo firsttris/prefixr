@@ -1,9 +1,11 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import GameList from "$lib/components/GameList.svelte";
   import GameForm from "$lib/components/GameForm.svelte";
   import RunnerList from "$lib/components/RunnerList.svelte";
   import PrefixManager from "$lib/components/PrefixManager.svelte";
   import Modal from "$lib/components/Modal.svelte";
+  import { initGameEvents, launchGame, takePendingLaunch } from "$lib/stores/games";
   import type { Game } from "$lib/types";
 
   let view = $state<"library" | "settings">("library");
@@ -11,6 +13,17 @@
 
   let modalGame = $derived(editing && editing !== "new" ? editing : undefined);
   let modalTitle = $derived(editing === "new" ? "Spiel hinzufügen" : "Spiel bearbeiten");
+
+  // If the app was started via a desktop shortcut (--launch <id>), jump
+  // straight into starting that game instead of just showing the library.
+  onMount(async () => {
+    const pendingGameId = await takePendingLaunch();
+    if (pendingGameId) {
+      view = "library";
+      initGameEvents();
+      launchGame(pendingGameId);
+    }
+  });
 </script>
 
 <div class="shell">

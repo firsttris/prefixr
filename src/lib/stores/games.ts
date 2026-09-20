@@ -102,3 +102,13 @@ export async function launchGame(id: string): Promise<void> {
     // Outcome is already surfaced via the game-launch-error event.
   }
 }
+
+// Checks whether the app was started via a desktop shortcut's
+// `--launch <id>` argument; returns the game id once, then clears it.
+export async function takePendingLaunch(): Promise<string | null> {
+  return await invoke<string | null>("take_pending_launch");
+}
+
+export async function createDesktopShortcut(id: string): Promise<void> {
+  await invoke("create_desktop_shortcut", { id });
+}

@@ -18,6 +18,7 @@ export interface Game {
   prefix_path: string;
   runner_id: string;
   env_vars: Record<string, string>;
+  icon: string | null;
 }
 
 export interface GameInput {

@@ -9,6 +9,7 @@
     onEdit,
     onRemove,
     onShowLog,
+    onCreateShortcut,
   }: {
     game: Game;
     runState?: GameRunState;
@@ -16,15 +17,44 @@
     onEdit: () => void;
     onRemove: () => void;
     onShowLog: (path: string) => void;
+    onCreateShortcut: () => Promise<void>;
   } = $props();
+
+  let shortcutState = $state<"idle" | "creating" | "done" | string>("idle");
+
+  async function handleCreateShortcut() {
+    shortcutState = "creating";
+    try {
+      await onCreateShortcut();
+      shortcutState = "done";
+      setTimeout(() => {
+        shortcutState = "idle";
+      }, 2000);
+    } catch (e) {
+      shortcutState = String(e);
+    }
+  }
 </script>
 
 <article class="card">
   <div class="corner-actions">
+    <button
+      type="button"
+      class="ghost"
+      onclick={handleCreateShortcut}
+      disabled={shortcutState === "creating"}
+      aria-label="Desktop-Verknüpfung erstellen"
+    >
+      {shortcutState === "done" ? "✓" : "🔗"}
+    </button>
     <button type="button" class="ghost" onclick={onEdit} aria-label="Spiel bearbeiten">✎</button>
     <button type="button" class="ghost" onclick={onRemove} aria-label="Spiel entfernen">✕</button>
   </div>
-  <div class="icon">🎮</div>
+  {#if game.icon}
+    <img class="icon" src={game.icon} alt="" />
+  {:else}
+    <div class="icon fallback">🎮</div>
+  {/if}
   <h3>{game.name}</h3>
   <span class="runner">{game.runner_id}</span>
 
@@ -51,6 +81,12 @@
           Log anzeigen
         </button>
       {/if}
+    </div>
+  {/if}
+
+  {#if shortcutState !== "idle" && shortcutState !== "creating" && shortcutState !== "done"}
+    <div class="toast">
+      <span>Verknüpfung fehlgeschlagen: {shortcutState}</span>
     </div>
   {/if}
 </article>
@@ -94,7 +130,19 @@
   }
 
   .icon {
+    width: 2.4em;
+    height: 2.4em;
+    object-fit: contain;
+    image-rendering: -webkit-optimize-contrast;
+  }
+
+  .icon.fallback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-size: 2.4em;
+    width: auto;
+    height: auto;
   }
 
   h3 {
