@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Mutex;
@@ -27,6 +28,32 @@ fn command_on_path(name: &str) -> bool {
     std::env::var_os("PATH")
         .map(|paths| std::env::split_paths(&paths).any(|dir| dir.join(name).is_file()))
         .unwrap_or(false)
+}
+
+/// Reads this process's hard limit on open file descriptors from
+/// `/proc/self/limits` (the "Max open files" row's second column). `None` if
+/// the file is missing or unparseable — callers treat that permissively
+/// rather than blocking on it, since it should only realistically happen if
+/// `/proc` itself isn't there.
+fn open_files_hard_limit() -> Option<u64> {
+    let limits = fs::read_to_string("/proc/self/limits").ok()?;
+    let row = limits.lines().find(|l| l.starts_with("Max open files"))?;
+    // Columns: "Max", "open", "files", <soft>, <hard>, "files" (units).
+    let hard = row.split_whitespace().nth(4)?;
+    if hard == "unlimited" {
+        Some(u64::MAX)
+    } else {
+        hard.parse().ok()
+    }
+}
+
+/// Appends a line to a game's launch log, best-effort — used for warnings
+/// that don't warrant failing the launch (e.g. a requested tweak silently
+/// not applying), so they're still visible if the user checks the log.
+fn log_line(log_path: &Path, message: &str) {
+    if let Ok(mut file) = fs::OpenOptions::new().append(true).open(log_path) {
+        let _ = writeln!(file, "[Prefixr] {message}");
+    }
 }
 
 /// A game process currently running under its runner, tracked so the tray
@@ -541,18 +568,6 @@ pub async fn launch_game(
     dll_override_parts.push("winemenubuilder.exe=".to_string());
     env.push(("WINEDLLOVERRIDES".to_string(), dll_override_parts.join(";")));
 
-    // Always set both variables explicitly, not just when enabled: recent
-    // Proton versions auto-enable ntsync whenever the kernel supports it, so
-    // leaving PROTON_NO_NTSYNC unset wouldn't actually let a user opt out.
-    let ntsync_active = performance.ntsync_enabled && Path::new("/dev/ntsync").exists();
-    env.push((
-        "WINENTSYNC".to_string(),
-        if ntsync_active { "1" } else { "0" }.to_string(),
-    ));
-    env.push((
-        "PROTON_NO_NTSYNC".to_string(),
-        if ntsync_active { "0" } else { "1" }.to_string(),
-    ));
     if mangohud.enabled {
         let conf_path = ensure_mangohud_conf(&app, &mangohud)?;
         env.push(("MANGOHUD".to_string(), "1".to_string()));
@@ -564,12 +579,53 @@ pub async fn launch_game(
     if performance.gamemode_enabled {
         env.push(("LD_PRELOAD".to_string(), "libgamemodeauto.so.0".to_string()));
     }
-    if performance.esync_enabled {
-        env.push(("WINEESYNC".to_string(), "1".to_string()));
+    // All three sync tiers are requested together and all three are always
+    // set explicitly, on *or* off — never left unset. wine/Proton itself
+    // already prioritizes ntsync > fsync > esync and silently ignores
+    // whichever tiers it can't actually use, so requesting all of them is no
+    // different from requesting just the one that'll end up winning, and
+    // forcing all of them off is the only way to be sure: Proton enables
+    // fsync (and, on some builds, ntsync) by default regardless of this
+    // toggle, so leaving PROTON_NO_FSYNC/PROTON_NO_NTSYNC unset when the user
+    // has it switched off here wouldn't actually turn it off.
+    //
+    // Ntsync additionally needs `/dev/ntsync` (kernel support), and esync a
+    // raised open-file limit (one fd per wine sync object) — below ~524288 it
+    // doesn't error cleanly, it corrupts state instead. Both are checked here
+    // rather than left to fail badly.
+    let ntsync_active = performance.sync_enabled && Path::new("/dev/ntsync").exists();
+    let esync_active = performance.sync_enabled
+        && open_files_hard_limit().is_none_or(|limit| limit >= 524_288);
+    if performance.sync_enabled && !esync_active {
+        log_line(
+            &log_path,
+            "Esync tier disabled: open-file hard limit is below 524288 (raise it, e.g. via a systemd LimitNOFILE override, to use it as a fallback).",
+        );
     }
-    if performance.fsync_enabled {
-        env.push(("WINEFSYNC".to_string(), "1".to_string()));
-    }
+    env.push((
+        "WINENTSYNC".to_string(),
+        if ntsync_active { "1" } else { "0" }.to_string(),
+    ));
+    env.push((
+        "PROTON_NO_NTSYNC".to_string(),
+        if ntsync_active { "0" } else { "1" }.to_string(),
+    ));
+    env.push((
+        "WINEFSYNC".to_string(),
+        if performance.sync_enabled { "1" } else { "0" }.to_string(),
+    ));
+    env.push((
+        "PROTON_NO_FSYNC".to_string(),
+        if performance.sync_enabled { "0" } else { "1" }.to_string(),
+    ));
+    env.push((
+        "WINEESYNC".to_string(),
+        if esync_active { "1" } else { "0" }.to_string(),
+    ));
+    env.push((
+        "PROTON_NO_ESYNC".to_string(),
+        if esync_active { "0" } else { "1" }.to_string(),
+    ));
     if performance.dxvk_async_enabled {
         env.push(("DXVK_ASYNC".to_string(), "1".to_string()));
     }
@@ -583,32 +639,65 @@ pub async fn launch_game(
     }
     env.extend(game.env_vars.iter().map(|(k, v)| (k.clone(), v.clone())));
 
-    // Wraps the actual launch with `systemd-inhibit` so the screensaver/sleep
-    // don't interrupt a play session. Only attempted when both the binary and
-    // the D-Bus system bus are actually there — `systemd-inhibit` itself
-    // would otherwise exit immediately (no session to inhibit), taking the
-    // whole game launch down with it since it'd be the process we spawn.
+    // Builds the actual launch as a chain of wrappers around wine, each one
+    // prepended in outer-to-inner order (so the last one added is the one
+    // that directly execs wine). Both wrappers are only attempted once their
+    // binary and backing service actually look reachable — otherwise the
+    // wrapper itself would exit immediately, taking the whole game launch
+    // down with it since it'd be the process we spawn.
+    let mut launch_chain = vec![wine.display().to_string()];
+
+    // `powerprofilesctl launch` holds the desktop at the "performance" power
+    // profile for exactly as long as this launch runs, releasing it
+    // automatically on exit (even a crash) since the hold lives on the
+    // D-Bus connection it opens. A quick `get` call first checks the daemon
+    // is actually running and not just installed.
+    let use_power_profile = performance.power_profile_enabled
+        && command_on_path("powerprofilesctl")
+        && Path::new("/run/dbus/system_bus_socket").exists()
+        && tokio::process::Command::new("powerprofilesctl")
+            .arg("get")
+            .output()
+            .await
+            .map(|out| out.status.success())
+            .unwrap_or(false);
+    if use_power_profile {
+        // No `--` separator: `launch`'s `arguments` is an argparse
+        // `REMAINDER` positional, which the upstream examples feed straight
+        // after the named options rather than behind an explicit `--`.
+        let mut wrapped = vec![
+            "powerprofilesctl".to_string(),
+            "launch".to_string(),
+            "--profile".to_string(),
+            "performance".to_string(),
+            "--reason".to_string(),
+            "Prefixr: game running".to_string(),
+            "--appid".to_string(),
+            "prefixr".to_string(),
+        ];
+        wrapped.append(&mut launch_chain);
+        launch_chain = wrapped;
+    }
+
     let use_inhibit_sleep = performance.inhibit_sleep_enabled
         && command_on_path("systemd-inhibit")
         && Path::new("/run/dbus/system_bus_socket").exists();
+    if use_inhibit_sleep {
+        let mut wrapped = vec![
+            "systemd-inhibit".to_string(),
+            "--mode=block".to_string(),
+            "--who=Prefixr".to_string(),
+            "--why=A game is running".to_string(),
+            "--what=idle:sleep".to_string(),
+            "--".to_string(),
+        ];
+        wrapped.append(&mut launch_chain);
+        launch_chain = wrapped;
+    }
 
-    let (launch_binary, launch_args, launch_env): (PathBuf, Vec<String>, Vec<(String, String)>) =
-        if use_inhibit_sleep {
-            (
-                PathBuf::from("systemd-inhibit"),
-                vec![
-                    "--mode=block".to_string(),
-                    "--who=Prefixr".to_string(),
-                    "--why=A game is running".to_string(),
-                    "--what=idle:sleep".to_string(),
-                    "--".to_string(),
-                    wine.display().to_string(),
-                ],
-                env,
-            )
-        } else {
-            (wine, vec![], env)
-        };
+    let launch_binary = PathBuf::from(&launch_chain[0]);
+    let launch_args = launch_chain[1..].to_vec();
+    let launch_env = env;
 
     let log_out = fs::OpenOptions::new()
         .append(true)

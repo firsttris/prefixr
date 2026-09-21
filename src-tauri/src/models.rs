@@ -116,43 +116,66 @@ pub struct MangoHudConfig {
 #[serde(rename_all = "snake_case")]
 pub struct PerformanceConfig {
     pub gamemode_enabled: bool,
-    pub esync_enabled: bool,
-    pub fsync_enabled: bool,
+    /// Requests the best inter-process sync primitive wine/Proton has
+    /// available, instead of exposing ntsync/fsync/esync as three separate
+    /// toggles a user would have to understand the tradeoffs between. All
+    /// three are requested at once (see `launch_game`) and wine/Proton
+    /// itself already picks the best one that's actually supported, in that
+    /// same priority order (ntsync > fsync > esync) — asking for all three
+    /// doesn't cost anything the way asking for one at a time would.
+    /// Force-disables all three when off, since Proton auto-enables fsync
+    /// (and, on some builds, ntsync) by default regardless of any toggle
+    /// here — leaving them unset wouldn't actually turn them off. Whichever
+    /// tier ends up unsupported (old kernel, plain Wine build with no fsync
+    /// patches, a build with no ntsync support) is a silent no-op; esync
+    /// additionally needs a raised open-file limit, checked at launch time.
+    ///
+    /// Defaults to on, unlike the rest of this struct: unsupported tiers are
+    /// already a no-op, so there's no "is the tool even installed" risk the
+    /// way there is for GameMode/vkBasalt — and defaulting it off would mean
+    /// a Proton game runs *without* fsync/ntsync under this app even though
+    /// Proton would have enabled it by default on its own.
+    #[serde(default = "default_true")]
+    pub sync_enabled: bool,
     pub dxvk_async_enabled: bool,
     pub vkbasalt_enabled: bool,
     pub vkbasalt_sharpen: bool,
     pub vkbasalt_sharpness: f32,
     pub vkbasalt_smaa: bool,
     pub vkbasalt_deband: bool,
-    /// Requests the kernel's `ntsync` driver for wine's inter-process sync
-    /// primitives (successor to esync/fsync). Silently has no effect if
-    /// `/dev/ntsync` isn't present (older kernel or module not loaded) — see
-    /// `launch_game`, which also explicitly force-disables it via
-    /// `PROTON_NO_NTSYNC` when this is off, since recent Proton versions
-    /// otherwise auto-enable it whenever the kernel supports it.
-    #[serde(default)]
-    pub ntsync_enabled: bool,
     /// Wraps the game process with `systemd-inhibit` so the screensaver/sleep
     /// don't kick in mid-session. No-op if `systemd-inhibit` or the D-Bus
     /// system bus isn't available.
     #[serde(default)]
     pub inhibit_sleep_enabled: bool,
+    /// Holds the desktop's power-profiles-daemon at the "performance" profile
+    /// for the duration of the game (via `powerprofilesctl launch`), released
+    /// automatically on exit. GameMode does *not* reliably do this itself —
+    /// it writes the CPU governor directly, which power-profiles-daemon (the
+    /// governor owner on most modern distros) can just overwrite again, so
+    /// `gamemoderun` alone often leaves the profile on "balanced". See
+    /// `launch_game`.
+    #[serde(default)]
+    pub power_profile_enabled: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl Default for PerformanceConfig {
     fn default() -> Self {
         Self {
             gamemode_enabled: false,
-            esync_enabled: false,
-            fsync_enabled: false,
+            sync_enabled: true,
             dxvk_async_enabled: false,
             vkbasalt_enabled: false,
             vkbasalt_sharpen: true,
             vkbasalt_sharpness: 0.4,
             vkbasalt_smaa: false,
             vkbasalt_deband: false,
-            ntsync_enabled: false,
             inhibit_sleep_enabled: false,
+            power_profile_enabled: false,
         }
     }
 }

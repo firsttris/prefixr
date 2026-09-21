@@ -10,16 +10,15 @@
 
   const FALLBACK: PerformanceConfig = {
     gamemode_enabled: false,
-    esync_enabled: false,
-    fsync_enabled: false,
+    sync_enabled: true,
     dxvk_async_enabled: false,
     vkbasalt_enabled: false,
     vkbasalt_sharpen: true,
     vkbasalt_sharpness: 0.4,
     vkbasalt_smaa: false,
     vkbasalt_deband: false,
-    ntsync_enabled: false,
     inhibit_sleep_enabled: false,
+    power_profile_enabled: false,
   };
 
   let config = $state<PerformanceConfig>({ ...FALLBACK });
@@ -99,33 +98,17 @@
       <div class="toggle-row">
         <div>
           <span class="toggle-label">
-            Esync
+            Schnelle Thread-Synchronisation
             <InfoIcon
-              text="Empfehlung: Nur aktivieren, wenn Fsync nicht verfügbar ist. Bei anspruchsvollen Spielen kann es zu Abstürzen kommen, wenn dein System ein niedriges Limit für offene Dateien hat (ulimit -n)."
-            />
-          </span>
-          <p class="toggle-desc">Schnellere Thread-Synchronisation zwischen Windows und Linux.</p>
-        </div>
-        <label class="switch">
-          <input type="checkbox" bind:checked={config.esync_enabled} onchange={changed} />
-          <span class="track"><span class="thumb"></span></span>
-        </label>
-      </div>
-
-      <div class="toggle-row">
-        <div>
-          <span class="toggle-label">
-            Fsync
-            <InfoIcon
-              text="Empfehlung: Wenn dein Kernel es unterstützt (5.16+), praktisch immer aktivieren — kaum Nachteile, spürbarer Gewinn. Wird es nicht unterstützt, passiert einfach nichts."
+              text="Standardmäßig aktiv, da praktisch nie ein Nachteil: Fragt Ntsync, Fsync und Esync gleichzeitig an — Wine/Proton nimmt selbst automatisch die schnellste Methode, die dein Kernel und der gewählte Runner tatsächlich unterstützen, und ignoriert den Rest. Nicht unterstützte Stufen passieren einfach nichts; Esync wird zusätzlich automatisch deaktiviert, falls dein System ein zu niedriges Limit für offene Dateien hat. Nur ausschalten, wenn ein bestimmtes Spiel damit nachweislich hängt oder abstürzt (selten, meist bei bestimmten Anti-Cheat-Systemen)."
             />
           </span>
           <p class="toggle-desc">
-            Wie Esync, aber effizienter mit passender Kernel-Unterstützung.
+            Nutzt Ntsync, Fsync oder Esync — je nachdem, was Kernel und Runner unterstützen.
           </p>
         </div>
         <label class="switch">
-          <input type="checkbox" bind:checked={config.fsync_enabled} onchange={changed} />
+          <input type="checkbox" bind:checked={config.sync_enabled} onchange={changed} />
           <span class="track"><span class="thumb"></span></span>
         </label>
       </div>
@@ -135,7 +118,7 @@
           <span class="toggle-label">
             DXVK Async
             <InfoIcon
-              text="Empfehlung: Nur einschalten, wenn du beim ersten Betreten eines Levels/Areals Ruckler durch Shader-Kompilierung bemerkst. Seltene, kurze Grafikfehler möglich — bei neueren Proton-GE-Versionen oft schon eingebaut und dann überflüssig."
+              text="Empfehlung: Nur einschalten, wenn du beim ersten Betreten eines Levels/Areals Ruckler durch Shader-Kompilierung bemerkst. Seltene, kurze Grafikfehler möglich, in Multiplayer-Titeln mit Anti-Cheat theoretisch auch ein Erkennungsrisiko. Wirkung hängt vom Runner ab: manche neueren GE-Proton-Versionen haben den alten Async-Patch durch einen automatischen Mechanismus ersetzt (dann tut der Schalter nichts), die meisten aktuellen GE-Proton-Builds (dxvk-gplasync) unterstützen ihn aber weiterhin."
             />
           </span>
           <p class="toggle-desc">
@@ -151,17 +134,17 @@
       <div class="toggle-row">
         <div>
           <span class="toggle-label">
-            Ntsync
+            Performance-Energieprofil
             <InfoIcon
-              text="Empfehlung: Nachfolger von Esync/Fsync über einen Kernel-Treiber (ab Kernel 6.14, oder per Modul nachgerüstet). Wenn dein Kernel es unterstützt, die schnellste der drei Optionen — ohne Unterstützung passiert einfach nichts."
+              text="Empfehlung: Auf Laptops praktisch immer sinnvoll, auf Desktops ohne Energieprofile meist wirkungslos. Ergänzt GameMode statt es zu ersetzen — GameMode setzt den CPU-Governor selbst, was der Power-Profile-Dienst auf vielen Distros wieder überschreibt. Braucht power-profiles-daemon; ohne das passiert einfach nichts."
             />
           </span>
           <p class="toggle-desc">
-            Thread-Synchronisation über den nativen ntsync-Kernel-Treiber statt Esync/Fsync.
+            Hält das Energieprofil auf „Leistung", solange ein Spiel läuft.
           </p>
         </div>
         <label class="switch">
-          <input type="checkbox" bind:checked={config.ntsync_enabled} onchange={changed} />
+          <input type="checkbox" bind:checked={config.power_profile_enabled} onchange={changed} />
           <span class="track"><span class="thumb"></span></span>
         </label>
       </div>
