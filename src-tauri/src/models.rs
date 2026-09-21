@@ -101,6 +101,10 @@ pub struct MangoHudConfig {
     pub show_gpu_name: bool,
     #[serde(default)]
     pub show_resolution: bool,
+    /// Lays the stats out in a row instead of a column (MangoHud's
+    /// `horizontal` option).
+    #[serde(default)]
+    pub horizontal: bool,
 }
 
 /// Global performance-tuning toggles applied to every game's launch — see
@@ -162,6 +166,7 @@ impl Default for MangoHudConfig {
             show_wine: false,
             show_gpu_name: false,
             show_resolution: false,
+            horizontal: false,
         }
     }
 }

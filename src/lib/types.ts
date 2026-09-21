@@ -68,6 +68,7 @@ export interface MangoHudConfig {
   show_wine: boolean;
   show_gpu_name: boolean;
   show_resolution: boolean;
+  horizontal: boolean;
 }
 
 export interface PerformanceConfig {

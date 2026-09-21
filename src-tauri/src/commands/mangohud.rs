@@ -60,6 +60,9 @@ fn render_conf(config: &MangoHudConfig) -> String {
     if config.show_resolution {
         lines.push("resolution".to_string());
     }
+    if config.horizontal {
+        lines.push("horizontal".to_string());
+    }
 
     lines.push(format!("position={}", config.position));
     lines.push(format!("background_alpha={}", config.background_alpha));

@@ -25,6 +25,7 @@
     show_wine: false,
     show_gpu_name: false,
     show_resolution: false,
+    horizontal: false,
   };
 
   interface Preset {
@@ -59,6 +60,7 @@
         show_wine: false,
         show_gpu_name: false,
         show_resolution: false,
+        horizontal: false,
       },
     },
     {
@@ -85,6 +87,7 @@
         show_wine: false,
         show_gpu_name: false,
         show_resolution: false,
+        horizontal: false,
       },
     },
     {
@@ -111,6 +114,7 @@
         show_wine: true,
         show_gpu_name: true,
         show_resolution: true,
+        horizontal: false,
       },
     },
     {
@@ -137,6 +141,7 @@
         show_wine: false,
         show_gpu_name: false,
         show_resolution: false,
+        horizontal: false,
       },
     },
   ];
@@ -235,6 +240,7 @@
         <div
           class="overlay-box pos-{config.position}"
           class:rounded={config.round_corners}
+          class:horizontal={config.horizontal}
           style={`--overlay-color:#${config.theme_color}; --overlay-alpha:${config.background_alpha};`}
         >
           {#if config.show_gpu_name}
@@ -338,6 +344,11 @@
       <label class="checkbox-row">
         <input type="checkbox" bind:checked={config.round_corners} onchange={markCustom} />
         Abgerundete Ecken
+      </label>
+
+      <label class="checkbox-row">
+        <input type="checkbox" bind:checked={config.horizontal} onchange={markCustom} />
+        Horizontales Layout
       </label>
 
       <div class="control-group">
@@ -591,6 +602,11 @@
 
   .overlay-box.rounded {
     border-radius: 8px;
+  }
+
+  .overlay-box.horizontal {
+    flex-direction: row;
+    align-items: center;
   }
 
   .overlay-box.pos-top-left {
