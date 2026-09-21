@@ -65,39 +65,55 @@ pub fn find_runner(runners_dir: &Path, runner_id: &str) -> Result<Runner, String
         .ok_or_else(|| format!("Runner '{runner_id}' not found"))
 }
 
-/// Locates the wine binary inside a runner folder, covering both plain Wine
-/// builds and Proton's bundled wine (used directly instead of going through
-/// the full `proton` entrypoint).
-pub fn wine_binary(runner_path: &Path) -> Result<PathBuf, String> {
-    for candidate in [
-        "bin/wine64",
-        "bin/wine",
-        "files/bin/wine64",
-        "files/bin/wine",
-        "wine64",
-        "wine",
-    ] {
-        let candidate_path = runner_path.join(candidate);
+/// Looks for a wine-toolchain binary (`wine`/`wine64`/`wineserver`) inside a
+/// runner folder, trying both plain Wine's layout and Proton's (which bundles
+/// its own copy of the same tools under `files/`).
+fn find_wine_tool(runner_path: &Path, name: &str) -> Result<PathBuf, String> {
+    for prefix in ["bin/", "files/bin/", ""] {
+        let candidate_path = runner_path.join(format!("{prefix}{name}"));
         if candidate_path.is_file() {
             return Ok(candidate_path);
         }
     }
     Err(format!(
-        "No wine binary found in runner directory {}",
+        "No {name} binary found in runner directory {}",
         runner_path.display()
     ))
 }
 
-/// Checks whether `distrobox-host-exec` is on `PATH`. When developing inside a
-/// distrobox container (common on immutable hosts like Bazzite, where the
-/// container is used for its dev headers but lacks a full 32-bit/GPU gaming
-/// userland), this lets us run wine on the host instead, transparently.
+/// Locates the wine binary inside a runner folder, covering both plain Wine
+/// builds and Proton's bundled wine (used directly instead of going through
+/// the full `proton` entrypoint).
+pub fn wine_binary(runner_path: &Path) -> Result<PathBuf, String> {
+    find_wine_tool(runner_path, "wine64").or_else(|_| find_wine_tool(runner_path, "wine"))
+}
+
+/// Locates `wineserver` inside a runner folder, used to shut down a running
+/// game's whole wine session (see `kill_running_game`).
+pub fn wineserver_binary(runner_path: &Path) -> Result<PathBuf, String> {
+    find_wine_tool(runner_path, "wineserver")
+}
+
+/// Checks whether we're actually running inside a distrobox/podman container
+/// with `distrobox-host-exec` available. When developing inside such a
+/// container (common on immutable hosts like Bazzite, where the container is
+/// used for its dev headers but lacks a full 32-bit/GPU gaming userland),
+/// this lets us run wine on the host instead, transparently.
+///
+/// Checking `PATH` alone isn't enough: on a host that ships distrobox
+/// system-wide (Bazzite does), `distrobox-host-exec` is on `PATH` even for a
+/// build running natively on that same host (e.g. the packaged AppImage) —
+/// routing through it there finds no bridge to connect to and just fails.
+/// `/run/.containerenv` is what podman (and so distrobox) creates inside a
+/// container to mark it as one, which is what we actually care about here,
+/// regardless of whether this is a debug or release build.
 fn host_exec_available() -> bool {
-    std::env::var_os("PATH")
-        .map(|paths| {
-            std::env::split_paths(&paths).any(|dir| dir.join("distrobox-host-exec").is_file())
-        })
-        .unwrap_or(false)
+    Path::new("/run/.containerenv").is_file()
+        && std::env::var_os("PATH")
+            .map(|paths| {
+                std::env::split_paths(&paths).any(|dir| dir.join("distrobox-host-exec").is_file())
+            })
+            .unwrap_or(false)
 }
 
 /// Builds the command used to run a runner-provided binary (wine, or the

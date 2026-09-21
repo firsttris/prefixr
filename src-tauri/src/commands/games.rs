@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -12,7 +12,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use uuid::Uuid;
 
 use crate::commands::icons::extract_icon_data_url;
-use crate::commands::runners::{find_runner, runner_command, wine_binary};
+use crate::commands::runners::{find_runner, runner_command, wine_binary, wineserver_binary};
 use crate::config::{save_config, ConfigState};
 use crate::models::{Game, GameInput, RunnerKind};
 use crate::tray::rebuild_tray_menu;
@@ -22,52 +22,118 @@ use crate::tray::rebuild_tray_menu;
 #[derive(Clone)]
 pub struct RunningGame {
     pub name: String,
-    /// PID of the runner process (the `proton` script or `wine` binary),
-    /// launched as its own process group leader (see `launch_game`) so this
-    /// single PID is enough to reach every process it spawned.
-    pub pid: u32,
+    /// Path to the `wineserver` binary belonging to the runner this game was
+    /// launched with, and the `WINEPREFIX` it's managing that game's session
+    /// under. Used to shut the session down (see `kill_running_game`) instead
+    /// of tracking a PID: when a runner is invoked through
+    /// `distrobox-host-exec` (see `runner_command`), the process actually
+    /// runs on the host, in a different PID namespace than this app — a PID
+    /// or process-group signal sent from here would only ever reach the
+    /// local `distrobox-host-exec` relay, not the real process, and a
+    /// SIGKILL can't be forwarded through that relay either since it kills
+    /// the relay itself before it gets the chance. Running `wineserver -k`
+    /// through the same `runner_command` reaches the real session either
+    /// way, because wineserver finds it via the prefix's socket file rather
+    /// than by PID.
+    pub wineserver: PathBuf,
+    pub wineprefix: String,
+    /// The game's own exe path, as passed to wine/proton. Present verbatim in
+    /// the command line of both the `proton`/`wine` wrapper we spawned and
+    /// the actual Windows process running under it, so it doubles as a
+    /// `pkill -f` pattern that reaches both directly — see
+    /// `kill_running_game`.
+    pub exe_path: PathBuf,
+    /// The prefix directory as configured (`STEAM_COMPAT_DATA_PATH` for
+    /// Proton, i.e. one level above `wineprefix`'s `pfx`). Official Proton
+    /// runs the game inside a `bwrap` sandbox (pressure-vessel) that gives it
+    /// its own PID namespace — neither `wineserver -k` nor `pkill -f` from
+    /// out here can reach anything inside that namespace at all, since it's
+    /// simply invisible outside it. `bwrap` itself, though, is the process
+    /// that *created* that namespace, so it still runs in ours, and killing
+    /// it tears down everything it contains. This path is how it's found:
+    /// pressure-vessel always bind-mounts it into the sandbox, so it shows up
+    /// verbatim in `bwrap`'s own argv.
+    pub prefix_path: PathBuf,
 }
 
 #[derive(Default)]
 pub struct RunningGames(pub Mutex<HashMap<Uuid, RunningGame>>);
 
-/// Sends `SIGKILL` to the whole process group `pid` leads, which — since the
-/// runner process is always spawned as a fresh group leader — tears down not
-/// just the `proton`/`wine` process but everything it started (wineserver,
-/// the game's own exe under wine, etc).
-fn kill_process_group(pid: u32) -> Result<(), String> {
-    let status = std::process::Command::new("kill")
-        .args(["-KILL", "--", &format!("-{pid}")])
-        .status()
-        .map_err(|e| format!("Could not run kill: {e}"))?;
-    if !status.success() {
-        return Err(format!("kill exited with status {status}"));
-    }
-    Ok(())
-}
-
-/// Kills a running game's process group, used by both the `kill_game`
+/// Kills a running game's whole wine session, used by both the `kill_game`
 /// command and the tray menu's per-game "beenden" entries. The tracked entry
 /// itself is removed once `launch_game`'s `child.wait()` observes the
 /// process actually exiting, not here.
-pub fn kill_running_game(running: &RunningGames, id: Uuid) -> Result<(), String> {
-    let pid = {
+///
+/// Uses three mechanisms together, the same way PortProton's `kill_portwine`
+/// combines a wineserver shutdown with directly hard-killing both the
+/// wine-preloader and any `bwrap` sandbox by PID:
+///
+/// 1. `wineserver -k9` asks the whole wine session (game exe, services.exe,
+///    explorer.exe, ...) to terminate via wineserver's own IPC — thorough
+///    when it works, but it can't reach a session it can't connect to (see
+///    point 3), and even when it works it never reaches the `proton`/`wine`
+///    wrapper process itself, since wineserver has no notion of its own
+///    parent.
+/// 2. `pkill -9 -f` on the game's exe path directly hard-kills anything
+///    whose command line mentions it — both that wrapper and, for a runner
+///    that isn't sandboxed, the game's own process too.
+/// 3. `pkill -9 -f` on `bwrap.*<prefix path>` targets the pressure-vessel
+///    sandbox official Proton runs the game inside. That sandbox gets its
+///    own PID namespace, which is exactly why 1 and 2 can fail silently
+///    against it: wineserver can't connect to a socket it can't see, and
+///    pkill can't match processes it can't see either. `bwrap` is the one
+///    process involved that still runs outside that namespace (it's what
+///    creates it), so it's the only thing from here that can be signaled at
+///    all — but signaling it is enough, since the kernel tears down the
+///    whole namespace once its creator dies.
+pub async fn kill_running_game(running: &RunningGames, id: Uuid) -> Result<(), String> {
+    let (wineserver, wineprefix, exe_path, prefix_path) = {
         let games = running
             .0
             .lock()
             .map_err(|_| "Running games list is locked".to_string())?;
-        games
-            .get(&id)
-            .map(|g| g.pid)
-            .ok_or_else(|| "Game is not running".to_string())?
+        let game = games.get(&id).ok_or_else(|| "Game is not running".to_string())?;
+        (
+            game.wineserver.clone(),
+            game.wineprefix.clone(),
+            game.exe_path.clone(),
+            game.prefix_path.clone(),
+        )
     };
-    kill_process_group(pid)
+
+    let wineserver_result = runner_command(&wineserver, [("WINEPREFIX", wineprefix.as_str())])
+        .arg("-k9")
+        .status()
+        .await;
+
+    let pkill_result = runner_command(Path::new("pkill"), [])
+        .args(["-9", "-f"])
+        .arg(&exe_path)
+        .status()
+        .await;
+
+    let bwrap_pattern = format!("bwrap.*{}", prefix_path.display());
+    let _ = runner_command(Path::new("pkill"), [])
+        .args(["-9", "-f"])
+        .arg(&bwrap_pattern)
+        .status()
+        .await;
+
+    // Any one of the three actually killing something is a success; only
+    // report an error if both direct attempts failed to even run (a real
+    // environment problem, e.g. neither binary exists) rather than surfacing
+    // e.g. wineserver's "no session found" exit code as a failure when pkill
+    // already got it.
+    match (wineserver_result, pkill_result) {
+        (Err(e), Err(_)) => Err(format!("Could not run wineserver: {e}")),
+        _ => Ok(()),
+    }
 }
 
 #[tauri::command]
-pub fn kill_game(running: State<RunningGames>, id: String) -> Result<(), String> {
+pub async fn kill_game(running: State<'_, RunningGames>, id: String) -> Result<(), String> {
     let game_id = Uuid::parse_str(&id).map_err(|e| format!("Invalid game id: {e}"))?;
-    kill_running_game(&running, game_id)
+    kill_running_game(&running, game_id).await
 }
 
 /// Holds a `--launch <game-id>` argument found at startup (see `run()` in
@@ -267,6 +333,26 @@ pub async fn launch_game(
     // runners have no such wrapper, so they're launched directly and — since
     // prefixes are created without ever running wineboot (see `add_prefix`)
     // — initialized here on first use, with that game's own runner.
+    // Proton runs wine against `<prefix>/pfx`, not `<prefix>` itself (that's
+    // where `STEAM_COMPAT_DATA_PATH` points); plain Wine uses `<prefix>`
+    // directly. `kill_running_game` needs this exact value to reach the
+    // right wineserver session.
+    let wineprefix = match runner.kind {
+        RunnerKind::Proton => game
+            .prefix_path
+            .join("pfx")
+            .to_str()
+            .ok_or_else(|| {
+                format!(
+                    "Prefix path is not valid UTF-8: {}",
+                    game.prefix_path.display()
+                )
+            })?
+            .to_string(),
+        RunnerKind::Wine => prefix_path_str.to_string(),
+    };
+    let wineserver = wineserver_binary(&runner.path)?;
+
     let (launch_binary, launch_args, launch_env): (PathBuf, Vec<String>, Vec<(String, String)>) =
         match runner.kind {
             RunnerKind::Proton => {
@@ -376,16 +462,17 @@ pub async fn launch_game(
             message
         })?;
 
-    if let Some(pid) = child.id() {
-        if let Ok(mut running) = running.0.lock() {
-            running.insert(
-                game_id,
-                RunningGame {
-                    name: game.name.clone(),
-                    pid,
-                },
-            );
-        }
+    if let Ok(mut running) = running.0.lock() {
+        running.insert(
+            game_id,
+            RunningGame {
+                name: game.name.clone(),
+                wineserver: wineserver.clone(),
+                wineprefix: wineprefix.clone(),
+                exe_path: game.exe_path.clone(),
+                prefix_path: game.prefix_path.clone(),
+            },
+        );
     }
     rebuild_tray_menu(&app);
 

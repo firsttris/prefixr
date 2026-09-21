@@ -152,8 +152,11 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
     }
     if let Some(game_id) = id.strip_prefix(KILL_PREFIX) {
         if let Ok(game_id) = Uuid::parse_str(game_id) {
-            let running = app.state::<RunningGames>();
-            let _ = kill_running_game(&running, game_id);
+            let app = app.clone();
+            tauri::async_runtime::spawn(async move {
+                let running = app.state::<RunningGames>();
+                let _ = kill_running_game(&running, game_id).await;
+            });
         }
     }
 }
