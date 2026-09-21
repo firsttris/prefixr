@@ -6,6 +6,7 @@
     savePerformanceConfig,
   } from "$lib/stores/performance";
   import type { PerformanceConfig } from "$lib/types";
+  import InfoIcon from "$lib/components/InfoIcon.svelte";
 
   const FALLBACK: PerformanceConfig = {
     gamemode_enabled: false,
@@ -79,11 +80,9 @@
         <div>
           <span class="toggle-label">
             GameMode
-            <span
-              class="info-icon"
-              title="Empfehlung: Wenn installiert, ruhig aktivieren — bringt oft spürbar mehr Leistung, besonders auf Laptops oder mit Energiesparmodus. Kein Nachteil, wenn GameMode fehlt."
-              >ⓘ</span
-            >
+            <InfoIcon
+              text="Empfehlung: Wenn installiert, ruhig aktivieren — bringt oft spürbar mehr Leistung, besonders auf Laptops oder mit Energiesparmodus. Kein Nachteil, wenn GameMode fehlt."
+            />
           </span>
           <p class="toggle-desc">
             Optimiert CPU-Takt und Priorität, solange das Spiel läuft.
@@ -99,11 +98,9 @@
         <div>
           <span class="toggle-label">
             Esync
-            <span
-              class="info-icon"
-              title="Empfehlung: Nur aktivieren, wenn Fsync nicht verfügbar ist. Bei anspruchsvollen Spielen kann es zu Abstürzen kommen, wenn dein System ein niedriges Limit für offene Dateien hat (ulimit -n)."
-              >ⓘ</span
-            >
+            <InfoIcon
+              text="Empfehlung: Nur aktivieren, wenn Fsync nicht verfügbar ist. Bei anspruchsvollen Spielen kann es zu Abstürzen kommen, wenn dein System ein niedriges Limit für offene Dateien hat (ulimit -n)."
+            />
           </span>
           <p class="toggle-desc">Schnellere Thread-Synchronisation zwischen Windows und Linux.</p>
         </div>
@@ -117,11 +114,9 @@
         <div>
           <span class="toggle-label">
             Fsync
-            <span
-              class="info-icon"
-              title="Empfehlung: Wenn dein Kernel es unterstützt (5.16+), praktisch immer aktivieren — kaum Nachteile, spürbarer Gewinn. Wird es nicht unterstützt, passiert einfach nichts."
-              >ⓘ</span
-            >
+            <InfoIcon
+              text="Empfehlung: Wenn dein Kernel es unterstützt (5.16+), praktisch immer aktivieren — kaum Nachteile, spürbarer Gewinn. Wird es nicht unterstützt, passiert einfach nichts."
+            />
           </span>
           <p class="toggle-desc">
             Wie Esync, aber effizienter mit passender Kernel-Unterstützung.
@@ -137,11 +132,9 @@
         <div>
           <span class="toggle-label">
             DXVK Async
-            <span
-              class="info-icon"
-              title="Empfehlung: Nur einschalten, wenn du beim ersten Betreten eines Levels/Areals Ruckler durch Shader-Kompilierung bemerkst. Seltene, kurze Grafikfehler möglich — bei neueren Proton-GE-Versionen oft schon eingebaut und dann überflüssig."
-              >ⓘ</span
-            >
+            <InfoIcon
+              text="Empfehlung: Nur einschalten, wenn du beim ersten Betreten eines Levels/Areals Ruckler durch Shader-Kompilierung bemerkst. Seltene, kurze Grafikfehler möglich — bei neueren Proton-GE-Versionen oft schon eingebaut und dann überflüssig."
+            />
           </span>
           <p class="toggle-desc">
             Kompiliert Shader im Hintergrund statt das Spiel kurz einfrieren zu lassen.
@@ -166,11 +159,9 @@
       <div>
         <span class="toggle-label">
           vkBasalt aktivieren
-          <span
-            class="info-icon"
-            title="Empfehlung: Kostet immer etwas Leistung (zusätzlicher Bildbearbeitungsschritt) — nur aktivieren, wenn du GPU-Leistung übrig hast und dir das Ergebnis optisch wichtiger ist als die letzten FPS."
-            >ⓘ</span
-          >
+          <InfoIcon
+            text="Empfehlung: Kostet immer etwas Leistung (zusätzlicher Bildbearbeitungsschritt) — nur aktivieren, wenn du GPU-Leistung übrig hast und dir das Ergebnis optisch wichtiger ist als die letzten FPS."
+          />
         </span>
         <p class="toggle-desc">Schaltet die Effekte unten für alle Spiele frei.</p>
       </div>
@@ -195,11 +186,9 @@
               <input type="checkbox" bind:checked={config.vkbasalt_sharpen} onchange={changed} />
               Schärfen (CAS)
             </label>
-            <span
-              class="info-icon"
-              title="Empfehlung: Kaum Leistungseinbruch — lohnt sich besonders bei Upscaling oder niedrigerer Auflösung, um Schärfe zurückzugewinnen."
-              >ⓘ</span
-            >
+            <InfoIcon
+              text="Empfehlung: Kaum Leistungseinbruch — lohnt sich besonders bei Upscaling oder niedrigerer Auflösung, um Schärfe zurückzugewinnen."
+            />
           </div>
           {#if config.vkbasalt_sharpen}
             <label class="control-group sharpness">
@@ -220,11 +209,9 @@
               <input type="checkbox" bind:checked={config.vkbasalt_smaa} onchange={changed} />
               Kantenglättung (SMAA)
             </label>
-            <span
-              class="info-icon"
-              title="Empfehlung: Spürbarer Leistungseinbruch möglich. Wenn das Spiel schon eigene Kantenglättung hat, hier eher weglassen — sonst kostet es nur zusätzlich Leistung."
-              >ⓘ</span
-            >
+            <InfoIcon
+              text="Empfehlung: Spürbarer Leistungseinbruch möglich. Wenn das Spiel schon eigene Kantenglättung hat, hier eher weglassen — sonst kostet es nur zusätzlich Leistung."
+            />
           </div>
 
           <div class="checkbox-row">
@@ -232,11 +219,9 @@
               <input type="checkbox" bind:checked={config.vkbasalt_deband} onchange={changed} />
               Farbverläufe glätten (Deband)
             </label>
-            <span
-              class="info-icon"
-              title="Empfehlung: Sehr geringe Kosten — nur sinnvoll bei sichtbaren Farbstufen (z. B. im Himmel), sonst kannst du es weglassen."
-              >ⓘ</span
-            >
+            <InfoIcon
+              text="Empfehlung: Sehr geringe Kosten — nur sinnvoll bei sichtbaren Farbstufen (z. B. im Himmel), sonst kannst du es weglassen."
+            />
           </div>
         </div>
       </div>
@@ -308,18 +293,6 @@
     font-size: 0.82em;
     margin-top: 0.25em;
     max-width: 48ch;
-  }
-
-  .info-icon {
-    display: inline-block;
-    color: var(--text-muted);
-    cursor: help;
-    font-size: 0.85em;
-    margin-left: 0.3em;
-  }
-
-  .info-icon:hover {
-    color: var(--accent);
   }
 
   .switch {
