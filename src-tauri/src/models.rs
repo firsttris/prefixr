@@ -58,3 +58,75 @@ pub struct GameInput {
     #[serde(default)]
     pub env_vars: HashMap<String, String>,
 }
+
+/// Global MangoHud (the in-game performance overlay) settings, applied to
+/// every game's launch — see `commands::mangohud`. Kept as a handful of
+/// friendly knobs plus a `preset` label rather than exposing MangoHud's own
+/// sprawling config format, since the point of this tab is to make "looking
+/// good" a couple of clicks rather than hand-editing a `MangoHud.conf`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct MangoHudConfig {
+    pub enabled: bool,
+    pub preset: String,
+    pub position: String,
+    pub theme_color: String,
+    pub background_alpha: f32,
+    pub round_corners: bool,
+    pub show_fps: bool,
+    pub show_frametime: bool,
+    pub show_cpu: bool,
+    pub show_gpu: bool,
+    pub show_ram: bool,
+    pub show_vram: bool,
+    pub show_temps: bool,
+    /// Small on/off indicator icons for other tools in the stack.
+    #[serde(default)]
+    pub show_gamemode: bool,
+    #[serde(default)]
+    pub show_vkbasalt: bool,
+    #[serde(default)]
+    pub show_hdr: bool,
+    /// Static diagnostic info, handy since this app manages the runner and
+    /// DXVK/VKD3D build a game actually ends up using (see
+    /// `graphics_layers.rs`) — `show_engine_version` in particular surfaces
+    /// the DXVK/VKD3D version MangoHud detects at runtime.
+    #[serde(default)]
+    pub show_driver: bool,
+    #[serde(default)]
+    pub show_engine_version: bool,
+    #[serde(default)]
+    pub show_wine: bool,
+    #[serde(default)]
+    pub show_gpu_name: bool,
+    #[serde(default)]
+    pub show_resolution: bool,
+}
+
+impl Default for MangoHudConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            preset: "standard".to_string(),
+            position: "top-left".to_string(),
+            theme_color: "ffffff".to_string(),
+            background_alpha: 0.4,
+            round_corners: true,
+            show_fps: true,
+            show_frametime: true,
+            show_cpu: true,
+            show_gpu: true,
+            show_ram: false,
+            show_vram: false,
+            show_temps: true,
+            show_gamemode: false,
+            show_vkbasalt: false,
+            show_hdr: false,
+            show_driver: false,
+            show_engine_version: false,
+            show_wine: false,
+            show_gpu_name: false,
+            show_resolution: false,
+        }
+    }
+}

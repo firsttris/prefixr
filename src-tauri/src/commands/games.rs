@@ -13,6 +13,7 @@ use uuid::Uuid;
 
 use crate::commands::graphics_layers::{ensure_directx_layer_cache, ensure_wine_mono_msi};
 use crate::commands::icons::extract_icon_data_url;
+use crate::commands::mangohud::ensure_mangohud_conf;
 use crate::commands::runners::{find_runner, runner_command, wine_binary, wineserver_binary};
 use crate::config::{save_config, ConfigState};
 use crate::models::{Game, GameInput, RunnerKind};
@@ -419,7 +420,7 @@ pub async fn launch_game(
 ) -> Result<(), String> {
     let game_id = Uuid::parse_str(&id).map_err(|e| format!("Invalid game id: {e}"))?;
 
-    let (game, runners_dir) = {
+    let (game, runners_dir, mangohud) = {
         let config = state
             .lock()
             .map_err(|_| "Configuration is locked".to_string())?;
@@ -429,7 +430,7 @@ pub async fn launch_game(
             .find(|g| g.id == game_id)
             .cloned()
             .ok_or_else(|| format!("No game with id {id}"))?;
-        (game, config.runners_dir.clone())
+        (game, config.runners_dir.clone(), config.mangohud.clone())
     };
 
     let runner = find_runner(&runners_dir, &game.runner_id)?;
@@ -516,6 +517,14 @@ pub async fn launch_game(
     let mut env = vec![("WINEPREFIX".to_string(), prefix_path_str.to_string())];
     if let Some(overrides) = dll_overrides {
         env.push(("WINEDLLOVERRIDES".to_string(), overrides));
+    }
+    if mangohud.enabled {
+        let conf_path = ensure_mangohud_conf(&app, &mangohud)?;
+        env.push(("MANGOHUD".to_string(), "1".to_string()));
+        env.push((
+            "MANGOHUD_CONFIGFILE".to_string(),
+            conf_path.display().to_string(),
+        ));
     }
     env.extend(game.env_vars.iter().map(|(k, v)| (k.clone(), v.clone())));
 

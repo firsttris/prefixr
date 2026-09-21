@@ -43,3 +43,29 @@ export interface RunnerRelease {
   download_url: string;
   size: number;
 }
+
+export type MangoHudPosition = "top-left" | "top-right" | "bottom-left" | "bottom-right";
+
+export interface MangoHudConfig {
+  enabled: boolean;
+  preset: string;
+  position: MangoHudPosition;
+  theme_color: string;
+  background_alpha: number;
+  round_corners: boolean;
+  show_fps: boolean;
+  show_frametime: boolean;
+  show_cpu: boolean;
+  show_gpu: boolean;
+  show_ram: boolean;
+  show_vram: boolean;
+  show_temps: boolean;
+  show_gamemode: boolean;
+  show_vkbasalt: boolean;
+  show_hdr: boolean;
+  show_driver: boolean;
+  show_engine_version: boolean;
+  show_wine: boolean;
+  show_gpu_name: boolean;
+  show_resolution: boolean;
+}

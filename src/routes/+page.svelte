@@ -4,11 +4,12 @@
   import GameForm from "$lib/components/GameForm.svelte";
   import RunnerList from "$lib/components/RunnerList.svelte";
   import PrefixManager from "$lib/components/PrefixManager.svelte";
+  import MangoHudSettings from "$lib/components/MangoHudSettings.svelte";
   import Modal from "$lib/components/Modal.svelte";
   import { initGameEvents, launchGame, takePendingLaunch } from "$lib/stores/games";
   import type { Game } from "$lib/types";
 
-  let view = $state<"library" | "settings">("library");
+  let view = $state<"library" | "settings" | "mangohud">("library");
   let editing = $state<Game | "new" | null>(null);
 
   let modalGame = $derived(editing && editing !== "new" ? editing : undefined);
@@ -45,6 +46,14 @@
     >
       Prefixe & Runner
     </button>
+    <button
+      type="button"
+      class="nav-item"
+      class:active={view === "mangohud"}
+      onclick={() => (view = "mangohud")}
+    >
+      MangoHud
+    </button>
   </nav>
 
   <main>
@@ -56,7 +65,7 @@
         </button>
       </div>
       <GameList onEdit={(game) => (editing = game)} />
-    {:else}
+    {:else if view === "settings"}
       <div class="page-header">
         <h1>Prefixe & Runner</h1>
       </div>
@@ -64,6 +73,11 @@
         <RunnerList />
         <PrefixManager />
       </div>
+    {:else}
+      <div class="page-header">
+        <h1>MangoHud</h1>
+      </div>
+      <MangoHudSettings />
     {/if}
   </main>
 </div>
