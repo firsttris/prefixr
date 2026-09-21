@@ -28,6 +28,7 @@ tokio = { version = "1", features = ["process", "io-util", "fs", "rt"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
 futures-util = "0.3"
 flate2 = "1"
+xz2 = "0.1"
 tar = "0.4"
 editpe = "0.2"
 image = { version = "0.25", default-features = false, features = ["png", "bmp"] }

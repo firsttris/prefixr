@@ -29,7 +29,14 @@ export interface GameInput {
   env_vars: Record<string, string>;
 }
 
-export interface ProtonGeRelease {
+export interface RunnerSourceInfo {
+  id: string;
+  label: string;
+  kind: RunnerKind;
+}
+
+export interface RunnerRelease {
+  source: string;
   tag: string;
   name: string;
   published_at: string;

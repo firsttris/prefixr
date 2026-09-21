@@ -2,8 +2,10 @@
   import { onMount } from "svelte";
   import {
     runners,
-    protonGeReleases,
-    refreshProtonGeReleases,
+    runnerSources,
+    refreshRunnerSources,
+    runnerReleases,
+    refreshRunnerReleases,
     runnerDownloadState,
     downloadRunner,
     initRunnerDownloadEvents,
@@ -11,17 +13,36 @@
 
   let loading = $state(true);
   let loadError = $state("");
+  let selectedSource = $state("");
 
   onMount(async () => {
     initRunnerDownloadEvents();
     try {
-      await refreshProtonGeReleases();
+      await refreshRunnerSources();
+      selectedSource = $runnerSources[0]?.id ?? "";
+      if (selectedSource) {
+        await refreshRunnerReleases(selectedSource);
+      }
     } catch (e) {
       loadError = String(e);
     } finally {
       loading = false;
     }
   });
+
+  async function selectSource(id: string): Promise<void> {
+    if (id === selectedSource) return;
+    selectedSource = id;
+    loading = true;
+    loadError = "";
+    try {
+      await refreshRunnerReleases(id);
+    } catch (e) {
+      loadError = String(e);
+    } finally {
+      loading = false;
+    }
+  }
 
   function isInstalled(tag: string): boolean {
     return $runners.some((r) => r.id === tag);
@@ -40,15 +61,28 @@
   }
 </script>
 
+<div class="tabs">
+  {#each $runnerSources as source (source.id)}
+    <button
+      type="button"
+      class="tab"
+      class:active={source.id === selectedSource}
+      onclick={() => selectSource(source.id)}
+    >
+      {source.label}
+    </button>
+  {/each}
+</div>
+
 {#if loading}
   <p class="hint">Lade Versionen von GitHub…</p>
 {:else if loadError}
   <p class="error">{loadError}</p>
-{:else if $protonGeReleases.length === 0}
+{:else if $runnerReleases.length === 0}
   <p class="hint">Keine Releases gefunden.</p>
 {:else}
   <ul>
-    {#each $protonGeReleases as release (release.tag)}
+    {#each $runnerReleases as release (release.tag)}
       {@const state = $runnerDownloadState[release.tag]}
       {@const installed = isInstalled(release.tag)}
       <li class="release">
@@ -85,6 +119,27 @@
 {/if}
 
 <style>
+  .tabs {
+    display: flex;
+    gap: 0.4em;
+    flex-wrap: wrap;
+    margin-bottom: 0.8em;
+  }
+
+  .tab {
+    padding: 0.4em 0.9em;
+    border-radius: 999px;
+    background: var(--surface-raised);
+    color: var(--text-muted);
+    font-size: 0.85em;
+    border: 1px solid transparent;
+  }
+
+  .tab.active {
+    background: var(--accent);
+    color: var(--accent-contrast, #fff);
+  }
+
   ul {
     list-style: none;
     margin: 0;

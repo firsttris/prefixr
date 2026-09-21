@@ -9,7 +9,7 @@ use commands::games::{
     update_game, PendingLaunch,
 };
 use commands::prefixes::{add_prefix, delete_prefix, list_prefixes};
-use commands::runner_downloads::{download_runner, list_proton_ge_releases};
+use commands::runner_downloads::{download_runner, list_runner_releases, list_runner_sources};
 use commands::runners::list_runners;
 use config::load_config;
 
@@ -45,7 +45,8 @@ pub fn run() {
             add_prefix,
             delete_prefix,
             list_prefixes,
-            list_proton_ge_releases,
+            list_runner_sources,
+            list_runner_releases,
             download_runner
         ])
         .run(tauri::generate_context!())

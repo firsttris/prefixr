@@ -17,7 +17,7 @@
     <div class="actions">
       <button type="button" class="ghost" onclick={refreshRunners}>Aktualisieren</button>
       <button type="button" class="primary" onclick={() => (showDownloads = true)}>
-        Proton-GE herunterladen
+        Runner herunterladen
       </button>
     </div>
   </div>
@@ -38,7 +38,7 @@
 
 <Modal
   open={showDownloads}
-  title="Proton-GE herunterladen"
+  title="Runner herunterladen"
   onClose={() => (showDownloads = false)}
 >
   <RunnerDownloads />
