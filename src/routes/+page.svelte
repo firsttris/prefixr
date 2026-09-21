@@ -10,7 +10,7 @@
   import { initGameEvents, launchGame, takePendingLaunch } from "$lib/stores/games";
   import type { Game } from "$lib/types";
 
-  let view = $state<"library" | "settings" | "mangohud" | "performance">("library");
+  let view = $state<"library" | "prefixes" | "runners" | "mangohud" | "performance">("library");
   let editing = $state<Game | "new" | null>(null);
 
   let modalGame = $derived(editing && editing !== "new" ? editing : undefined);
@@ -42,10 +42,18 @@
     <button
       type="button"
       class="nav-item"
-      class:active={view === "settings"}
-      onclick={() => (view = "settings")}
+      class:active={view === "prefixes"}
+      onclick={() => (view = "prefixes")}
     >
-      Prefixe & Runner
+      Prefixe
+    </button>
+    <button
+      type="button"
+      class="nav-item"
+      class:active={view === "runners"}
+      onclick={() => (view = "runners")}
+    >
+      Runner
     </button>
     <button
       type="button"
@@ -74,14 +82,16 @@
         </button>
       </div>
       <GameList onEdit={(game) => (editing = game)} />
-    {:else if view === "settings"}
+    {:else if view === "prefixes"}
       <div class="page-header">
-        <h1>Prefixe & Runner</h1>
+        <h1>Prefixe</h1>
       </div>
-      <div class="settings-grid">
-        <RunnerList />
-        <PrefixManager />
+      <PrefixManager />
+    {:else if view === "runners"}
+      <div class="page-header">
+        <h1>Runner</h1>
       </div>
+      <RunnerList />
     {:else if view === "mangohud"}
       <div class="page-header">
         <h1>MangoHud</h1>
@@ -156,16 +166,4 @@
     margin-bottom: 1.5em;
   }
 
-  .settings-grid {
-    display: grid;
-    grid-template-columns: 1fr 1.4fr;
-    gap: 1.5em;
-    align-items: start;
-  }
-
-  @media (max-width: 720px) {
-    .settings-grid {
-      grid-template-columns: 1fr;
-    }
-  }
 </style>

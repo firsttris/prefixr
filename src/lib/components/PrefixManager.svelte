@@ -39,9 +39,12 @@
 </script>
 
 <section class="panel">
-  <div class="panel-header">
-    <h2>Prefixe</h2>
-  </div>
+  <p class="explainer">
+    Ein Prefix ist ein eigenständiges, virtuelles Windows-Dateisystem — mit eigenem
+    <strong>C:-Laufwerk</strong> und eigener Registry — für installierte Programme. Jeder Prefix ist
+    komplett getrennt von deinem echten Linux-System und von anderen Prefixen, so wie eine eigene
+    kleine Windows-Installation nur für dieses eine Spiel.
+  </p>
 
   <p class="hint">
     Neuer, leerer Ordner oder ein bereits vorhandener Wine-Prefix (z. B. aus PortProton, Lutris
@@ -88,6 +91,17 @@
     display: flex;
     flex-direction: column;
     gap: 1em;
+    max-width: 780px;
+  }
+
+  .explainer {
+    color: var(--text-muted);
+    font-size: 0.9em;
+    max-width: 60ch;
+  }
+
+  .explainer strong {
+    color: var(--text);
   }
 
   .hint {

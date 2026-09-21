@@ -12,8 +12,15 @@
 </script>
 
 <section class="panel">
+  <p class="explainer">
+    Ein Runner ist die Kompatibilitätsschicht, die ein Windows-Spiel unter Linux überhaupt zum
+    Laufen bringt — z. B. <strong>Proton</strong> (bekannt von Steam) oder <strong>Wine</strong>.
+    Er übersetzt die Windows-Programmaufrufe des Spiels ins Linux-System, quasi eine
+    Übersetzungsschicht zwischen den beiden Welten.
+  </p>
+
   <div class="panel-header">
-    <h2>Runner</h2>
+    <h2>Installierte Runner</h2>
     <div class="actions">
       <button type="button" class="ghost" onclick={refreshRunners}>Aktualisieren</button>
       <button type="button" class="primary" onclick={() => (showDownloads = true)}>
@@ -53,6 +60,17 @@
     display: flex;
     flex-direction: column;
     gap: 0.8em;
+    max-width: 780px;
+  }
+
+  .explainer {
+    color: var(--text-muted);
+    font-size: 0.9em;
+    max-width: 60ch;
+  }
+
+  .explainer strong {
+    color: var(--text);
   }
 
   .panel-header {
