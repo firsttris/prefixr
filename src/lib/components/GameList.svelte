@@ -7,6 +7,7 @@
     refreshGames,
     removeGame,
     launchGame,
+    killGame,
     initGameEvents,
     createDesktopShortcut,
   } from "$lib/stores/games";
@@ -46,6 +47,7 @@
         {game}
         runState={$gameRunState[game.id]}
         onLaunch={() => launchGame(game.id)}
+        onKill={() => killGame(game.id)}
         onEdit={() => onEdit(game)}
         onRemove={() => removeGame(game.id)}
         onShowLog={showLog}

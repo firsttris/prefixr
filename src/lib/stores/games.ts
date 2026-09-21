@@ -103,6 +103,14 @@ export async function launchGame(id: string): Promise<void> {
   }
 }
 
+// Kills the game's whole process group (the Proton/Wine runner and
+// everything it started), e.g. when a game has hung. The actual "not running
+// anymore" state update arrives via the game-exited event once the process
+// is reaped, not from this call directly.
+export async function killGame(id: string): Promise<void> {
+  await invoke("kill_game", { id });
+}
+
 // Checks whether the app was started via a desktop shortcut's
 // `--launch <id>` argument; returns the game id once, then clears it.
 export async function takePendingLaunch(): Promise<string | null> {

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Stdio;
@@ -14,6 +15,60 @@ use crate::commands::icons::extract_icon_data_url;
 use crate::commands::runners::{find_runner, runner_command, wine_binary};
 use crate::config::{save_config, ConfigState};
 use crate::models::{Game, GameInput, RunnerKind};
+use crate::tray::rebuild_tray_menu;
+
+/// A game process currently running under its runner, tracked so the tray
+/// menu can list it and offer to kill it (e.g. when a Proton game hangs).
+#[derive(Clone)]
+pub struct RunningGame {
+    pub name: String,
+    /// PID of the runner process (the `proton` script or `wine` binary),
+    /// launched as its own process group leader (see `launch_game`) so this
+    /// single PID is enough to reach every process it spawned.
+    pub pid: u32,
+}
+
+#[derive(Default)]
+pub struct RunningGames(pub Mutex<HashMap<Uuid, RunningGame>>);
+
+/// Sends `SIGKILL` to the whole process group `pid` leads, which — since the
+/// runner process is always spawned as a fresh group leader — tears down not
+/// just the `proton`/`wine` process but everything it started (wineserver,
+/// the game's own exe under wine, etc).
+fn kill_process_group(pid: u32) -> Result<(), String> {
+    let status = std::process::Command::new("kill")
+        .args(["-KILL", "--", &format!("-{pid}")])
+        .status()
+        .map_err(|e| format!("Could not run kill: {e}"))?;
+    if !status.success() {
+        return Err(format!("kill exited with status {status}"));
+    }
+    Ok(())
+}
+
+/// Kills a running game's process group, used by both the `kill_game`
+/// command and the tray menu's per-game "beenden" entries. The tracked entry
+/// itself is removed once `launch_game`'s `child.wait()` observes the
+/// process actually exiting, not here.
+pub fn kill_running_game(running: &RunningGames, id: Uuid) -> Result<(), String> {
+    let pid = {
+        let games = running
+            .0
+            .lock()
+            .map_err(|_| "Running games list is locked".to_string())?;
+        games
+            .get(&id)
+            .map(|g| g.pid)
+            .ok_or_else(|| "Game is not running".to_string())?
+    };
+    kill_process_group(pid)
+}
+
+#[tauri::command]
+pub fn kill_game(running: State<RunningGames>, id: String) -> Result<(), String> {
+    let game_id = Uuid::parse_str(&id).map_err(|e| format!("Invalid game id: {e}"))?;
+    kill_running_game(&running, game_id)
+}
 
 /// Holds a `--launch <game-id>` argument found at startup (see `run()` in
 /// `lib.rs`), so the frontend can pick it up once and start that game
@@ -172,6 +227,7 @@ fn log_file_path(app: &AppHandle, game_id: &str) -> Result<PathBuf, String> {
 pub async fn launch_game(
     app: AppHandle,
     state: State<'_, ConfigState>,
+    running: State<'_, RunningGames>,
     id: String,
 ) -> Result<(), String> {
     let game_id = Uuid::parse_str(&id).map_err(|e| format!("Invalid game id: {e}"))?;
@@ -301,6 +357,11 @@ pub async fn launch_game(
         .arg(&game.exe_path)
         .stdout(Stdio::from(log_out))
         .stderr(Stdio::from(log_err))
+        // Makes this process (the `proton` script, or `wine` itself) the
+        // leader of a fresh process group, so `kill_running_game` can reach
+        // everything it spawns (wineserver, the game exe, ...) by signalling
+        // the group instead of just this one PID.
+        .process_group(0)
         .spawn()
         .map_err(|e| {
             let message = format!("Could not start game: {e}");
@@ -315,6 +376,19 @@ pub async fn launch_game(
             message
         })?;
 
+    if let Some(pid) = child.id() {
+        if let Ok(mut running) = running.0.lock() {
+            running.insert(
+                game_id,
+                RunningGame {
+                    name: game.name.clone(),
+                    pid,
+                },
+            );
+        }
+    }
+    rebuild_tray_menu(&app);
+
     let _ = app.emit(
         "game-started",
         GameStartedPayload {
@@ -323,10 +397,14 @@ pub async fn launch_game(
         },
     );
 
-    let status = child
-        .wait()
-        .await
-        .map_err(|e| format!("Game process failed: {e}"))?;
+    let wait_result = child.wait().await;
+
+    if let Ok(mut running) = running.0.lock() {
+        running.remove(&game_id);
+    }
+    rebuild_tray_menu(&app);
+
+    let status = wait_result.map_err(|e| format!("Game process failed: {e}"))?;
 
     let _ = app.emit(
         "game-exited",

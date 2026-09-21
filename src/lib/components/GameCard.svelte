@@ -6,6 +6,7 @@
     game,
     runState,
     onLaunch,
+    onKill,
     onEdit,
     onRemove,
     onShowLog,
@@ -14,6 +15,7 @@
     game: Game;
     runState?: GameRunState;
     onLaunch: () => void;
+    onKill: () => void;
     onEdit: () => void;
     onRemove: () => void;
     onShowLog: (path: string) => void;
@@ -72,6 +74,12 @@
       Start
     {/if}
   </button>
+
+  {#if runState?.running}
+    <button type="button" class="kill" onclick={onKill}>
+      Beenden (Prozess killen)
+    </button>
+  {/if}
 
   {#if runState?.error}
     <div class="toast">
@@ -161,6 +169,18 @@
   .start {
     width: 100%;
     margin-top: 0.4em;
+  }
+
+  .kill {
+    width: 100%;
+    background: var(--danger-bg);
+    border-color: transparent;
+    color: var(--danger);
+    font-size: 0.85em;
+  }
+
+  .kill:hover:not(:disabled) {
+    border-color: var(--danger);
   }
 
   .toast {
