@@ -14,6 +14,7 @@ use uuid::Uuid;
 use crate::commands::graphics_layers::{ensure_directx_layer_cache, ensure_wine_mono_msi};
 use crate::commands::icons::extract_icon_data_url;
 use crate::commands::mangohud::ensure_mangohud_conf;
+use crate::commands::performance::ensure_vkbasalt_conf;
 use crate::commands::runners::{find_runner, runner_command, wine_binary, wineserver_binary};
 use crate::config::{save_config, ConfigState};
 use crate::models::{Game, GameInput, RunnerKind};
@@ -420,7 +421,7 @@ pub async fn launch_game(
 ) -> Result<(), String> {
     let game_id = Uuid::parse_str(&id).map_err(|e| format!("Invalid game id: {e}"))?;
 
-    let (game, runners_dir, mangohud) = {
+    let (game, runners_dir, mangohud, performance) = {
         let config = state
             .lock()
             .map_err(|_| "Configuration is locked".to_string())?;
@@ -430,7 +431,12 @@ pub async fn launch_game(
             .find(|g| g.id == game_id)
             .cloned()
             .ok_or_else(|| format!("No game with id {id}"))?;
-        (game, config.runners_dir.clone(), config.mangohud.clone())
+        (
+            game,
+            config.runners_dir.clone(),
+            config.mangohud.clone(),
+            config.performance.clone(),
+        )
     };
 
     let runner = find_runner(&runners_dir, &game.runner_id)?;
@@ -524,6 +530,26 @@ pub async fn launch_game(
         env.push((
             "MANGOHUD_CONFIGFILE".to_string(),
             conf_path.display().to_string(),
+        ));
+    }
+    if performance.gamemode_enabled {
+        env.push(("LD_PRELOAD".to_string(), "libgamemodeauto.so.0".to_string()));
+    }
+    if performance.esync_enabled {
+        env.push(("WINEESYNC".to_string(), "1".to_string()));
+    }
+    if performance.fsync_enabled {
+        env.push(("WINEFSYNC".to_string(), "1".to_string()));
+    }
+    if performance.dxvk_async_enabled {
+        env.push(("DXVK_ASYNC".to_string(), "1".to_string()));
+    }
+    if performance.vkbasalt_enabled {
+        let vkbasalt_conf = ensure_vkbasalt_conf(&app, &performance)?;
+        env.push(("ENABLE_VKBASALT".to_string(), "1".to_string()));
+        env.push((
+            "VKBASALT_CONFIG_FILE".to_string(),
+            vkbasalt_conf.display().to_string(),
         ));
     }
     env.extend(game.env_vars.iter().map(|(k, v)| (k.clone(), v.clone())));

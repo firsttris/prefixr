@@ -10,6 +10,7 @@ use commands::games::{
     take_pending_launch, update_game, PendingLaunch, RunningGames,
 };
 use commands::mangohud::{get_mangohud_config, save_mangohud_config};
+use commands::performance::{get_performance_config, save_performance_config};
 use commands::prefixes::{add_prefix, delete_prefix, list_prefixes};
 use commands::runner_downloads::{download_runner, list_runner_releases, list_runner_sources};
 use commands::runners::list_runners;
@@ -69,7 +70,9 @@ pub fn run() {
             list_runner_releases,
             download_runner,
             get_mangohud_config,
-            save_mangohud_config
+            save_mangohud_config,
+            get_performance_config,
+            save_performance_config
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

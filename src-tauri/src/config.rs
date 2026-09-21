@@ -5,7 +5,7 @@ use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
-use crate::models::{Game, MangoHudConfig, PrefixInfo};
+use crate::models::{Game, MangoHudConfig, PerformanceConfig, PrefixInfo};
 
 const CONFIG_FILE_NAME: &str = "config.json";
 
@@ -20,6 +20,8 @@ pub struct AppConfig {
     pub games: Vec<Game>,
     #[serde(default)]
     pub mangohud: MangoHudConfig,
+    #[serde(default)]
+    pub performance: PerformanceConfig,
 }
 
 impl AppConfig {
@@ -33,6 +35,7 @@ impl AppConfig {
             prefixes: Vec::new(),
             games: Vec::new(),
             mangohud: MangoHudConfig::default(),
+            performance: PerformanceConfig::default(),
         })
     }
 }

@@ -103,6 +103,41 @@ pub struct MangoHudConfig {
     pub show_resolution: bool,
 }
 
+/// Global performance-tuning toggles applied to every game's launch — see
+/// `commands::performance`. Kept opt-in (all off by default) for the same
+/// reason as `MangoHudConfig`: we can't know whether the underlying tool
+/// (GameMode, vkBasalt) is even installed, so nothing gets silently switched
+/// on for the user.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct PerformanceConfig {
+    pub gamemode_enabled: bool,
+    pub esync_enabled: bool,
+    pub fsync_enabled: bool,
+    pub dxvk_async_enabled: bool,
+    pub vkbasalt_enabled: bool,
+    pub vkbasalt_sharpen: bool,
+    pub vkbasalt_sharpness: f32,
+    pub vkbasalt_smaa: bool,
+    pub vkbasalt_deband: bool,
+}
+
+impl Default for PerformanceConfig {
+    fn default() -> Self {
+        Self {
+            gamemode_enabled: false,
+            esync_enabled: false,
+            fsync_enabled: false,
+            dxvk_async_enabled: false,
+            vkbasalt_enabled: false,
+            vkbasalt_sharpen: true,
+            vkbasalt_sharpness: 0.4,
+            vkbasalt_smaa: false,
+            vkbasalt_deband: false,
+        }
+    }
+}
+
 impl Default for MangoHudConfig {
     fn default() -> Self {
         Self {
