@@ -77,10 +77,14 @@ export function initRunnerDownloadEvents(): void {
   });
 }
 
-export async function downloadRunner(tag: string, downloadUrl: string): Promise<void> {
+export async function downloadRunner(
+  source: string,
+  tag: string,
+  downloadUrl: string,
+): Promise<void> {
   patchDownloadState(tag, { downloaded: 0, total: undefined, done: false, error: undefined });
   try {
-    await invoke("download_runner", { tag, downloadUrl });
+    await invoke("download_runner", { source, tag, downloadUrl });
   } catch {
     // Outcome is already surfaced via the runner-download-error event.
   }

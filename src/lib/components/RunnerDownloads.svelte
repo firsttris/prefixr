@@ -104,7 +104,10 @@
               ></div>
             </div>
           {:else}
-            <button type="button" onclick={() => downloadRunner(release.tag, release.download_url)}>
+            <button
+              type="button"
+              onclick={() => downloadRunner(release.source, release.tag, release.download_url)}
+            >
               Herunterladen
             </button>
           {/if}

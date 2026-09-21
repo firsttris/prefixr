@@ -3,7 +3,10 @@ mod config;
 mod models;
 mod tray;
 
+use std::path::Path;
+
 use tauri::{Manager, WindowEvent};
+use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
 use commands::games::{
     add_game, create_desktop_shortcut, kill_game, launch_game, list_games, remove_game,
@@ -16,6 +19,27 @@ use commands::runner_downloads::{download_runner, list_runner_releases, list_run
 use commands::runners::list_runners;
 use config::load_config;
 use tray::{hide_main_window, rebuild_tray_menu, setup_tray, WindowVisible};
+
+/// Checks the real (not effective) UID via `/proc/self/status`, mirroring
+/// what PortProton's own launcher script checks via `id -u`. A prefix set up
+/// or run as root ends up with root-owned files inside it, which the user's
+/// normal desktop session then can't use or clean up without `sudo` — worth
+/// catching before it happens rather than after. Batocera intentionally runs
+/// its whole userspace as root, so it's exempted the same way PortProton
+/// exempts it.
+fn running_as_root() -> bool {
+    if Path::new("/userdata/system/batocera.conf").exists() {
+        return false;
+    }
+    let Ok(status) = std::fs::read_to_string("/proc/self/status") else {
+        return false;
+    };
+    status
+        .lines()
+        .find_map(|line| line.strip_prefix("Uid:"))
+        .and_then(|rest| rest.split_whitespace().next())
+        .is_some_and(|real_uid| real_uid == "0")
+}
 
 /// Looks for `--launch <game-id>` among the process args, as invoked by a
 /// desktop shortcut created via `create_desktop_shortcut`.
@@ -32,6 +56,20 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
+            if running_as_root() {
+                app.dialog()
+                    .message(
+                        "Ein als root angelegter oder gestarteter Wine-Prefix gehört danach \
+                         root statt dir — deine normale Sitzung kann ihn dann oft nicht mehr \
+                         verwenden oder ohne sudo löschen. Bitte Prefixr als normaler Benutzer \
+                         starten.",
+                    )
+                    .title("Prefixr nicht als root ausführen")
+                    .kind(MessageDialogKind::Error)
+                    .blocking_show();
+                std::process::exit(1);
+            }
+
             let config = load_config(app.handle())?;
             app.manage(std::sync::Mutex::new(config));
             app.manage(PendingLaunch(std::sync::Mutex::new(find_launch_arg())));

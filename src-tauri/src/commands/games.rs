@@ -443,6 +443,38 @@ async fn install_wine_mono(
     Ok(())
 }
 
+/// Steers a prefix's Windows user profile into `drive_c/users/steamuser`
+/// instead of the real Linux username, by pre-creating that directory and
+/// symlinking the real username to it before wineboot ever runs — wineboot
+/// then transparently populates the profile through the symlink instead of
+/// creating a separate one. Proton's own prefixes are already laid out this
+/// way (Valve's `steamuser` is a fixed pseudo-account, not the host's real
+/// user), and plenty of games — plus some anti-cheat systems — hardcode
+/// "steamuser" as the expected profile name regardless of which
+/// compatibility layer actually launched them, so a profile created under
+/// the real username can break them (see PortProton's
+/// `check_dirs_and_files_in_pfx`, which does the same thing).
+///
+/// A no-op once `drive_c/users/<username>` exists as its own real directory
+/// or symlink — imported from elsewhere, or already initialized before this
+/// existed — so this never clobbers a prefix's actual profile.
+fn steer_profile_to_steamuser(prefix_path: &Path) -> Result<(), String> {
+    let users_dir = prefix_path.join("drive_c/users");
+    let steamuser_dir = users_dir.join("steamuser");
+    fs::create_dir_all(&steamuser_dir)
+        .map_err(|e| format!("Could not create {}: {e}", steamuser_dir.display()))?;
+
+    let Some(username) = std::env::var_os("USER").filter(|u| u != "steamuser") else {
+        return Ok(());
+    };
+    let user_dir = users_dir.join(&username);
+    if fs::symlink_metadata(&user_dir).is_ok() {
+        return Ok(());
+    }
+    std::os::unix::fs::symlink("steamuser", &user_dir)
+        .map_err(|e| format!("Could not link {}: {e}", user_dir.display()))
+}
+
 /// Launches a game's exe under its configured runner and prefix. stdout/stderr
 /// are redirected straight into a per-run log file. The frontend is told about
 /// the outcome both via the command's own `Result` and via `game-started` /
@@ -508,6 +540,11 @@ pub async fn launch_game(
     // so an empty one — no `drive_c` yet — is initialized here on first use,
     // with that game's own runner.
     let is_uninitialized_prefix = !game.prefix_path.join("drive_c").is_dir();
+    // Must run before wineboot's first initialization of this prefix (see
+    // `steer_profile_to_steamuser`), but is otherwise idempotent, so it's
+    // simplest to just always ensure it — cheap, and self-healing if
+    // something ever removed the symlink.
+    steer_profile_to_steamuser(&game.prefix_path)?;
     if is_uninitialized_prefix {
         let _ = app.emit("game-initializing", GameInitializingPayload { id: &id });
 
