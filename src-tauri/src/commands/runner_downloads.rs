@@ -32,18 +32,17 @@ const RUNNER_SOURCES: &[RunnerSource] = &[
         matches_asset: |name| name.ends_with(".tar.gz") && !name.contains("aarch64"),
     },
     RunnerSource {
-        id: "wine-ge",
-        label: "Wine-GE",
-        repo: "GloriousEggroll/wine-ge-custom",
+        id: "wine-kron4ek",
+        label: "Wine (Kron4ek)",
+        repo: "Kron4ek/Wine-Builds",
         kind: RunnerKind::Wine,
-        matches_asset: |name| name.ends_with(".tar.xz") && !name.contains("aarch64"),
-    },
-    RunnerSource {
-        id: "umu-proton",
-        label: "UMU-Proton",
-        repo: "Open-Wine-Components/umu-proton",
-        kind: RunnerKind::Proton,
-        matches_asset: |name| name.ends_with(".tar.gz"),
+        // Kron4ek ships several variants per release (vanilla/staging,
+        // amd64/x86, with/without a bundled 32-bit wow64 build, plus a
+        // "-tkg" flavor with extra patches). Staging + wow64 without tkg:
+        // staging for the same gaming-oriented patches Proton itself
+        // carries, wow64 so a single 64-bit wine binary handles 32-bit
+        // games too without a separate wine32 install.
+        matches_asset: |name| name.ends_with("-staging-amd64-wow64.tar.xz"),
     },
     RunnerSource {
         id: "proton-cachyos",
@@ -178,7 +177,7 @@ pub async fn list_runner_releases(source: String) -> Result<Vec<RunnerRelease>, 
 
 /// Names of `runners_dir`'s current top-level entries, used to spot exactly
 /// which directory an extraction just created.
-fn snapshot_entries(runners_dir: &Path) -> HashSet<String> {
+pub(crate) fn snapshot_entries(runners_dir: &Path) -> HashSet<String> {
     fs::read_dir(runners_dir)
         .map(|entries| {
             entries
@@ -194,7 +193,11 @@ fn snapshot_entries(runners_dir: &Path) -> HashSet<String> {
 /// (e.g. Wine-GE names it after the build, not the tag) while the rest of
 /// the app (the "already exists" guard, `isInstalled` in the UI) keys
 /// runners by tag.
-fn normalize_extracted_dir(runners_dir: &Path, before: &HashSet<String>, tag: &str) -> Result<(), String> {
+pub(crate) fn normalize_extracted_dir(
+    runners_dir: &Path,
+    before: &HashSet<String>,
+    tag: &str,
+) -> Result<(), String> {
     let target_dir = runners_dir.join(tag);
     if target_dir.exists() {
         return Ok(());
@@ -375,14 +378,22 @@ mod tests {
         assert!((find_source("proton-ge").unwrap().matches_asset)("GE-Proton9-20.tar.gz"));
         assert!(!(find_source("proton-ge").unwrap().matches_asset)("GE-Proton9-20.sha512sum"));
 
-        assert!((find_source("wine-ge").unwrap().matches_asset)(
-            "wine-lutris-GE-Proton8-26-x86_64.tar.xz"
+        assert!((find_source("wine-kron4ek").unwrap().matches_asset)(
+            "wine-11.18-staging-amd64-wow64.tar.xz"
         ));
-        assert!(!(find_source("wine-ge").unwrap().matches_asset)(
-            "wine-lutris-GE-Proton8-26-x86_64.sha512sum"
+        assert!(!(find_source("wine-kron4ek").unwrap().matches_asset)(
+            "wine-11.18-amd64-wow64.tar.xz"
         ));
-
-        assert!((find_source("umu-proton").unwrap().matches_asset)("UMU-Proton-10.0-4.tar.gz"));
+        assert!(!(find_source("wine-kron4ek").unwrap().matches_asset)(
+            "wine-11.18-staging-amd64.tar.xz"
+        ));
+        assert!(!(find_source("wine-kron4ek").unwrap().matches_asset)(
+            "wine-11.18-staging-tkg-amd64-wow64.tar.xz"
+        ));
+        assert!(!(find_source("wine-kron4ek").unwrap().matches_asset)(
+            "wine-11.18-staging-x86.tar.xz"
+        ));
+        assert!(!(find_source("wine-kron4ek").unwrap().matches_asset)("sha256sums.txt"));
 
         assert!((find_source("proton-cachyos").unwrap().matches_asset)(
             "proton-cachyos-11.0-20260703-slr-x86_64.tar.xz"
@@ -401,8 +412,8 @@ mod tests {
         fs::create_dir_all(&dir).unwrap();
         let before = snapshot_entries(&dir);
 
-        // Simulate an archive whose top-level folder name (Wine-GE style)
-        // doesn't match the GitHub tag.
+        // Simulate an archive whose top-level folder name doesn't match the
+        // GitHub tag (some sources name it after the build, not the tag).
         fs::create_dir(dir.join("wine-lutris-GE-Proton8-26-x86_64")).unwrap();
 
         normalize_extracted_dir(&dir, &before, "GE-Proton8-26").unwrap();

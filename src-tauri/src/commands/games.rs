@@ -11,6 +11,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 use uuid::Uuid;
 
+use crate::commands::graphics_layers::{ensure_directx_layer_cache, ensure_wine_mono_msi};
 use crate::commands::icons::extract_icon_data_url;
 use crate::commands::runners::{find_runner, runner_command, wine_binary, wineserver_binary};
 use crate::config::{save_config, ConfigState};
@@ -37,23 +38,11 @@ pub struct RunningGame {
     /// than by PID.
     pub wineserver: PathBuf,
     pub wineprefix: String,
-    /// The game's own exe path, as passed to wine/proton. Present verbatim in
-    /// the command line of both the `proton`/`wine` wrapper we spawned and
-    /// the actual Windows process running under it, so it doubles as a
-    /// `pkill -f` pattern that reaches both directly — see
-    /// `kill_running_game`.
+    /// The game's own exe path, as passed to wine. Present verbatim in the
+    /// command line of both the `wine` process we spawned and the actual
+    /// Windows process running under it, so it doubles as a `pkill -f`
+    /// pattern that reaches both directly — see `kill_running_game`.
     pub exe_path: PathBuf,
-    /// The prefix directory as configured (`STEAM_COMPAT_DATA_PATH` for
-    /// Proton, i.e. one level above `wineprefix`'s `pfx`). Official Proton
-    /// runs the game inside a `bwrap` sandbox (pressure-vessel) that gives it
-    /// its own PID namespace — neither `wineserver -k` nor `pkill -f` from
-    /// out here can reach anything inside that namespace at all, since it's
-    /// simply invisible outside it. `bwrap` itself, though, is the process
-    /// that *created* that namespace, so it still runs in ours, and killing
-    /// it tears down everything it contains. This path is how it's found:
-    /// pressure-vessel always bind-mounts it into the sandbox, so it shows up
-    /// verbatim in `bwrap`'s own argv.
-    pub prefix_path: PathBuf,
 }
 
 #[derive(Default)]
@@ -64,30 +53,19 @@ pub struct RunningGames(pub Mutex<HashMap<Uuid, RunningGame>>);
 /// itself is removed once `launch_game`'s `child.wait()` observes the
 /// process actually exiting, not here.
 ///
-/// Uses three mechanisms together, the same way PortProton's `kill_portwine`
-/// combines a wineserver shutdown with directly hard-killing both the
-/// wine-preloader and any `bwrap` sandbox by PID:
+/// Uses two mechanisms together, the same way PortProton's `kill_portwine`
+/// combines a wineserver shutdown with directly hard-killing the
+/// wine-preloader:
 ///
 /// 1. `wineserver -k9` asks the whole wine session (game exe, services.exe,
 ///    explorer.exe, ...) to terminate via wineserver's own IPC — thorough
-///    when it works, but it can't reach a session it can't connect to (see
-///    point 3), and even when it works it never reaches the `proton`/`wine`
-///    wrapper process itself, since wineserver has no notion of its own
-///    parent.
+///    when it works, but it never reaches the `wine` process we spawned
+///    itself, since wineserver has no notion of its own parent.
 /// 2. `pkill -9 -f` on the game's exe path directly hard-kills anything
-///    whose command line mentions it — both that wrapper and, for a runner
-///    that isn't sandboxed, the game's own process too.
-/// 3. `pkill -9 -f` on `bwrap.*<prefix path>` targets the pressure-vessel
-///    sandbox official Proton runs the game inside. That sandbox gets its
-///    own PID namespace, which is exactly why 1 and 2 can fail silently
-///    against it: wineserver can't connect to a socket it can't see, and
-///    pkill can't match processes it can't see either. `bwrap` is the one
-///    process involved that still runs outside that namespace (it's what
-///    creates it), so it's the only thing from here that can be signaled at
-///    all — but signaling it is enough, since the kernel tears down the
-///    whole namespace once its creator dies.
+///    whose command line mentions it — both that process and the game's own
+///    process.
 pub async fn kill_running_game(running: &RunningGames, id: Uuid) -> Result<(), String> {
-    let (wineserver, wineprefix, exe_path, prefix_path) = {
+    let (wineserver, wineprefix, exe_path) = {
         let games = running
             .0
             .lock()
@@ -97,7 +75,6 @@ pub async fn kill_running_game(running: &RunningGames, id: Uuid) -> Result<(), S
             game.wineserver.clone(),
             game.wineprefix.clone(),
             game.exe_path.clone(),
-            game.prefix_path.clone(),
         )
     };
 
@@ -112,18 +89,10 @@ pub async fn kill_running_game(running: &RunningGames, id: Uuid) -> Result<(), S
         .status()
         .await;
 
-    let bwrap_pattern = format!("bwrap.*{}", prefix_path.display());
-    let _ = runner_command(Path::new("pkill"), [])
-        .args(["-9", "-f"])
-        .arg(&bwrap_pattern)
-        .status()
-        .await;
-
-    // Any one of the three actually killing something is a success; only
-    // report an error if both direct attempts failed to even run (a real
-    // environment problem, e.g. neither binary exists) rather than surfacing
-    // e.g. wineserver's "no session found" exit code as a failure when pkill
-    // already got it.
+    // Either one actually killing something is a success; only report an
+    // error if both failed to even run (a real environment problem, e.g.
+    // neither binary exists) rather than surfacing e.g. wineserver's "no
+    // session found" exit code as a failure when pkill already got it.
     match (wineserver_result, pkill_result) {
         (Err(e), Err(_)) => Err(format!("Could not run wineserver: {e}")),
         _ => Ok(()),
@@ -250,23 +219,6 @@ struct GameLaunchErrorPayload<'a> {
     log_path: Option<String>,
 }
 
-/// A writable directory to hand Proton as `STEAM_COMPAT_CLIENT_INSTALL_PATH`.
-/// Proton expects a Steam-install-shaped path for some checks even when run
-/// outside of Steam; a dedicated empty directory satisfies that without
-/// depending on a real Steam installation being present.
-fn steam_compat_client_dir(app: &AppHandle) -> Result<String, String> {
-    let data_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("Could not resolve data directory: {e}"))?;
-    let dir = data_dir.join("steam-compat-client-install");
-    fs::create_dir_all(&dir)
-        .map_err(|e| format!("Could not create Steam compat client directory: {e}"))?;
-    dir.to_str()
-        .map(str::to_string)
-        .ok_or_else(|| format!("Path is not valid UTF-8: {}", dir.display()))
-}
-
 fn log_file_path(app: &AppHandle, game_id: &str) -> Result<PathBuf, String> {
     let data_dir = app
         .path()
@@ -282,6 +234,175 @@ fn log_file_path(app: &AppHandle, game_id: &str) -> Result<PathBuf, String> {
         .join("logs")
         .join(game_id)
         .join(format!("{timestamp}.txt")))
+}
+
+/// Direct3D/DXGI/VKD3D files a Proton runner ships pre-linked into its own
+/// template prefix (`files/share/default_pfx/`) — what it copies from into a
+/// fresh `pfx/` on first run. GE-Proton bakes DXVK/VKD3D directly into its
+/// wine build as the builtin implementation of these modules (unlike a tool
+/// that bolts external DXVK onto a plain Wine build), so no `WINEDLLOVERRIDES`
+/// is needed to make wine prefer them — it uses them automatically once
+/// they're the ones actually reachable at these paths.
+const DIRECTX_OVERRIDE_FILES: &[&str] = &[
+    "d3d8.dll",
+    "d3d8thk.dll",
+    "d3d9.dll",
+    "d3d10core.dll",
+    "d3d11.dll",
+    "d3d12.dll",
+    "d3d12core.dll",
+    "dxgi.dll",
+    "wined3d.dll",
+    "libvkd3d-1.dll",
+    "libvkd3d-shader-1.dll",
+    "libvkd3d-utils-1.dll",
+];
+
+/// Re-links the given runner's own Direct3D/DXGI/VKD3D files into a prefix's
+/// `system32`/`syswow64`. Mirrors what Proton's own wrapper script does for
+/// its nested `pfx/` (see the comment on `wineprefix` in `launch_game`) and
+/// what PortProton does on every launch for the same reason (its
+/// `functions_helper`, `CP_DXVK_FILES`/`CP_VKD3D_FILES`): a prefix driven
+/// directly by wine — because it's imported from another tool, or was last
+/// used with a different runner — may have these files symlinked to a
+/// completely different, binary-incompatible build, or be
+/// missing them entirely, which breaks the moment this runner's wine tries
+/// to load them (its own builtin version depends on companions, like
+/// `wined3d.dll` on `libvkd3d-utils-1.dll`, that a foreign build won't have
+/// next to it). Runners with no bundled DXVK/VKD3D (plain Wine builds, no
+/// `files/share/default_pfx`) leave the prefix untouched.
+fn sync_directx_overrides(runner_path: &Path, prefix_path: &Path) -> Result<(), String> {
+    let template_windows = runner_path.join("files/share/default_pfx/drive_c/windows");
+    if !template_windows.is_dir() {
+        return Ok(());
+    }
+
+    for subdir in ["system32", "syswow64"] {
+        let src_dir = template_windows.join(subdir);
+        let dst_dir = prefix_path.join("drive_c/windows").join(subdir);
+        if !dst_dir.is_dir() {
+            continue;
+        }
+
+        for file_name in DIRECTX_OVERRIDE_FILES {
+            relink_if_needed(&src_dir.join(file_name), &dst_dir.join(file_name))?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Symlinks `dst_path` to `src_path`'s fully-resolved target, replacing
+/// whatever (if anything) is already there — unless it's already correctly
+/// linked, in which case it's left untouched. A missing `src_path` is not an
+/// error: it just means this particular file isn't relevant (Direct3D
+/// modules a given layer doesn't provide, e.g. DXVK has no d3d12).
+fn relink_if_needed(src_path: &Path, dst_path: &Path) -> Result<(), String> {
+    let Ok(resolved_src) = fs::canonicalize(src_path) else {
+        return Ok(());
+    };
+    if fs::canonicalize(dst_path).ok().as_deref() == Some(resolved_src.as_path()) {
+        return Ok(());
+    }
+    if fs::symlink_metadata(dst_path).is_ok() {
+        fs::remove_file(dst_path)
+            .map_err(|e| format!("Could not remove {}: {e}", dst_path.display()))?;
+    }
+    std::os::unix::fs::symlink(&resolved_src, dst_path)
+        .map_err(|e| format!("Could not link {}: {e}", dst_path.display()))
+}
+
+/// Direct3D/DXGI modules DXVK provides, and D3D12 modules VKD3D-Proton
+/// provides — forced to load as native (unlike a Proton runner's own
+/// builtin copies, see `sync_directx_overrides`) since a plain Wine build's
+/// own builtin implementations of these are the unaccelerated, OpenGL-backed
+/// ones DXVK/VKD3D-Proton exist to replace.
+const DXVK_MODULES: &[&str] = &["d3d8", "d3d9", "d3d10core", "d3d11", "dxgi"];
+const VKD3D_MODULES: &[&str] = &["d3d12", "d3d12core"];
+
+/// Re-links DXVK and VKD3D-Proton's DLLs (from the shared cache — see
+/// `graphics_layers::ensure_directx_layer_cache`) into a Wine prefix's
+/// `system32`/`syswow64`, and returns the `WINEDLLOVERRIDES` value that
+/// forces wine to actually load them. Mirrors PortProton's own
+/// `CP_DXVK_FILES`/`CP_VKD3D_FILES` handling in `functions_helper` — the
+/// same trick `sync_directx_overrides` uses for a Proton runner, just
+/// sourced from a separately downloaded DXVK/VKD3D-Proton instead of a
+/// runner's bundled copy, and (unlike a Proton runner, whose builtin modules
+/// already *are* DXVK/VKD3D) needing the override to actually take effect.
+fn sync_directx_overrides_from_cache(cache_dir: &Path, prefix_path: &Path) -> Result<String, String> {
+    let windows_dir = prefix_path.join("drive_c/windows");
+
+    for (layer_dir, dir64, dir32, modules) in [
+        ("dxvk", "x64", "x32", DXVK_MODULES),
+        ("vkd3d-proton", "x64", "x86", VKD3D_MODULES),
+    ] {
+        for (arch_dir, subdir) in [(dir64, "system32"), (dir32, "syswow64")] {
+            let src_dir = cache_dir.join(layer_dir).join(arch_dir);
+            let dst_dir = windows_dir.join(subdir);
+            if !dst_dir.is_dir() {
+                continue;
+            }
+            for module in modules {
+                let file_name = format!("{module}.dll");
+                relink_if_needed(&src_dir.join(&file_name), &dst_dir.join(&file_name))?;
+            }
+        }
+    }
+
+    let modules: Vec<&str> = DXVK_MODULES
+        .iter()
+        .chain(VKD3D_MODULES.iter())
+        .copied()
+        .collect();
+    Ok(format!("{}=n", modules.join(",")))
+}
+
+/// Installs wine-mono into `prefix_path` via `msiexec`, unless it's already
+/// there (`drive_c/windows/mono/`, where the installer places it). Wine
+/// looks for it there whenever an app tries to host a .NET assembly, and,
+/// finding it missing, shows its own "Wine Mono Installation" dialog asking
+/// to download and install it — which would otherwise pop up unprompted on
+/// whatever needs it first. Proton bundles Mono and installs it
+/// automatically via its own wrapper script; a plain Wine build (e.g.
+/// Kron4ek) doesn't, so this does the same job for a Wine-kind runner.
+async fn install_wine_mono(
+    app: &AppHandle,
+    wine: &Path,
+    prefix_path: &Path,
+    log_path: &Path,
+) -> Result<(), String> {
+    if prefix_path.join("drive_c/windows/mono").is_dir() {
+        return Ok(());
+    }
+
+    let msi_path = ensure_wine_mono_msi(app).await?;
+    let prefix_str = prefix_path
+        .to_str()
+        .ok_or_else(|| format!("Prefix path is not valid UTF-8: {}", prefix_path.display()))?;
+    let msi_str = msi_path
+        .to_str()
+        .ok_or_else(|| format!("Installer path is not valid UTF-8: {}", msi_path.display()))?;
+
+    let out = fs::OpenOptions::new()
+        .append(true)
+        .open(log_path)
+        .map_err(|e| format!("Could not open log file: {e}"))?;
+    let err = out
+        .try_clone()
+        .map_err(|e| format!("Could not open log file: {e}"))?;
+
+    let status = runner_command(wine, [("WINEPREFIX", prefix_str)])
+        .args(["msiexec", "/i", msi_str, "/qn"])
+        .stdout(Stdio::from(out))
+        .stderr(Stdio::from(err))
+        .status()
+        .await
+        .map_err(|e| format!("Could not run wine-mono installer: {e}"))?;
+
+    if !status.success() {
+        return Err(format!("wine-mono installer exited with status {status}"));
+    }
+    Ok(())
 }
 
 /// Launches a game's exe under its configured runner and prefix. stdout/stderr
@@ -326,104 +447,80 @@ pub async fn launch_game(
     fs::File::create(&log_path).map_err(|e| format!("Could not create log file: {e}"))?;
     let log_path_string = log_path.display().to_string();
 
-    // Proton isn't just wine: its `proton` wrapper script also installs
-    // DXVK/VKD3D (the Direct3D-to-Vulkan layers) into the prefix on first run
-    // and manages its own prefix layout at `<prefix>/pfx`. Calling wine
-    // directly for a Proton runner would skip all of that. Plain Wine
-    // runners have no such wrapper, so they're launched directly and — since
-    // prefixes are created without ever running wineboot (see `add_prefix`)
-    // — initialized here on first use, with that game's own runner.
-    // Proton runs wine against `<prefix>/pfx`, not `<prefix>` itself (that's
-    // where `STEAM_COMPAT_DATA_PATH` points); plain Wine uses `<prefix>`
-    // directly. `kill_running_game` needs this exact value to reach the
+    // Every prefix is driven directly by the runner's own wine binary,
+    // against `<prefix>` itself — never through Proton's `proton` wrapper
+    // script, which pins its prefix to `<STEAM_COMPAT_DATA_PATH>/pfx` with no
+    // way to point it at `<prefix>` instead. That's deliberate, not just a
+    // shortcut: it's the only way a game can be freely reassigned between a
+    // Proton and a Wine runner and keep seeing the same installed files and
+    // saves either way (both PortProton and Bottles manage DXVK/VKD3D this
+    // same way, independently of which wine build is running them, for the
+    // same reason). `kill_running_game` needs this exact value to reach the
     // right wineserver session.
-    let wineprefix = match runner.kind {
-        RunnerKind::Proton => game
-            .prefix_path
-            .join("pfx")
-            .to_str()
-            .ok_or_else(|| {
-                format!(
-                    "Prefix path is not valid UTF-8: {}",
-                    game.prefix_path.display()
-                )
-            })?
-            .to_string(),
-        RunnerKind::Wine => prefix_path_str.to_string(),
-    };
+    let wineprefix = prefix_path_str.to_string();
     let wineserver = wineserver_binary(&runner.path)?;
+    let wine = wine_binary(&runner.path)?;
+
+    // A prefix is created without ever running wineboot (see `add_prefix`),
+    // so an empty one — no `drive_c` yet — is initialized here on first use,
+    // with that game's own runner.
+    let is_uninitialized_prefix = !game.prefix_path.join("drive_c").is_dir();
+    if is_uninitialized_prefix {
+        let _ = app.emit("game-initializing", GameInitializingPayload { id: &id });
+
+        let init_out = fs::OpenOptions::new()
+            .append(true)
+            .open(&log_path)
+            .map_err(|e| format!("Could not open log file: {e}"))?;
+        let init_err = init_out
+            .try_clone()
+            .map_err(|e| format!("Could not open log file: {e}"))?;
+
+        let status = runner_command(&wine, [("WINEPREFIX", prefix_path_str)])
+            .arg("wineboot")
+            .stdout(Stdio::from(init_out))
+            .stderr(Stdio::from(init_err))
+            .status()
+            .await
+            .map_err(|e| format!("Could not initialize prefix: {e}"))?;
+
+        if !status.success() {
+            let message = format!("Prefix initialization failed with status {status}");
+            let _ = app.emit(
+                "game-launch-error",
+                GameLaunchErrorPayload {
+                    id: &id,
+                    message: message.clone(),
+                    log_path: Some(log_path_string.clone()),
+                },
+            );
+            return Err(message);
+        }
+    }
+
+    let dll_overrides = match runner.kind {
+        RunnerKind::Proton => {
+            sync_directx_overrides(&runner.path, &game.prefix_path)?;
+            None
+        }
+        RunnerKind::Wine => {
+            install_wine_mono(&app, &wine, &game.prefix_path, &log_path).await?;
+            let cache = ensure_directx_layer_cache(&app).await?;
+            Some(sync_directx_overrides_from_cache(
+                &cache,
+                &game.prefix_path,
+            )?)
+        }
+    };
+
+    let mut env = vec![("WINEPREFIX".to_string(), prefix_path_str.to_string())];
+    if let Some(overrides) = dll_overrides {
+        env.push(("WINEDLLOVERRIDES".to_string(), overrides));
+    }
+    env.extend(game.env_vars.iter().map(|(k, v)| (k.clone(), v.clone())));
 
     let (launch_binary, launch_args, launch_env): (PathBuf, Vec<String>, Vec<(String, String)>) =
-        match runner.kind {
-            RunnerKind::Proton => {
-                let proton_script = runner.path.join("proton");
-                if !proton_script.is_file() {
-                    return Err(format!(
-                        "Proton script not found in runner directory {}",
-                        runner.path.display()
-                    ));
-                }
-
-                if !game.prefix_path.join("pfx").is_dir() {
-                    let _ = app.emit("game-initializing", GameInitializingPayload { id: &id });
-                }
-
-                let mut env = vec![
-                    (
-                        "STEAM_COMPAT_DATA_PATH".to_string(),
-                        prefix_path_str.to_string(),
-                    ),
-                    (
-                        "STEAM_COMPAT_CLIENT_INSTALL_PATH".to_string(),
-                        steam_compat_client_dir(&app)?,
-                    ),
-                ];
-                env.extend(game.env_vars.iter().map(|(k, v)| (k.clone(), v.clone())));
-
-                (proton_script, vec!["run".to_string()], env)
-            }
-            RunnerKind::Wine => {
-                let wine = wine_binary(&runner.path)?;
-
-                if !game.prefix_path.join("drive_c").is_dir() {
-                    let _ = app.emit("game-initializing", GameInitializingPayload { id: &id });
-
-                    let init_out = fs::OpenOptions::new()
-                        .append(true)
-                        .open(&log_path)
-                        .map_err(|e| format!("Could not open log file: {e}"))?;
-                    let init_err = init_out
-                        .try_clone()
-                        .map_err(|e| format!("Could not open log file: {e}"))?;
-
-                    let status = runner_command(&wine, [("WINEPREFIX", prefix_path_str)])
-                        .arg("wineboot")
-                        .stdout(Stdio::from(init_out))
-                        .stderr(Stdio::from(init_err))
-                        .status()
-                        .await
-                        .map_err(|e| format!("Could not initialize prefix: {e}"))?;
-
-                    if !status.success() {
-                        let message = format!("Prefix initialization failed with status {status}");
-                        let _ = app.emit(
-                            "game-launch-error",
-                            GameLaunchErrorPayload {
-                                id: &id,
-                                message: message.clone(),
-                                log_path: Some(log_path_string.clone()),
-                            },
-                        );
-                        return Err(message);
-                    }
-                }
-
-                let mut env = vec![("WINEPREFIX".to_string(), prefix_path_str.to_string())];
-                env.extend(game.env_vars.iter().map(|(k, v)| (k.clone(), v.clone())));
-
-                (wine, vec![], env)
-            }
-        };
+        (wine, vec![], env);
 
     let log_out = fs::OpenOptions::new()
         .append(true)
@@ -470,7 +567,6 @@ pub async fn launch_game(
                 wineserver: wineserver.clone(),
                 wineprefix: wineprefix.clone(),
                 exe_path: game.exe_path.clone(),
-                prefix_path: game.prefix_path.clone(),
             },
         );
     }
