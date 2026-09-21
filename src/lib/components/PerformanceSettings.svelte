@@ -360,10 +360,12 @@
   .preview-wrap {
     display: flex;
     flex-direction: column;
+    min-width: 0;
   }
 
   .preview-screen {
-    aspect-ratio: 16 / 9;
+    width: 100%;
+    height: 260px;
     border-radius: var(--radius);
     overflow: hidden;
     border: 1px solid var(--border);
@@ -383,6 +385,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.8em;
+    min-width: 0;
   }
 
   .checkbox-row {

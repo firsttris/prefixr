@@ -575,12 +575,13 @@
   .preview-wrap {
     display: flex;
     flex-direction: column;
+    min-width: 0;
   }
 
   .preview-screen {
     position: relative;
-    aspect-ratio: 16 / 9;
-    min-height: 280px;
+    width: 100%;
+    height: 260px;
     border-radius: var(--radius);
     overflow: hidden;
     background: radial-gradient(circle at 30% 20%, #2c3550, #0b0d13 70%);
@@ -673,6 +674,7 @@
     display: flex;
     flex-direction: column;
     gap: 1.1em;
+    min-width: 0;
   }
 
   .control-group {

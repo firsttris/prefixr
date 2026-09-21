@@ -113,7 +113,7 @@
 <style>
   .shell {
     display: flex;
-    min-height: 100vh;
+    height: 100vh;
   }
 
   .sidebar {
@@ -125,6 +125,7 @@
     flex-direction: column;
     padding: 1em 0.8em;
     gap: 0.3em;
+    overflow-y: auto;
   }
 
   .brand {
@@ -157,6 +158,7 @@
     flex: 1;
     padding: 2em;
     max-width: 1100px;
+    overflow-y: auto;
   }
 
   .page-header {
