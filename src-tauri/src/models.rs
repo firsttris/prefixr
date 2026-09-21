@@ -124,6 +124,19 @@ pub struct PerformanceConfig {
     pub vkbasalt_sharpness: f32,
     pub vkbasalt_smaa: bool,
     pub vkbasalt_deband: bool,
+    /// Requests the kernel's `ntsync` driver for wine's inter-process sync
+    /// primitives (successor to esync/fsync). Silently has no effect if
+    /// `/dev/ntsync` isn't present (older kernel or module not loaded) — see
+    /// `launch_game`, which also explicitly force-disables it via
+    /// `PROTON_NO_NTSYNC` when this is off, since recent Proton versions
+    /// otherwise auto-enable it whenever the kernel supports it.
+    #[serde(default)]
+    pub ntsync_enabled: bool,
+    /// Wraps the game process with `systemd-inhibit` so the screensaver/sleep
+    /// don't kick in mid-session. No-op if `systemd-inhibit` or the D-Bus
+    /// system bus isn't available.
+    #[serde(default)]
+    pub inhibit_sleep_enabled: bool,
 }
 
 impl Default for PerformanceConfig {
@@ -138,6 +151,8 @@ impl Default for PerformanceConfig {
             vkbasalt_sharpness: 0.4,
             vkbasalt_smaa: false,
             vkbasalt_deband: false,
+            ntsync_enabled: false,
+            inhibit_sleep_enabled: false,
         }
     }
 }

@@ -81,4 +81,6 @@ export interface PerformanceConfig {
   vkbasalt_sharpness: number;
   vkbasalt_smaa: boolean;
   vkbasalt_deband: boolean;
+  ntsync_enabled: boolean;
+  inhibit_sleep_enabled: boolean;
 }

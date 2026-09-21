@@ -18,6 +18,8 @@
     vkbasalt_sharpness: 0.4,
     vkbasalt_smaa: false,
     vkbasalt_deband: false,
+    ntsync_enabled: false,
+    inhibit_sleep_enabled: false,
   };
 
   let config = $state<PerformanceConfig>({ ...FALLBACK });
@@ -142,6 +144,42 @@
         </div>
         <label class="switch">
           <input type="checkbox" bind:checked={config.dxvk_async_enabled} onchange={changed} />
+          <span class="track"><span class="thumb"></span></span>
+        </label>
+      </div>
+
+      <div class="toggle-row">
+        <div>
+          <span class="toggle-label">
+            Ntsync
+            <InfoIcon
+              text="Empfehlung: Nachfolger von Esync/Fsync über einen Kernel-Treiber (ab Kernel 6.14, oder per Modul nachgerüstet). Wenn dein Kernel es unterstützt, die schnellste der drei Optionen — ohne Unterstützung passiert einfach nichts."
+            />
+          </span>
+          <p class="toggle-desc">
+            Thread-Synchronisation über den nativen ntsync-Kernel-Treiber statt Esync/Fsync.
+          </p>
+        </div>
+        <label class="switch">
+          <input type="checkbox" bind:checked={config.ntsync_enabled} onchange={changed} />
+          <span class="track"><span class="thumb"></span></span>
+        </label>
+      </div>
+
+      <div class="toggle-row">
+        <div>
+          <span class="toggle-label">
+            Ruhezustand verhindern
+            <InfoIcon
+              text="Empfehlung: Praktisch immer sinnvoll — verhindert, dass der Bildschirmschoner oder der Energiesparmodus mitten im Spiel zuschlägt. Braucht systemd-inhibit; ohne das passiert einfach nichts."
+            />
+          </span>
+          <p class="toggle-desc">
+            Hält System und Bildschirm wach, solange ein Spiel läuft.
+          </p>
+        </div>
+        <label class="switch">
+          <input type="checkbox" bind:checked={config.inhibit_sleep_enabled} onchange={changed} />
           <span class="track"><span class="thumb"></span></span>
         </label>
       </div>

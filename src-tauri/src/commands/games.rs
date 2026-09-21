@@ -20,6 +20,15 @@ use crate::config::{save_config, ConfigState};
 use crate::models::{Game, GameInput, RunnerKind};
 use crate::tray::rebuild_tray_menu;
 
+/// Checks whether `name` resolves to an executable file somewhere on `PATH`,
+/// used to gate optional wrappers (e.g. `systemd-inhibit`) that may not be
+/// installed on every system.
+fn command_on_path(name: &str) -> bool {
+    std::env::var_os("PATH")
+        .map(|paths| std::env::split_paths(&paths).any(|dir| dir.join(name).is_file()))
+        .unwrap_or(false)
+}
+
 /// A game process currently running under its runner, tracked so the tray
 /// menu can list it and offer to kill it (e.g. when a Proton game hangs).
 #[derive(Clone)]
@@ -521,9 +530,29 @@ pub async fn launch_game(
     };
 
     let mut env = vec![("WINEPREFIX".to_string(), prefix_path_str.to_string())];
+    // `winemenubuilder.exe=` is disabled unconditionally: wine's default
+    // behavior of registering .desktop entries and file associations for
+    // whatever the game installs is never wanted here, since this app is
+    // itself the game's launcher/menu.
+    let mut dll_override_parts = Vec::new();
     if let Some(overrides) = dll_overrides {
-        env.push(("WINEDLLOVERRIDES".to_string(), overrides));
+        dll_override_parts.push(overrides);
     }
+    dll_override_parts.push("winemenubuilder.exe=".to_string());
+    env.push(("WINEDLLOVERRIDES".to_string(), dll_override_parts.join(";")));
+
+    // Always set both variables explicitly, not just when enabled: recent
+    // Proton versions auto-enable ntsync whenever the kernel supports it, so
+    // leaving PROTON_NO_NTSYNC unset wouldn't actually let a user opt out.
+    let ntsync_active = performance.ntsync_enabled && Path::new("/dev/ntsync").exists();
+    env.push((
+        "WINENTSYNC".to_string(),
+        if ntsync_active { "1" } else { "0" }.to_string(),
+    ));
+    env.push((
+        "PROTON_NO_NTSYNC".to_string(),
+        if ntsync_active { "0" } else { "1" }.to_string(),
+    ));
     if mangohud.enabled {
         let conf_path = ensure_mangohud_conf(&app, &mangohud)?;
         env.push(("MANGOHUD".to_string(), "1".to_string()));
@@ -554,8 +583,32 @@ pub async fn launch_game(
     }
     env.extend(game.env_vars.iter().map(|(k, v)| (k.clone(), v.clone())));
 
+    // Wraps the actual launch with `systemd-inhibit` so the screensaver/sleep
+    // don't interrupt a play session. Only attempted when both the binary and
+    // the D-Bus system bus are actually there — `systemd-inhibit` itself
+    // would otherwise exit immediately (no session to inhibit), taking the
+    // whole game launch down with it since it'd be the process we spawn.
+    let use_inhibit_sleep = performance.inhibit_sleep_enabled
+        && command_on_path("systemd-inhibit")
+        && Path::new("/run/dbus/system_bus_socket").exists();
+
     let (launch_binary, launch_args, launch_env): (PathBuf, Vec<String>, Vec<(String, String)>) =
-        (wine, vec![], env);
+        if use_inhibit_sleep {
+            (
+                PathBuf::from("systemd-inhibit"),
+                vec![
+                    "--mode=block".to_string(),
+                    "--who=Prefixr".to_string(),
+                    "--why=A game is running".to_string(),
+                    "--what=idle:sleep".to_string(),
+                    "--".to_string(),
+                    wine.display().to_string(),
+                ],
+                env,
+            )
+        } else {
+            (wine, vec![], env)
+        };
 
     let log_out = fs::OpenOptions::new()
         .append(true)
