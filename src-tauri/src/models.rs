@@ -191,6 +191,16 @@ pub struct SteamGridDbConfig {
     pub api_key: Option<String>,
 }
 
+/// GitHub settings — see `commands::github`. An optional personal access
+/// token, sent as a bearer token on requests to `api.github.com` (runner
+/// release listings) to raise its rate limit from 60 to 5000 requests/hour;
+/// GitHub accepts unauthenticated requests too, so this stays optional.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct GitHubConfig {
+    #[serde(default)]
+    pub token: Option<String>,
+}
+
 impl Default for PerformanceConfig {
     fn default() -> Self {
         Self {

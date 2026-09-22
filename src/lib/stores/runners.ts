@@ -17,8 +17,21 @@ export async function refreshRunnerSources(): Promise<void> {
 
 export const runnerReleases = writable<RunnerRelease[]>([]);
 
-export async function refreshRunnerReleases(source: string): Promise<void> {
-  runnerReleases.set(await invoke<RunnerRelease[]>("list_runner_releases", { source }));
+// GitHub's unauthenticated API rate limit (60 requests/hour) is easy to
+// exhaust if every tab switch re-fetches releases from scratch, so cache
+// each source's list for a while and only bypass it on an explicit refresh.
+const RELEASES_CACHE_TTL_MS = 5 * 60 * 1000;
+const releasesCache = new Map<string, { releases: RunnerRelease[]; fetchedAt: number }>();
+
+export async function refreshRunnerReleases(source: string, force = false): Promise<void> {
+  const cached = releasesCache.get(source);
+  if (!force && cached && Date.now() - cached.fetchedAt < RELEASES_CACHE_TTL_MS) {
+    runnerReleases.set(cached.releases);
+    return;
+  }
+  const releases = await invoke<RunnerRelease[]>("list_runner_releases", { source });
+  releasesCache.set(source, { releases, fetchedAt: Date.now() });
+  runnerReleases.set(releases);
 }
 
 export interface RunnerDownloadState {

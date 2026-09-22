@@ -5,7 +5,9 @@ use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
-use crate::models::{Game, MangoHudConfig, PerformanceConfig, PrefixInfo, SteamGridDbConfig};
+use crate::models::{
+    Game, GitHubConfig, MangoHudConfig, PerformanceConfig, PrefixInfo, SteamGridDbConfig,
+};
 
 const CONFIG_FILE_NAME: &str = "config.json";
 
@@ -24,6 +26,8 @@ pub struct AppConfig {
     pub performance: PerformanceConfig,
     #[serde(default)]
     pub steamgriddb: SteamGridDbConfig,
+    #[serde(default)]
+    pub github: GitHubConfig,
 }
 
 impl AppConfig {
@@ -39,6 +43,7 @@ impl AppConfig {
             mangohud: MangoHudConfig::default(),
             performance: PerformanceConfig::default(),
             steamgriddb: SteamGridDbConfig::default(),
+            github: GitHubConfig::default(),
         })
     }
 }

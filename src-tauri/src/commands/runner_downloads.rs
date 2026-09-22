@@ -5,13 +5,25 @@ use std::path::{Path, PathBuf};
 
 use futures_util::StreamExt;
 use reqwest::header::USER_AGENT;
+use reqwest::RequestBuilder;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256, Sha512};
 use tauri::{AppHandle, Emitter, State};
 use tokio::io::AsyncWriteExt;
 
+use crate::commands::github::read_token;
 use crate::config::ConfigState;
 use crate::models::RunnerKind;
+
+/// Adds a bearer `Authorization` header when a GitHub token is configured,
+/// leaving the request unauthenticated otherwise — GitHub's API accepts both,
+/// just at a much lower rate limit (60 vs 5000 requests/hour) when anonymous.
+fn with_optional_auth(builder: RequestBuilder, token: Option<&str>) -> RequestBuilder {
+    match token {
+        Some(token) => builder.bearer_auth(token),
+        None => builder,
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 enum ChecksumAlgorithm {
@@ -200,22 +212,34 @@ struct RunnerDownloadDonePayload<'a> {
 /// entry per release that ships an asset matching that source's filter
 /// (skips checksum-only, source-only, or wrong-architecture releases).
 #[tauri::command]
-pub async fn list_runner_releases(source: String) -> Result<Vec<RunnerRelease>, String> {
+pub async fn list_runner_releases(
+    state: State<'_, ConfigState>,
+    source: String,
+) -> Result<Vec<RunnerRelease>, String> {
     let runner_source = find_source(&source)?;
+    let token = read_token(&state)?;
     let url = format!(
         "https://api.github.com/repos/{}/releases?per_page=20",
         runner_source.repo
     );
 
-    let response = reqwest::Client::new()
-        .get(&url)
-        .header(USER_AGENT, "prefixr")
-        .send()
-        .await
-        .map_err(|e| format!("Could not reach GitHub: {e}"))?;
+    let response = with_optional_auth(
+        reqwest::Client::new().get(&url).header(USER_AGENT, "prefixr"),
+        token.as_deref(),
+    )
+    .send()
+    .await
+    .map_err(|e| format!("Could not reach GitHub: {e}"))?;
 
     if !response.status().is_success() {
-        return Err(format!("GitHub API returned status {}", response.status()));
+        let status = response.status();
+        let hint = if status.as_u16() == 403 && token.is_none() {
+            " (GitHub's rate limit for unauthenticated requests is likely exhausted — \
+              add a GitHub token in the settings to raise it)"
+        } else {
+            ""
+        };
+        return Err(format!("GitHub API returned status {status}{hint}"));
     }
 
     let releases: Vec<GitHubRelease> = response
@@ -333,6 +357,7 @@ async fn verify_checksum(
     asset_name: &str,
     download_url: &str,
     archive_path: &Path,
+    token: Option<&str>,
 ) -> Result<(), String> {
     let checksum_asset_name = (source.checksum.asset_name)(asset_name);
     let checksum_url = download_url
@@ -340,12 +365,15 @@ async fn verify_checksum(
         .map(|prefix| format!("{prefix}{checksum_asset_name}"))
         .ok_or_else(|| "Could not derive checksum file URL".to_string())?;
 
-    let response = reqwest::Client::new()
-        .get(&checksum_url)
-        .header(USER_AGENT, "prefixr")
-        .send()
-        .await
-        .map_err(|e| format!("Could not fetch checksum file: {e}"))?;
+    let response = with_optional_auth(
+        reqwest::Client::new()
+            .get(&checksum_url)
+            .header(USER_AGENT, "prefixr"),
+        token,
+    )
+    .send()
+    .await
+    .map_err(|e| format!("Could not fetch checksum file: {e}"))?;
     if !response.status().is_success() {
         return Err(format!(
             "Could not fetch checksum file (status {})",
@@ -403,6 +431,7 @@ pub async fn download_runner(
             .map_err(|_| "Configuration is locked".to_string())?;
         config.runners_dir.clone()
     };
+    let token = read_token(&state)?;
 
     fs::create_dir_all(&runners_dir)
         .map_err(|e| format!("Could not create runners directory: {e}"))?;
@@ -414,12 +443,15 @@ pub async fn download_runner(
 
     let is_xz = download_url.ends_with(".tar.xz");
 
-    let response = reqwest::Client::new()
-        .get(&download_url)
-        .header(USER_AGENT, "prefixr")
-        .send()
-        .await
-        .map_err(|e| format!("Could not start download: {e}"))?;
+    let response = with_optional_auth(
+        reqwest::Client::new()
+            .get(&download_url)
+            .header(USER_AGENT, "prefixr"),
+        token.as_deref(),
+    )
+    .send()
+    .await
+    .map_err(|e| format!("Could not start download: {e}"))?;
 
     if !response.status().is_success() {
         let message = format!("Download failed with status {}", response.status());
@@ -477,8 +509,14 @@ pub async fn download_runner(
         return Err(message);
     }
 
-    if let Err(message) =
-        verify_checksum(runner_source, &asset_name, &download_url, &archive_path).await
+    if let Err(message) = verify_checksum(
+        runner_source,
+        &asset_name,
+        &download_url,
+        &archive_path,
+        token.as_deref(),
+    )
+    .await
     {
         let _ = tokio::fs::remove_file(&archive_path).await;
         let _ = app.emit(

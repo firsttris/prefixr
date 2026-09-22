@@ -13,6 +13,7 @@ use commands::games::{
     kill_game, launch_game, list_games, remove_game, run_installer, take_pending_install,
     take_pending_launch, update_game, PendingInstall, PendingLaunch, RunningGames,
 };
+use commands::github::{get_github_config, save_github_config};
 use commands::mangohud::{get_mangohud_config, save_mangohud_config};
 use commands::performance::{
     check_max_map_count, fix_max_map_count, get_performance_config, save_performance_config,
@@ -178,7 +179,9 @@ pub fn run() {
             remove_game_cover,
             set_game_icon,
             get_game_icon,
-            remove_game_icon
+            remove_game_icon,
+            get_github_config,
+            save_github_config
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

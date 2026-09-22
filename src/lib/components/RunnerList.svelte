@@ -3,6 +3,7 @@
   import { runners, refreshRunners } from "$lib/stores/runners";
   import Modal from "./Modal.svelte";
   import RunnerDownloads from "./RunnerDownloads.svelte";
+  import GitHubSettings from "./GitHubSettings.svelte";
 
   let showDownloads = $state(false);
 
@@ -28,6 +29,8 @@
       </button>
     </div>
   </div>
+
+  <GitHubSettings />
 
   {#if $runners.length === 0}
     <p class="hint">Keine Runner gefunden. Lege Proton- oder Wine-Builds im Runner-Verzeichnis ab.</p>

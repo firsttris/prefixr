@@ -98,6 +98,10 @@ export interface SteamGridDbConfig {
   api_key: string | null;
 }
 
+export interface GitHubConfig {
+  token: string | null;
+}
+
 export interface SteamGridDbGameMatch {
   id: number;
   name: string;
