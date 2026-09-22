@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Game } from "$lib/types";
   import type { GameRunState } from "$lib/stores/games";
+  import { getGameCover } from "$lib/stores/steamgriddb";
 
   let {
     game,
@@ -11,6 +12,7 @@
     onRemove,
     onShowLog,
     onCreateShortcut,
+    onEditCover,
   }: {
     game: Game;
     runState?: GameRunState;
@@ -20,9 +22,22 @@
     onRemove: () => void;
     onShowLog: (path: string) => void;
     onCreateShortcut: () => Promise<void>;
+    onEditCover: () => void;
   } = $props();
 
   let shortcutState = $state<"idle" | "creating" | "done" | string>("idle");
+
+  let coverDataUrl = $state<string | null>(null);
+
+  $effect(() => {
+    if (!game.cover_url) {
+      coverDataUrl = null;
+      return;
+    }
+    getGameCover(game.id)
+      .then((url) => (coverDataUrl = url))
+      .catch(() => (coverDataUrl = null));
+  });
 
   async function handleCreateShortcut() {
     shortcutState = "creating";
@@ -49,10 +64,13 @@
     >
       {shortcutState === "done" ? "✓" : "🔗"}
     </button>
+    <button type="button" class="ghost" onclick={onEditCover} aria-label="Cover auswählen">🖼</button>
     <button type="button" class="ghost" onclick={onEdit} aria-label="Spiel bearbeiten">✎</button>
     <button type="button" class="ghost" onclick={onRemove} aria-label="Spiel entfernen">✕</button>
   </div>
-  {#if game.icon}
+  {#if coverDataUrl}
+    <img class="cover" src={coverDataUrl} alt="" />
+  {:else if game.icon}
     <img class="icon" src={game.icon} alt="" />
   {:else}
     <div class="icon fallback">🎮</div>
@@ -142,6 +160,13 @@
     height: 2.4em;
     object-fit: contain;
     image-rendering: -webkit-optimize-contrast;
+  }
+
+  .cover {
+    width: 100%;
+    aspect-ratio: 2 / 3;
+    object-fit: cover;
+    border-radius: calc(var(--radius) - 4px);
   }
 
   .icon.fallback {

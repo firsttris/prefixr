@@ -51,6 +51,21 @@ pub struct Game {
     /// no icon resource or it couldn't be parsed.
     #[serde(default)]
     pub icon: Option<String>,
+    /// The matched SteamGridDB *game* id, so re-opening the cover picker (or
+    /// a future Steam-shortcut export) can reuse the match without
+    /// re-searching by name.
+    #[serde(default)]
+    pub steamgriddb_id: Option<i64>,
+    /// The specific SteamGridDB grid asset id behind `cover_url`, kept for
+    /// future reuse (e.g. a Steam shortcut export).
+    #[serde(default)]
+    pub cover_grid_id: Option<i64>,
+    /// Source URL of the chosen SteamGridDB cover image. Its file extension
+    /// also identifies the cached file's format at
+    /// `artwork/{id}.{ext}` under the app data dir — see
+    /// `commands::steamgriddb`.
+    #[serde(default)]
+    pub cover_url: Option<String>,
 }
 
 /// Payload for `add_game`; the id is assigned by the backend.
@@ -142,6 +157,13 @@ pub struct PerformanceConfig {
     /// `launch_game`.
     #[serde(default)]
     pub power_profile_enabled: bool,
+}
+
+/// SteamGridDB API settings — see `commands::steamgriddb`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SteamGridDbConfig {
+    #[serde(default)]
+    pub api_key: Option<String>,
 }
 
 impl Default for PerformanceConfig {

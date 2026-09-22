@@ -152,6 +152,9 @@ pub fn add_game(
         env_vars: game.env_vars,
         launch_args: game.launch_args,
         icon,
+        steamgriddb_id: None,
+        cover_grid_id: None,
+        cover_url: None,
     };
 
     let mut config = state

@@ -20,6 +20,9 @@ export interface Game {
   env_vars: Record<string, string>;
   launch_args: string;
   icon: string | null;
+  steamgriddb_id: number | null;
+  cover_grid_id: number | null;
+  cover_url: string | null;
 }
 
 export interface GameInput {
@@ -82,6 +85,24 @@ export interface PerformanceConfig {
   vkbasalt_deband: boolean;
   inhibit_sleep_enabled: boolean;
   power_profile_enabled: boolean;
+}
+
+export interface SteamGridDbConfig {
+  api_key: string | null;
+}
+
+export interface SteamGridDbGameMatch {
+  id: number;
+  name: string;
+  verified: boolean;
+}
+
+export interface SteamGridDbGrid {
+  id: number;
+  url: string;
+  thumb: string;
+  width: number;
+  height: number;
 }
 
 export interface MaxMapCountStatus {

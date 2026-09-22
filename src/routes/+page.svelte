@@ -6,12 +6,17 @@
   import PrefixManager from "$lib/components/PrefixManager.svelte";
   import MangoHudSettings from "$lib/components/MangoHudSettings.svelte";
   import PerformanceSettings from "$lib/components/PerformanceSettings.svelte";
+  import SteamGridDbSettings from "$lib/components/SteamGridDbSettings.svelte";
+  import ArtworkPicker from "$lib/components/ArtworkPicker.svelte";
   import Modal from "$lib/components/Modal.svelte";
   import { initGameEvents, launchGame, takePendingLaunch } from "$lib/stores/games";
   import type { Game } from "$lib/types";
 
-  let view = $state<"library" | "prefixes" | "runners" | "mangohud" | "performance">("library");
+  let view = $state<"library" | "prefixes" | "runners" | "mangohud" | "performance" | "steamgriddb">(
+    "library",
+  );
   let editing = $state<Game | "new" | null>(null);
+  let pickingCoverFor = $state<Game | null>(null);
 
   let modalGame = $derived(editing && editing !== "new" ? editing : undefined);
   let modalTitle = $derived(editing === "new" ? "Spiel hinzufügen" : "Spiel bearbeiten");
@@ -71,6 +76,14 @@
     >
       Performance
     </button>
+    <button
+      type="button"
+      class="nav-item"
+      class:active={view === "steamgriddb"}
+      onclick={() => (view = "steamgriddb")}
+    >
+      SteamGridDB
+    </button>
   </nav>
 
   <main>
@@ -81,7 +94,7 @@
           + Spiel hinzufügen
         </button>
       </div>
-      <GameList onEdit={(game) => (editing = game)} />
+      <GameList onEdit={(game) => (editing = game)} onEditCover={(game) => (pickingCoverFor = game)} />
     {:else if view === "prefixes"}
       <div class="page-header">
         <h1>Prefixe</h1>
@@ -97,17 +110,32 @@
         <h1>MangoHud</h1>
       </div>
       <MangoHudSettings />
-    {:else}
+    {:else if view === "performance"}
       <div class="page-header">
         <h1>Performance</h1>
       </div>
       <PerformanceSettings />
+    {:else}
+      <div class="page-header">
+        <h1>SteamGridDB</h1>
+      </div>
+      <SteamGridDbSettings />
     {/if}
   </main>
 </div>
 
 <Modal open={editing !== null} title={modalTitle} onClose={() => (editing = null)}>
   <GameForm existingGame={modalGame} onSuccess={() => (editing = null)} />
+</Modal>
+
+<Modal
+  open={pickingCoverFor !== null}
+  title="Cover auswählen"
+  onClose={() => (pickingCoverFor = null)}
+>
+  {#if pickingCoverFor}
+    <ArtworkPicker game={pickingCoverFor} onDone={() => (pickingCoverFor = null)} />
+  {/if}
 </Modal>
 
 <style>

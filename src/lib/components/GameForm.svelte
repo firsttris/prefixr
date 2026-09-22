@@ -4,6 +4,7 @@
   import { runners, refreshRunners } from "$lib/stores/runners";
   import { prefixes, refreshPrefixes } from "$lib/stores/prefixes";
   import { addGame, updateGame } from "$lib/stores/games";
+  import { prettifyExeName } from "$lib/gameName";
   import type { Game, GameInput } from "$lib/types";
 
   let { existingGame, onSuccess }: { existingGame?: Game; onSuccess?: () => void } = $props();
@@ -46,7 +47,8 @@
     if (typeof selected === "string") {
       exePath = selected;
       if (!name) {
-        name = selected.split(/[/\\]/).pop() ?? "";
+        const fileName = selected.split(/[/\\]/).pop() ?? "";
+        name = prettifyExeName(fileName);
       }
     }
   }

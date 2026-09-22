@@ -14,7 +14,10 @@
   import GameCard from "./GameCard.svelte";
   import type { Game } from "$lib/types";
 
-  let { onEdit }: { onEdit: (game: Game) => void } = $props();
+  let {
+    onEdit,
+    onEditCover,
+  }: { onEdit: (game: Game) => void; onEditCover: (game: Game) => void } = $props();
 
   onMount(() => {
     initGameEvents();
@@ -38,6 +41,7 @@
         onRemove={() => removeGame(game.id)}
         onShowLog={showLog}
         onCreateShortcut={() => createDesktopShortcut(game.id)}
+        onEditCover={() => onEditCover(game)}
       />
     {/each}
   </div>
