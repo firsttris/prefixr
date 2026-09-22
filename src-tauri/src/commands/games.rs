@@ -16,6 +16,7 @@ use crate::commands::icons::extract_icon_data_url;
 use crate::commands::mangohud::ensure_mangohud_conf;
 use crate::commands::performance::ensure_vkbasalt_conf;
 use crate::commands::runners::{find_runner, runner_command, wine_binary, wineserver_binary};
+use crate::commands::steamgriddb::{artwork_dir, asset_cache_path, image_extension};
 use crate::config::{save_config, ConfigState};
 use crate::models::{Game, GameInput, RunnerKind};
 use crate::tray::rebuild_tray_menu;
@@ -155,6 +156,8 @@ pub fn add_game(
         steamgriddb_id: None,
         cover_grid_id: None,
         cover_url: None,
+        steamgriddb_icon_grid_id: None,
+        steamgriddb_icon_url: None,
     };
 
     let mut config = state
@@ -812,9 +815,25 @@ fn sanitize_filename(name: &str) -> String {
     }
 }
 
-/// Decodes a game's `icon` data URI to a cached PNG file, since a `.desktop`
-/// entry's `Icon=` needs a real file path, not inline image data.
+/// Resolves the file path a `.desktop` shortcut's `Icon=` should point to.
+/// Prefers a chosen SteamGridDB icon (already cached to disk as a real file)
+/// over the exe's embedded icon, since it's the higher-quality, user-picked
+/// option when both exist.
 fn write_shortcut_icon(app: &AppHandle, game: &Game) -> Result<Option<PathBuf>, String> {
+    if let Some(icon_url) = &game.steamgriddb_icon_url {
+        let ext = image_extension(icon_url);
+        let path = asset_cache_path(&artwork_dir(app)?, game.id, "_icon", ext);
+        if path.exists() {
+            return Ok(Some(path));
+        }
+    }
+    write_exe_icon_file(app, game)
+}
+
+/// Decodes a game's `icon` data URI (the exe's embedded icon) to a cached
+/// PNG file, since a `.desktop` entry's `Icon=` needs a real file path, not
+/// inline image data.
+fn write_exe_icon_file(app: &AppHandle, game: &Game) -> Result<Option<PathBuf>, String> {
     let Some(data_url) = &game.icon else {
         return Ok(None);
     };

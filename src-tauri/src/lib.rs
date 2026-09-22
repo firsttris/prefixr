@@ -20,8 +20,9 @@ use commands::prefixes::{add_prefix, delete_prefix, list_prefixes};
 use commands::runner_downloads::{download_runner, list_runner_releases, list_runner_sources};
 use commands::runners::list_runners;
 use commands::steamgriddb::{
-    get_game_cover, get_steamgriddb_config, list_steamgriddb_grids, remove_game_cover,
-    save_steamgriddb_config, search_steamgriddb_games, set_game_cover,
+    get_game_cover, get_game_icon, get_steamgriddb_config, list_steamgriddb_grids,
+    list_steamgriddb_icons, remove_game_cover, remove_game_icon, save_steamgriddb_config,
+    search_steamgriddb_games, set_game_cover, set_game_icon,
 };
 use commands::wine_tools::launch_wine_tool;
 use commands::winetricks::{
@@ -131,9 +132,13 @@ pub fn run() {
             save_steamgriddb_config,
             search_steamgriddb_games,
             list_steamgriddb_grids,
+            list_steamgriddb_icons,
             set_game_cover,
             get_game_cover,
-            remove_game_cover
+            remove_game_cover,
+            set_game_icon,
+            get_game_icon,
+            remove_game_icon
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

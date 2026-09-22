@@ -1,16 +1,28 @@
 <script lang="ts">
   import { onMount, untrack } from "svelte";
   import type { Game, SteamGridDbGameMatch, SteamGridDbGrid } from "$lib/types";
-  import { searchSteamGridDbGames, listSteamGridDbGrids, setGameCover, removeGameCover } from "$lib/stores/steamgriddb";
+  import {
+    searchSteamGridDbGames,
+    listSteamGridDbGrids,
+    listSteamGridDbIcons,
+    setGameCover,
+    removeGameCover,
+    setGameIcon,
+    removeGameIcon,
+  } from "$lib/stores/steamgriddb";
   import { prettifyExeName } from "$lib/gameName";
 
   let { game, onDone }: { game: Game; onDone: () => void } = $props();
+
+  type Kind = "cover" | "icon";
+
+  const kindLabels: Record<Kind, string> = { cover: "Cover", icon: "Icon" };
 
   // `game` is only read here to seed this picker's initial state — a fresh
   // instance is mounted per game (see +page.svelte), so a one-time snapshot
   // is intentional, not a missed reactivity dependency.
   const initial = untrack(() => ({
-    stage: (game.steamgriddb_id ? "grids" : "search") as "search" | "grids",
+    stage: (game.steamgriddb_id ? "assets" : "search") as "search" | "assets",
     // Cleans up leftover ".exe"/camelCase artifacts in names stored before
     // GameForm started prettifying them — a no-op on an already-clean name.
     query: prettifyExeName(game.name),
@@ -19,19 +31,22 @@
       : null,
   }));
 
-  let stage = $state<"search" | "grids">(initial.stage);
+  let kind = $state<Kind>("cover");
+  let stage = $state<"search" | "assets">(initial.stage);
   let query = $state(initial.query);
   let matches = $state<SteamGridDbGameMatch[]>([]);
   let selectedGame = $state<SteamGridDbGameMatch | null>(initial.selectedGame);
-  let grids = $state<SteamGridDbGrid[]>([]);
+  let assetOptions = $state<SteamGridDbGrid[]>([]);
   let loading = $state(false);
   let error = $state("");
   let picking = $state(false);
   let removing = $state(false);
 
+  const currentUrl = $derived(kind === "cover" ? game.cover_url : game.steamgriddb_icon_url);
+
   onMount(async () => {
-    if (stage === "grids" && selectedGame) {
-      await loadGrids(selectedGame.id);
+    if (stage === "assets" && selectedGame) {
+      await loadAssets(selectedGame.id);
     } else {
       await handleSearch();
     }
@@ -53,16 +68,19 @@
 
   async function selectMatch(match: SteamGridDbGameMatch) {
     selectedGame = match;
-    stage = "grids";
-    await loadGrids(match.id);
+    stage = "assets";
+    await loadAssets(match.id);
   }
 
-  async function loadGrids(steamgriddbId: number) {
+  async function loadAssets(steamgriddbId: number) {
     loading = true;
     error = "";
-    grids = [];
+    assetOptions = [];
     try {
-      grids = await listSteamGridDbGrids(steamgriddbId);
+      assetOptions =
+        kind === "cover"
+          ? await listSteamGridDbGrids(steamgriddbId)
+          : await listSteamGridDbIcons(steamgriddbId);
     } catch (e) {
       error = String(e);
     } finally {
@@ -70,12 +88,24 @@
     }
   }
 
-  async function pickGrid(grid: SteamGridDbGrid) {
+  async function switchKind(next: Kind) {
+    if (kind === next) return;
+    kind = next;
+    if (stage === "assets" && selectedGame) {
+      await loadAssets(selectedGame.id);
+    }
+  }
+
+  async function pickAsset(asset: SteamGridDbGrid) {
     if (!selectedGame) return;
     picking = true;
     error = "";
     try {
-      await setGameCover(game.id, selectedGame.id, grid.id, grid.url);
+      if (kind === "cover") {
+        await setGameCover(game.id, selectedGame.id, asset.id, asset.url);
+      } else {
+        await setGameIcon(game.id, selectedGame.id, asset.id, asset.url);
+      }
       onDone();
     } catch (e) {
       error = String(e);
@@ -87,7 +117,11 @@
     removing = true;
     error = "";
     try {
-      await removeGameCover(game.id);
+      if (kind === "cover") {
+        await removeGameCover(game.id);
+      } else {
+        await removeGameIcon(game.id);
+      }
       onDone();
     } catch (e) {
       error = String(e);
@@ -98,17 +132,30 @@
   function backToSearch() {
     stage = "search";
     selectedGame = null;
-    grids = [];
+    assetOptions = [];
     error = "";
   }
 </script>
 
 <div class="picker">
-  {#if game.cover_url}
+  <div class="kind-tabs">
+    {#each Object.keys(kindLabels) as k (k)}
+      <button
+        type="button"
+        class="kind-tab"
+        class:active={kind === k}
+        onclick={() => switchKind(k as Kind)}
+      >
+        {kindLabels[k as Kind]}
+      </button>
+    {/each}
+  </div>
+
+  {#if currentUrl}
     <div class="current">
-      <span class="tune-title">Aktuelles Cover</span>
+      <span class="tune-title">Aktuelles {kindLabels[kind]}</span>
       <div class="current-row">
-        <img class="current-cover" src={game.cover_url} alt="" />
+        <img class="current-asset" class:square={kind === "icon"} src={currentUrl} alt="" />
         <button type="button" class="ghost" disabled={removing} onclick={handleRemove}>
           {removing ? "Wird entfernt…" : "Entfernen"}
         </button>
@@ -150,16 +197,22 @@
     <button type="button" class="ghost back" onclick={backToSearch}>← Andere Suche</button>
 
     {#if loading}
-      <p class="hint">Lade Cover-Vorschläge…</p>
+      <p class="hint">Lade {kindLabels[kind]}-Vorschläge…</p>
     {:else if error}
       <p class="error">{error}</p>
-    {:else if grids.length === 0}
-      <p class="hint">Keine Cover gefunden.</p>
+    {:else if assetOptions.length === 0}
+      <p class="hint">Keine {kindLabels[kind]}-Optionen gefunden.</p>
     {:else}
       <div class="grid-options">
-        {#each grids as grid (grid.id)}
-          <button type="button" class="grid-option" disabled={picking} onclick={() => pickGrid(grid)}>
-            <img src={grid.thumb} alt="" loading="lazy" />
+        {#each assetOptions as asset (asset.id)}
+          <button
+            type="button"
+            class="grid-option"
+            class:square={kind === "icon"}
+            disabled={picking}
+            onclick={() => pickAsset(asset)}
+          >
+            <img src={asset.thumb} alt="" loading="lazy" />
           </button>
         {/each}
       </div>
@@ -172,6 +225,23 @@
     display: flex;
     flex-direction: column;
     gap: 1em;
+  }
+
+  .kind-tabs {
+    display: flex;
+    gap: 0.4em;
+  }
+
+  .kind-tab {
+    padding: 0.4em 1em;
+    border-radius: 999px;
+    background: var(--surface-raised);
+    color: var(--text-muted);
+  }
+
+  .kind-tab.active {
+    background: var(--accent);
+    color: var(--on-accent, #fff);
   }
 
   .tune-title {
@@ -187,11 +257,17 @@
     gap: 0.8em;
   }
 
-  .current-cover {
+  .current-asset {
     width: 4em;
     aspect-ratio: 2 / 3;
     object-fit: cover;
     border-radius: 6px;
+  }
+
+  .current-asset.square {
+    aspect-ratio: 1 / 1;
+    object-fit: contain;
+    background: var(--surface-raised);
   }
 
   .search-row {
@@ -273,6 +349,11 @@
     min-width: 0;
   }
 
+  .grid-option.square {
+    padding-top: 100%; /* 1:1 */
+    background: var(--surface-raised);
+  }
+
   .grid-option:hover:not(:disabled) {
     border-color: var(--accent);
   }
@@ -284,6 +365,10 @@
     height: 100%;
     object-fit: cover;
     display: block;
+  }
+
+  .grid-option.square img {
+    object-fit: contain;
   }
 
   .hint {

@@ -23,6 +23,8 @@ export interface Game {
   steamgriddb_id: number | null;
   cover_grid_id: number | null;
   cover_url: string | null;
+  steamgriddb_icon_grid_id: number | null;
+  steamgriddb_icon_url: string | null;
 }
 
 export interface GameInput {

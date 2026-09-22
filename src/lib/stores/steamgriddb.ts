@@ -22,6 +22,10 @@ export async function listSteamGridDbGrids(steamgriddbId: number): Promise<Steam
   return await invoke<SteamGridDbGrid[]>("list_steamgriddb_grids", { steamgriddbId });
 }
 
+export async function listSteamGridDbIcons(steamgriddbId: number): Promise<SteamGridDbGrid[]> {
+  return await invoke<SteamGridDbGrid[]>("list_steamgriddb_icons", { steamgriddbId });
+}
+
 export async function setGameCover(
   gameId: string,
   steamgriddbId: number,
@@ -39,4 +43,23 @@ export async function removeGameCover(gameId: string): Promise<void> {
 
 export async function getGameCover(gameId: string): Promise<string | null> {
   return await invoke<string | null>("get_game_cover", { gameId });
+}
+
+export async function setGameIcon(
+  gameId: string,
+  steamgriddbId: number,
+  iconGridId: number,
+  imageUrl: string,
+): Promise<void> {
+  await invoke("set_game_icon", { gameId, steamgriddbId, iconGridId, imageUrl });
+  await refreshGames();
+}
+
+export async function removeGameIcon(gameId: string): Promise<void> {
+  await invoke("remove_game_icon", { gameId });
+  await refreshGames();
+}
+
+export async function getGameIcon(gameId: string): Promise<string | null> {
+  return await invoke<string | null>("get_game_icon", { gameId });
 }

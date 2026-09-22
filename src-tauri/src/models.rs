@@ -66,6 +66,16 @@ pub struct Game {
     /// `commands::steamgriddb`.
     #[serde(default)]
     pub cover_url: Option<String>,
+    /// The specific SteamGridDB icon asset id behind `steamgriddb_icon_url`,
+    /// kept for future reuse (e.g. a Steam shortcut export).
+    #[serde(default)]
+    pub steamgriddb_icon_grid_id: Option<i64>,
+    /// Source URL of the chosen SteamGridDB icon image (distinct from
+    /// `icon`, which is extracted from the exe itself). Cached at
+    /// `artwork/{id}_icon.{ext}` under the app data dir — see
+    /// `commands::steamgriddb`.
+    #[serde(default)]
+    pub steamgriddb_icon_url: Option<String>,
 }
 
 /// Payload for `add_game`; the id is assigned by the backend.

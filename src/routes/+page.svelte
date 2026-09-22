@@ -16,7 +16,7 @@
     "library",
   );
   let editing = $state<Game | "new" | null>(null);
-  let pickingCoverFor = $state<Game | null>(null);
+  let pickingArtworkFor = $state<Game | null>(null);
 
   let modalGame = $derived(editing && editing !== "new" ? editing : undefined);
   let modalTitle = $derived(editing === "new" ? "Spiel hinzufügen" : "Spiel bearbeiten");
@@ -101,7 +101,7 @@
       </div>
       <GameList
         onEdit={(game) => (editing = game)}
-        onEditCover={(game) => (pickingCoverFor = game)}
+        onEditArtwork={(game) => (pickingArtworkFor = game)}
         onAddNew={() => (editing = "new")}
       />
     {:else if view === "prefixes"}
@@ -138,12 +138,12 @@
 </Modal>
 
 <Modal
-  open={pickingCoverFor !== null}
-  title="Cover auswählen"
-  onClose={() => (pickingCoverFor = null)}
+  open={pickingArtworkFor !== null}
+  title="Artwork auswählen"
+  onClose={() => (pickingArtworkFor = null)}
 >
-  {#if pickingCoverFor}
-    <ArtworkPicker game={pickingCoverFor} onDone={() => (pickingCoverFor = null)} />
+  {#if pickingArtworkFor}
+    <ArtworkPicker game={pickingArtworkFor} onDone={() => (pickingArtworkFor = null)} />
   {/if}
 </Modal>
 

@@ -17,11 +17,11 @@
 
   let {
     onEdit,
-    onEditCover,
+    onEditArtwork,
     onAddNew,
   }: {
     onEdit: (game: Game) => void;
-    onEditCover: (game: Game) => void;
+    onEditArtwork: (game: Game) => void;
     onAddNew?: () => void;
   } = $props();
 
@@ -136,7 +136,7 @@
         onRemove={() => removeGame(game.id)}
         onShowLog={showLog}
         onCreateShortcut={() => createDesktopShortcut(game.id)}
-        onEditCover={() => onEditCover(game)}
+        onEditArtwork={() => onEditArtwork(game)}
       />
     {/each}
   </div>
@@ -152,7 +152,7 @@
         onRemove={() => removeGame(game.id)}
         onShowLog={showLog}
         onCreateShortcut={() => createDesktopShortcut(game.id)}
-        onEditCover={() => onEditCover(game)}
+        onEditArtwork={() => onEditArtwork(game)}
       />
     {/each}
   </div>

@@ -13,7 +13,7 @@
     onRemove,
     onShowLog,
     onCreateShortcut,
-    onEditCover,
+    onEditArtwork,
   }: {
     game: Game;
     runState?: GameRunState;
@@ -23,7 +23,7 @@
     onRemove: () => void;
     onShowLog: (path: string) => void;
     onCreateShortcut: () => Promise<void>;
-    onEditCover: () => void;
+    onEditArtwork: () => void;
   } = $props();
 
   let shortcutState = $state<"idle" | "creating" | "done" | string>("idle");
@@ -95,9 +95,9 @@
     <button
       type="button"
       class="icon-btn"
-      onclick={onEditCover}
-      aria-label="Cover auswählen"
-      title="Cover auswählen"
+      onclick={onEditArtwork}
+      aria-label="Artwork auswählen"
+      title="Artwork auswählen"
     >
       🖼
     </button>
