@@ -51,7 +51,7 @@ fn is_main_window_visible(app: &AppHandle) -> bool {
 ///   (re-)shown is treated as freshly opening, which is allowed. Hiding
 ///   first unconditionally, even if already visible, makes every call look
 ///   like that permitted case.
-fn show_and_focus(app: &AppHandle) {
+pub fn show_and_focus(app: &AppHandle) {
     let Some(window) = app.get_webview_window(MAIN_WINDOW) else {
         return;
     };

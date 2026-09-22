@@ -5,12 +5,13 @@ mod tray;
 
 use std::path::Path;
 
-use tauri::{Manager, WindowEvent};
+use tauri::{Emitter, Manager, WindowEvent};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
 use commands::games::{
-    add_game, create_desktop_shortcut, create_menu_shortcut, kill_game, launch_game, list_games,
-    remove_game, take_pending_launch, update_game, PendingLaunch, RunningGames,
+    add_game, create_desktop_shortcut, create_menu_shortcut, ensure_install_desktop_entry,
+    kill_game, launch_game, list_games, remove_game, run_installer, take_pending_install,
+    take_pending_launch, update_game, PendingInstall, PendingLaunch, RunningGames,
 };
 use commands::mangohud::{get_mangohud_config, save_mangohud_config};
 use commands::performance::{
@@ -29,7 +30,7 @@ use commands::winetricks::{
     install_winetricks_verbs, list_all_winetricks_verbs, list_installed_winetricks_verbs,
 };
 use config::load_config;
-use tray::{hide_main_window, rebuild_tray_menu, setup_tray, WindowVisible};
+use tray::{hide_main_window, rebuild_tray_menu, setup_tray, show_and_focus, WindowVisible};
 
 /// Checks the real (not effective) UID via `/proc/self/status`, mirroring
 /// what PortProton's own launcher script checks via `id -u`. A prefix set up
@@ -55,15 +56,44 @@ fn running_as_root() -> bool {
 /// Looks for `--launch <game-id>` among the process args, as invoked by a
 /// shortcut created via `create_desktop_shortcut` or `create_menu_shortcut`.
 fn find_launch_arg() -> Option<String> {
-    let args: Vec<String> = std::env::args().collect();
+    find_flag_arg(&std::env::args().collect::<Vec<_>>(), "--launch")
+}
+
+/// Looks for `--install <exe-path>` among the process args, as invoked by the
+/// "Mit Prefixr installieren" file-manager context menu entry (see
+/// `ensure_install_desktop_entry`).
+fn find_install_arg(args: &[String]) -> Option<String> {
+    find_flag_arg(args, "--install")
+}
+
+fn find_flag_arg(args: &[String], flag: &str) -> Option<String> {
     args.windows(2)
-        .find(|pair| pair[0] == "--launch")
+        .find(|pair| pair[0] == flag)
         .map(|pair| pair[1].clone())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // Must be the first plugin registered (see tauri-plugin-single-instance's
+        // own docs) — this is what makes a second "Mit Prefixr installieren"
+        // click, while Prefixr is already running, hand its `--install <path>`
+        // off to this instance instead of opening a second window.
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            let Some(exe_path) = find_install_arg(&argv) else {
+                show_and_focus(app);
+                rebuild_tray_menu(app);
+                return;
+            };
+            if let Some(state) = app.try_state::<PendingInstall>() {
+                if let Ok(mut pending) = state.0.lock() {
+                    *pending = Some(exe_path.clone());
+                }
+            }
+            let _ = app.emit("pending-install", exe_path);
+            show_and_focus(app);
+            rebuild_tray_menu(app);
+        }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
@@ -84,9 +114,16 @@ pub fn run() {
             let config = load_config(app.handle())?;
             app.manage(std::sync::Mutex::new(config));
             app.manage(PendingLaunch(std::sync::Mutex::new(find_launch_arg())));
+            let install_args: Vec<String> = std::env::args().collect();
+            app.manage(PendingInstall(std::sync::Mutex::new(find_install_arg(
+                &install_args,
+            ))));
             app.manage(RunningGames::default());
             app.manage(WindowVisible::new(true));
             setup_tray(app.handle())?;
+            // Best-effort: a file manager's "Öffnen mit" context menu working
+            // is a nice-to-have, not something worth failing startup over.
+            let _ = ensure_install_desktop_entry(app.handle());
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -111,6 +148,8 @@ pub fn run() {
             launch_game,
             kill_game,
             take_pending_launch,
+            take_pending_install,
+            run_installer,
             create_desktop_shortcut,
             create_menu_shortcut,
             add_prefix,

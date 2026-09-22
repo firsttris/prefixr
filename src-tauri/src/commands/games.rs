@@ -159,6 +159,69 @@ pub fn take_pending_launch(state: State<PendingLaunch>) -> Option<String> {
     state.0.lock().ok()?.take()
 }
 
+/// Holds a `--install <exe-path>` argument found at startup, or forwarded by
+/// a second app instance (see `tauri_plugin_single_instance` in `lib.rs`) —
+/// the "Install with Prefixr" file-manager context menu entry launches
+/// Prefixr this way. The frontend picks it up once (either via
+/// `take_pending_install` on startup, or via the `pending-install` event a
+/// second instance triggers while the app is already running) and opens the
+/// installer dialog with this exe path pre-filled.
+pub struct PendingInstall(pub Mutex<Option<String>>);
+
+#[tauri::command]
+pub fn take_pending_install(state: State<PendingInstall>) -> Option<String> {
+    state.0.lock().ok()?.take()
+}
+
+/// Runs an arbitrary exe (typically a game's setup/installer, as opposed to
+/// the game's own exe once installed) under a chosen prefix and runner,
+/// without creating a `Game` entry — that's a separate, deliberate step the
+/// user takes afterwards once the install has finished, since an installer
+/// exe is a different exe than the one that ends up launching the game.
+/// Detached and untracked, like `launch_wine_tool`: this is a GUI installer
+/// the user drives themselves, not something this app manages the lifecycle
+/// of.
+#[tauri::command]
+pub async fn run_installer(
+    state: State<'_, ConfigState>,
+    prefix_path: String,
+    runner_id: String,
+    exe_path: String,
+) -> Result<(), String> {
+    let runners_dir = {
+        let config = state
+            .lock()
+            .map_err(|_| "Configuration is locked".to_string())?;
+        config.runners_dir.clone()
+    };
+
+    let runner = find_runner(&runners_dir, &runner_id)?;
+    let wine = wine_binary(&runner.path)?;
+    let prefix = PathBuf::from(&prefix_path);
+
+    // Must run before wineboot's first initialization of this prefix (see
+    // `steer_profile_to_steamuser`), which the installer itself can trigger
+    // on a fresh, still-uninitialized prefix.
+    steer_profile_to_steamuser(&prefix)?;
+
+    let exe = PathBuf::from(&exe_path);
+    let mut command = runner_command(&wine, [("WINEPREFIX", prefix_path.as_str())]);
+    command.arg(&exe);
+    // Installers commonly expect to run from their own directory (sibling
+    // data files, relative paths) — mirrors how a user would run it by hand.
+    if let Some(parent) = exe.parent() {
+        command.current_dir(parent);
+    }
+    command
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|e| format!("Konnte Setup nicht starten: {e}"))?;
+
+    Ok(())
+}
+
 #[tauri::command]
 pub fn list_games(state: State<ConfigState>) -> Result<Vec<Game>, String> {
     let config = state
@@ -1056,5 +1119,75 @@ pub fn create_menu_shortcut(
     let _ = std::process::Command::new("update-desktop-database")
         .arg(&applications_dir)
         .status();
+    Ok(())
+}
+
+/// Bundled at compile time so the install `.desktop` entry always has an
+/// icon to point to, regardless of packaging format (see
+/// `ensure_install_desktop_entry`).
+const APP_ICON_PNG: &[u8] = include_bytes!("../../icons/128x128.png");
+
+/// MIME types shared-mime-info registers for Windows executables across
+/// mainstream distros — matching any of these is what makes a file manager's
+/// "Öffnen mit" offer this entry when right-clicking an `.exe`.
+const EXE_MIME_TYPES: &str = "application/x-ms-dos-executable;application/x-msdownload;application/vnd.microsoft.portable-executable;";
+
+/// Writes (idempotently overwrites) a second, hidden `.desktop` entry that
+/// registers Prefixr as a handler for Windows executables — this is what
+/// makes "Mit Prefixr installieren" show up when right-clicking an `.exe` in
+/// a file manager's "Öffnen mit" menu, the same mechanism PortProton uses for
+/// its own "Install with PortProton" entry. `NoDisplay=true` keeps it out of
+/// the application menu/launcher, where the main `.desktop` entry (created by
+/// the platform installer/bundler) already covers opening Prefixr itself.
+/// Best-effort and re-run on every startup so it self-heals and stays in
+/// sync with the app's own executable path (relevant for an AppImage, whose
+/// mount path can move between updates).
+pub fn ensure_install_desktop_entry(app: &AppHandle) -> Result<(), String> {
+    let applications_dir = applications_directory()?;
+    fs::create_dir_all(&applications_dir)
+        .map_err(|e| format!("Could not access {}: {e}", applications_dir.display()))?;
+
+    let icons_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Could not resolve data directory: {e}"))?
+        .join("shortcut-icons");
+    fs::create_dir_all(&icons_dir)
+        .map_err(|e| format!("Could not create shortcut icons directory: {e}"))?;
+    let icon_path = icons_dir.join("prefixr-install.png");
+    fs::write(&icon_path, APP_ICON_PNG)
+        .map_err(|e| format!("Could not write install icon: {e}"))?;
+
+    let exe_path = own_executable_path()?;
+    let mut contents = String::new();
+    contents.push_str("[Desktop Entry]\n");
+    contents.push_str("Type=Application\n");
+    contents.push_str("Name=Mit Prefixr installieren\n");
+    contents.push_str("Name[en]=Install with Prefixr\n");
+    contents.push_str(&format!("Exec=\"{}\" --install %f\n", exe_path.display()));
+    contents.push_str(&format!("Icon={}\n", icon_path.display()));
+    contents.push_str("Terminal=false\n");
+    contents.push_str("NoDisplay=true\n");
+    contents.push_str(&format!("MimeType={EXE_MIME_TYPES}\n"));
+
+    let desktop_path = applications_dir.join("com.tristan.prefixr.install.desktop");
+    fs::write(&desktop_path, contents)
+        .map_err(|e| format!("Could not write install desktop entry: {e}"))?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&desktop_path)
+            .map_err(|e| format!("Could not read desktop entry permissions: {e}"))?
+            .permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&desktop_path, perms)
+            .map_err(|e| format!("Could not set desktop entry permissions: {e}"))?;
+    }
+
+    let _ = std::process::Command::new("update-desktop-database")
+        .arg(&applications_dir)
+        .status();
+
     Ok(())
 }

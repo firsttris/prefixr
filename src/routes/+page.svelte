@@ -8,8 +8,16 @@
   import PerformanceSettings from "$lib/components/PerformanceSettings.svelte";
   import SteamGridDbSettings from "$lib/components/SteamGridDbSettings.svelte";
   import ArtworkPicker from "$lib/components/ArtworkPicker.svelte";
+  import InstallDialog from "$lib/components/InstallDialog.svelte";
   import Modal from "$lib/components/Modal.svelte";
-  import { games, initGameEvents, launchGame, takePendingLaunch } from "$lib/stores/games";
+  import {
+    games,
+    initGameEvents,
+    launchGame,
+    listenForPendingInstall,
+    takePendingInstall,
+    takePendingLaunch,
+  } from "$lib/stores/games";
   import type { Game } from "$lib/types";
 
   let view = $state<"library" | "prefixes" | "runners" | "mangohud" | "performance" | "steamgriddb">(
@@ -17,12 +25,16 @@
   );
   let editing = $state<Game | "new" | null>(null);
   let pickingArtworkFor = $state<Game | null>(null);
+  let installingExePath = $state<string | null>(null);
 
   let modalGame = $derived(editing && editing !== "new" ? editing : undefined);
   let modalTitle = $derived(editing === "new" ? "Spiel hinzufügen" : "Spiel bearbeiten");
 
   // If the app was started via a desktop shortcut (--launch <id>), jump
   // straight into starting that game instead of just showing the library.
+  // If it was started via the "Mit Prefixr installieren" context menu entry
+  // (--install <exe-path>) — or a second such click handed its path off to
+  // this already-running instance — open the install dialog instead.
   onMount(async () => {
     const pendingGameId = await takePendingLaunch();
     if (pendingGameId) {
@@ -30,6 +42,12 @@
       initGameEvents();
       launchGame(pendingGameId);
     }
+
+    const pendingExePath = await takePendingInstall();
+    if (pendingExePath) {
+      installingExePath = pendingExePath;
+    }
+    listenForPendingInstall((exePath) => (installingExePath = exePath));
   });
 </script>
 
@@ -144,6 +162,16 @@
 >
   {#if pickingArtworkFor}
     <ArtworkPicker game={pickingArtworkFor} onDone={() => (pickingArtworkFor = null)} />
+  {/if}
+</Modal>
+
+<Modal
+  open={installingExePath !== null}
+  title="Mit Prefixr installieren"
+  onClose={() => (installingExePath = null)}
+>
+  {#if installingExePath}
+    <InstallDialog exePath={installingExePath} onClose={() => (installingExePath = null)} />
   {/if}
 </Modal>
 

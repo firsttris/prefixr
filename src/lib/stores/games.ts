@@ -117,6 +117,30 @@ export async function takePendingLaunch(): Promise<string | null> {
   return await invoke<string | null>("take_pending_launch");
 }
 
+// Checks whether the app was started via the "Mit Prefixr installieren"
+// file-manager context menu entry's `--install <exe-path>` argument; returns
+// the exe path once, then clears it. A second instance launched the same way
+// while Prefixr is already running instead delivers the path via the
+// `pending-install` event (see `listenForPendingInstall`).
+export async function takePendingInstall(): Promise<string | null> {
+  return await invoke<string | null>("take_pending_install");
+}
+
+// Listens for a `pending-install` event, fired when a second "Mit Prefixr
+// installieren" click hands its exe path off to this already-running
+// instance instead of opening a new one.
+export function listenForPendingInstall(callback: (exePath: string) => void): void {
+  listen<string>("pending-install", (event) => callback(event.payload));
+}
+
+export async function runInstaller(
+  prefixPath: string,
+  runnerId: string,
+  exePath: string,
+): Promise<void> {
+  await invoke("run_installer", { prefixPath, runnerId, exePath });
+}
+
 export async function createDesktopShortcut(id: string): Promise<void> {
   await invoke("create_desktop_shortcut", { id });
 }
