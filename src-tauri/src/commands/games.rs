@@ -432,7 +432,11 @@ async fn install_wine_mono(
 /// A no-op once `drive_c/users/<username>` exists as its own real directory
 /// or symlink — imported from elsewhere, or already initialized before this
 /// existed — so this never clobbers a prefix's actual profile.
-fn steer_profile_to_steamuser(prefix_path: &Path) -> Result<(), String> {
+///
+/// `pub(crate)`: `commands::winetricks` needs this too, since winetricks can
+/// be the very first thing to touch a fresh prefix (installing dependencies
+/// before ever launching the game once) and implicitly runs wineboot itself.
+pub(crate) fn steer_profile_to_steamuser(prefix_path: &Path) -> Result<(), String> {
     let users_dir = prefix_path.join("drive_c/users");
     let steamuser_dir = users_dir.join("steamuser");
     fs::create_dir_all(&steamuser_dir)

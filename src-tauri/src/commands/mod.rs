@@ -6,3 +6,4 @@ pub mod performance;
 pub mod prefixes;
 pub mod runner_downloads;
 pub mod runners;
+pub mod winetricks;

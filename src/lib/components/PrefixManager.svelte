@@ -2,10 +2,14 @@
   import { onMount } from "svelte";
   import { open } from "@tauri-apps/plugin-dialog";
   import { prefixes, refreshPrefixes, addPrefix, deletePrefix } from "$lib/stores/prefixes";
+  import { showLog } from "$lib/logViewer";
+  import Modal from "$lib/components/Modal.svelte";
+  import WinetricksInstaller from "$lib/components/WinetricksInstaller.svelte";
 
   let path = $state("");
   let busy = $state(false);
   let error = $state("");
+  let winetricksFor = $state<string | null>(null);
 
   onMount(() => {
     refreshPrefixes();
@@ -75,12 +79,34 @@
       {#each $prefixes as prefix (prefix.path)}
         <li>
           <span>{prefix.path}</span>
-          <button type="button" class="ghost" onclick={() => handleDelete(prefix.path)}>Löschen</button>
+          <div class="actions">
+            <button
+              type="button"
+              class="ghost"
+              onclick={() => (winetricksFor = prefix.path)}
+              aria-label="Abhängigkeiten installieren"
+            >
+              📦
+            </button>
+            <button type="button" class="ghost" onclick={() => handleDelete(prefix.path)}>
+              Löschen
+            </button>
+          </div>
         </li>
       {/each}
     </ul>
   {/if}
 </section>
+
+<Modal
+  open={winetricksFor !== null}
+  title="Abhängigkeiten installieren"
+  onClose={() => (winetricksFor = null)}
+>
+  {#if winetricksFor}
+    <WinetricksInstaller prefixPath={winetricksFor} onShowLog={showLog} />
+  {/if}
+</Modal>
 
 <style>
   .panel {
@@ -141,9 +167,20 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 1em;
     padding: 0.5em 0.7em;
     background: var(--surface-raised);
     border-radius: 8px;
     font-size: 0.9em;
+  }
+
+  li span {
+    word-break: break-all;
+  }
+
+  .actions {
+    display: flex;
+    gap: 0.3em;
+    flex-shrink: 0;
   }
 </style>

@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener";
   import {
     games,
     gameRunState,
@@ -11,6 +10,7 @@
     initGameEvents,
     createDesktopShortcut,
   } from "$lib/stores/games";
+  import { showLog } from "$lib/logViewer";
   import GameCard from "./GameCard.svelte";
   import type { Game } from "$lib/types";
 
@@ -20,20 +20,6 @@
     initGameEvents();
     refreshGames();
   });
-
-  async function showLog(logPath: string) {
-    try {
-      await openPath(logPath);
-    } catch {
-      // No default app for the log file on this system — fall back to just
-      // showing it in the file manager instead of failing silently.
-      try {
-        await revealItemInDir(logPath);
-      } catch (e) {
-        console.error("Could not open or reveal log file", e);
-      }
-    }
-  }
 </script>
 
 {#if $games.length === 0}
