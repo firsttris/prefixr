@@ -18,6 +18,11 @@
     vkbasalt_deband: false,
     inhibit_sleep_enabled: false,
     power_profile_enabled: false,
+    gamescope_enabled: false,
+    gamescope_width: null,
+    gamescope_height: null,
+    gamescope_fps_limit: null,
+    gamescope_fullscreen: false,
   };
 
   let config = $state<PerformanceConfig>({ ...FALLBACK });
@@ -131,7 +136,7 @@
           <span class="toggle-label">
             GameMode
             <InfoIcon
-              text="Empfehlung: Wenn installiert, ruhig aktivieren — bringt oft spürbar mehr Leistung, besonders auf Laptops oder mit Energiesparmodus. Kein Nachteil, wenn GameMode fehlt."
+              text="Empfehlung: Wenn installiert, ruhig aktivieren — bringt oft spürbar mehr Leistung, besonders auf Laptops oder mit Energiesparmodus. Kein Nachteil, wenn GameMode fehlt. Läuft gerade ein konkurrierender Scheduler-Daemon (z. B. ananicy-cpp, scx), wird GameMode automatisch übersprungen und stattdessen auf das Performance-Energieprofil ausgewichen, um Konflikte um CPU-Priorität zu vermeiden."
             />
           </span>
           <p class="toggle-desc">
@@ -179,6 +184,69 @@
           <span class="track"><span class="thumb"></span></span>
         </label>
       </div>
+
+      <div class="toggle-row">
+        <div>
+          <span class="toggle-label">
+            Gamescope
+            <InfoIcon
+              text="Empfehlung: Für Handhelds/TV-Setups oder um Auflösung und FPS-Limit unabhängig vom Spiel zu erzwingen. Braucht das gamescope-Paket; ohne das passiert einfach nichts. Wird übersprungen, wenn prefixr selbst schon in einer Gamescope-Session läuft."
+            />
+          </span>
+          <p class="toggle-desc">
+            Startet das Spiel in einer eigenen, verschachtelten Compositor-Session.
+          </p>
+        </div>
+        <label class="switch">
+          <input type="checkbox" bind:checked={config.gamescope_enabled} onchange={changed} />
+          <span class="track"><span class="thumb"></span></span>
+        </label>
+      </div>
+
+      {#if config.gamescope_enabled}
+        <div class="gamescope-options">
+          <label class="control-group">
+            <span class="tune-title">Breite (px, optional)</span>
+            <input
+              type="number"
+              min="0"
+              placeholder="native"
+              bind:value={config.gamescope_width}
+              oninput={changed}
+            />
+          </label>
+          <label class="control-group">
+            <span class="tune-title">Höhe (px, optional)</span>
+            <input
+              type="number"
+              min="0"
+              placeholder="native"
+              bind:value={config.gamescope_height}
+              oninput={changed}
+            />
+          </label>
+          <label class="control-group">
+            <span class="tune-title">FPS-Limit (optional)</span>
+            <input
+              type="number"
+              min="0"
+              placeholder="unbegrenzt"
+              bind:value={config.gamescope_fps_limit}
+              oninput={changed}
+            />
+          </label>
+          <div class="checkbox-row">
+            <label>
+              <input
+                type="checkbox"
+                bind:checked={config.gamescope_fullscreen}
+                onchange={changed}
+              />
+              Vollbild erzwingen
+            </label>
+          </div>
+        </div>
+      {/if}
     </div>
   </div>
 
@@ -412,6 +480,23 @@
 
   .switch input:checked + .track .thumb {
     transform: translateX(20px);
+  }
+
+  .gamescope-options {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.9em;
+    padding: 0.2em 0.9em 0.7em;
+  }
+
+  .gamescope-options input[type="number"] {
+    width: 100%;
+  }
+
+  @media (max-width: 640px) {
+    .gamescope-options {
+      grid-template-columns: 1fr;
+    }
   }
 
   .vkbasalt-grid {

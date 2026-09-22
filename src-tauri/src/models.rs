@@ -167,6 +167,21 @@ pub struct PerformanceConfig {
     /// `launch_game`.
     #[serde(default)]
     pub power_profile_enabled: bool,
+    /// Wraps the game in `gamescope`, giving it its own nested compositor
+    /// session with independent resolution/refresh-rate — useful on
+    /// handhelds/TVs. No-op if `gamescope` isn't installed, and skipped
+    /// entirely if we're already running inside a gamescope session
+    /// ourselves (nesting it again is pointless). See `launch_game`.
+    #[serde(default)]
+    pub gamescope_enabled: bool,
+    #[serde(default)]
+    pub gamescope_width: Option<u32>,
+    #[serde(default)]
+    pub gamescope_height: Option<u32>,
+    #[serde(default)]
+    pub gamescope_fps_limit: Option<u32>,
+    #[serde(default)]
+    pub gamescope_fullscreen: bool,
 }
 
 /// SteamGridDB API settings — see `commands::steamgriddb`.
@@ -187,6 +202,11 @@ impl Default for PerformanceConfig {
             vkbasalt_deband: false,
             inhibit_sleep_enabled: false,
             power_profile_enabled: false,
+            gamescope_enabled: false,
+            gamescope_width: None,
+            gamescope_height: None,
+            gamescope_fps_limit: None,
+            gamescope_fullscreen: false,
         }
     }
 }

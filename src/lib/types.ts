@@ -87,6 +87,11 @@ export interface PerformanceConfig {
   vkbasalt_deband: boolean;
   inhibit_sleep_enabled: boolean;
   power_profile_enabled: boolean;
+  gamescope_enabled: boolean;
+  gamescope_width: number | null;
+  gamescope_height: number | null;
+  gamescope_fps_limit: number | null;
+  gamescope_fullscreen: boolean;
 }
 
 export interface SteamGridDbConfig {

@@ -31,6 +31,36 @@ pub(crate) fn command_on_path(name: &str) -> bool {
         .unwrap_or(false)
 }
 
+/// systemd units for CPU/process schedulers that manage niceness dynamically
+/// (auto-nice daemons, sched-ext loaders). GameMode's `gamemoderun` also
+/// writes niceness/governor directly, so running both fights over the same
+/// knobs — seen in the wild as priority flapping. Checked in `launch_game`.
+const COMPETING_SCHEDULER_UNITS: &[&str] = &[
+    "ananicy.service",
+    "ananicy-cpp.service",
+    "scx.service",
+    "scx_loader.service",
+    "falcond.service",
+];
+
+/// Whether one of `COMPETING_SCHEDULER_UNITS` is currently active, in which
+/// case GameMode's own niceness/governor tweaks should be skipped in favor of
+/// `power_profile` (see `launch_game`).
+async fn competing_scheduler_active() -> bool {
+    for unit in COMPETING_SCHEDULER_UNITS {
+        let active = tokio::process::Command::new("systemctl")
+            .args(["is-active", "--quiet", unit])
+            .status()
+            .await
+            .map(|status| status.success())
+            .unwrap_or(false);
+        if active {
+            return true;
+        }
+    }
+    false
+}
+
 /// A game process currently running under its runner, tracked so the tray
 /// menu can list it and offer to kill it (e.g. when a Proton game hangs).
 #[derive(Clone)]
@@ -599,7 +629,13 @@ pub async fn launch_game(
             conf_path.display().to_string(),
         ));
     }
-    if performance.gamemode_enabled {
+    // GameMode writes niceness/CPU-governor directly, which fights a
+    // competing auto-nice/scheduler daemon if one is running — so in that
+    // case we skip the LD_PRELOAD and fall back to `power_profile` instead
+    // (see `use_power_profile` below), which doesn't touch niceness at all.
+    let scheduler_conflict =
+        performance.gamemode_enabled && competing_scheduler_active().await;
+    if performance.gamemode_enabled && !scheduler_conflict {
         env.push(("LD_PRELOAD".to_string(), "libgamemodeauto.so.0".to_string()));
     }
     if performance.vkbasalt_enabled {
@@ -625,7 +661,7 @@ pub async fn launch_game(
     // automatically on exit (even a crash) since the hold lives on the
     // D-Bus connection it opens. A quick `get` call first checks the daemon
     // is actually running and not just installed.
-    let use_power_profile = performance.power_profile_enabled
+    let use_power_profile = (performance.power_profile_enabled || scheduler_conflict)
         && command_on_path("powerprofilesctl")
         && Path::new("/run/dbus/system_bus_socket").exists()
         && tokio::process::Command::new("powerprofilesctl")
@@ -668,6 +704,35 @@ pub async fn launch_game(
         launch_chain = wrapped;
     }
 
+    // Gamescope goes outermost: it opens its own nested compositor session
+    // and everything else (wine, the other wrappers) runs inside it. Skipped
+    // if we're already inside a gamescope session ourselves — nesting it
+    // again is pointless and often broken.
+    let use_gamescope = performance.gamescope_enabled
+        && command_on_path("gamescope")
+        && std::env::var_os("GAMESCOPE_WAYLAND_DISPLAY").is_none();
+    if use_gamescope {
+        let mut wrapped = vec!["gamescope".to_string()];
+        if let Some(width) = performance.gamescope_width {
+            wrapped.push("-w".to_string());
+            wrapped.push(width.to_string());
+        }
+        if let Some(height) = performance.gamescope_height {
+            wrapped.push("-h".to_string());
+            wrapped.push(height.to_string());
+        }
+        if let Some(fps) = performance.gamescope_fps_limit {
+            wrapped.push("-r".to_string());
+            wrapped.push(fps.to_string());
+        }
+        if performance.gamescope_fullscreen {
+            wrapped.push("-f".to_string());
+        }
+        wrapped.push("--".to_string());
+        wrapped.append(&mut launch_chain);
+        launch_chain = wrapped;
+    }
+
     let launch_binary = PathBuf::from(&launch_chain[0]);
     let wrapper_args = launch_chain[1..].to_vec();
     let launch_env = env;
@@ -679,6 +744,18 @@ pub async fn launch_game(
         .split_whitespace()
         .map(str::to_string)
         .collect();
+
+    if scheduler_conflict {
+        let note = if use_power_profile {
+            "[prefixr] GameMode uebersprungen: konkurrierender Scheduler-Daemon aktiv, nutze Power-Profile stattdessen\n"
+        } else {
+            "[prefixr] GameMode uebersprungen: konkurrierender Scheduler-Daemon aktiv, powerprofilesctl nicht verfuegbar\n"
+        };
+        let _ = fs::OpenOptions::new()
+            .append(true)
+            .open(&log_path)
+            .and_then(|mut f| std::io::Write::write_all(&mut f, note.as_bytes()));
+    }
 
     let log_out = fs::OpenOptions::new()
         .append(true)
