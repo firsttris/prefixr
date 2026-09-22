@@ -10,9 +10,9 @@
   let exeName = $derived(exePath.split(/[/\\]/).pop() ?? exePath);
 
   let prefixPath = $state("");
-  let newPrefixPath = $state("");
   let runnerId = $state("");
   let busy = $state(false);
+  let creatingPrefix = $state(false);
   let started = $state(false);
   let error = $state("");
 
@@ -21,27 +21,28 @@
     refreshRunners();
   });
 
-  async function pickNewPrefixFolder() {
+  async function createNewPrefix() {
     const selected = await open({ directory: true });
-    if (typeof selected === "string") {
-      newPrefixPath = selected;
-      prefixPath = "";
+    if (typeof selected !== "string") return;
+    creatingPrefix = true;
+    error = "";
+    try {
+      await addPrefix(selected);
+      prefixPath = selected;
+    } catch (e) {
+      error = String(e);
+    } finally {
+      creatingPrefix = false;
     }
   }
 
   async function handleStart(event: Event) {
     event.preventDefault();
-    if (!runnerId) return;
+    if (!runnerId || !prefixPath) return;
     busy = true;
     error = "";
     try {
-      let targetPrefix = prefixPath;
-      if (!targetPrefix && newPrefixPath) {
-        await addPrefix(newPrefixPath);
-        targetPrefix = newPrefixPath;
-      }
-      if (!targetPrefix) return;
-      await runInstaller(targetPrefix, runnerId, exePath);
+      await runInstaller(prefixPath, runnerId, exePath);
       started = true;
     } catch (e) {
       error = String(e);
@@ -54,8 +55,7 @@
 <div class="install-dialog">
   <p class="hint">
     <strong>{exeName}</strong> in einem Prefix ausführen, um es zu installieren. Das Spiel selbst
-    trägst du danach separat über „Spiel hinzufügen“ ein — die Setup-exe ist ja meist eine andere
-    Datei als die, die das Spiel am Ende startet.
+    trägst du danach separat über „Spiel hinzufügen“ ein.
   </p>
 
   {#if started}
@@ -68,25 +68,22 @@
     <form onsubmit={handleStart}>
       <label>
         Prefix
-        <select bind:value={prefixPath} disabled={newPrefixPath !== ""}>
-          <option value="" disabled selected>Prefix wählen</option>
-          {#each $prefixes as prefix (prefix.path)}
-            <option value={prefix.path}>{prefix.path}</option>
-          {/each}
-        </select>
-      </label>
-
-      <div class="or">oder</div>
-
-      <label>
-        Neuer Prefix
         <div class="row">
-          <input
-            placeholder="z. B. /home/du/prefixes/mein-spiel"
-            bind:value={newPrefixPath}
-            oninput={() => (prefixPath = "")}
-          />
-          <button type="button" onclick={pickNewPrefixFolder}>Ordner wählen</button>
+          <select bind:value={prefixPath} disabled={creatingPrefix}>
+            <option value="" disabled selected>Prefix wählen</option>
+            {#each $prefixes as prefix (prefix.path)}
+              <option value={prefix.path}>{prefix.path}</option>
+            {/each}
+          </select>
+          <button
+            type="button"
+            class="icon-button"
+            title="Neuen Prefix erstellen"
+            disabled={creatingPrefix}
+            onclick={createNewPrefix}
+          >
+            {creatingPrefix ? "…" : "+"}
+          </button>
         </div>
       </label>
 
@@ -100,11 +97,7 @@
         </select>
       </label>
 
-      <button
-        type="submit"
-        class="primary"
-        disabled={busy || !runnerId || (!prefixPath && !newPrefixPath)}
-      >
+      <button type="submit" class="primary" disabled={busy || !runnerId || !prefixPath}>
         {busy ? "Starte…" : "Setup ausführen"}
       </button>
     </form>
@@ -150,14 +143,16 @@
     gap: 0.5em;
   }
 
-  .row input {
+  .row select {
     flex: 1;
   }
 
-  .or {
-    color: var(--text-muted);
-    font-size: 0.8em;
-    text-align: center;
+  .icon-button {
+    flex-shrink: 0;
+    width: 2.2em;
+    padding: 0;
+    font-size: 1.1em;
+    line-height: 1;
   }
 
   .error {
