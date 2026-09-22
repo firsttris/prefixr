@@ -1162,8 +1162,13 @@ pub fn ensure_install_desktop_entry(app: &AppHandle) -> Result<(), String> {
     let mut contents = String::new();
     contents.push_str("[Desktop Entry]\n");
     contents.push_str("Type=Application\n");
-    contents.push_str("Name=Mit Prefixr installieren\n");
-    contents.push_str("Name[en]=Install with Prefixr\n");
+    // No leading "Mit"/"with": file managers that build their own "Open
+    // With %s" wrapper (e.g. GNOME Files) would otherwise double it up into
+    // "Mit Mit Prefixr installieren öffnen" / "Open With Install with
+    // Prefixr". Leaving the verb out of the name lets each file manager
+    // compose its own sentence around it, same as every other app's entry.
+    contents.push_str("Name=Prefixr installieren\n");
+    contents.push_str("Name[en]=Install Prefixr\n");
     contents.push_str(&format!("Exec=\"{}\" --install %f\n", exe_path.display()));
     contents.push_str(&format!("Icon={}\n", icon_path.display()));
     contents.push_str("Terminal=false\n");
