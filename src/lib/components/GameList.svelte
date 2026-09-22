@@ -12,12 +12,58 @@
   } from "$lib/stores/games";
   import { showLog } from "$lib/logViewer";
   import GameCard from "./GameCard.svelte";
+  import GameListRow from "./GameListRow.svelte";
   import type { Game } from "$lib/types";
 
   let {
     onEdit,
     onEditCover,
-  }: { onEdit: (game: Game) => void; onEditCover: (game: Game) => void } = $props();
+    onAddNew,
+  }: {
+    onEdit: (game: Game) => void;
+    onEditCover: (game: Game) => void;
+    onAddNew?: () => void;
+  } = $props();
+
+  const VIEW_MODE_KEY = "library-view-mode";
+
+  function loadViewMode(): "grid" | "list" {
+    try {
+      const stored = localStorage.getItem(VIEW_MODE_KEY);
+      if (stored === "grid" || stored === "list") return stored;
+    } catch {
+      // localStorage unavailable (e.g. private mode) — fall back silently.
+    }
+    return "grid";
+  }
+
+  let viewMode = $state<"grid" | "list">(loadViewMode());
+  let query = $state("");
+  let sortBy = $state<"name-asc" | "name-desc" | "runner">("name-asc");
+
+  $effect(() => {
+    try {
+      localStorage.setItem(VIEW_MODE_KEY, viewMode);
+    } catch {
+      // Ignore — view mode just won't persist across restarts.
+    }
+  });
+
+  let visibleGames = $derived.by(() => {
+    const q = query.trim().toLowerCase();
+    let list = q ? $games.filter((g) => g.name.toLowerCase().includes(q)) : $games.slice();
+
+    if (sortBy === "name-asc") {
+      list.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sortBy === "name-desc") {
+      list.sort((a, b) => b.name.localeCompare(a.name));
+    } else {
+      list.sort(
+        (a, b) => a.runner_id.localeCompare(b.runner_id) || a.name.localeCompare(b.name),
+      );
+    }
+    return list;
+  });
 
   onMount(() => {
     initGameEvents();
@@ -25,14 +71,79 @@
   });
 </script>
 
+{#if $games.length > 0}
+  <div class="toolbar">
+    <input
+      type="search"
+      placeholder="Spiel suchen…"
+      bind:value={query}
+      aria-label="Spiel suchen"
+    />
+
+    <select bind:value={sortBy} aria-label="Sortierung">
+      <option value="name-asc">Name (A–Z)</option>
+      <option value="name-desc">Name (Z–A)</option>
+      <option value="runner">Runner</option>
+    </select>
+
+    <div class="view-toggle" role="group" aria-label="Ansicht wechseln">
+      <button
+        type="button"
+        class:active={viewMode === "grid"}
+        onclick={() => (viewMode = "grid")}
+        aria-label="Kachelansicht"
+        title="Kachelansicht"
+      >
+        ▦
+      </button>
+      <button
+        type="button"
+        class:active={viewMode === "list"}
+        onclick={() => (viewMode = "list")}
+        aria-label="Listenansicht"
+        title="Listenansicht"
+      >
+        ☰
+      </button>
+    </div>
+  </div>
+{/if}
+
 {#if $games.length === 0}
   <div class="empty">
-    <p>Noch keine Spiele in deiner Bibliothek.</p>
+    <span class="empty-icon">🎮</span>
+    <h3>Noch keine Spiele in deiner Bibliothek</h3>
+    <p>Füge dein erstes Spiel hinzu, um loszulegen.</p>
+    {#if onAddNew}
+      <button type="button" class="primary" onclick={onAddNew}>+ Spiel hinzufügen</button>
+    {/if}
+  </div>
+{:else if visibleGames.length === 0}
+  <div class="empty">
+    <span class="empty-icon">🔍</span>
+    <h3>Keine Treffer</h3>
+    <p>Kein Spiel gefunden für „{query}“.</p>
+  </div>
+{:else if viewMode === "grid"}
+  <div class="grid">
+    {#each visibleGames as game (game.id)}
+      <GameCard
+        {game}
+        runState={$gameRunState[game.id]}
+        onLaunch={() => launchGame(game.id)}
+        onKill={() => killGame(game.id)}
+        onEdit={() => onEdit(game)}
+        onRemove={() => removeGame(game.id)}
+        onShowLog={showLog}
+        onCreateShortcut={() => createDesktopShortcut(game.id)}
+        onEditCover={() => onEditCover(game)}
+      />
+    {/each}
   </div>
 {:else}
-  <div class="grid">
-    {#each $games as game (game.id)}
-      <GameCard
+  <div class="list">
+    {#each visibleGames as game (game.id)}
+      <GameListRow
         {game}
         runState={$gameRunState[game.id]}
         onLaunch={() => launchGame(game.id)}
@@ -48,17 +159,81 @@
 {/if}
 
 <style>
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+    margin-bottom: 1.3em;
+  }
+
+  .toolbar input[type="search"] {
+    flex: 1;
+    max-width: 320px;
+  }
+
+  .toolbar select {
+    width: auto;
+  }
+
+  .view-toggle {
+    display: flex;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .view-toggle button {
+    border: none;
+    border-radius: 0;
+    background: var(--surface-raised);
+    padding: 0.5em 0.8em;
+    color: var(--text-muted);
+  }
+
+  .view-toggle button + button {
+    border-left: 1px solid var(--border);
+  }
+
+  .view-toggle button.active {
+    background: var(--accent);
+    color: #fff;
+  }
+
   .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: 1em;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 1.1em;
+  }
+
+  .list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
   }
 
   .empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5em;
     color: var(--text-muted);
     text-align: center;
-    padding: 3em 1em;
+    padding: 4em 1em;
     border: 1px dashed var(--border);
     border-radius: var(--radius);
+  }
+
+  .empty-icon {
+    font-size: 2.4em;
+    margin-bottom: 0.2em;
+  }
+
+  .empty h3 {
+    color: var(--text);
+  }
+
+  .empty .primary {
+    margin-top: 0.8em;
   }
 </style>

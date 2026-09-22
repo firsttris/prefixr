@@ -55,33 +55,33 @@
   }
 </script>
 
-<article class="card" class:running={runState?.running}>
-  <div class="cover-wrap">
+<div class="row" class:running={runState?.running}>
+  <div class="thumb">
     {#if coverDataUrl}
       <img class="cover" src={coverDataUrl} alt="" />
+    {:else if game.icon}
+      <img class="icon" src={game.icon} alt="" />
     {:else}
-      <div class="cover placeholder">
-        {#if game.icon}
-          <img class="icon" src={game.icon} alt="" />
-        {:else}
-          <span class="icon fallback">🎮</span>
-        {/if}
-      </div>
+      <span class="icon fallback">🎮</span>
     {/if}
+  </div>
 
+  <div class="meta">
+    <span class="name" title={game.name}>{game.name}</span>
+    <span class="runner">{game.runner_id}</span>
+  </div>
+
+  <div class="status">
     {#if runState?.running}
       <span class="status-badge running"><span class="dot"></span>Läuft</span>
     {:else if runState?.initializing}
       <span class="status-badge init"><span class="dot"></span>Startet…</span>
+    {:else if runState?.error}
+      <span class="status-badge error">Fehler</span>
     {/if}
   </div>
 
-  <div class="info">
-    <h3 title={game.name}>{game.name}</h3>
-    <span class="runner">{game.runner_id}</span>
-  </div>
-
-  <div class="actions-row">
+  <div class="row-actions">
     <button
       type="button"
       class="icon-btn"
@@ -120,44 +120,38 @@
     >
       ✕
     </button>
-  </div>
 
-  <button
-    type="button"
-    class="primary start"
-    onclick={onLaunch}
-    disabled={runState?.running || runState?.initializing}
-  >
-    {#if runState?.initializing}
-      Initialisiere…
-    {:else if runState?.running}
-      Läuft…
+    {#if runState?.running}
+      <button type="button" class="kill-sm" onclick={onKill}>Beenden</button>
     {:else}
-      ▶ Start
+      <button
+        type="button"
+        class="primary start-sm"
+        onclick={onLaunch}
+        disabled={runState?.initializing}
+      >
+        {runState?.initializing ? "Initialisiere…" : "▶ Start"}
+      </button>
     {/if}
-  </button>
+  </div>
+</div>
 
-  {#if runState?.running}
-    <button type="button" class="kill" onclick={onKill}> Beenden (Prozess killen) </button>
-  {/if}
+{#if runState?.error}
+  <div class="toast">
+    <span>{runState.error}</span>
+    {#if runState.logPath}
+      <button type="button" class="ghost" onclick={() => onShowLog(runState.logPath!)}>
+        Log anzeigen
+      </button>
+    {/if}
+  </div>
+{/if}
 
-  {#if runState?.error}
-    <div class="toast">
-      <span>{runState.error}</span>
-      {#if runState.logPath}
-        <button type="button" class="ghost" onclick={() => onShowLog(runState.logPath!)}>
-          Log anzeigen
-        </button>
-      {/if}
-    </div>
-  {/if}
-
-  {#if shortcutState !== "idle" && shortcutState !== "creating" && shortcutState !== "done"}
-    <div class="toast">
-      <span>Verknüpfung fehlgeschlagen: {shortcutState}</span>
-    </div>
-  {/if}
-</article>
+{#if shortcutState !== "idle" && shortcutState !== "creating" && shortcutState !== "done"}
+  <div class="toast">
+    <span>Verknüpfung fehlgeschlagen: {shortcutState}</span>
+  </div>
+{/if}
 
 <ConfirmDialog
   open={confirmingRemove}
@@ -171,75 +165,106 @@
 />
 
 <style>
-  .card {
+  .row {
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    gap: 1em;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    overflow: hidden;
+    padding: 0.6em 0.8em;
+    transition: border-color 0.15s ease;
   }
 
-  .card.running {
+  .row:hover {
+    border-color: var(--accent);
+  }
+
+  .row.running {
     border-color: var(--success);
     box-shadow: 0 0 0 1px var(--success);
   }
 
-  .cover-wrap {
-    position: relative;
-    aspect-ratio: 2 / 3;
+  .thumb {
+    flex-shrink: 0;
+    width: 2.8em;
+    height: 2.8em;
+    border-radius: 6px;
     overflow: hidden;
     background: var(--surface-raised);
-  }
-
-  .cover {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-
-  .cover.placeholder {
     display: flex;
     align-items: center;
     justify-content: center;
   }
 
-  .icon {
-    width: 2.6em;
-    height: 2.6em;
-    object-fit: contain;
-    image-rendering: -webkit-optimize-contrast;
+  .thumb .cover {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 
-  .icon.fallback {
-    font-size: 3em;
+  .thumb .icon {
+    width: 1.7em;
+    height: 1.7em;
+    object-fit: contain;
+  }
+
+  .thumb .icon.fallback {
+    font-size: 1.4em;
+  }
+
+  .meta {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 0.7em;
+  }
+
+  .name {
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .runner {
+    flex-shrink: 0;
+    font-size: 0.75em;
+    color: var(--text-muted);
+    background: var(--surface-raised);
+    padding: 0.15em 0.6em;
+    border-radius: 999px;
+  }
+
+  .status {
+    flex-shrink: 0;
+    width: 6.5em;
   }
 
   .status-badge {
-    position: absolute;
-    top: 0.6em;
-    left: 0.6em;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 0.4em;
     font-size: 0.72em;
     font-weight: 600;
     padding: 0.3em 0.65em;
     border-radius: 999px;
-    backdrop-filter: blur(6px);
   }
 
   .status-badge.running {
     background: var(--success-bg);
     color: var(--success);
-    border: 1px solid rgba(62, 207, 142, 0.4);
   }
 
   .status-badge.init {
     background: rgba(91, 140, 255, 0.18);
     color: var(--accent);
-    border: 1px solid rgba(91, 140, 255, 0.4);
+  }
+
+  .status-badge.error {
+    background: var(--danger-bg);
+    color: var(--danger);
   }
 
   .dot {
@@ -263,79 +288,47 @@
     }
   }
 
-  .info {
+  .row-actions {
+    flex-shrink: 0;
     display: flex;
-    flex-direction: column;
-    gap: 0.35em;
-    padding: 0.8em 0.9em 0;
-    text-align: left;
-  }
-
-  h3 {
-    font-size: 0.95em;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    min-height: 2.6em;
-  }
-
-  .runner {
-    align-self: flex-start;
-    font-size: 0.75em;
-    color: var(--text-muted);
-    background: var(--surface-raised);
-    padding: 0.15em 0.6em;
-    border-radius: 999px;
-  }
-
-  .actions-row {
-    display: flex;
+    align-items: center;
     gap: 0.4em;
-    padding: 0.7em 0.9em 0;
-  }
-
-  .actions-row .icon-btn {
-    flex: 1;
-    width: auto;
   }
 
   .divider {
     flex-shrink: 0;
-    align-self: center;
     width: 1px;
     height: 1.4em;
     background: var(--border);
     margin: 0 0.1em;
   }
 
-  .start {
-    margin: 0.7em 0.9em 0.9em;
+  .start-sm,
+  .kill-sm {
+    font-size: 0.85em;
+    padding: 0.5em 0.9em;
+    white-space: nowrap;
   }
 
-  .kill {
-    margin: 0 0.9em 0.9em;
+  .kill-sm {
     background: var(--danger-bg);
     border-color: transparent;
     color: var(--danger);
-    font-size: 0.85em;
   }
 
-  .kill:hover:not(:disabled) {
+  .kill-sm:hover:not(:disabled) {
     border-color: var(--danger);
   }
 
   .toast {
     display: flex;
-    flex-direction: column;
-    gap: 0.4em;
+    align-items: center;
+    gap: 0.6em;
     background: var(--danger-bg);
     color: var(--danger);
     border-radius: 8px;
-    padding: 0.5em 0.7em;
-    margin: 0 0.9em 0.9em;
+    padding: 0.5em 0.8em;
+    margin-top: 0.4em;
     font-size: 0.85em;
-    text-align: left;
   }
 </style>

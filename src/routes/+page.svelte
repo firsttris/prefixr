@@ -9,7 +9,7 @@
   import SteamGridDbSettings from "$lib/components/SteamGridDbSettings.svelte";
   import ArtworkPicker from "$lib/components/ArtworkPicker.svelte";
   import Modal from "$lib/components/Modal.svelte";
-  import { initGameEvents, launchGame, takePendingLaunch } from "$lib/stores/games";
+  import { games, initGameEvents, launchGame, takePendingLaunch } from "$lib/stores/games";
   import type { Game } from "$lib/types";
 
   let view = $state<"library" | "prefixes" | "runners" | "mangohud" | "performance" | "steamgriddb">(
@@ -89,12 +89,21 @@
   <main>
     {#if view === "library"}
       <div class="page-header">
-        <h1>Bibliothek</h1>
+        <div>
+          <h1>Bibliothek</h1>
+          {#if $games.length > 0}
+            <p class="subtitle">{$games.length} {$games.length === 1 ? "Spiel" : "Spiele"}</p>
+          {/if}
+        </div>
         <button type="button" class="primary" onclick={() => (editing = "new")}>
           + Spiel hinzufügen
         </button>
       </div>
-      <GameList onEdit={(game) => (editing = game)} onEditCover={(game) => (pickingCoverFor = game)} />
+      <GameList
+        onEdit={(game) => (editing = game)}
+        onEditCover={(game) => (pickingCoverFor = game)}
+        onAddNew={() => (editing = "new")}
+      />
     {:else if view === "prefixes"}
       <div class="page-header">
         <h1>Prefixe</h1>
@@ -194,6 +203,12 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 1.5em;
+  }
+
+  .subtitle {
+    color: var(--text-muted);
+    font-size: 0.9em;
+    margin-top: 0.2em;
   }
 
 </style>
