@@ -10,8 +10,6 @@
 
   const FALLBACK: PerformanceConfig = {
     gamemode_enabled: false,
-    sync_enabled: true,
-    dxvk_async_enabled: false,
     vkbasalt_enabled: false,
     vkbasalt_sharpen: true,
     vkbasalt_sharpness: 0.4,
@@ -91,42 +89,6 @@
         </div>
         <label class="switch">
           <input type="checkbox" bind:checked={config.gamemode_enabled} onchange={changed} />
-          <span class="track"><span class="thumb"></span></span>
-        </label>
-      </div>
-
-      <div class="toggle-row">
-        <div>
-          <span class="toggle-label">
-            Schnelle Thread-Synchronisation
-            <InfoIcon
-              text="Standardmäßig aktiv, da praktisch nie ein Nachteil: Fragt Ntsync, Fsync und Esync gleichzeitig an — Wine/Proton nimmt selbst automatisch die schnellste Methode, die dein Kernel und der gewählte Runner tatsächlich unterstützen, und ignoriert den Rest. Nicht unterstützte Stufen passieren einfach nichts; Esync wird zusätzlich automatisch deaktiviert, falls dein System ein zu niedriges Limit für offene Dateien hat. Nur ausschalten, wenn ein bestimmtes Spiel damit nachweislich hängt oder abstürzt (selten, meist bei bestimmten Anti-Cheat-Systemen)."
-            />
-          </span>
-          <p class="toggle-desc">
-            Nutzt Ntsync, Fsync oder Esync — je nachdem, was Kernel und Runner unterstützen.
-          </p>
-        </div>
-        <label class="switch">
-          <input type="checkbox" bind:checked={config.sync_enabled} onchange={changed} />
-          <span class="track"><span class="thumb"></span></span>
-        </label>
-      </div>
-
-      <div class="toggle-row">
-        <div>
-          <span class="toggle-label">
-            DXVK Async
-            <InfoIcon
-              text="Empfehlung: Nur einschalten, wenn du beim ersten Betreten eines Levels/Areals Ruckler durch Shader-Kompilierung bemerkst. Seltene, kurze Grafikfehler möglich, in Multiplayer-Titeln mit Anti-Cheat theoretisch auch ein Erkennungsrisiko. Wirkung hängt vom Runner ab: manche neueren GE-Proton-Versionen haben den alten Async-Patch durch einen automatischen Mechanismus ersetzt (dann tut der Schalter nichts), die meisten aktuellen GE-Proton-Builds (dxvk-gplasync) unterstützen ihn aber weiterhin."
-            />
-          </span>
-          <p class="toggle-desc">
-            Kompiliert Shader im Hintergrund statt das Spiel kurz einfrieren zu lassen.
-          </p>
-        </div>
-        <label class="switch">
-          <input type="checkbox" bind:checked={config.dxvk_async_enabled} onchange={changed} />
           <span class="track"><span class="thumb"></span></span>
         </label>
       </div>

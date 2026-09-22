@@ -73,8 +73,6 @@ export interface MangoHudConfig {
 
 export interface PerformanceConfig {
   gamemode_enabled: boolean;
-  sync_enabled: boolean;
-  dxvk_async_enabled: boolean;
   vkbasalt_enabled: boolean;
   vkbasalt_sharpen: boolean;
   vkbasalt_sharpness: number;

@@ -116,28 +116,6 @@ pub struct MangoHudConfig {
 #[serde(rename_all = "snake_case")]
 pub struct PerformanceConfig {
     pub gamemode_enabled: bool,
-    /// Requests the best inter-process sync primitive wine/Proton has
-    /// available, instead of exposing ntsync/fsync/esync as three separate
-    /// toggles a user would have to understand the tradeoffs between. All
-    /// three are requested at once (see `launch_game`) and wine/Proton
-    /// itself already picks the best one that's actually supported, in that
-    /// same priority order (ntsync > fsync > esync) — asking for all three
-    /// doesn't cost anything the way asking for one at a time would.
-    /// Force-disables all three when off, since Proton auto-enables fsync
-    /// (and, on some builds, ntsync) by default regardless of any toggle
-    /// here — leaving them unset wouldn't actually turn them off. Whichever
-    /// tier ends up unsupported (old kernel, plain Wine build with no fsync
-    /// patches, a build with no ntsync support) is a silent no-op; esync
-    /// additionally needs a raised open-file limit, checked at launch time.
-    ///
-    /// Defaults to on, unlike the rest of this struct: unsupported tiers are
-    /// already a no-op, so there's no "is the tool even installed" risk the
-    /// way there is for GameMode/vkBasalt — and defaulting it off would mean
-    /// a Proton game runs *without* fsync/ntsync under this app even though
-    /// Proton would have enabled it by default on its own.
-    #[serde(default = "default_true")]
-    pub sync_enabled: bool,
-    pub dxvk_async_enabled: bool,
     pub vkbasalt_enabled: bool,
     pub vkbasalt_sharpen: bool,
     pub vkbasalt_sharpness: f32,
@@ -159,16 +137,10 @@ pub struct PerformanceConfig {
     pub power_profile_enabled: bool,
 }
 
-fn default_true() -> bool {
-    true
-}
-
 impl Default for PerformanceConfig {
     fn default() -> Self {
         Self {
             gamemode_enabled: false,
-            sync_enabled: true,
-            dxvk_async_enabled: false,
             vkbasalt_enabled: false,
             vkbasalt_sharpen: true,
             vkbasalt_sharpness: 0.4,
