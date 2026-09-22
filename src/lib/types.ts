@@ -18,6 +18,7 @@ export interface Game {
   prefix_path: string;
   runner_id: string;
   env_vars: Record<string, string>;
+  launch_args: string;
   icon: string | null;
 }
 
@@ -27,6 +28,7 @@ export interface GameInput {
   prefix_path: string;
   runner_id: string;
   env_vars: Record<string, string>;
+  launch_args: string;
 }
 
 export interface RunnerSourceInfo {

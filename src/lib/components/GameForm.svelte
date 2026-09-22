@@ -22,6 +22,7 @@
     prefixPath: existingGame?.prefix_path ?? "",
     runnerId: existingGame?.runner_id ?? "",
     envVarsText: existingGame ? formatEnvVars(existingGame.env_vars) : "",
+    launchArgs: existingGame?.launch_args ?? "",
   }));
 
   let name = $state(defaults.name);
@@ -29,6 +30,7 @@
   let prefixPath = $state(defaults.prefixPath);
   let runnerId = $state(defaults.runnerId);
   let envVarsText = $state(defaults.envVarsText);
+  let launchArgs = $state(defaults.launchArgs);
   let error = $state("");
   let submitting = $state(false);
 
@@ -73,6 +75,7 @@
       prefix_path: prefixPath,
       runner_id: runnerId,
       env_vars: parseEnvVars(envVarsText),
+      launch_args: launchArgs.trim(),
     };
     try {
       if (existingGame) {
@@ -129,6 +132,11 @@
   <label>
     Umgebungsvariablen
     <textarea placeholder={"KEY=WERT, eine pro Zeile"} bind:value={envVarsText}></textarea>
+  </label>
+
+  <label>
+    Startparameter
+    <input placeholder="z. B. --launcher-skip -dx11" bind:value={launchArgs} />
   </label>
 
   {#if error}

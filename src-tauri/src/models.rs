@@ -41,6 +41,11 @@ pub struct Game {
     pub runner_id: String,
     #[serde(default)]
     pub env_vars: HashMap<String, String>,
+    /// Extra arguments passed to the game's exe itself (e.g. `--launcher-skip
+    /// -dx11`), analogous to PortProton's `LAUNCH_PARAMETERS`. Split on
+    /// whitespace at launch time — see `launch_game`.
+    #[serde(default)]
+    pub launch_args: String,
     /// The exe's embedded icon, as a `data:image/png;base64,...` URI.
     /// Extracted once when the game is added/updated; `None` if the exe has
     /// no icon resource or it couldn't be parsed.
@@ -57,6 +62,8 @@ pub struct GameInput {
     pub runner_id: String,
     #[serde(default)]
     pub env_vars: HashMap<String, String>,
+    #[serde(default)]
+    pub launch_args: String,
 }
 
 /// Global MangoHud (the in-game performance overlay) settings, applied to

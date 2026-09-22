@@ -150,6 +150,7 @@ pub fn add_game(
         prefix_path: game.prefix_path,
         runner_id: game.runner_id,
         env_vars: game.env_vars,
+        launch_args: game.launch_args,
         icon,
     };
 
@@ -185,6 +186,7 @@ pub fn update_game(
     existing.prefix_path = game.prefix_path;
     existing.runner_id = game.runner_id;
     existing.env_vars = game.env_vars;
+    existing.launch_args = game.launch_args;
     let updated = existing.clone();
 
     save_config(&app, &config)?;
@@ -661,8 +663,16 @@ pub async fn launch_game(
     }
 
     let launch_binary = PathBuf::from(&launch_chain[0]);
-    let launch_args = launch_chain[1..].to_vec();
+    let wrapper_args = launch_chain[1..].to_vec();
     let launch_env = env;
+
+    // Per-game exe arguments (PortProton calls these `LAUNCH_PARAMETERS`),
+    // e.g. `--launcher-skip -dx11`. Whitespace-split; no quoting support.
+    let game_launch_args: Vec<String> = game
+        .launch_args
+        .split_whitespace()
+        .map(str::to_string)
+        .collect();
 
     let log_out = fs::OpenOptions::new()
         .append(true)
@@ -678,8 +688,9 @@ pub async fn launch_game(
         .collect();
 
     let mut child = runner_command(&launch_binary, env_pairs)
-        .args(&launch_args)
+        .args(&wrapper_args)
         .arg(&game.exe_path)
+        .args(&game_launch_args)
         .stdout(Stdio::from(log_out))
         .stderr(Stdio::from(log_err))
         // Makes this process (the `proton` script, or `wine` itself) the
