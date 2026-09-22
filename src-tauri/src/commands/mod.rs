@@ -7,6 +7,7 @@ pub mod performance;
 pub mod prefixes;
 pub mod runner_downloads;
 pub mod runners;
+pub mod shell_link;
 pub mod steamgriddb;
 pub mod wine_tools;
 pub mod winetricks;

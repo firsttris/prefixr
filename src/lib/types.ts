@@ -36,6 +36,13 @@ export interface GameInput {
   launch_args: string;
 }
 
+// An .exe shortcut found on the Desktop/Start Menu right after an
+// installer finished running inside a prefix — see `run_installer`.
+export interface DetectedShortcut {
+  name: string;
+  exe_path: string;
+}
+
 export interface RunnerSourceInfo {
   id: string;
   label: string;

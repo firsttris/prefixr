@@ -7,7 +7,23 @@
   import { prettifyExeName } from "$lib/gameName";
   import type { Game, GameInput } from "$lib/types";
 
-  let { existingGame, onSuccess }: { existingGame?: Game; onSuccess?: () => void } = $props();
+  let {
+    existingGame,
+    initialName,
+    initialExePath,
+    initialPrefixPath,
+    initialRunnerId,
+    onSuccess,
+  }: {
+    existingGame?: Game;
+    // Prefills a fresh (non-`existingGame`) form, e.g. from a shortcut
+    // detected right after running an installer — see InstallDialog.svelte.
+    initialName?: string;
+    initialExePath?: string;
+    initialPrefixPath?: string;
+    initialRunnerId?: string;
+    onSuccess?: () => void;
+  } = $props();
 
   function formatEnvVars(envVars: Record<string, string>): string {
     return Object.entries(envVars)
@@ -18,10 +34,10 @@
   // Modal fully unmounts/remounts this form on every open, so reading
   // existingGame once here to seed the fields is intentional, not a bug.
   const defaults = untrack(() => ({
-    name: existingGame?.name ?? "",
-    exePath: existingGame?.exe_path ?? "",
-    prefixPath: existingGame?.prefix_path ?? "",
-    runnerId: existingGame?.runner_id ?? "",
+    name: existingGame?.name ?? initialName ?? "",
+    exePath: existingGame?.exe_path ?? initialExePath ?? "",
+    prefixPath: existingGame?.prefix_path ?? initialPrefixPath ?? "",
+    runnerId: existingGame?.runner_id ?? initialRunnerId ?? "",
     envVarsText: existingGame ? formatEnvVars(existingGame.env_vars) : "",
     launchArgs: existingGame?.launch_args ?? "",
   }));

@@ -16,6 +16,7 @@ use crate::commands::icons::extract_icon_data_url;
 use crate::commands::mangohud::ensure_mangohud_conf;
 use crate::commands::performance::ensure_vkbasalt_conf;
 use crate::commands::runners::{find_runner, runner_command, wine_binary, wineserver_binary};
+use crate::commands::shell_link::{find_recently_created_shortcuts, DetectedShortcut};
 use crate::commands::steamgriddb::{artwork_dir, asset_cache_path, image_extension};
 use crate::config::{save_config, ConfigState};
 use crate::models::{Game, GameInput, RunnerKind};
@@ -174,20 +175,25 @@ pub fn take_pending_install(state: State<PendingInstall>) -> Option<String> {
 }
 
 /// Runs an arbitrary exe (typically a game's setup/installer, as opposed to
-/// the game's own exe once installed) under a chosen prefix and runner,
-/// without creating a `Game` entry — that's a separate, deliberate step the
-/// user takes afterwards once the install has finished, since an installer
-/// exe is a different exe than the one that ends up launching the game.
-/// Detached and untracked, like `launch_wine_tool`: this is a GUI installer
-/// the user drives themselves, not something this app manages the lifecycle
-/// of.
+/// the game's own exe once installed) under a chosen prefix and runner, then
+/// (once the installer exits) reports any `.exe` shortcuts it created on the
+/// Desktop / in the Start Menu — see `find_recently_created_shortcuts` — so
+/// the frontend can offer them as the game's exe instead of making the user
+/// hunt for it manually. This does not create a `Game` entry itself: that's
+/// still a separate, deliberate step the frontend takes with whichever
+/// candidate (or manually chosen exe) the user confirms.
+///
+/// Unlike `launch_wine_tool`, this is awaited rather than left detached: the
+/// whole point is to know when the installer has finished so the shortcut
+/// scan sees its result, and a GUI installer's own window is what the user
+/// actually interacts with in the meantime, not this command.
 #[tauri::command]
 pub async fn run_installer(
     state: State<'_, ConfigState>,
     prefix_path: String,
     runner_id: String,
     exe_path: String,
-) -> Result<(), String> {
+) -> Result<Vec<DetectedShortcut>, String> {
     let runners_dir = {
         let config = state
             .lock()
@@ -212,14 +218,24 @@ pub async fn run_installer(
     if let Some(parent) = exe.parent() {
         command.current_dir(parent);
     }
+
+    // Captured before the installer runs, so the shortcut scan below only
+    // picks up files it actually created (or touched) just now, not
+    // pre-existing shortcuts from an earlier install into the same prefix.
+    let started_at = SystemTime::now();
+    // Exit status is deliberately not checked: some installers return a
+    // non-zero code on perfectly successful installs (e.g. "reboot
+    // recommended"), so a shortcut having appeared is a more reliable
+    // success signal than the process's own exit code.
     command
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
-        .spawn()
+        .status()
+        .await
         .map_err(|e| format!("Konnte Setup nicht starten: {e}"))?;
 
-    Ok(())
+    Ok(find_recently_created_shortcuts(&prefix, started_at))
 }
 
 #[tauri::command]
