@@ -794,6 +794,20 @@ fn desktop_directory() -> Result<PathBuf, String> {
     Ok(home.join("Desktop"))
 }
 
+/// The user's XDG applications directory (`$XDG_DATA_HOME/applications`,
+/// falling back to `~/.local/share/applications`) — where a `.desktop` file
+/// needs to live for the desktop environment's start menu / app launcher to
+/// pick it up, as opposed to `desktop_directory` for an icon on the Desktop.
+fn applications_directory() -> Result<PathBuf, String> {
+    if let Some(data_home) = std::env::var_os("XDG_DATA_HOME") {
+        return Ok(PathBuf::from(data_home).join("applications"));
+    }
+    let home = std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .ok_or_else(|| "HOME is not set".to_string())?;
+    Ok(home.join(".local/share/applications"))
+}
+
 /// Keeps a filename safe across filesystems by replacing anything but
 /// alphanumerics, spaces, dashes and underscores.
 fn sanitize_filename(name: &str) -> String {
@@ -871,16 +885,19 @@ fn own_executable_path() -> Result<PathBuf, String> {
     std::env::current_exe().map_err(|e| format!("Could not resolve own executable path: {e}"))
 }
 
-/// Creates a `.desktop` shortcut on the user's Desktop that launches this
-/// game directly, by re-invoking the app's own executable with
-/// `--launch <game-id>` (picked up on startup via `take_pending_launch`).
-#[tauri::command]
-pub fn create_desktop_shortcut(
-    app: AppHandle,
-    state: State<ConfigState>,
-    id: String,
+/// Looks up a game by id and writes a `.desktop` file for it into
+/// `target_dir`, launching this game directly by re-invoking the app's own
+/// executable with `--launch <game-id>` (picked up on startup via
+/// `take_pending_launch`). Shared by `create_desktop_shortcut` and
+/// `create_menu_shortcut`, which only differ in which directory a `.desktop`
+/// file needs to land in to show up.
+fn write_game_shortcut(
+    app: &AppHandle,
+    state: &State<ConfigState>,
+    id: &str,
+    target_dir: &Path,
 ) -> Result<(), String> {
-    let game_id = Uuid::parse_str(&id).map_err(|e| format!("Invalid game id: {e}"))?;
+    let game_id = Uuid::parse_str(id).map_err(|e| format!("Invalid game id: {e}"))?;
     let game = {
         let config = state
             .lock()
@@ -893,11 +910,10 @@ pub fn create_desktop_shortcut(
             .ok_or_else(|| format!("No game with id {id}"))?
     };
 
-    let desktop_dir = desktop_directory()?;
-    fs::create_dir_all(&desktop_dir)
-        .map_err(|e| format!("Could not access Desktop directory: {e}"))?;
+    fs::create_dir_all(target_dir)
+        .map_err(|e| format!("Could not access {}: {e}", target_dir.display()))?;
 
-    let icon_path = write_shortcut_icon(&app, &game)?;
+    let icon_path = write_shortcut_icon(app, &game)?;
     let exe_path = own_executable_path()?;
 
     let mut contents = String::new();
@@ -915,7 +931,7 @@ pub fn create_desktop_shortcut(
     contents.push_str("Terminal=false\n");
     contents.push_str("Categories=Game;\n");
 
-    let shortcut_path = desktop_dir.join(format!("{}.desktop", sanitize_filename(&game.name)));
+    let shortcut_path = target_dir.join(format!("{}.desktop", sanitize_filename(&game.name)));
     fs::write(&shortcut_path, contents)
         .map_err(|e| format!("Could not write shortcut file: {e}"))?;
 
@@ -930,5 +946,38 @@ pub fn create_desktop_shortcut(
             .map_err(|e| format!("Could not set shortcut permissions: {e}"))?;
     }
 
+    Ok(())
+}
+
+/// Creates a `.desktop` shortcut on the user's Desktop that launches this
+/// game directly.
+#[tauri::command]
+pub fn create_desktop_shortcut(
+    app: AppHandle,
+    state: State<ConfigState>,
+    id: String,
+) -> Result<(), String> {
+    let desktop_dir = desktop_directory()?;
+    write_game_shortcut(&app, &state, &id, &desktop_dir)
+}
+
+/// Creates a `.desktop` entry in the user's XDG applications directory so
+/// this game shows up in the desktop environment's start menu / app
+/// launcher, mirroring how PortProton offers "Add to Menu" as a choice
+/// separate from "Add to Desktop" rather than doing both at once.
+/// `update-desktop-database` is nudged afterwards, best-effort, so menus
+/// that cache entries (like KDE's) pick up the addition immediately instead
+/// of waiting for their own refresh.
+#[tauri::command]
+pub fn create_menu_shortcut(
+    app: AppHandle,
+    state: State<ConfigState>,
+    id: String,
+) -> Result<(), String> {
+    let applications_dir = applications_directory()?;
+    write_game_shortcut(&app, &state, &id, &applications_dir)?;
+    let _ = std::process::Command::new("update-desktop-database")
+        .arg(&applications_dir)
+        .status();
     Ok(())
 }

@@ -12,7 +12,8 @@
     onEdit,
     onRemove,
     onShowLog,
-    onCreateShortcut,
+    onCreateDesktopShortcut,
+    onCreateMenuShortcut,
     onEditArtwork,
   }: {
     game: Game;
@@ -22,11 +23,15 @@
     onEdit: () => void;
     onRemove: () => void;
     onShowLog: (path: string) => void;
-    onCreateShortcut: () => Promise<void>;
+    onCreateDesktopShortcut: () => Promise<void>;
+    onCreateMenuShortcut: () => Promise<void>;
     onEditArtwork: () => void;
   } = $props();
 
   let shortcutState = $state<"idle" | "creating" | "done" | string>("idle");
+  let shortcutMenuOpen = $state(false);
+  let shortcutMenuUpward = $state(false);
+  let shortcutButtonEl: HTMLButtonElement | undefined;
   let confirmingRemove = $state(false);
 
   let coverDataUrl = $state<string | null>(null);
@@ -41,10 +46,19 @@
       .catch(() => (coverDataUrl = null));
   });
 
-  async function handleCreateShortcut() {
+  function toggleShortcutMenu() {
+    if (!shortcutMenuOpen && shortcutButtonEl) {
+      const rect = shortcutButtonEl.getBoundingClientRect();
+      shortcutMenuUpward = window.innerHeight - rect.bottom < 120;
+    }
+    shortcutMenuOpen = !shortcutMenuOpen;
+  }
+
+  async function handleCreateShortcut(target: "desktop" | "menu") {
+    shortcutMenuOpen = false;
     shortcutState = "creating";
     try {
-      await onCreateShortcut();
+      await (target === "desktop" ? onCreateDesktopShortcut() : onCreateMenuShortcut());
       shortcutState = "done";
       setTimeout(() => {
         shortcutState = "idle";
@@ -64,7 +78,19 @@
         {#if game.icon}
           <img class="icon" src={game.icon} alt="" />
         {:else}
-          <span class="icon fallback">🎮</span>
+          <svg class="icon fallback" viewBox="0 0 64 40" aria-hidden="true">
+            <path
+              fill="#64748b"
+              d="M19 6h26a12 12 0 0 1 12 12v5a7 7 0 0 1-12.5 4.5L40 24H24l-4.5 3.5A7 7 0 0 1 7 23v-5A12 12 0 0 1 19 6z"
+            />
+            <ellipse cx="32" cy="11" rx="16" ry="4" fill="#fff" opacity="0.1" />
+            <rect x="15.5" y="11" width="3" height="12" rx="1.5" fill="#e2e8f0" />
+            <rect x="11" y="15.5" width="12" height="3" rx="1.5" fill="#e2e8f0" />
+            <circle cx="47" cy="12" r="2.2" fill="#22c55e" />
+            <circle cx="52" cy="17" r="2.2" fill="#ef4444" />
+            <circle cx="47" cy="22" r="2.2" fill="#eab308" />
+            <circle cx="42" cy="17" r="2.2" fill="#3b82f6" />
+          </svg>
         {/if}
       </div>
     {/if}
@@ -82,16 +108,36 @@
   </div>
 
   <div class="actions-row">
-    <button
-      type="button"
-      class="icon-btn"
-      onclick={handleCreateShortcut}
-      disabled={shortcutState === "creating"}
-      aria-label="Desktop-Verknüpfung erstellen"
-      title="Desktop-Verknüpfung erstellen"
-    >
-      {shortcutState === "done" ? "✓" : "🔗"}
-    </button>
+    <div class="shortcut-menu">
+      <button
+        bind:this={shortcutButtonEl}
+        type="button"
+        class="icon-btn"
+        onclick={toggleShortcutMenu}
+        disabled={shortcutState === "creating"}
+        aria-haspopup="true"
+        aria-expanded={shortcutMenuOpen}
+        aria-label="Verknüpfung erstellen"
+        title="Verknüpfung erstellen"
+      >
+        {shortcutState === "done" ? "✓" : "🔗"}
+      </button>
+      {#if shortcutMenuOpen}
+        <div
+          class="menu-backdrop"
+          onclick={() => (shortcutMenuOpen = false)}
+          role="presentation"
+        ></div>
+        <div class="menu" class:menu-up={shortcutMenuUpward} role="menu">
+          <button type="button" role="menuitem" onclick={() => handleCreateShortcut("desktop")}>
+            Auf Desktop
+          </button>
+          <button type="button" role="menuitem" onclick={() => handleCreateShortcut("menu")}>
+            Ins Startmenü
+          </button>
+        </div>
+      {/if}
+    </div>
     <button
       type="button"
       class="icon-btn"
@@ -206,15 +252,12 @@
   }
 
   .icon {
-    width: 2.6em;
-    height: 2.6em;
+    width: 45%;
+    height: 45%;
     object-fit: contain;
     image-rendering: -webkit-optimize-contrast;
   }
 
-  .icon.fallback {
-    font-size: 3em;
-  }
 
   .status-badge {
     position: absolute;
@@ -299,6 +342,56 @@
   .actions-row .icon-btn {
     flex: 1;
     width: auto;
+  }
+
+  .shortcut-menu {
+    position: relative;
+    flex: 1;
+    display: flex;
+  }
+
+  .shortcut-menu .icon-btn {
+    flex: 1;
+  }
+
+  .menu-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+  }
+
+  .menu {
+    position: absolute;
+    top: calc(100% + 0.3em);
+    left: 0;
+    z-index: 11;
+    display: flex;
+    flex-direction: column;
+    min-width: 9.5em;
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.3em;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  }
+
+  .menu.menu-up {
+    top: auto;
+    bottom: calc(100% + 0.3em);
+  }
+
+  .menu button {
+    text-align: left;
+    background: transparent;
+    border: none;
+    padding: 0.5em 0.6em;
+    border-radius: 6px;
+    font-size: 0.85em;
+    color: var(--text);
+  }
+
+  .menu button:hover {
+    background: var(--surface);
   }
 
   .divider {

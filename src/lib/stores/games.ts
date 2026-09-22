@@ -120,3 +120,7 @@ export async function takePendingLaunch(): Promise<string | null> {
 export async function createDesktopShortcut(id: string): Promise<void> {
   await invoke("create_desktop_shortcut", { id });
 }
+
+export async function createMenuShortcut(id: string): Promise<void> {
+  await invoke("create_menu_shortcut", { id });
+}

@@ -9,8 +9,8 @@ use tauri::{Manager, WindowEvent};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
 use commands::games::{
-    add_game, create_desktop_shortcut, kill_game, launch_game, list_games, remove_game,
-    take_pending_launch, update_game, PendingLaunch, RunningGames,
+    add_game, create_desktop_shortcut, create_menu_shortcut, kill_game, launch_game, list_games,
+    remove_game, take_pending_launch, update_game, PendingLaunch, RunningGames,
 };
 use commands::mangohud::{get_mangohud_config, save_mangohud_config};
 use commands::performance::{
@@ -53,7 +53,7 @@ fn running_as_root() -> bool {
 }
 
 /// Looks for `--launch <game-id>` among the process args, as invoked by a
-/// desktop shortcut created via `create_desktop_shortcut`.
+/// shortcut created via `create_desktop_shortcut` or `create_menu_shortcut`.
 fn find_launch_arg() -> Option<String> {
     let args: Vec<String> = std::env::args().collect();
     args.windows(2)
@@ -112,6 +112,7 @@ pub fn run() {
             kill_game,
             take_pending_launch,
             create_desktop_shortcut,
+            create_menu_shortcut,
             add_prefix,
             delete_prefix,
             list_prefixes,

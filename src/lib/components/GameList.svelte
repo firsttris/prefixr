@@ -9,6 +9,7 @@
     killGame,
     initGameEvents,
     createDesktopShortcut,
+    createMenuShortcut,
   } from "$lib/stores/games";
   import { showLog } from "$lib/logViewer";
   import GameCard from "./GameCard.svelte";
@@ -135,7 +136,8 @@
         onEdit={() => onEdit(game)}
         onRemove={() => removeGame(game.id)}
         onShowLog={showLog}
-        onCreateShortcut={() => createDesktopShortcut(game.id)}
+        onCreateDesktopShortcut={() => createDesktopShortcut(game.id)}
+        onCreateMenuShortcut={() => createMenuShortcut(game.id)}
         onEditArtwork={() => onEditArtwork(game)}
       />
     {/each}
@@ -151,7 +153,8 @@
         onEdit={() => onEdit(game)}
         onRemove={() => removeGame(game.id)}
         onShowLog={showLog}
-        onCreateShortcut={() => createDesktopShortcut(game.id)}
+        onCreateDesktopShortcut={() => createDesktopShortcut(game.id)}
+        onCreateMenuShortcut={() => createMenuShortcut(game.id)}
         onEditArtwork={() => onEditArtwork(game)}
       />
     {/each}
