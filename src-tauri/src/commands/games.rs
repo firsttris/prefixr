@@ -22,8 +22,9 @@ use crate::tray::rebuild_tray_menu;
 
 /// Checks whether `name` resolves to an executable file somewhere on `PATH`,
 /// used to gate optional wrappers (e.g. `systemd-inhibit`) that may not be
-/// installed on every system.
-fn command_on_path(name: &str) -> bool {
+/// installed on every system. `pub(crate)` since `commands::performance` also
+/// needs it (to gate the `pkexec`-based max_map_count fix).
+pub(crate) fn command_on_path(name: &str) -> bool {
     std::env::var_os("PATH")
         .map(|paths| std::env::split_paths(&paths).any(|dir| dir.join(name).is_file()))
         .unwrap_or(false)

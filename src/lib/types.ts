@@ -81,3 +81,10 @@ export interface PerformanceConfig {
   inhibit_sleep_enabled: boolean;
   power_profile_enabled: boolean;
 }
+
+export interface MaxMapCountStatus {
+  current: number;
+  recommended: number;
+  sufficient: boolean;
+  can_fix: boolean;
+}
