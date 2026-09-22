@@ -5,11 +5,13 @@
   import { showLog } from "$lib/logViewer";
   import Modal from "$lib/components/Modal.svelte";
   import WinetricksInstaller from "$lib/components/WinetricksInstaller.svelte";
+  import WineToolsLauncher from "$lib/components/WineToolsLauncher.svelte";
 
   let path = $state("");
   let busy = $state(false);
   let error = $state("");
   let winetricksFor = $state<string | null>(null);
+  let wineToolsFor = $state<string | null>(null);
 
   onMount(() => {
     refreshPrefixes();
@@ -88,6 +90,14 @@
             >
               📦
             </button>
+            <button
+              type="button"
+              class="ghost"
+              onclick={() => (wineToolsFor = prefix.path)}
+              aria-label="Wine-Werkzeuge öffnen"
+            >
+              🛠️
+            </button>
             <button type="button" class="ghost" onclick={() => handleDelete(prefix.path)}>
               Löschen
             </button>
@@ -105,6 +115,16 @@
 >
   {#if winetricksFor}
     <WinetricksInstaller prefixPath={winetricksFor} onShowLog={showLog} />
+  {/if}
+</Modal>
+
+<Modal
+  open={wineToolsFor !== null}
+  title="Wine-Werkzeuge"
+  onClose={() => (wineToolsFor = null)}
+>
+  {#if wineToolsFor}
+    <WineToolsLauncher prefixPath={wineToolsFor} />
   {/if}
 </Modal>
 

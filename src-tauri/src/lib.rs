@@ -19,6 +19,7 @@ use commands::performance::{
 use commands::prefixes::{add_prefix, delete_prefix, list_prefixes};
 use commands::runner_downloads::{download_runner, list_runner_releases, list_runner_sources};
 use commands::runners::list_runners;
+use commands::wine_tools::launch_wine_tool;
 use commands::winetricks::{
     install_winetricks_verbs, list_all_winetricks_verbs, list_installed_winetricks_verbs,
 };
@@ -120,7 +121,8 @@ pub fn run() {
             fix_max_map_count,
             install_winetricks_verbs,
             list_all_winetricks_verbs,
-            list_installed_winetricks_verbs
+            list_installed_winetricks_verbs,
+            launch_wine_tool
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
