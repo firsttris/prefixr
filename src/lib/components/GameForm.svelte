@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, untrack } from "svelte";
+  import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-dialog";
   import { runners, refreshRunners } from "$lib/stores/runners";
   import { prefixes, refreshPrefixes } from "$lib/stores/prefixes";
@@ -7,8 +8,15 @@
   import { performanceConfig, refreshPerformanceConfig } from "$lib/stores/performance";
   import { mangoHudConfig, refreshMangoHudConfig } from "$lib/stores/mangohud";
   import { prettifyExeName } from "$lib/gameName";
+  import { PROTON_OPTION_INFO, PROTON_OPTION_ORDER } from "$lib/protonOptions";
   import InfoIcon from "$lib/components/InfoIcon.svelte";
-  import type { Game, GameInput, GamescopeSettings, VkBasaltSettings } from "$lib/types";
+  import type {
+    Game,
+    GameInput,
+    GamescopeSettings,
+    ProtonOption,
+    VkBasaltSettings,
+  } from "$lib/types";
 
   let {
     existingGame,
@@ -64,6 +72,15 @@
   let gamescope = $state<GamescopeSettings | null>(
     defaults.overrides?.gamescope ? { ...defaults.overrides.gamescope } : null,
   );
+  // Proton switches this game sets, by variable name; a missing key keeps
+  // Proton's default. Kept when switching to a Wine runner (which ignores
+  // them), so switching back doesn't lose them.
+  let protonOptions = $state<Record<string, boolean>>({
+    ...(defaults.overrides?.proton_options ?? {}),
+  });
+  // What the selected runner's `proton` script understands.
+  let availableProtonOptions = $state<ProtonOption[]>([]);
+  let protonOptionsError = $state("");
   let error = $state("");
   let submitting = $state(false);
 
@@ -74,11 +91,57 @@
   const overrideCount = $derived(
     [mangohudOverride, gamemodeOverride, vkbasalt, gamescope].filter((o) => o !== null).length,
   );
+  const isProton = $derived($runners.find((r) => r.id === runnerId)?.kind === "proton");
+  const curatedProtonOptions = $derived(
+    availableProtonOptions
+      .filter((o) => o.config in PROTON_OPTION_INFO)
+      .sort(
+        (a, b) => PROTON_OPTION_ORDER.indexOf(a.config) - PROTON_OPTION_ORDER.indexOf(b.config),
+      ),
+  );
+  const otherProtonOptions = $derived(
+    availableProtonOptions.filter((o) => !(o.config in PROTON_OPTION_INFO)),
+  );
+  // Set on this game, but unknown to the selected runner — e.g. carried over
+  // from a previous Proton version. Harmless, but shown so they can be
+  // cleared.
+  const unknownProtonOptions = $derived(
+    Object.keys(protonOptions).filter(
+      (name) => !availableProtonOptions.some((o) => o.env === name || o.aliases.includes(name)),
+    ),
+  );
+  const protonOptionCount = $derived(Object.keys(protonOptions).length);
+
   // Starts expanded if the game already has overrides. Bound two-way rather
   // than passed as `open={...}`: Svelte re-applies every attribute of the
   // form in one shared effect, so a one-way value would snap the section
   // back to it on every toggle click.
   let overridesOpen = $state(untrack(() => overrideCount > 0));
+  let protonOptionsOpen = $state(untrack(() => protonOptionCount > 0));
+
+  $effect(() => {
+    const id = runnerId;
+    if (!isProton) {
+      availableProtonOptions = [];
+      protonOptionsError = "";
+      return;
+    }
+    let cancelled = false;
+    invoke<ProtonOption[]>("list_proton_options", { runnerId: id })
+      .then((options) => {
+        if (cancelled) return;
+        availableProtonOptions = options;
+        protonOptionsError = "";
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        availableProtonOptions = [];
+        protonOptionsError = String(e);
+      });
+    return () => {
+      cancelled = true;
+    };
+  });
 
   onMount(() => {
     refreshRunners();
@@ -151,6 +214,29 @@
     gamescope = sameGamescope(next, globalGamescope()) ? null : next;
   }
 
+  // Looks under every name the runner accepts for this switch, so a value
+  // saved under an alias (or under a name an older runner preferred) shows up.
+  function protonOptionValue(option: ProtonOption): boolean | null {
+    for (const name of [option.env, ...option.aliases]) {
+      if (name in protonOptions) return protonOptions[name];
+    }
+    return null;
+  }
+
+  function setProtonOption(option: ProtonOption, value: boolean | null) {
+    const next = { ...protonOptions };
+    for (const alias of option.aliases) delete next[alias];
+    if (value === null) delete next[option.env];
+    else next[option.env] = value;
+    protonOptions = next;
+  }
+
+  function clearProtonOption(name: string) {
+    const next = { ...protonOptions };
+    delete next[name];
+    protonOptions = next;
+  }
+
   // Emptied number inputs read as NaN; 0 is no valid size or limit either.
   function numberOrNull(input: HTMLInputElement): number | null {
     const value = input.valueAsNumber;
@@ -205,6 +291,7 @@
         gamemode_enabled: gamemodeOverride,
         vkbasalt,
         gamescope,
+        proton_options: protonOptions,
       },
     };
     try {
@@ -498,6 +585,102 @@
     </div>
   </details>
 
+  {#if isProton}
+    <details class="overrides" bind:open={protonOptionsOpen}>
+      <summary>
+        Proton-Optionen
+        {#if protonOptionCount > 0}
+          <span class="badge">{protonOptionCount} gesetzt</span>
+        {/if}
+      </summary>
+      <p class="hint">
+        Schalter, die der gewählte Runner kennt. „Standard“ überlässt die Entscheidung Proton und
+        den protonfixes. Einträge unter „Umgebungsvariablen“ haben Vorrang.
+      </p>
+
+      {#if protonOptionsError}
+        <p class="error">{protonOptionsError}</p>
+      {/if}
+
+      {#snippet tristate(option: ProtonOption)}
+        {@const value = protonOptionValue(option)}
+        <div class="tristate" role="group" aria-label={option.env}>
+          <button
+            type="button"
+            aria-pressed={value === null}
+            onclick={() => setProtonOption(option, null)}
+          >
+            Standard
+          </button>
+          <button
+            type="button"
+            aria-pressed={value === true}
+            onclick={() => setProtonOption(option, true)}
+          >
+            An
+          </button>
+          <button
+            type="button"
+            aria-pressed={value === false}
+            onclick={() => setProtonOption(option, false)}
+          >
+            Aus
+          </button>
+        </div>
+      {/snippet}
+
+      <div class="toggle-list">
+        {#each curatedProtonOptions as option (option.config)}
+          {@const info = PROTON_OPTION_INFO[option.config]}
+          <div class="toggle-row" class:overridden={protonOptionValue(option) !== null}>
+            <div>
+              <span class="toggle-label">{info.label}</span>
+              <p class="toggle-desc">{info.description}</p>
+              <code class="env-name">{option.env}</code>
+            </div>
+            <div class="toggle-controls">
+              {@render tristate(option)}
+            </div>
+          </div>
+        {/each}
+      </div>
+
+      {#if otherProtonOptions.length > 0}
+        <details class="advanced">
+          <summary>Erweitert ({otherProtonOptions.length})</summary>
+          <p class="hint">
+            Weitere Schalter aus dem Skript des Runners, ohne Beschreibung. Nur ändern, wenn ein
+            Fix für ein Spiel genau das verlangt.
+          </p>
+          <div class="compact-list">
+            {#each otherProtonOptions as option (option.config)}
+              <div class="compact-row" class:overridden={protonOptionValue(option) !== null}>
+                <code title={option.aliases.length ? `auch: ${option.aliases.join(", ")}` : ""}>
+                  {option.env}
+                </code>
+                {@render tristate(option)}
+              </div>
+            {/each}
+          </div>
+        </details>
+      {/if}
+
+      {#if availableProtonOptions.length > 0 && unknownProtonOptions.length > 0}
+        <div class="compact-list">
+          <p class="hint">Gesetzt, aber vom gewählten Runner nicht erkannt:</p>
+          {#each unknownProtonOptions as name (name)}
+            <div class="compact-row overridden">
+              <code>{name}={protonOptions[name] ? "1" : "0"}</code>
+              <button type="button" class="reset" onclick={() => clearProtonOption(name)}>
+                Entfernen
+              </button>
+            </div>
+          {/each}
+        </div>
+      {/if}
+    </details>
+  {/if}
+
   {#if error}
     <p class="error">{error}</p>
   {/if}
@@ -689,6 +872,72 @@
 
   .detail-grid input {
     width: 100%;
+  }
+
+  .env-name {
+    display: inline-block;
+    margin-top: 0.3em;
+    color: var(--text-muted);
+    font-size: 0.75em;
+  }
+
+  .tristate {
+    display: flex;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .tristate button {
+    border: none;
+    border-radius: 0;
+    padding: 0.3em 0.7em;
+    font-size: 0.8em;
+    background: none;
+  }
+
+  .tristate button + button {
+    border-left: 1px solid var(--border);
+  }
+
+  .tristate button[aria-pressed="true"] {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .advanced summary {
+    font-weight: 500;
+  }
+
+  .advanced[open] {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6em;
+  }
+
+  .compact-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3em;
+  }
+
+  .compact-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1em;
+    padding: 0.3em 0.6em;
+    border-radius: 8px;
+    border: 1px solid transparent;
+  }
+
+  .compact-row code {
+    font-size: 0.8em;
+    overflow-wrap: anywhere;
+  }
+
+  .compact-row.overridden {
+    border-color: var(--accent);
   }
 
   .check {

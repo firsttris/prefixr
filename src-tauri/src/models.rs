@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -106,6 +106,10 @@ pub struct GameInput {
 /// couldn't tell "inherit the width" apart from "explicitly no width".
 /// MangoHud only gets an on/off switch here — its layout is a matter of
 /// taste, not of the game, so it stays global.
+///
+/// `proton_options` has no global counterpart: it's the set of `PROTON_*`
+/// switches (see `commands::proton_options`) this game sets explicitly,
+/// keyed by variable name; a missing key leaves Proton's own default.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct GameOverrides {
@@ -117,6 +121,8 @@ pub struct GameOverrides {
     pub vkbasalt: Option<VkBasaltSettings>,
     #[serde(default)]
     pub gamescope: Option<GamescopeSettings>,
+    #[serde(default)]
+    pub proton_options: BTreeMap<String, bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -167,6 +173,15 @@ impl GameOverrides {
             performance.gamescope_fps_limit = gamescope.fps_limit;
             performance.gamescope_fullscreen = gamescope.fullscreen;
         }
+    }
+
+    /// The env vars for this game's Proton switches. `"0"` is an explicit
+    /// off rather than a no-op: Proton turns some flags on by itself (e.g.
+    /// `nvml` on Nvidia), and only a `0` switches those back off.
+    pub fn proton_env(&self) -> impl Iterator<Item = (String, String)> + '_ {
+        self.proton_options
+            .iter()
+            .map(|(name, on)| (name.clone(), if *on { "1" } else { "0" }.to_string()))
     }
 }
 
@@ -377,6 +392,7 @@ mod tests {
                 fps_limit: Some(40),
                 fullscreen: true,
             }),
+            proton_options: BTreeMap::new(),
         };
         overrides.apply(&mut mangohud, &mut performance);
         assert!(!mangohud.enabled);
@@ -398,5 +414,25 @@ mod tests {
         .unwrap();
         assert!(game.overrides.mangohud_enabled.is_none());
         assert!(game.overrides.gamescope.is_none());
+        assert!(game.overrides.proton_options.is_empty());
+    }
+
+    #[test]
+    fn proton_options_map_to_one_and_zero() {
+        let overrides = GameOverrides {
+            proton_options: BTreeMap::from([
+                ("PROTON_ENABLE_HDR".to_string(), true),
+                ("PROTON_NO_NTSYNC".to_string(), false),
+            ]),
+            ..GameOverrides::default()
+        };
+        let env: Vec<_> = overrides.proton_env().collect();
+        assert_eq!(
+            env,
+            vec![
+                ("PROTON_ENABLE_HDR".to_string(), "1".to_string()),
+                ("PROTON_NO_NTSYNC".to_string(), "0".to_string()),
+            ]
+        );
     }
 }

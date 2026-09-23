@@ -898,6 +898,11 @@ async fn run_game(
             vkbasalt_conf.display().to_string(),
         ));
     }
+    // Before the game's own env vars, so a hand-written entry for the same
+    // variable still wins. Wine runners don't read these names at all.
+    if runner.kind == RunnerKind::Proton {
+        env.extend(game.overrides.proton_env());
+    }
     env.extend(game.env_vars.iter().map(|(k, v)| (k.clone(), v.clone())));
 
     // Builds the actual launch as a chain of wrappers around the runner

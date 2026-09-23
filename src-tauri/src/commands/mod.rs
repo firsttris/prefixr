@@ -5,6 +5,7 @@ pub mod icons;
 pub mod mangohud;
 pub mod performance;
 pub mod prefixes;
+pub mod proton_options;
 pub mod runner_downloads;
 pub mod runners;
 pub mod shell_link;

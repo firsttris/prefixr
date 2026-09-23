@@ -19,6 +19,7 @@ use commands::performance::{
     check_max_map_count, fix_max_map_count, get_performance_config, save_performance_config,
 };
 use commands::prefixes::{add_prefix, delete_prefix, list_prefixes};
+use commands::proton_options::list_proton_options;
 use commands::runner_downloads::{download_runner, list_runner_releases, list_runner_sources};
 use commands::runners::list_runners;
 use commands::steamgriddb::{
@@ -143,6 +144,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             list_runners,
+            list_proton_options,
             list_games,
             add_game,
             update_game,

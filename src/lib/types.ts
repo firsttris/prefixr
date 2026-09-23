@@ -40,11 +40,22 @@ export interface GameInput {
 
 // Per-game deviations from the global MangoHud/performance settings; `null`
 // inherits the global value — see `GameOverrides` in models.rs.
+// `proton_options` maps a `PROTON_*` variable to on/off; a missing key keeps
+// Proton's own default.
 export interface GameOverrides {
   mangohud_enabled: boolean | null;
   gamemode_enabled: boolean | null;
   vkbasalt: VkBasaltSettings | null;
   gamescope: GamescopeSettings | null;
+  proton_options: Record<string, boolean>;
+}
+
+// A switch found in a Proton runner's `proton` script — see
+// `list_proton_options` in proton_options.rs.
+export interface ProtonOption {
+  env: string;
+  config: string;
+  aliases: string[];
 }
 
 export interface VkBasaltSettings {
