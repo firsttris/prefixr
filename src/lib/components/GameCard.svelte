@@ -7,6 +7,7 @@
   let {
     game,
     runState,
+    inSteam,
     onLaunch,
     onKill,
     onEdit,
@@ -14,10 +15,13 @@
     onShowLog,
     onCreateDesktopShortcut,
     onCreateMenuShortcut,
+    onExportToSteam,
+    onRemoveFromSteam,
     onEditArtwork,
   }: {
     game: Game;
     runState?: GameRunState;
+    inSteam: boolean;
     onLaunch: () => void;
     onKill: () => void;
     onEdit: () => void;
@@ -25,6 +29,8 @@
     onShowLog: (path: string) => void;
     onCreateDesktopShortcut: () => Promise<void>;
     onCreateMenuShortcut: () => Promise<void>;
+    onExportToSteam: () => void;
+    onRemoveFromSteam: () => void;
     onEditArtwork: () => void;
   } = $props();
 
@@ -49,7 +55,7 @@
   function toggleMenu() {
     if (!menuOpen && menuButtonEl) {
       const rect = menuButtonEl.getBoundingClientRect();
-      menuUpward = window.innerHeight - rect.bottom < 250;
+      menuUpward = window.innerHeight - rect.bottom < 330;
     }
     menuOpen = !menuOpen;
   }
@@ -203,6 +209,36 @@
             </svg>
             Ins Startmenü
           </button>
+          <button
+            type="button"
+            role="menuitem"
+            onclick={() => {
+              menuOpen = false;
+              onExportToSteam();
+            }}
+          >
+            <svg class="menu-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <rect x="3" y="3" width="14" height="14" rx="3" stroke="currentColor" stroke-width="1.5" />
+              <path d="M10 6.5v7M6.5 10h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+            </svg>
+            {inSteam ? "In Steam aktualisieren" : "Zu Steam hinzufügen"}
+          </button>
+          {#if inSteam}
+            <button
+              type="button"
+              role="menuitem"
+              onclick={() => {
+                menuOpen = false;
+                onRemoveFromSteam();
+              }}
+            >
+              <svg class="menu-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <rect x="3" y="3" width="14" height="14" rx="3" stroke="currentColor" stroke-width="1.5" />
+                <path d="M6.5 10h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              </svg>
+              Aus Steam entfernen
+            </button>
+          {/if}
           <span class="menu-divider"></span>
           <button
             type="button"
@@ -299,7 +335,7 @@
 <ConfirmDialog
   open={confirmingRemove}
   title="Spiel entfernen?"
-  message={`„${game.name}“ wird aus der Bibliothek entfernt. Der Prefix und die Spieldateien bleiben erhalten.`}
+  message={`„${game.name}“ wird aus der Bibliothek${inSteam ? " und aus Steam" : ""} entfernt. Der Prefix und die Spieldateien bleiben erhalten.`}
   onConfirm={() => {
     confirmingRemove = false;
     onRemove();

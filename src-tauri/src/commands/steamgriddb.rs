@@ -8,7 +8,7 @@ use tauri::{AppHandle, Manager, State};
 use uuid::Uuid;
 
 use crate::config::{save_config, ConfigState};
-use crate::models::{Game, SteamGridDbConfig};
+use crate::models::{ArtworkKind, Game, SteamGridDbConfig};
 
 const BASE_URL: &str = "https://www.steamgriddb.com/api/v2";
 
@@ -286,6 +286,35 @@ pub async fn list_steamgriddb_icons(
     Ok(icons.into_iter().map(SteamGridDbGrid::from).collect())
 }
 
+/// Lists still-image options for one of Steam's other artwork slots (see
+/// `ArtworkKind`). Animated ones are left out: Steam's grid folder only
+/// reliably shows still images.
+#[tauri::command]
+pub async fn list_steamgriddb_artwork(
+    state: State<'_, ConfigState>,
+    steamgriddb_id: i64,
+    kind: ArtworkKind,
+) -> Result<Vec<SteamGridDbGrid>, String> {
+    let api_key = require_api_key(&state)?;
+
+    let (endpoint, dimensions) = match kind {
+        ArtworkKind::Wide => ("grids", Some("920x430,460x215")),
+        ArtworkKind::Hero => ("heroes", None),
+        ArtworkKind::Logo => ("logos", None),
+    };
+    let mut url = build_url(&[endpoint, "game", &steamgriddb_id.to_string()])?;
+    {
+        let mut query = url.query_pairs_mut();
+        query.append_pair("types", "static");
+        if let Some(dimensions) = dimensions {
+            query.append_pair("dimensions", dimensions);
+        }
+    }
+    let assets: Vec<SgdbAsset> = sgdb_get(url, &api_key).await?;
+
+    Ok(assets.into_iter().map(SteamGridDbGrid::from).collect())
+}
+
 pub(crate) fn artwork_dir(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(app
         .path()
@@ -538,6 +567,60 @@ pub fn remove_game_icon(app: AppHandle, state: State<ConfigState>, game_id: Stri
     let updated = game.clone();
 
     remove_stale_asset_files(&artwork_dir(&app)?, game_uuid, "_icon")?;
+    save_config(&app, &config)?;
+    Ok(updated)
+}
+
+/// Downloads the chosen image for one of Steam's other artwork slots,
+/// caches it and records it on the game, like `set_game_cover`.
+#[tauri::command]
+pub async fn set_game_artwork(
+    app: AppHandle,
+    state: State<'_, ConfigState>,
+    game_id: String,
+    kind: ArtworkKind,
+    steamgriddb_id: i64,
+    image_url: String,
+) -> Result<Game, String> {
+    let bytes = download_image(&image_url).await?;
+
+    let dir = artwork_dir(&app)?;
+    fs::create_dir_all(&dir).map_err(|e| format!("Could not create artwork directory: {e}"))?;
+
+    let game_uuid = Uuid::parse_str(&game_id).map_err(|e| format!("Invalid game id: {e}"))?;
+    remove_stale_asset_files(&dir, game_uuid, kind.cache_suffix())?;
+    let ext = image_extension(&image_url);
+    fs::write(asset_cache_path(&dir, game_uuid, kind.cache_suffix(), ext), &bytes)
+        .map_err(|e| format!("Could not write artwork file: {e}"))?;
+
+    let mut config = state
+        .lock()
+        .map_err(|_| "Configuration is locked".to_string())?;
+    let game = find_game(&mut config, &game_id)?;
+    game.steamgriddb_id = Some(steamgriddb_id);
+    game.artwork.insert(kind, image_url);
+    let updated = game.clone();
+    save_config(&app, &config)?;
+    Ok(updated)
+}
+
+/// Clears one of a game's Steam artwork slots and deletes its cached file.
+#[tauri::command]
+pub fn remove_game_artwork(
+    app: AppHandle,
+    state: State<ConfigState>,
+    game_id: String,
+    kind: ArtworkKind,
+) -> Result<Game, String> {
+    let mut config = state
+        .lock()
+        .map_err(|_| "Configuration is locked".to_string())?;
+    let game = find_game(&mut config, &game_id)?;
+    let game_uuid = game.id;
+    game.artwork.remove(&kind);
+    let updated = game.clone();
+
+    remove_stale_asset_files(&artwork_dir(&app)?, game_uuid, kind.cache_suffix())?;
     save_config(&app, &config)?;
     Ok(updated)
 }

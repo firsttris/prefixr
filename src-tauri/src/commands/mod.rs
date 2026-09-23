@@ -1,3 +1,4 @@
+pub mod binary_vdf;
 pub mod games;
 pub mod github;
 pub mod graphics;
@@ -10,6 +11,7 @@ pub mod proton_options;
 pub mod runner_downloads;
 pub mod runners;
 pub mod shell_link;
+pub mod steam;
 pub mod steamgriddb;
 pub mod umu;
 pub mod umu_database;

@@ -25,10 +25,17 @@ export interface Game {
   cover_url: string | null;
   steamgriddb_icon_grid_id: number | null;
   steamgriddb_icon_url: string | null;
+  // Source URLs of the SteamGridDB images picked for Steam's other artwork
+  // slots — see `ArtworkKind` in models.rs.
+  artwork: Partial<Record<ArtworkKind, string>>;
   umu_id: string | null;
   umu_store: string | null;
   overrides: GameOverrides;
 }
+
+// Steam's artwork slots besides the cover and icon: the wide grid image,
+// the banner on the game's page, and the logo laid over it.
+export type ArtworkKind = "wide" | "hero" | "logo";
 
 export interface GameInput {
   name: string;
@@ -82,6 +89,13 @@ export interface DetectedShortcut {
   name: string;
   exe_path: string;
 }
+
+// Outcome of `export_to_steam` / `remove_from_steam` (steam.rs).
+// `steam_running`: nothing was changed, since Steam would overwrite it —
+// ask before quitting Steam.
+export type SteamChange =
+  | { status: "done"; restarted_steam: boolean }
+  | { status: "steam_running" };
 
 export interface RunnerSourceInfo {
   id: string;

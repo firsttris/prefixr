@@ -16,7 +16,7 @@ Bereits erledigt: Start von Proton über umu-launcher und Performance-Overrides 
 | 3 | Runner aus Steam/Lutris/umu mitbenutzen | mittel | S | ProtonUp-Qt, Lutris |
 | 4 | Kleine Bugs und Kanten (siehe unten) | mittel | S | – |
 | 5 | GAMEID-Zuordnung für protonfixes | hoch | M | Lutris, Heroic |
-| 6 | Export nach Steam (Nicht-Steam-Spiel) | hoch | M | Lutris, Bottles, Heroic |
+| 6 | Export nach Steam (Nicht-Steam-Spiel) ✓ | hoch | M | Lutris, Bottles, Heroic |
 | 7 | Prefix-Snapshots, Backup und Restore | hoch | M–L | Bottles, PortProton |
 | 8 | Log-Analyse mit Lösungsvorschlägen | mittel | M | Bottles (ansatzweise) |
 | 9 | Spiel ohne Netzwerk starten | mittel | M | Bottles, PortProton |
@@ -84,15 +84,15 @@ Ohne `GAMEID` nutzt umu `umu-default`, dann greifen nur die allgemeinen protonfi
 **Vorher klären:** Wie die umu-database abgefragt wird (CSV im GitHub-Repo oder eine API) und welches Format sie hat.
 
 ### 6. Export nach Steam
-**Nutzen: hoch · Aufwand: M**
+**Nutzen: hoch · Aufwand: M** · **erledigt**
 
-Das Spiel als Nicht-Steam-Spiel in Steam eintragen, mit Artwork. Auf Bazzite und im Steam-Deck-/Gaming-Modus ist das der wichtigste Weg, Spiele überhaupt zu starten. `steamgriddb_id`, `cover_grid_id` und `steamgriddb_icon_grid_id` am `Game` sind genau dafür schon vorgesehen.
+Pro Spiel über „Zu Steam hinzufügen“ ([steam.rs](src-tauri/src/commands/steam.rs)). Die Funktion trägt das Spiel in die `shortcuts.vdf` des zuletzt angemeldeten Kontos ein. Mit nach Steam geht genau das Artwork, das im Artwork-Dialog ausgewählt ist: Cover, Icon und die Steam-Bilder breites Cover, Hero und Logo. Für Bildarten ohne Auswahl behält Steam seine eigenen Bilder. Die App-ID leitet sich aus der Spiel-ID ab und bleibt deshalb auch nach einer Umbenennung gleich. „In Steam aktualisieren“ und „Aus Steam entfernen“ gibt es ebenfalls, und wer ein Spiel aus der Bibliothek entfernt, entfernt es auch aus Steam. Läuft Steam, fragt Prefixr nach und startet Steam für die Änderung neu.
 
-**Umsetzung:**
-- `userdata/<id>/config/shortcuts.vdf` im **binären** VDF-Format lesen und schreiben.
-- Der Eintrag startet `prefixr --launch <game-id>` (siehe `write_game_shortcut`).
-- Die App-ID berechnet sich per CRC32 aus Exe und Name, damit die Grid-Bilder unter `userdata/<id>/config/grid/<appid>p.png` usw. zugeordnet werden.
-- Steam muss beim Schreiben beendet sein, sonst überschreibt es die Datei. Also Hinweis oder Prüfung einbauen.
+Steam startet `prefixr --run <game-id>`: ohne Fenster, ohne Tray und neben einer offenen Prefixr-Instanz. Der Prozess beendet sich mit dem Spiel, sodass Steam das Spielende sieht. Desktop-Verknüpfungen (`--launch`) reichen den Start jetzt an eine laufende Instanz weiter.
+
+**Offen:**
+- Ein über Steam gestartetes Spiel erscheint in einer offenen Prefixr-Oberfläche nicht als „läuft“.
+- Steam als Flatpak wird nicht unterstützt, weil es Prefixr außerhalb seiner Sandbox nicht starten kann.
 
 ### 7. Prefix-Snapshots, Backup und Restore
 **Nutzen: hoch · Aufwand: M–L**

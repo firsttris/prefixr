@@ -7,6 +7,7 @@
   let {
     game,
     runState,
+    inSteam,
     onLaunch,
     onKill,
     onEdit,
@@ -14,10 +15,13 @@
     onShowLog,
     onCreateDesktopShortcut,
     onCreateMenuShortcut,
+    onExportToSteam,
+    onRemoveFromSteam,
     onEditArtwork,
   }: {
     game: Game;
     runState?: GameRunState;
+    inSteam: boolean;
     onLaunch: () => void;
     onKill: () => void;
     onEdit: () => void;
@@ -25,6 +29,8 @@
     onShowLog: (path: string) => void;
     onCreateDesktopShortcut: () => Promise<void>;
     onCreateMenuShortcut: () => Promise<void>;
+    onExportToSteam: () => void;
+    onRemoveFromSteam: () => void;
     onEditArtwork: () => void;
   } = $props();
 
@@ -49,7 +55,7 @@
   function toggleShortcutMenu() {
     if (!shortcutMenuOpen && shortcutButtonEl) {
       const rect = shortcutButtonEl.getBoundingClientRect();
-      shortcutMenuUpward = window.innerHeight - rect.bottom < 120;
+      shortcutMenuUpward = window.innerHeight - rect.bottom < 200;
     }
     shortcutMenuOpen = !shortcutMenuOpen;
   }
@@ -117,8 +123,8 @@
         disabled={shortcutState === "creating"}
         aria-haspopup="true"
         aria-expanded={shortcutMenuOpen}
-        aria-label="Verknüpfung erstellen"
-        title="Verknüpfung erstellen"
+        aria-label="Verknüpfung erstellen oder zu Steam hinzufügen"
+        title="Verknüpfung erstellen oder zu Steam hinzufügen"
       >
         {shortcutState === "done" ? "✓" : "🔗"}
       </button>
@@ -135,6 +141,28 @@
           <button type="button" role="menuitem" onclick={() => handleCreateShortcut("menu")}>
             Ins Startmenü
           </button>
+          <button
+            type="button"
+            role="menuitem"
+            onclick={() => {
+              shortcutMenuOpen = false;
+              onExportToSteam();
+            }}
+          >
+            {inSteam ? "In Steam aktualisieren" : "Zu Steam hinzufügen"}
+          </button>
+          {#if inSteam}
+            <button
+              type="button"
+              role="menuitem"
+              onclick={() => {
+                shortcutMenuOpen = false;
+                onRemoveFromSteam();
+              }}
+            >
+              Aus Steam entfernen
+            </button>
+          {/if}
         </div>
       {/if}
     </div>
@@ -202,7 +230,7 @@
 <ConfirmDialog
   open={confirmingRemove}
   title="Spiel entfernen?"
-  message={`„${game.name}“ wird aus der Bibliothek entfernt. Der Prefix und die Spieldateien bleiben erhalten.`}
+  message={`„${game.name}“ wird aus der Bibliothek${inSteam ? " und aus Steam" : ""} entfernt. Der Prefix und die Spieldateien bleiben erhalten.`}
   onConfirm={() => {
     confirmingRemove = false;
     onRemove();

@@ -10,10 +10,15 @@
     initGameEvents,
     createDesktopShortcut,
     createMenuShortcut,
+    exportToSteam,
+    removeFromSteam,
+    steamGameIds,
+    refreshSteamGames,
   } from "$lib/stores/games";
   import { showLog } from "$lib/logViewer";
   import GameCard from "./GameCard.svelte";
   import GameListRow from "./GameListRow.svelte";
+  import ConfirmDialog from "./ConfirmDialog.svelte";
   import type { Game } from "$lib/types";
 
   let {
@@ -69,7 +74,71 @@
   onMount(() => {
     initGameEvents();
     refreshGames();
+    refreshSteamGames().catch(() => {});
   });
+
+  // Steam changes run from here for both views, since a running Steam first
+  // needs the user's OK to be quit (see steam.rs). "remove-game" takes the
+  // game out of Steam before removing it from the library.
+  type SteamAction = "export" | "remove" | "remove-game";
+
+  let steamConfirm = $state<{ game: Game; action: SteamAction } | null>(null);
+  let steamNotice = $state<{ text: string; kind: "busy" | "done" | "error" } | null>(null);
+  let noticeTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function notify(text: string, kind: "busy" | "done" | "error") {
+    clearTimeout(noticeTimer);
+    steamNotice = { text, kind };
+    if (kind !== "busy") {
+      noticeTimer = setTimeout(() => (steamNotice = null), kind === "error" ? 10000 : 5000);
+    }
+  }
+
+  async function runSteamAction(game: Game, action: SteamAction, shutdownSteam = false) {
+    steamConfirm = null;
+    notify(
+      shutdownSteam
+        ? "Steam wird beendet…"
+        : action === "export"
+          ? `„${game.name}“ wird zu Steam hinzugefügt…`
+          : `„${game.name}“ wird aus Steam entfernt…`,
+      "busy",
+    );
+    try {
+      const result =
+        action === "export"
+          ? await exportToSteam(game.id, shutdownSteam)
+          : await removeFromSteam(game.id, shutdownSteam);
+      if (result.status === "steam_running") {
+        steamNotice = null;
+        steamConfirm = { game, action };
+        return;
+      }
+      await refreshSteamGames();
+      const restarted = result.restarted_steam ? " Steam startet neu." : "";
+      if (action === "remove-game") {
+        await removeGame(game.id);
+        notify(`„${game.name}“ ist aus der Bibliothek und aus Steam entfernt.${restarted}`, "done");
+      } else if (action === "remove") {
+        notify(`„${game.name}“ ist aus Steam entfernt.${restarted}`, "done");
+      } else {
+        notify(
+          `„${game.name}“ ist in Steam.${restarted || " Es erscheint beim nächsten Start von Steam."}`,
+          "done",
+        );
+      }
+    } catch (e) {
+      notify(`Steam: ${e}`, "error");
+    }
+  }
+
+  function handleRemove(game: Game) {
+    if ($steamGameIds.has(game.id)) {
+      runSteamAction(game, "remove-game");
+    } else {
+      removeGame(game.id);
+    }
+  }
 </script>
 
 {#if $games.length > 0}
@@ -131,13 +200,16 @@
       <GameCard
         {game}
         runState={$gameRunState[game.id]}
+        inSteam={$steamGameIds.has(game.id)}
         onLaunch={() => launchGame(game.id)}
         onKill={() => killGame(game.id)}
         onEdit={() => onEdit(game)}
-        onRemove={() => removeGame(game.id)}
+        onRemove={() => handleRemove(game)}
         onShowLog={showLog}
         onCreateDesktopShortcut={() => createDesktopShortcut(game.id)}
         onCreateMenuShortcut={() => createMenuShortcut(game.id)}
+        onExportToSteam={() => runSteamAction(game, "export")}
+        onRemoveFromSteam={() => runSteamAction(game, "remove")}
         onEditArtwork={() => onEditArtwork(game)}
       />
     {/each}
@@ -148,20 +220,70 @@
       <GameListRow
         {game}
         runState={$gameRunState[game.id]}
+        inSteam={$steamGameIds.has(game.id)}
         onLaunch={() => launchGame(game.id)}
         onKill={() => killGame(game.id)}
         onEdit={() => onEdit(game)}
-        onRemove={() => removeGame(game.id)}
+        onRemove={() => handleRemove(game)}
         onShowLog={showLog}
         onCreateDesktopShortcut={() => createDesktopShortcut(game.id)}
         onCreateMenuShortcut={() => createMenuShortcut(game.id)}
+        onExportToSteam={() => runSteamAction(game, "export")}
+        onRemoveFromSteam={() => runSteamAction(game, "remove")}
         onEditArtwork={() => onEditArtwork(game)}
       />
     {/each}
   </div>
 {/if}
 
+{#if steamNotice}
+  <div class="notice {steamNotice.kind}" role="status">{steamNotice.text}</div>
+{/if}
+
+<ConfirmDialog
+  open={steamConfirm !== null}
+  title="Steam neu starten?"
+  message={steamConfirm
+    ? `Steam läuft gerade und würde die Änderung wieder überschreiben. Prefixr beendet Steam, ${
+        steamConfirm.action === "export"
+          ? `trägt „${steamConfirm.game.name}“ ein`
+          : `entfernt „${steamConfirm.game.name}“`
+      } und startet Steam danach neu. Ein laufendes Steam-Spiel wird dabei beendet.`
+    : ""}
+  confirmLabel="Steam neu starten"
+  onConfirm={() => steamConfirm && runSteamAction(steamConfirm.game, steamConfirm.action, true)}
+  onCancel={() => (steamConfirm = null)}
+/>
+
 <style>
+  .notice {
+    position: fixed;
+    bottom: 1.2em;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 20;
+    max-width: min(36em, calc(100vw - 2em));
+    padding: 0.6em 1em;
+    border-radius: 8px;
+    font-size: 0.85em;
+    background: var(--surface-raised);
+    color: var(--text);
+    border: 1px solid var(--border);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  }
+
+  .notice.done {
+    background: var(--success-bg);
+    color: var(--success);
+    border-color: transparent;
+  }
+
+  .notice.error {
+    background: var(--danger-bg);
+    color: var(--danger);
+    border-color: transparent;
+  }
+
   .toolbar {
     display: flex;
     align-items: center;

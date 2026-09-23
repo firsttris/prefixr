@@ -76,6 +76,11 @@ pub struct Game {
     /// `commands::steamgriddb`.
     #[serde(default)]
     pub steamgriddb_icon_url: Option<String>,
+    /// Chosen SteamGridDB images for Steam's other artwork slots, by kind:
+    /// the source URL, cached at `artwork/{id}{suffix}.{ext}` (see
+    /// `ArtworkKind::cache_suffix`). Only used by the Steam export.
+    #[serde(default)]
+    pub artwork: BTreeMap<ArtworkKind, String>,
     /// The game's UMU id (e.g. `umu-1091500`), passed to umu as `GAMEID` so
     /// umu-protonfixes applies this game's own fixes, and Proton its
     /// per-game hacks (umu derives `SteamAppId` from it). `None` leaves umu
@@ -92,6 +97,41 @@ pub struct Game {
     /// exactly as before.
     #[serde(default)]
     pub overrides: GameOverrides,
+}
+
+/// Steam's artwork slots besides the cover and icon, picked from
+/// SteamGridDB just like those two.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ArtworkKind {
+    /// The wide grid image, shown e.g. under "recent games".
+    Wide,
+    /// The banner at the top of the game's page.
+    Hero,
+    /// The logo laid over the hero.
+    Logo,
+}
+
+impl ArtworkKind {
+    pub const ALL: [ArtworkKind; 3] = [ArtworkKind::Wide, ArtworkKind::Hero, ArtworkKind::Logo];
+
+    /// The suffix of the cached file, after the game id.
+    pub fn cache_suffix(self) -> &'static str {
+        match self {
+            ArtworkKind::Wide => "_wide",
+            ArtworkKind::Hero => "_hero",
+            ArtworkKind::Logo => "_logo",
+        }
+    }
+
+    /// The suffix of Steam's grid file, after the app id.
+    pub fn grid_suffix(self) -> &'static str {
+        match self {
+            ArtworkKind::Wide => "",
+            ArtworkKind::Hero => "_hero",
+            ArtworkKind::Logo => "_logo",
+        }
+    }
 }
 
 impl Game {

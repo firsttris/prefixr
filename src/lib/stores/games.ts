@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { writable } from "svelte/store";
-import type { DetectedShortcut, Game, GameInput } from "$lib/types";
+import type { DetectedShortcut, Game, GameInput, SteamChange } from "$lib/types";
 
 export const games = writable<Game[]>([]);
 
@@ -117,6 +117,13 @@ export async function takePendingLaunch(): Promise<string | null> {
   return await invoke<string | null>("take_pending_launch");
 }
 
+// Listens for a `pending-launch` event, fired when a desktop shortcut is
+// used while Prefixr is already running: that second instance hands its
+// game id off to this one instead.
+export function listenForPendingLaunch(callback: (id: string) => void): void {
+  listen<string>("pending-launch", (event) => callback(event.payload));
+}
+
 // Checks whether the app was started via the "Mit Prefixr installieren"
 // file-manager context menu entry's `--install <exe-path>` argument; returns
 // the exe path once, then clears it. A second instance launched the same way
@@ -151,4 +158,21 @@ export async function createDesktopShortcut(id: string): Promise<void> {
 
 export async function createMenuShortcut(id: string): Promise<void> {
   await invoke("create_menu_shortcut", { id });
+}
+
+// Ids of the games that have an entry in Steam.
+export const steamGameIds = writable<Set<string>>(new Set());
+
+export async function refreshSteamGames(): Promise<void> {
+  steamGameIds.set(new Set(await invoke<string[]>("list_steam_games")));
+}
+
+// Adds the game to Steam as a non-Steam game, or updates its entry. With
+// `shutdownSteam`, a running Steam is quit for the write and started again.
+export async function exportToSteam(id: string, shutdownSteam: boolean): Promise<SteamChange> {
+  return await invoke<SteamChange>("export_to_steam", { id, shutdownSteam });
+}
+
+export async function removeFromSteam(id: string, shutdownSteam: boolean): Promise<SteamChange> {
+  return await invoke<SteamChange>("remove_from_steam", { id, shutdownSteam });
 }

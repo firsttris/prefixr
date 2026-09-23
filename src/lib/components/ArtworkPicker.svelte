@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, untrack } from "svelte";
-  import type { Game, SteamGridDbGameMatch, SteamGridDbGrid } from "$lib/types";
+  import type { ArtworkKind, Game, SteamGridDbGameMatch, SteamGridDbGrid } from "$lib/types";
   import {
     searchSteamGridDbGames,
     listSteamGridDbGrids,
@@ -9,14 +9,30 @@
     removeGameCover,
     setGameIcon,
     removeGameIcon,
+    listSteamGridDbArtwork,
+    setGameArtwork,
+    removeGameArtwork,
   } from "$lib/stores/steamgriddb";
   import { prettifyExeName } from "$lib/gameName";
 
   let { game, onDone }: { game: Game; onDone: () => void } = $props();
 
-  type Kind = "cover" | "icon";
+  type Kind = "cover" | "icon" | ArtworkKind;
 
-  const kindLabels: Record<Kind, string> = { cover: "Cover", icon: "Icon" };
+  const kindLabels: Record<Kind, string> = {
+    cover: "Cover",
+    icon: "Icon",
+    wide: "Breites Cover",
+    hero: "Hero",
+    logo: "Logo",
+  };
+
+  // Only Steam shows these; Prefixr itself uses the cover and icon.
+  const steamOnlyHints: Partial<Record<Kind, string>> = {
+    wide: "Nur für Steam: das breite Bild, z. B. unter „Zuletzt gespielt“.",
+    hero: "Nur für Steam: das Banner oben auf der Seite des Spiels.",
+    logo: "Nur für Steam: das Logo über dem Hero-Banner.",
+  };
 
   // `game` is only read here to seed this picker's initial state — a fresh
   // instance is mounted per game (see +page.svelte), so a one-time snapshot
@@ -42,7 +58,13 @@
   let picking = $state(false);
   let removing = $state(false);
 
-  const currentUrl = $derived(kind === "cover" ? game.cover_url : game.steamgriddb_icon_url);
+  const currentUrl = $derived(
+    kind === "cover"
+      ? game.cover_url
+      : kind === "icon"
+        ? game.steamgriddb_icon_url
+        : (game.artwork[kind] ?? null),
+  );
 
   onMount(async () => {
     if (stage === "assets" && selectedGame) {
@@ -80,7 +102,9 @@
       assetOptions =
         kind === "cover"
           ? await listSteamGridDbGrids(steamgriddbId)
-          : await listSteamGridDbIcons(steamgriddbId);
+          : kind === "icon"
+            ? await listSteamGridDbIcons(steamgriddbId)
+            : await listSteamGridDbArtwork(steamgriddbId, kind);
     } catch (e) {
       error = String(e);
     } finally {
@@ -103,8 +127,10 @@
     try {
       if (kind === "cover") {
         await setGameCover(game.id, selectedGame.id, asset.id, asset.url);
-      } else {
+      } else if (kind === "icon") {
         await setGameIcon(game.id, selectedGame.id, asset.id, asset.url);
+      } else {
+        await setGameArtwork(game.id, kind, selectedGame.id, asset.url);
       }
       onDone();
     } catch (e) {
@@ -119,8 +145,10 @@
     try {
       if (kind === "cover") {
         await removeGameCover(game.id);
-      } else {
+      } else if (kind === "icon") {
         await removeGameIcon(game.id);
+      } else {
+        await removeGameArtwork(game.id, kind);
       }
       onDone();
     } catch (e) {
@@ -151,11 +179,15 @@
     {/each}
   </div>
 
+  {#if steamOnlyHints[kind]}
+    <p class="hint">{steamOnlyHints[kind]}</p>
+  {/if}
+
   {#if currentUrl}
     <div class="current">
-      <span class="tune-title">Aktuelles {kindLabels[kind]}</span>
+      <span class="tune-title">Aktuelle Auswahl</span>
       <div class="current-row">
-        <img class="current-asset" class:square={kind === "icon"} src={currentUrl} alt="" />
+        <img class="current-asset shape-{kind}" src={currentUrl} alt="" />
         <button type="button" class="ghost" disabled={removing} onclick={handleRemove}>
           {removing ? "Wird entfernt…" : "Entfernen"}
         </button>
@@ -203,12 +235,11 @@
     {:else if assetOptions.length === 0}
       <p class="hint">Keine {kindLabels[kind]}-Optionen gefunden.</p>
     {:else}
-      <div class="grid-options">
+      <div class="grid-options" class:landscape={kind === "wide" || kind === "hero" || kind === "logo"}>
         {#each assetOptions as asset (asset.id)}
           <button
             type="button"
-            class="grid-option"
-            class:square={kind === "icon"}
+            class="grid-option shape-{kind}"
             disabled={picking}
             onclick={() => pickAsset(asset)}
           >
@@ -229,6 +260,7 @@
 
   .kind-tabs {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.4em;
   }
 
@@ -264,8 +296,18 @@
     border-radius: 6px;
   }
 
-  .current-asset.square {
+  .current-asset.shape-icon {
     aspect-ratio: 1 / 1;
+    object-fit: contain;
+    background: var(--surface-raised);
+  }
+
+  .current-asset.shape-wide,
+  .current-asset.shape-hero,
+  .current-asset.shape-logo {
+    width: 10em;
+    aspect-ratio: auto;
+    max-height: 5em;
     object-fit: contain;
     background: var(--surface-raised);
   }
@@ -323,6 +365,10 @@
     align-self: flex-start;
   }
 
+  .grid-options.landscape {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+
   .grid-options {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
@@ -349,8 +395,21 @@
     min-width: 0;
   }
 
-  .grid-option.square {
+  .grid-option.shape-icon {
     padding-top: 100%; /* 1:1 */
+    background: var(--surface-raised);
+  }
+
+  .grid-option.shape-wide {
+    padding-top: 46.7%; /* 920×430 */
+  }
+
+  .grid-option.shape-hero {
+    padding-top: 32.3%; /* 1920×620 */
+  }
+
+  .grid-option.shape-logo {
+    padding-top: 50%;
     background: var(--surface-raised);
   }
 
@@ -367,7 +426,8 @@
     display: block;
   }
 
-  .grid-option.square img {
+  .grid-option.shape-icon img,
+  .grid-option.shape-logo img {
     object-fit: contain;
   }
 

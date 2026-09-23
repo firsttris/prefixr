@@ -1,6 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { writable } from "svelte/store";
-import type { SteamGridDbConfig, SteamGridDbGameMatch, SteamGridDbGrid } from "$lib/types";
+import type {
+  ArtworkKind,
+  SteamGridDbConfig,
+  SteamGridDbGameMatch,
+  SteamGridDbGrid,
+} from "$lib/types";
 import { refreshGames } from "$lib/stores/games";
 
 export const steamGridDbConfig = writable<SteamGridDbConfig | null>(null);
@@ -62,4 +67,26 @@ export async function removeGameIcon(gameId: string): Promise<void> {
 
 export async function getGameIcon(gameId: string): Promise<string | null> {
   return await invoke<string | null>("get_game_icon", { gameId });
+}
+
+export async function listSteamGridDbArtwork(
+  steamgriddbId: number,
+  kind: ArtworkKind,
+): Promise<SteamGridDbGrid[]> {
+  return await invoke<SteamGridDbGrid[]>("list_steamgriddb_artwork", { steamgriddbId, kind });
+}
+
+export async function setGameArtwork(
+  gameId: string,
+  kind: ArtworkKind,
+  steamgriddbId: number,
+  imageUrl: string,
+): Promise<void> {
+  await invoke("set_game_artwork", { gameId, kind, steamgriddbId, imageUrl });
+  await refreshGames();
+}
+
+export async function removeGameArtwork(gameId: string, kind: ArtworkKind): Promise<void> {
+  await invoke("remove_game_artwork", { gameId, kind });
+  await refreshGames();
 }

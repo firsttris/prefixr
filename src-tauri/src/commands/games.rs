@@ -2,13 +2,15 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, Listener, Manager, State};
+use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use uuid::Uuid;
 
 use crate::commands::github::read_token;
@@ -416,6 +418,7 @@ pub fn add_game(
         cover_url: None,
         steamgriddb_icon_grid_id: None,
         steamgriddb_icon_url: None,
+        artwork: Default::default(),
         umu_id,
         umu_store,
         overrides: game.overrides,
@@ -826,6 +829,45 @@ pub async fn launch_game(
     result
 }
 
+/// Runs a game without any window and exits along with it: how Steam
+/// starts games exported to it (`--run <game-id>`, see `commands::steam`),
+/// so Steam counts the game as running exactly as long as it really runs.
+/// With no window to show an error in, a failure before the game got going
+/// becomes a dialog. A game that ran and then exited with an error only
+/// sets the exit code; its log has the details.
+pub fn launch_game_headless(app: &AppHandle, id: String) {
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let started = Arc::new(AtomicBool::new(false));
+        let flag = started.clone();
+        app.listen_any("game-started", move |_| flag.store(true, Ordering::SeqCst));
+
+        let logs_dir = log_file_path(&app, &id)
+            .ok()
+            .and_then(|path| path.parent().map(Path::to_path_buf));
+        let result = launch_game(app.clone(), app.state(), app.state(), id).await;
+        let code = match result {
+            Ok(()) => 0,
+            Err(message) => {
+                if !started.load(Ordering::SeqCst) {
+                    let mut text = message;
+                    if let Some(dir) = logs_dir {
+                        text.push_str(&format!("\n\nLogs: {}", dir.display()));
+                    }
+                    let dialog = app
+                        .dialog()
+                        .message(text)
+                        .title("Spiel konnte nicht gestartet werden")
+                        .kind(MessageDialogKind::Error);
+                    let _ = tauri::async_runtime::spawn_blocking(move || dialog.blocking_show()).await;
+                }
+                1
+            }
+        };
+        app.exit(code);
+    });
+}
+
 async fn run_game(
     app: &AppHandle,
     state: &State<'_, ConfigState>,
@@ -1159,7 +1201,7 @@ fn sanitize_filename(name: &str) -> String {
 /// Prefers a chosen SteamGridDB icon (already cached to disk as a real file)
 /// over the exe's embedded icon, since it's the higher-quality, user-picked
 /// option when both exist.
-fn write_shortcut_icon(app: &AppHandle, game: &Game) -> Result<Option<PathBuf>, String> {
+pub(crate) fn write_shortcut_icon(app: &AppHandle, game: &Game) -> Result<Option<PathBuf>, String> {
     if let Some(icon_url) = &game.steamgriddb_icon_url {
         let ext = image_extension(icon_url);
         let path = asset_cache_path(&artwork_dir(app)?, game.id, "_icon", ext);
@@ -1204,7 +1246,7 @@ fn write_exe_icon_file(app: &AppHandle, game: &Game) -> Result<Option<PathBuf>, 
 /// re-randomized on every launch — useless for a persistent shortcut.
 /// AppImages set `APPIMAGE` to the real `.AppImage` file's path exactly for
 /// cases like this, so that's preferred when present.
-fn own_executable_path() -> Result<PathBuf, String> {
+pub(crate) fn own_executable_path() -> Result<PathBuf, String> {
     if let Some(appimage_path) = std::env::var_os("APPIMAGE") {
         return Ok(PathBuf::from(appimage_path));
     }

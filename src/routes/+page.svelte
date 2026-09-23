@@ -19,6 +19,7 @@
     listenForPendingInstall,
     takePendingInstall,
     takePendingLaunch,
+    listenForPendingLaunch,
   } from "$lib/stores/games";
   import type { Game } from "$lib/types";
 
@@ -60,6 +61,10 @@
       initGameEvents();
       launchGame(pendingGameId);
     }
+    listenForPendingLaunch((gameId) => {
+      initGameEvents();
+      launchGame(gameId);
+    });
 
     const pendingExePath = await takePendingInstall();
     if (pendingExePath) {

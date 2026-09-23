@@ -5,12 +5,12 @@ mod tray;
 
 use std::path::Path;
 
-use tauri::{Emitter, Manager, WindowEvent};
+use tauri::{Emitter, Manager, WebviewWindowBuilder, WindowEvent};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
 use commands::games::{
     add_game, create_desktop_shortcut, create_menu_shortcut, ensure_install_desktop_entry,
-    kill_game, launch_game, list_games, remove_game, run_installer, take_pending_install,
+    kill_game, launch_game, launch_game_headless, list_games, remove_game, run_installer, take_pending_install,
     take_pending_launch, update_game, PendingInstall, PendingLaunch, RunningGames,
 };
 use commands::github::{get_github_config, save_github_config};
@@ -23,10 +23,12 @@ use commands::prefixes::{add_prefix, delete_prefix, list_prefixes};
 use commands::proton_options::{get_proton_config, list_proton_options, save_proton_config};
 use commands::runner_downloads::{download_runner, list_runner_releases, list_runner_sources};
 use commands::runners::list_runners;
+use commands::steam::{export_to_steam, list_steam_games, remove_from_steam};
 use commands::steamgriddb::{
-    get_game_cover, get_game_icon, get_steamgriddb_config, list_steamgriddb_grids,
-    list_steamgriddb_icons, remove_game_cover, remove_game_icon, save_steamgriddb_config,
-    search_steamgriddb_games, set_game_cover, set_game_icon,
+    get_game_cover, get_game_icon, get_steamgriddb_config, list_steamgriddb_artwork,
+    list_steamgriddb_grids, list_steamgriddb_icons, remove_game_artwork, remove_game_cover,
+    remove_game_icon, save_steamgriddb_config, search_steamgriddb_games, set_game_artwork,
+    set_game_cover, set_game_icon,
 };
 use commands::umu::{get_umu_status, install_umu};
 use commands::umu_database::search_umu_ids;
@@ -60,8 +62,15 @@ fn running_as_root() -> bool {
 
 /// Looks for `--launch <game-id>` among the process args, as invoked by a
 /// shortcut created via `create_desktop_shortcut` or `create_menu_shortcut`.
-fn find_launch_arg() -> Option<String> {
-    find_flag_arg(&std::env::args().collect::<Vec<_>>(), "--launch")
+fn find_launch_arg(args: &[String]) -> Option<String> {
+    find_flag_arg(args, "--launch")
+}
+
+/// Looks for `--run <game-id>` among the process args, as invoked by Steam
+/// for a game exported to it (see `commands::steam`): the game then runs
+/// without any window, and the app exits with it.
+fn find_run_arg(args: &[String]) -> Option<String> {
+    find_flag_arg(args, "--run")
 }
 
 /// Looks for `--install <exe-path>` among the process args, as invoked by the
@@ -79,12 +88,23 @@ fn find_flag_arg(args: &[String], flag: &str) -> Option<String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let args: Vec<String> = std::env::args().collect();
+    let run_game_id = find_run_arg(&args);
+
+    let mut builder = tauri::Builder::default();
+    // A `--run` game runs in a process of its own, next to an open Prefixr,
+    // so it stays out of the single-instance handoff.
+    if run_game_id.is_none() {
         // Must be the first plugin registered (see tauri-plugin-single-instance's
         // own docs) — this is what makes a second "Mit Prefixr installieren"
-        // click, while Prefixr is already running, hand its `--install <path>`
-        // off to this instance instead of opening a second window.
-        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+        // click or a desktop shortcut, while Prefixr is already running, hand
+        // its `--install <path>` or `--launch <id>` off to this instance
+        // instead of opening a second window.
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            if let Some(game_id) = find_launch_arg(&argv) {
+                let _ = app.emit("pending-launch", game_id);
+                return;
+            }
             let Some(exe_path) = find_install_arg(&argv) else {
                 show_and_focus(app);
                 rebuild_tray_menu(app);
@@ -98,10 +118,12 @@ pub fn run() {
             let _ = app.emit("pending-install", exe_path);
             show_and_focus(app);
             rebuild_tray_menu(app);
-        }))
+        }));
+    }
+    builder
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .setup(|app| {
+        .setup(move |app| {
             if running_as_root() {
                 app.dialog()
                     .message(
@@ -118,13 +140,21 @@ pub fn run() {
 
             let config = load_config(app.handle())?;
             app.manage(std::sync::Mutex::new(config));
-            app.manage(PendingLaunch(std::sync::Mutex::new(find_launch_arg())));
-            let install_args: Vec<String> = std::env::args().collect();
-            app.manage(PendingInstall(std::sync::Mutex::new(find_install_arg(
-                &install_args,
-            ))));
+            app.manage(PendingLaunch(std::sync::Mutex::new(find_launch_arg(&args))));
+            app.manage(PendingInstall(std::sync::Mutex::new(find_install_arg(&args))));
             app.manage(RunningGames::default());
             app.manage(WindowVisible::new(true));
+
+            if let Some(game_id) = run_game_id {
+                launch_game_headless(app.handle(), game_id);
+                return Ok(());
+            }
+            // The window is created here rather than by Tauri itself (see
+            // `"create": false` in tauri.conf.json), so a `--run` launch
+            // never shows one.
+            for window in app.config().app.windows.clone() {
+                WebviewWindowBuilder::from_config(app.handle(), &window)?.build()?;
+            }
             setup_tray(app.handle())?;
             // Best-effort: a file manager's "Öffnen mit" context menu working
             // is a nice-to-have, not something worth failing startup over.
@@ -158,6 +188,9 @@ pub fn run() {
             run_installer,
             create_desktop_shortcut,
             create_menu_shortcut,
+            export_to_steam,
+            remove_from_steam,
+            list_steam_games,
             add_prefix,
             delete_prefix,
             list_prefixes,
@@ -189,6 +222,9 @@ pub fn run() {
             set_game_icon,
             get_game_icon,
             remove_game_icon,
+            list_steamgriddb_artwork,
+            set_game_artwork,
+            remove_game_artwork,
             get_github_config,
             save_github_config,
             get_umu_status,
