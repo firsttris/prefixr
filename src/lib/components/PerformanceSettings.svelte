@@ -9,6 +9,7 @@
   } from "$lib/stores/performance";
   import { maxMapCountStatus, refreshMaxMapCountStatus, fixMaxMapCount } from "$lib/stores/system";
   import type { PerformanceConfig } from "$lib/types";
+  import { t, getLocale } from "$lib/i18n/index.svelte";
 
   let draft = $state<PerformanceConfig | null>(null);
   let saving = $state(false);
@@ -59,13 +60,16 @@
   {#if $maxMapCountStatus && !$maxMapCountStatus.sufficient}
     <div class="warning-banner">
       <div>
-        <strong>vm.max_map_count zu niedrig</strong>
+        <strong>{t("performanceSettings.mapCountWarningTitle")}</strong>
         <p>
-          Aktuell {$maxMapCountStatus.current.toLocaleString("de-DE")}, empfohlen mindestens
-          {$maxMapCountStatus.recommended.toLocaleString("de-DE")}. Mehrere moderne Spiele (u. a.
-          mit Easy Anti-Cheat, Elden Ring, Baldur's Gate 3, Diablo IV) stürzen darunter direkt
-          beim Start ab. Steam setzt diesen Wert selbst systemweit — Spiele außerhalb von Steam
-          bekommen ihn ohne diesen Fix nicht.
+          {t("performanceSettings.mapCountWarningBody", {
+            current: $maxMapCountStatus.current.toLocaleString(
+              getLocale() === "de" ? "de-DE" : "en-US",
+            ),
+            recommended: $maxMapCountStatus.recommended.toLocaleString(
+              getLocale() === "de" ? "de-DE" : "en-US",
+            ),
+          })}
         </p>
         {#if mapCountFixError}
           <p class="error">{mapCountFixError}</p>
@@ -84,7 +88,7 @@
           disabled={fixingMapCount}
           onclick={handleFixMapCount}
         >
-          {fixingMapCount ? "Wird angewendet…" : "Jetzt erhöhen"}
+          {fixingMapCount ? t("performanceSettings.fixing") : t("performanceSettings.fixNow")}
         </button>
       {/if}
     </div>
@@ -92,8 +96,8 @@
 
 
   <SettingsPanel
-    title="Leistung"
-    hint="Wie das System ein laufendes Spiel behandelt. Gilt für alle Spiele und lässt sich pro Spiel überschreiben (Spiel bearbeiten → Leistung). Setzt jeweils voraus, dass das zugrunde liegende Tool installiert ist."
+    title={t("performanceSettings.title")}
+    hint={t("performanceSettings.hint")}
     {saving}
     {saved}
     {error}

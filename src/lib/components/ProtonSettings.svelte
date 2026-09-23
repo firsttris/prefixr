@@ -10,6 +10,7 @@
   } from "$lib/stores/proton";
   import { refreshRunners, runners } from "$lib/stores/runners";
   import type { ProtonOption } from "$lib/types";
+  import { t } from "$lib/i18n/index.svelte";
 
   let draft = $state<Record<string, boolean> | null>(null);
   let saving = $state(false);
@@ -77,18 +78,18 @@
 </script>
 
 <SettingsPanel
-  title="Proton"
-  hint="Schalter, die Proton selbst auswertet. Gelten für alle Spiele mit Proton-Runner und lassen sich pro Spiel überschreiben (Spiel bearbeiten → Proton). „Standard“ überlässt die Entscheidung Proton und den protonfixes."
+  title={t("protonSettings.title")}
+  hint={t("protonSettings.hint")}
   {saving}
   {saved}
   {error}
   onSave={handleSave}
 >
   {#if protonRunners.length === 0}
-    <p class="hint">Noch kein Proton-Runner installiert — lade zuerst einen unter „Runner“ herunter.</p>
+    <p class="hint">{t("protonSettings.noRunner")}</p>
   {:else}
     <label class="runner">
-      Verfügbare Schalter laut
+      {t("protonSettings.availableSwitches")}
       <select
         value={runnerId}
         onchange={(e) => (pickedRunnerId = e.currentTarget.value)}

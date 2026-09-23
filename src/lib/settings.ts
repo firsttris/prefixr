@@ -5,6 +5,8 @@
 // values; in the game dialog they additionally get `OverrideHooks` to show
 // which rows deviate from the global setting and to reset them.
 
+import { t } from "$lib/i18n/index.svelte";
+
 export interface OverrideHooks<K extends string> {
   isOverridden: (key: K) => boolean;
   reset: (key: K) => void;
@@ -13,7 +15,7 @@ export interface OverrideHooks<K extends string> {
 }
 
 export function onOff(value: boolean | undefined): string {
-  return value ? "an" : "aus";
+  return value ? t("common.on") : t("common.off");
 }
 
 // Field-by-field equality of two flat settings objects.

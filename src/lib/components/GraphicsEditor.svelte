@@ -3,6 +3,7 @@
   import SettingToggle from "$lib/components/SettingToggle.svelte";
   import type { OverrideHooks } from "$lib/settings";
   import type { GamescopeSettings, GraphicsConfig, VkBasaltSettings } from "$lib/types";
+  import { t } from "$lib/i18n/index.svelte";
 
   // Bild — see settings.ts for how the editors are shared between the global
   // page and the game dialog. gamescope and vkBasalt are each overridden as
@@ -42,9 +43,9 @@
 
 <div class="list">
   <SettingToggle
-    label="Gamescope"
-    description="Startet das Spiel in einer eigenen, verschachtelten Compositor-Session."
-    info="Empfehlung: Für Handhelds/TV-Setups oder um Auflösung und FPS-Limit unabhängig vom Spiel zu erzwingen. Braucht das gamescope-Paket; ohne das passiert einfach nichts. Wird übersprungen, wenn prefixr selbst schon in einer Gamescope-Session läuft."
+    label={t("graphicsEditor.gamescopeLabel")}
+    description={t("graphicsEditor.gamescopeDescription")}
+    info={t("graphicsEditor.gamescopeInfo")}
     checked={value.gamescope.enabled}
     onToggle={(enabled) => onchange({ gamescope: { enabled } })}
     overridden={overrides?.isOverridden("gamescope")}
@@ -55,31 +56,31 @@
       {#if value.gamescope.enabled}
         <div class="field-grid">
           <label>
-            Breite (px)
+            {t("graphicsEditor.widthLabel")}
             <input
               type="number"
               min="0"
-              placeholder="native"
+              placeholder={t("graphicsEditor.widthPlaceholder")}
               value={value.gamescope.width ?? ""}
               oninput={(e) => onchange({ gamescope: { width: numberOrNull(e.currentTarget) } })}
             />
           </label>
           <label>
-            Höhe (px)
+            {t("graphicsEditor.heightLabel")}
             <input
               type="number"
               min="0"
-              placeholder="native"
+              placeholder={t("graphicsEditor.heightPlaceholder")}
               value={value.gamescope.height ?? ""}
               oninput={(e) => onchange({ gamescope: { height: numberOrNull(e.currentTarget) } })}
             />
           </label>
           <label>
-            FPS-Limit
+            {t("graphicsEditor.fpsLimitLabel")}
             <input
               type="number"
               min="0"
-              placeholder="unbegrenzt"
+              placeholder={t("graphicsEditor.fpsLimitPlaceholder")}
               value={value.gamescope.fps_limit ?? ""}
               oninput={(e) =>
                 onchange({ gamescope: { fps_limit: numberOrNull(e.currentTarget) } })}
@@ -92,16 +93,16 @@
             checked={value.gamescope.fullscreen}
             onchange={(e) => onchange({ gamescope: { fullscreen: e.currentTarget.checked } })}
           />
-          Vollbild erzwingen
+          {t("graphicsEditor.forceFullscreen")}
         </label>
       {/if}
     {/snippet}
   </SettingToggle>
 
   <SettingToggle
-    label="vkBasalt"
-    description="Bildnachbearbeitung direkt im Spiel — kostet etwas Leistung."
-    info="Empfehlung: Kostet immer etwas Leistung (zusätzlicher Bildbearbeitungsschritt) — nur aktivieren, wenn du GPU-Leistung übrig hast und dir das Ergebnis optisch wichtiger ist als die letzten FPS."
+    label={t("graphicsEditor.vkbasaltLabel")}
+    description={t("graphicsEditor.vkbasaltDescription")}
+    info={t("graphicsEditor.vkbasaltInfo")}
     checked={value.vkbasalt.enabled}
     onToggle={(enabled) => onchange({ vkbasalt: { enabled } })}
     overridden={overrides?.isOverridden("vkbasalt")}
@@ -113,7 +114,7 @@
         <div class="vkbasalt" class:compact>
           {#if !compact}
             <div class="preview">
-              <span class="title">Vorschau (Annäherung)</span>
+              <span class="title">{t("graphicsEditor.previewTitle")}</span>
               <div class="preview-screen">
                 <div class="preview-image" style={`filter:${previewFilter}`}></div>
               </div>
@@ -127,15 +128,13 @@
                   checked={value.vkbasalt.sharpen}
                   onchange={(e) => onchange({ vkbasalt: { sharpen: e.currentTarget.checked } })}
                 />
-                Schärfen (CAS)
+                {t("graphicsEditor.sharpenLabel")}
               </label>
-              <InfoIcon
-                text="Empfehlung: Kaum Leistungseinbruch — lohnt sich besonders bei Upscaling oder niedrigerer Auflösung, um Schärfe zurückzugewinnen."
-              />
+              <InfoIcon text={t("graphicsEditor.sharpenInfo")} />
             </div>
             {#if value.vkbasalt.sharpen}
               <label class="sharpness">
-                Stärke: {value.vkbasalt.sharpness.toFixed(2)}
+                {t("graphicsEditor.sharpnessLabel", { value: value.vkbasalt.sharpness.toFixed(2) })}
                 <input
                   type="range"
                   min="0"
@@ -154,11 +153,9 @@
                   checked={value.vkbasalt.smaa}
                   onchange={(e) => onchange({ vkbasalt: { smaa: e.currentTarget.checked } })}
                 />
-                Kantenglättung (SMAA)
+                {t("graphicsEditor.smaaLabel")}
               </label>
-              <InfoIcon
-                text="Empfehlung: Spürbarer Leistungseinbruch möglich. Wenn das Spiel schon eigene Kantenglättung hat, hier eher weglassen — sonst kostet es nur zusätzlich Leistung."
-              />
+              <InfoIcon text={t("graphicsEditor.smaaInfo")} />
             </div>
           </div>
         </div>

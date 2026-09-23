@@ -16,6 +16,7 @@
     refreshSteamGames,
   } from "$lib/stores/games";
   import { showLog } from "$lib/logViewer";
+  import { t } from "$lib/i18n/index.svelte";
   import GameCard from "./GameCard.svelte";
   import GameListRow from "./GameListRow.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
@@ -98,10 +99,10 @@
     steamConfirm = null;
     notify(
       shutdownSteam
-        ? "Steam wird beendet…"
+        ? t("gameList.steam.busyQuitting")
         : action === "export"
-          ? `„${game.name}“ wird zu Steam hinzugefügt…`
-          : `„${game.name}“ wird aus Steam entfernt…`,
+          ? t("gameList.steam.busyExporting", { name: game.name })
+          : t("gameList.steam.busyRemoving", { name: game.name }),
       "busy",
     );
     try {
@@ -115,20 +116,23 @@
         return;
       }
       await refreshSteamGames();
-      const restarted = result.restarted_steam ? " Steam startet neu." : "";
+      const restarted = result.restarted_steam ? t("gameList.steam.restartedSuffix") : "";
       if (action === "remove-game") {
         await removeGame(game.id);
-        notify(`„${game.name}“ ist aus der Bibliothek und aus Steam entfernt.${restarted}`, "done");
+        notify(t("gameList.steam.doneRemovedBoth", { name: game.name, restarted }), "done");
       } else if (action === "remove") {
-        notify(`„${game.name}“ ist aus Steam entfernt.${restarted}`, "done");
+        notify(t("gameList.steam.doneRemoved", { name: game.name, restarted }), "done");
       } else {
         notify(
-          `„${game.name}“ ist in Steam.${restarted || " Es erscheint beim nächsten Start von Steam."}`,
+          t("gameList.steam.doneAdded", {
+            name: game.name,
+            restarted: restarted || t("gameList.steam.doneAddedNextStartSuffix"),
+          }),
           "done",
         );
       }
     } catch (e) {
-      notify(`Steam: ${e}`, "error");
+      notify(t("gameList.steam.errorPrefix", { error: String(e) }), "error");
     }
   }
 
@@ -137,7 +141,7 @@
       runSteamAction(game, "remove-game");
     } else {
       removeGame(game.id).catch((e) =>
-        notify(`„${game.name}“ konnte nicht entfernt werden: ${e}`, "error"),
+        notify(t("gameList.steam.removeFailed", { name: game.name, error: String(e) }), "error"),
       );
     }
   }
@@ -147,24 +151,24 @@
   <div class="toolbar">
     <input
       type="search"
-      placeholder="Spiel suchen…"
+      placeholder={t("gameList.toolbar.searchPlaceholder")}
       bind:value={query}
-      aria-label="Spiel suchen"
+      aria-label={t("gameList.toolbar.searchLabel")}
     />
 
-    <select bind:value={sortBy} aria-label="Sortierung">
-      <option value="name-asc">Name (A–Z)</option>
-      <option value="name-desc">Name (Z–A)</option>
-      <option value="runner">Runner</option>
+    <select bind:value={sortBy} aria-label={t("gameList.toolbar.sortLabel")}>
+      <option value="name-asc">{t("gameList.toolbar.sortNameAsc")}</option>
+      <option value="name-desc">{t("gameList.toolbar.sortNameDesc")}</option>
+      <option value="runner">{t("gameList.toolbar.sortRunner")}</option>
     </select>
 
-    <div class="view-toggle" role="group" aria-label="Ansicht wechseln">
+    <div class="view-toggle" role="group" aria-label={t("gameList.toolbar.viewToggleLabel")}>
       <button
         type="button"
         class:active={viewMode === "grid"}
         onclick={() => (viewMode = "grid")}
-        aria-label="Kachelansicht"
-        title="Kachelansicht"
+        aria-label={t("gameList.toolbar.gridView")}
+        title={t("gameList.toolbar.gridView")}
       >
         ▦
       </button>
@@ -172,8 +176,8 @@
         type="button"
         class:active={viewMode === "list"}
         onclick={() => (viewMode = "list")}
-        aria-label="Listenansicht"
-        title="Listenansicht"
+        aria-label={t("gameList.toolbar.listView")}
+        title={t("gameList.toolbar.listView")}
       >
         ☰
       </button>
@@ -184,17 +188,17 @@
 {#if $games.length === 0}
   <div class="empty">
     <span class="empty-icon">🎮</span>
-    <h3>Noch keine Spiele in deiner Bibliothek</h3>
-    <p>Füge dein erstes Spiel hinzu, um loszulegen.</p>
+    <h3>{t("gameList.emptyLibrary.title")}</h3>
+    <p>{t("gameList.emptyLibrary.hint")}</p>
     {#if onAddNew}
-      <button type="button" class="primary" onclick={onAddNew}>+ Spiel hinzufügen</button>
+      <button type="button" class="primary" onclick={onAddNew}>{t("library.addGame")}</button>
     {/if}
   </div>
 {:else if visibleGames.length === 0}
   <div class="empty">
     <span class="empty-icon">🔍</span>
-    <h3>Keine Treffer</h3>
-    <p>Kein Spiel gefunden für „{query}“.</p>
+    <h3>{t("gameList.emptySearch.title")}</h3>
+    <p>{t("gameList.emptySearch.hint", { query })}</p>
   </div>
 {:else if viewMode === "grid"}
   <div class="grid">
@@ -244,15 +248,16 @@
 
 <ConfirmDialog
   open={steamConfirm !== null}
-  title="Steam neu starten?"
+  title={t("gameList.steam.confirmTitle")}
   message={steamConfirm
-    ? `Steam läuft gerade und würde die Änderung wieder überschreiben. Prefixr beendet Steam, ${
-        steamConfirm.action === "export"
-          ? `trägt „${steamConfirm.game.name}“ ein`
-          : `entfernt „${steamConfirm.game.name}“`
-      } und startet Steam danach neu. Ein laufendes Steam-Spiel wird dabei beendet.`
+    ? t("gameList.steam.confirmMessage", {
+        action:
+          steamConfirm.action === "export"
+            ? t("gameList.steam.confirmActionExport", { name: steamConfirm.game.name })
+            : t("gameList.steam.confirmActionRemove", { name: steamConfirm.game.name }),
+      })
     : ""}
-  confirmLabel="Steam neu starten"
+  confirmLabel={t("gameList.steam.confirmButton")}
   onConfirm={() => steamConfirm && runSteamAction(steamConfirm.game, steamConfirm.action, true)}
   onCancel={() => (steamConfirm = null)}
 />

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
+  import { t } from "$lib/i18n/index.svelte";
 
   let {
     open,
@@ -37,7 +38,9 @@
     >
       <header>
         <h2>{title}</h2>
-        <button type="button" class="ghost" onclick={onClose} aria-label="Schließen">✕</button>
+        <button type="button" class="ghost" onclick={onClose} aria-label={t("common.close")}
+          >✕</button
+        >
       </header>
       <div class="body">
         {@render children()}

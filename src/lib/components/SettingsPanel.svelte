@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
+  import { t } from "$lib/i18n/index.svelte";
 
   // Frame for a global settings page: heading, intro, the category's
   // editor, and a save button for the page's draft.
@@ -36,10 +37,10 @@
 
   <div class="save-row">
     <button type="button" class="primary" disabled={saving} onclick={onSave}>
-      {saving ? "Wird gespeichert…" : "Änderungen speichern"}
+      {saving ? t("common.saving") : t("settingsPanel.saveChanges")}
     </button>
     {#if saved}
-      <span class="saved-hint">Gespeichert.</span>
+      <span class="saved-hint">{t("common.saved")}</span>
     {/if}
   </div>
 </section>

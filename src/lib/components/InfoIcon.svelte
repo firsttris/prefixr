@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { t } from "$lib/i18n/index.svelte";
+
   let { text }: { text: string } = $props();
 
   let open = $state(false);
@@ -28,7 +30,7 @@
     class:active={open}
     onclick={toggle}
     aria-expanded={open}
-    aria-label="Mehr Informationen"
+    aria-label={t("common.moreInfo")}
   >
     ⓘ
   </button>

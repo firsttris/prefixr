@@ -4,6 +4,7 @@
   import SettingsPanel from "$lib/components/SettingsPanel.svelte";
   import { graphicsConfig, refreshGraphicsConfig, saveGraphicsConfig } from "$lib/stores/graphics";
   import type { GraphicsConfig } from "$lib/types";
+  import { t } from "$lib/i18n/index.svelte";
 
   let draft = $state<GraphicsConfig | null>(null);
   let saving = $state(false);
@@ -40,8 +41,8 @@
 </script>
 
 <SettingsPanel
-  title="Bild"
-  hint="Was mit dem Bild des Spiels passiert, bevor es auf dem Bildschirm landet. Gilt für alle Spiele und lässt sich pro Spiel überschreiben (Spiel bearbeiten → Bild)."
+  title={t("graphicsSettings.title")}
+  hint={t("graphicsSettings.hint")}
   {saving}
   {saved}
   {error}

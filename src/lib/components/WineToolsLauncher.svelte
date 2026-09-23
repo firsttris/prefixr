@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { runners, refreshRunners } from "$lib/stores/runners";
   import { WINE_TOOLS, launchWineTool } from "$lib/stores/wineTools";
+  import { t, type TranslationKey } from "$lib/i18n/index.svelte";
 
   let { prefixPath }: { prefixPath: string } = $props();
 
@@ -29,14 +30,13 @@
 
 <div class="wine-tools">
   <p class="hint">
-    Wines eigene Werkzeuge für diesen Prefix (<code>{prefixPath}</code>) — nützlich, um ein
-    Problem direkt zu untersuchen, statt nur ein Spiel neu zu starten.
+    {t("wineToolsLauncher.hintBefore")}<code>{prefixPath}</code>{t("wineToolsLauncher.hintAfter")}
   </p>
 
   <label>
-    Runner (zum Ausführen des Werkzeugs)
+    {t("wineToolsLauncher.runnerLabel")}
     <select bind:value={runnerId}>
-      <option value="" disabled selected>Runner wählen</option>
+      <option value="" disabled selected>{t("gameForm.runnerChoose")}</option>
       {#each $runners as runner (runner.id)}
         <option value={runner.id}>{runner.name} ({runner.kind})</option>
       {/each}
@@ -47,8 +47,8 @@
     {#each WINE_TOOLS as tool (tool.id)}
       <div class="tool-row">
         <div>
-          <span class="tool-label">{tool.label}</span>
-          <p class="tool-desc">{tool.description}</p>
+          <span class="tool-label">{t(`wineTools.${tool.id}.label` as TranslationKey)}</span>
+          <p class="tool-desc">{t(`wineTools.${tool.id}.description` as TranslationKey)}</p>
         </div>
         <button
           type="button"
@@ -56,7 +56,7 @@
           disabled={!runnerId || launching !== ""}
           onclick={() => handleLaunch(tool.id)}
         >
-          {launching === tool.id ? "Öffnet…" : "Öffnen"}
+          {launching === tool.id ? t("wineToolsLauncher.opening") : t("wineToolsLauncher.open")}
         </button>
       </div>
     {/each}

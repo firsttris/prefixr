@@ -12,6 +12,7 @@
   import ArtworkPicker from "$lib/components/ArtworkPicker.svelte";
   import InstallDialog from "$lib/components/InstallDialog.svelte";
   import Modal from "$lib/components/Modal.svelte";
+  import { t, getLocale, setLocale, type Locale } from "$lib/i18n/index.svelte";
   import {
     games,
     initGameEvents,
@@ -36,18 +37,20 @@
 
   // The game settings categories: set globally here, overridable per game
   // in the game dialog's tabs of the same names.
-  const SETTINGS_VIEWS: { view: View; label: string }[] = [
-    { view: "performance", label: "Leistung" },
-    { view: "graphics", label: "Bild" },
-    { view: "overlay", label: "Overlay" },
-    { view: "proton", label: "Proton" },
+  const SETTINGS_VIEWS: { view: View; label: () => string }[] = [
+    { view: "performance", label: () => t("nav.performance") },
+    { view: "graphics", label: () => t("nav.graphics") },
+    { view: "overlay", label: () => t("nav.overlay") },
+    { view: "proton", label: () => t("nav.proton") },
   ];
   let editing = $state<Game | "new" | null>(null);
   let pickingArtworkFor = $state<Game | null>(null);
   let installingExePath = $state<string | null>(null);
 
   let modalGame = $derived(editing && editing !== "new" ? editing : undefined);
-  let modalTitle = $derived(editing === "new" ? "Spiel hinzufügen" : "Spiel bearbeiten");
+  let modalTitle = $derived(
+    editing === "new" ? t("library.addGameTitle") : t("library.editGameTitle"),
+  );
 
   // If the app was started via a desktop shortcut (--launch <id>), jump
   // straight into starting that game instead of just showing the library.
@@ -88,7 +91,7 @@
       class:active={view === "library"}
       onclick={() => (view = "library")}
     >
-      Bibliothek
+      {t("nav.library")}
     </button>
     <button
       type="button"
@@ -96,7 +99,7 @@
       class:active={view === "prefixes"}
       onclick={() => (view = "prefixes")}
     >
-      Prefixe
+      {t("nav.prefixes")}
     </button>
     <button
       type="button"
@@ -104,10 +107,10 @@
       class:active={view === "runners"}
       onclick={() => (view = "runners")}
     >
-      Runner
+      {t("nav.runners")}
     </button>
-    <div class="nav-group" title="Gilt für alle Spiele, pro Spiel überschreibbar">
-      Standard für alle Spiele
+    <div class="nav-group" title={t("nav.perGameGroupTitle")}>
+      {t("nav.perGameGroupLabel")}
     </div>
     {#each SETTINGS_VIEWS as item (item.view)}
       <button
@@ -116,7 +119,7 @@
         class:active={view === item.view}
         onclick={() => (view = item.view)}
       >
-        {item.label}
+        {item.label()}
       </button>
     {/each}
     <div class="nav-divider"></div>
@@ -126,21 +129,37 @@
       class:active={view === "steamgriddb"}
       onclick={() => (view = "steamgriddb")}
     >
-      SteamGridDB
+      {t("nav.steamgriddb")}
     </button>
+    <div class="nav-spacer"></div>
+    <div class="lang-switch" role="group" aria-label="Language">
+      {#each ["de", "en"] as const as lng (lng)}
+        <button
+          type="button"
+          class="lang-item"
+          class:active={getLocale() === lng}
+          onclick={() => setLocale(lng as Locale)}
+        >
+          {lng.toUpperCase()}
+        </button>
+      {/each}
+    </div>
   </nav>
 
   <main>
     {#if view === "library"}
       <div class="page-header">
         <div>
-          <h1>Bibliothek</h1>
+          <h1>{t("library.heading")}</h1>
           {#if $games.length > 0}
-            <p class="subtitle">{$games.length} {$games.length === 1 ? "Spiel" : "Spiele"}</p>
+            <p class="subtitle">
+              {$games.length}
+              {$games.length === 1 ? t("library.gameSingular") : t("library.gamePlural")}
+            </p>
           {/if}
         </div>
         <button type="button" class="primary" onclick={() => (editing = "new")}>
-          + Spiel hinzufügen
+          {t("library.addGame")}
         </button>
       </div>
       <GameList
@@ -150,12 +169,12 @@
       />
     {:else if view === "prefixes"}
       <div class="page-header">
-        <h1>Prefixe</h1>
+        <h1>{t("library.prefixesHeading")}</h1>
       </div>
       <PrefixManager />
     {:else if view === "runners"}
       <div class="page-header">
-        <h1>Runner</h1>
+        <h1>{t("library.runnersHeading")}</h1>
       </div>
       <RunnerList />
     {:else if view === "performance"}
@@ -168,7 +187,7 @@
       <ProtonSettings />
     {:else}
       <div class="page-header">
-        <h1>SteamGridDB</h1>
+        <h1>{t("library.steamgriddbHeading")}</h1>
       </div>
       <SteamGridDbSettings />
     {/if}
@@ -181,7 +200,7 @@
 
 <Modal
   open={pickingArtworkFor !== null}
-  title="Artwork auswählen"
+  title={t("library.selectArtworkTitle")}
   onClose={() => (pickingArtworkFor = null)}
 >
   {#if pickingArtworkFor}
@@ -191,7 +210,7 @@
 
 <Modal
   open={installingExePath !== null}
-  title="Mit Prefixr installieren"
+  title={t("library.installTitle")}
   onClose={() => (installingExePath = null)}
 >
   {#if installingExePath}
@@ -256,6 +275,33 @@
     background: var(--surface-raised);
     color: var(--text);
     font-weight: 600;
+  }
+
+  .nav-spacer {
+    flex: 1;
+  }
+
+  .lang-switch {
+    display: flex;
+    gap: 0.3em;
+    padding: 0.4em 0.6em;
+  }
+
+  .lang-item {
+    flex: 1;
+    padding: 0.4em;
+    font-size: 0.78em;
+    font-weight: 600;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    border-radius: 6px;
+  }
+
+  .lang-item.active {
+    background: var(--surface-raised);
+    color: var(--text);
+    border-color: var(--accent);
   }
 
   main {

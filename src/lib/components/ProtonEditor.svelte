@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { PROTON_OPTION_INFO, PROTON_OPTION_ORDER } from "$lib/protonOptions";
+  import { PROTON_OPTION_ORDER } from "$lib/protonOptions";
   import type { ProtonOption } from "$lib/types";
+  import { t, type TranslationKey } from "$lib/i18n/index.svelte";
 
   // Proton — see settings.ts for how the editors are shared between the
   // global page and the game dialog. Unlike the other categories every
@@ -27,12 +28,12 @@
 
   const curated = $derived(
     options
-      .filter((o) => o.config in PROTON_OPTION_INFO)
+      .filter((o) => PROTON_OPTION_ORDER.includes(o.config))
       .sort(
         (a, b) => PROTON_OPTION_ORDER.indexOf(a.config) - PROTON_OPTION_ORDER.indexOf(b.config),
       ),
   );
-  const others = $derived(options.filter((o) => !(o.config in PROTON_OPTION_INFO)));
+  const others = $derived(options.filter((o) => !PROTON_OPTION_ORDER.includes(o.config)));
   // Set here, but unknown to the runner — e.g. carried over from an older
   // Proton version. Harmless, but shown so they can be cleared.
   const unknown = $derived(
@@ -66,9 +67,11 @@
   }
 
   function neutralLabel(option: ProtonOption): string {
-    if (!inherited) return "Standard";
+    if (!inherited) return t("protonEditor.neutralDefault");
     const global = lookup(inherited, option);
-    return global === null ? "Global" : `Global (${global ? "an" : "aus"})`;
+    return global === null
+      ? t("protonEditor.neutralGlobal")
+      : t("protonEditor.neutralGlobalState", { state: global ? t("common.on") : t("common.off") });
   }
 </script>
 
@@ -79,10 +82,10 @@
       {neutralLabel(option)}
     </button>
     <button type="button" aria-pressed={value === true} onclick={() => set(option, true)}>
-      An
+      {t("protonEditor.on")}
     </button>
     <button type="button" aria-pressed={value === false} onclick={() => set(option, false)}>
-      Aus
+      {t("protonEditor.off")}
     </button>
   </div>
 {/snippet}
@@ -94,11 +97,10 @@
 
   <div class="list">
     {#each curated as option (option.config)}
-      {@const info = PROTON_OPTION_INFO[option.config]}
       <div class="row" class:overridden={lookup(values, option) !== null}>
         <div>
-          <span class="label">{info.label}</span>
-          <p class="desc">{info.description}</p>
+          <span class="label">{t(`protonOptions.${option.config}.label` as TranslationKey)}</span>
+          <p class="desc">{t(`protonOptions.${option.config}.description` as TranslationKey)}</p>
           <code class="env-name">{option.env}</code>
         </div>
         {@render tristate(option)}
@@ -108,15 +110,16 @@
 
   {#if others.length > 0}
     <details class="advanced">
-      <summary>Erweitert ({others.length})</summary>
-      <p class="hint">
-        Weitere Schalter aus dem Skript des Runners, ohne Beschreibung. Nur ändern, wenn ein Fix
-        für ein Spiel genau das verlangt.
-      </p>
+      <summary>{t("protonEditor.advanced", { count: others.length })}</summary>
+      <p class="hint">{t("protonEditor.advancedHint")}</p>
       <div class="compact-list">
         {#each others as option (option.config)}
           <div class="compact-row" class:overridden={lookup(values, option) !== null}>
-            <code title={option.aliases.length ? `auch: ${option.aliases.join(", ")}` : ""}>
+            <code
+              title={option.aliases.length
+                ? t("protonEditor.alsoAliases", { aliases: option.aliases.join(", ") })
+                : ""}
+            >
               {option.env}
             </code>
             {@render tristate(option)}
@@ -128,11 +131,13 @@
 
   {#if options.length > 0 && unknown.length > 0}
     <div class="compact-list">
-      <p class="hint">Gesetzt, aber vom Runner nicht erkannt:</p>
+      <p class="hint">{t("protonEditor.unsetKnownHint")}</p>
       {#each unknown as name (name)}
         <div class="compact-row overridden">
           <code>{name}={values[name] ? "1" : "0"}</code>
-          <button type="button" class="reset" onclick={() => remove(name)}>Entfernen</button>
+          <button type="button" class="reset" onclick={() => remove(name)}
+            >{t("common.remove")}</button
+          >
         </div>
       {/each}
     </div>

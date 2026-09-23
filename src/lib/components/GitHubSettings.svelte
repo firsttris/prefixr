@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { githubConfig, refreshGitHubConfig, saveGitHubConfig } from "$lib/stores/github";
   import type { GitHubConfig } from "$lib/types";
+  import { t } from "$lib/i18n/index.svelte";
 
   let { open = false }: { open?: boolean } = $props();
 
@@ -40,31 +41,26 @@
 </script>
 
 <details class="github-token" {open}>
-  <summary>GitHub-Token (gegen "403 rate limit")</summary>
-  <p class="hint">
-    Die Liste hier ruft die GitHub-API ab, die ohne Anmeldung nur 60 Anfragen pro Stunde
-    erlaubt und dann mit Fehler 403 antwortet. Ein kostenloses Personal Access Token (ohne
-    jegliche Berechtigungen, nur "Public Repositories") hebt das Limit auf 5000 Anfragen pro
-    Stunde an. Erstelle eines auf github.com/settings/tokens?type=beta und füge es hier ein.
-  </p>
+  <summary>{t("githubSettings.summary")}</summary>
+  <p class="hint">{t("githubSettings.hint")}</p>
 
   <div class="row">
     <input
       type="password"
       class="text-input"
-      placeholder="ghp_… oder github_pat_…"
+      placeholder={t("githubSettings.tokenPlaceholder")}
       bind:value={config.token}
       oninput={() => (saved = false)}
     />
     <button type="button" class="ghost" disabled={saving} onclick={handleSave}>
-      {saving ? "Speichert…" : "Speichern"}
+      {saving ? t("githubSettings.saving") : t("common.save")}
     </button>
   </div>
 
   {#if error}
     <p class="error">{error}</p>
   {:else if saved}
-    <p class="saved-hint">Gespeichert.</p>
+    <p class="saved-hint">{t("common.saved")}</p>
   {/if}
 </details>
 

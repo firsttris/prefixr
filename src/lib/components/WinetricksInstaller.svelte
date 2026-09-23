@@ -8,6 +8,7 @@
     listInstalledWinetricksVerbs,
     type WinetricksVerbMeta,
   } from "$lib/stores/winetricks";
+  import { t, type TranslationKey } from "$lib/i18n/index.svelte";
 
   let { prefixPath, onShowLog }: { prefixPath: string; onShowLog: (path: string) => void } =
     $props();
@@ -90,16 +91,14 @@
 
 <div class="winetricks">
   <p class="hint">
-    Installiert Windows-Abhängigkeiten direkt in diesen Prefix (<code>{prefixPath}</code>) — wirkt
-    sich auf alle Spiele aus, die ihn verwenden. Je nach Auswahl können mehrere Minuten vergehen,
-    dabei werden die Originaldateien von den jeweiligen Herstellern heruntergeladen. Ein ✓ markiert
-    bereits installierte Pakete.
+    {t("winetricksInstaller.hintBefore")}<code>{prefixPath}</code
+    >{t("winetricksInstaller.hintAfter")}
   </p>
 
   <label>
-    Runner (zum Ausführen von winetricks)
+    {t("winetricksInstaller.runnerLabel")}
     <select bind:value={runnerId}>
-      <option value="" disabled selected>Runner wählen</option>
+      <option value="" disabled selected>{t("gameForm.runnerChoose")}</option>
       {#each $runners as runner (runner.id)}
         <option value={runner.id}>{runner.name} ({runner.kind})</option>
       {/each}
@@ -116,10 +115,12 @@
         />
         <div>
           <span class="verb-label">
-            {verb.label}
-            {#if installed.has(verb.id)}<span class="badge">✓ installiert</span>{/if}
+            {t(`winetricksVerbs.${verb.id}.label` as TranslationKey)}
+            {#if installed.has(verb.id)}
+              <span class="badge">{t("winetricksInstaller.installedBadge")}</span>
+            {/if}
           </span>
-          <p class="verb-desc">{verb.description}</p>
+          <p class="verb-desc">{t(`winetricksVerbs.${verb.id}.description` as TranslationKey)}</p>
         </div>
       </label>
     {/each}
@@ -127,20 +128,21 @@
 
   <div class="catalogue">
     <button type="button" class="ghost disclosure" onclick={toggleCatalogue}>
-      {catalogueOpen ? "▾" : "▸"} Weitere Pakete durchsuchen
+      {catalogueOpen ? "▾" : "▸"}
+      {t("winetricksInstaller.browseMore")}
     </button>
 
     {#if catalogueOpen}
       <div class="catalogue-body">
         {#if catalogueLoading}
-          <p class="hint">Lade Paketliste…</p>
+          <p class="hint">{t("winetricksInstaller.loadingCatalogue")}</p>
         {:else if catalogueError}
           <p class="error">{catalogueError}</p>
         {:else}
           <input
             class="search"
             type="search"
-            placeholder="Suchen (z. B. xinput oder arial)…"
+            placeholder={t("winetricksInstaller.searchPlaceholder")}
             bind:value={search}
           />
           <div class="catalogue-list">
@@ -158,7 +160,7 @@
                 <span class="catalogue-id">{verb.id}</span>
               </label>
             {:else}
-              <p class="hint">Keine Treffer.</p>
+              <p class="hint">{t("winetricksInstaller.noMatches")}</p>
             {/each}
           </div>
         {/if}
@@ -174,9 +176,9 @@
 
   {#if successLogPath}
     <div class="success">
-      <span>Installation abgeschlossen.</span>
+      <span>{t("winetricksInstaller.installSuccess")}</span>
       <button type="button" class="ghost" onclick={() => onShowLog(successLogPath)}>
-        Log anzeigen
+        {t("winetricksInstaller.showLog")}
       </button>
     </div>
   {/if}
@@ -187,7 +189,9 @@
     disabled={installing || !runnerId || selected.size === 0}
     onclick={handleInstall}
   >
-    {installing ? "Wird installiert…" : `Installieren (${selected.size})`}
+    {installing
+      ? t("winetricksInstaller.installing")
+      : t("winetricksInstaller.installButton", { count: selected.size })}
   </button>
 </div>
 

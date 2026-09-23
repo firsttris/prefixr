@@ -1,11 +1,12 @@
 <script lang="ts">
   import Modal from "./Modal.svelte";
+  import { t } from "$lib/i18n/index.svelte";
 
   let {
     open,
     title,
     message,
-    confirmLabel = "Entfernen",
+    confirmLabel = t("common.remove"),
     onConfirm,
     onCancel,
   }: {
@@ -21,7 +22,7 @@
 <Modal {open} {title} onClose={onCancel}>
   <p>{message}</p>
   <div class="actions">
-    <button type="button" class="ghost" onclick={onCancel}>Abbrechen</button>
+    <button type="button" class="ghost" onclick={onCancel}>{t("common.cancel")}</button>
     <button type="button" class="danger" onclick={onConfirm}>{confirmLabel}</button>
   </div>
 </Modal>

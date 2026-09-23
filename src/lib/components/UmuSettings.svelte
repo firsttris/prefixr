@@ -7,6 +7,7 @@
     installUmu,
     checkUmuUpdate,
   } from "$lib/stores/umu";
+  import { t } from "$lib/i18n/index.svelte";
 
   let installing = $state(false);
   let error = $state("");
@@ -45,34 +46,32 @@
   <summary>
     umu-launcher
     {#if $umuStatus?.installed}
-      <span class="status">{$umuStatus.version ?? "installiert"}</span>
+      <span class="status">{$umuStatus.version ?? t("umuSettings.installed")}</span>
       {#if updateAvailable}
-        <span class="update">Update auf {$latestUmuVersion} verfügbar</span>
+        <span class="update"
+          >{t("umuSettings.updateAvailable", { version: $latestUmuVersion ?? "" })}</span
+        >
       {/if}
     {:else if $umuStatus}
-      <span class="status">nicht installiert</span>
+      <span class="status">{t("umuSettings.notInstalled")}</span>
     {/if}
   </summary>
   <p class="hint">
-    Proton-Runner starten über umu — so, wie Steam selbst Proton startet: in der Steam Linux
-    Runtime, mit allen <code>PROTON_*</code>-Optionen und automatischen Fixes pro Spiel
-    (protonfixes). umu wird beim ersten Start eines Proton-Spiels automatisch geladen; die
-    Steam Runtime (einige hundert MB) ebenfalls, einmalig, und wird mit Lutris, Heroic & Co.
-    geteilt.
+    {t("umuSettings.hintBefore")} <code>PROTON_*</code>{t("umuSettings.hintAfter")}
   </p>
 
   <div class="row">
     <button type="button" class="ghost" disabled={installing} onclick={handleInstall}>
       {#if installing}
-        Lädt…
+        {t("umuSettings.loading")}
       {:else if updateAvailable}
-        Auf {$latestUmuVersion} aktualisieren
+        {t("umuSettings.updateTo", { version: $latestUmuVersion ?? "" })}
       {:else if $umuStatus?.installed && $latestUmuVersion === $umuStatus.version}
-        Neu installieren
+        {t("umuSettings.reinstall")}
       {:else if $umuStatus?.installed}
-        Auf neueste Version aktualisieren
+        {t("umuSettings.updateToLatest")}
       {:else}
-        Jetzt installieren
+        {t("umuSettings.installNow")}
       {/if}
     </button>
   </div>
@@ -80,7 +79,9 @@
   {#if error}
     <p class="error">{error}</p>
   {:else if updated}
-    <p class="saved-hint">umu {$umuStatus?.version ?? ""} ist installiert.</p>
+    <p class="saved-hint">
+      {t("umuSettings.installedHint", { version: $umuStatus?.version ?? "" })}
+    </p>
   {/if}
 </details>
 

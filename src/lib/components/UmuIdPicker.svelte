@@ -3,6 +3,7 @@
   import { searchUmuIds } from "$lib/stores/umu";
   import { prettifyExeName } from "$lib/gameName";
   import type { UmuMatch } from "$lib/types";
+  import { t } from "$lib/i18n/index.svelte";
 
   // The game's UMU id, which umu gets as `GAMEID` so umu-protonfixes
   // applies this game's own fixes — see `Game::umu_id` in models.rs.
@@ -39,7 +40,7 @@
 
   function storeLabel(match: UmuMatch): string {
     if (match.store) return STORE_LABELS[match.store] ?? match.store;
-    return match.source === "steam" ? "Steam" : "ohne Store";
+    return match.source === "steam" ? t("umuPicker.steam") : t("umuPicker.noStore");
   }
 
   // Mounted fresh each time the Proton tab opens, so reading the name once
@@ -80,11 +81,8 @@
 
 <section class="umu-picker">
   <div>
-    <span class="label">protonfixes-Zuordnung</span>
-    <p class="hint">
-      Mit der passenden ID wendet umu die Fixes für genau dieses Spiel an, und Proton seine
-      spielspezifischen Anpassungen. Ohne ID greifen nur allgemeine Fixes.
-    </p>
+    <span class="label">{t("umuPicker.label")}</span>
+    <p class="hint">{t("umuPicker.intro")}</p>
   </div>
 
   <div class="current" class:set={!!umuId}>
@@ -93,16 +91,22 @@
         <code>GAMEID={umuId}</code>
         {#if umuStore}<code>STORE={umuStore}</code>{/if}
       </span>
-      <button type="button" class="reset" onclick={() => onchange(null, null)}>Entfernen</button>
+      <button type="button" class="reset" onclick={() => onchange(null, null)}
+        >{t("common.remove")}</button
+      >
     {:else}
-      <span class="hint">Keine ID gesetzt, umu nutzt <code>umu-default</code>.</span>
+      <span class="hint"
+        >{t("umuPicker.noneSetHintBefore")} <code>umu-default</code>{t(
+          "umuPicker.noneSetHintAfter",
+        )}</span
+      >
     {/if}
   </div>
 
   <div class="search-row">
     <input
       type="text"
-      placeholder="Spielname…"
+      placeholder={t("umuPicker.searchPlaceholder")}
       bind:value={query}
       onkeydown={(e) => {
         if (e.key === "Enter") {
@@ -112,15 +116,17 @@
         }
       }}
     />
-    <button type="button" onclick={handleSearch} disabled={loading}>Suchen</button>
+    <button type="button" onclick={handleSearch} disabled={loading}
+      >{t("umuPicker.searchButton")}</button
+    >
   </div>
 
   {#if loading}
-    <p class="hint">Suche…</p>
+    <p class="hint">{t("umuPicker.searching")}</p>
   {:else if error}
     <p class="error">{error}</p>
   {:else if searched && matches.length === 0}
-    <p class="hint">Keine Treffer für „{query}“. Nicht jedes Spiel braucht eigene Fixes.</p>
+    <p class="hint">{t("umuPicker.noMatches", { query })}</p>
   {:else if matches.length > 0}
     <ul class="matches">
       {#each matches as match (`${match.umu_id}:${match.store}`)}
@@ -139,21 +145,21 @@
         </li>
       {/each}
     </ul>
-    <p class="hint">
-      Steam-Treffer kommen über SteamGridDB, die übrigen aus der umu-database. Bei mehreren
-      Stores den wählen, aus dem das Spiel stammt.
-    </p>
+    <p class="hint">{t("umuPicker.matchesHint")}</p>
   {/if}
 
   <details class="manual">
-    <summary>ID von Hand eingeben</summary>
+    <summary>{t("umuPicker.manualSummary")}</summary>
     <input
       type="text"
-      placeholder="z. B. umu-1091500"
+      placeholder={t("umuPicker.manualPlaceholder")}
       value={umuId ?? ""}
       oninput={(e) => onchange(e.currentTarget.value || null, null)}
     />
-    <p class="hint">Eine reine Steam-App-ID wird beim Speichern zu <code>umu-&lt;ID&gt;</code>.</p>
+    <p class="hint">
+      {t("umuPicker.manualHintBefore")} <code>umu-&lt;ID&gt;</code>
+      {t("umuPicker.manualHintAfter")}
+    </p>
   </details>
 </section>
 

@@ -3,6 +3,7 @@
   import type { GameRunState } from "$lib/stores/games";
   import { getGameCover } from "$lib/stores/steamgriddb";
   import ConfirmDialog from "./ConfirmDialog.svelte";
+  import { t } from "$lib/i18n/index.svelte";
 
   let {
     game,
@@ -102,9 +103,9 @@
     {/if}
 
     {#if runState?.running}
-      <span class="status-badge running"><span class="dot"></span>Läuft</span>
+      <span class="status-badge running"><span class="dot"></span>{t("gameCard.running")}</span>
     {:else if runState?.initializing}
-      <span class="status-badge init"><span class="dot"></span>Startet…</span>
+      <span class="status-badge init"><span class="dot"></span>{t("gameCard.initializing")}</span>
     {/if}
 
     <div class="menu-anchor">
@@ -115,8 +116,8 @@
         onclick={toggleMenu}
         aria-haspopup="true"
         aria-expanded={menuOpen}
-        aria-label="Weitere Optionen"
-        title="Weitere Optionen"
+        aria-label={t("gameCard.moreOptions")}
+        title={t("gameCard.moreOptions")}
       >
         ⋮
       </button>
@@ -142,7 +143,7 @@
                 stroke-linejoin="round"
               />
             </svg>
-            Artwork auswählen
+            {t("library.selectArtworkTitle")}
           </button>
           <button
             type="button"
@@ -160,7 +161,7 @@
                 stroke-linejoin="round"
               />
             </svg>
-            Spiel bearbeiten
+            {t("library.editGameTitle")}
           </button>
           <span class="menu-divider"></span>
           <button
@@ -184,7 +185,7 @@
                 stroke-linecap="round"
               />
             </svg>
-            Auf Desktop
+            {t("gameCard.menuDesktopShortcut")}
           </button>
           <button
             type="button"
@@ -207,7 +208,7 @@
                 stroke-linecap="round"
               />
             </svg>
-            Ins Startmenü
+            {t("gameCard.menuMenuShortcut")}
           </button>
           <button
             type="button"
@@ -221,7 +222,7 @@
               <rect x="3" y="3" width="14" height="14" rx="3" stroke="currentColor" stroke-width="1.5" />
               <path d="M10 6.5v7M6.5 10h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
             </svg>
-            {inSteam ? "In Steam aktualisieren" : "Zu Steam hinzufügen"}
+            {inSteam ? t("gameCard.menuUpdateInSteam") : t("gameCard.menuAddToSteam")}
           </button>
           {#if inSteam}
             <button
@@ -236,7 +237,7 @@
                 <rect x="3" y="3" width="14" height="14" rx="3" stroke="currentColor" stroke-width="1.5" />
                 <path d="M6.5 10h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
               </svg>
-              Aus Steam entfernen
+              {t("gameCard.menuRemoveFromSteam")}
             </button>
           {/if}
           <span class="menu-divider"></span>
@@ -258,7 +259,7 @@
                 stroke-linejoin="round"
               />
             </svg>
-            Entfernen
+            {t("common.remove")}
           </button>
         </div>
       {/if}
@@ -278,15 +279,15 @@
           onclick={runState?.running ? onKill : onLaunch}
           disabled={runState?.initializing}
           aria-label={runState?.running
-            ? "Beenden (Prozess killen)"
+            ? t("gameCard.playKill")
             : runState?.initializing
-              ? "Initialisiert…"
-              : "Starten"}
+              ? t("gameCard.playInitializing")
+              : t("gameCard.playStart")}
           title={runState?.running
-            ? "Beenden (Prozess killen)"
+            ? t("gameCard.playKill")
             : runState?.initializing
-              ? "Initialisiert…"
-              : "Starten"}
+              ? t("gameCard.playInitializing")
+              : t("gameCard.playStart")}
         >
           {#if runState?.initializing}
             <svg class="play-icon spin" viewBox="0 0 20 20" fill="none" aria-hidden="true">
@@ -319,7 +320,7 @@
       <span>{runState.error}</span>
       {#if runState.logPath}
         <button type="button" class="ghost" onclick={() => onShowLog(runState.logPath!)}>
-          Log anzeigen
+          {t("gameCard.showLog")}
         </button>
       {/if}
     </div>
@@ -327,15 +328,18 @@
 
   {#if shortcutState !== "idle" && shortcutState !== "creating" && shortcutState !== "done"}
     <div class="toast">
-      <span>Verknüpfung fehlgeschlagen: {shortcutState}</span>
+      <span>{t("gameCard.shortcutFailed", { error: shortcutState })}</span>
     </div>
   {/if}
 </article>
 
 <ConfirmDialog
   open={confirmingRemove}
-  title="Spiel entfernen?"
-  message={`„${game.name}“ wird aus der Bibliothek${inSteam ? " und aus Steam" : ""} entfernt. Der Prefix und die Spieldateien bleiben erhalten.`}
+  title={t("gameCard.removeConfirmTitle")}
+  message={t("gameCard.removeConfirmMessage", {
+    name: game.name,
+    steamPart: inSteam ? t("gameCard.removeConfirmSteamPart") : "",
+  })}
   onConfirm={() => {
     confirmingRemove = false;
     onRemove();

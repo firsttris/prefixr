@@ -3,6 +3,7 @@
   import type { GameRunState } from "$lib/stores/games";
   import { getGameCover } from "$lib/stores/steamgriddb";
   import ConfirmDialog from "./ConfirmDialog.svelte";
+  import { t } from "$lib/i18n/index.svelte";
 
   let {
     game,
@@ -105,11 +106,11 @@
 
   <div class="status">
     {#if runState?.running}
-      <span class="status-badge running"><span class="dot"></span>Läuft</span>
+      <span class="status-badge running"><span class="dot"></span>{t("gameCard.running")}</span>
     {:else if runState?.initializing}
-      <span class="status-badge init"><span class="dot"></span>Startet…</span>
+      <span class="status-badge init"><span class="dot"></span>{t("gameCard.initializing")}</span>
     {:else if runState?.error}
-      <span class="status-badge error">Fehler</span>
+      <span class="status-badge error">{t("gameCard.error")}</span>
     {/if}
   </div>
 
@@ -123,8 +124,8 @@
         disabled={shortcutState === "creating"}
         aria-haspopup="true"
         aria-expanded={shortcutMenuOpen}
-        aria-label="Verknüpfung erstellen oder zu Steam hinzufügen"
-        title="Verknüpfung erstellen oder zu Steam hinzufügen"
+        aria-label={t("gameCard.shortcutMenuLabel")}
+        title={t("gameCard.shortcutMenuLabel")}
       >
         {shortcutState === "done" ? "✓" : "🔗"}
       </button>
@@ -136,10 +137,10 @@
         ></div>
         <div class="menu" class:menu-up={shortcutMenuUpward} role="menu">
           <button type="button" role="menuitem" onclick={() => handleCreateShortcut("desktop")}>
-            Auf Desktop
+            {t("gameCard.menuDesktopShortcut")}
           </button>
           <button type="button" role="menuitem" onclick={() => handleCreateShortcut("menu")}>
-            Ins Startmenü
+            {t("gameCard.menuMenuShortcut")}
           </button>
           <button
             type="button"
@@ -149,7 +150,7 @@
               onExportToSteam();
             }}
           >
-            {inSteam ? "In Steam aktualisieren" : "Zu Steam hinzufügen"}
+            {inSteam ? t("gameCard.menuUpdateInSteam") : t("gameCard.menuAddToSteam")}
           </button>
           {#if inSteam}
             <button
@@ -160,7 +161,7 @@
                 onRemoveFromSteam();
               }}
             >
-              Aus Steam entfernen
+              {t("gameCard.menuRemoveFromSteam")}
             </button>
           {/if}
         </div>
@@ -170,8 +171,8 @@
       type="button"
       class="icon-btn"
       onclick={onEditArtwork}
-      aria-label="Artwork auswählen"
-      title="Artwork auswählen"
+      aria-label={t("library.selectArtworkTitle")}
+      title={t("library.selectArtworkTitle")}
     >
       🖼
     </button>
@@ -179,8 +180,8 @@
       type="button"
       class="icon-btn"
       onclick={onEdit}
-      aria-label="Spiel bearbeiten"
-      title="Spiel bearbeiten"
+      aria-label={t("library.editGameTitle")}
+      title={t("library.editGameTitle")}
     >
       ✎
     </button>
@@ -189,14 +190,14 @@
       type="button"
       class="icon-btn danger"
       onclick={() => (confirmingRemove = true)}
-      aria-label="Spiel entfernen"
-      title="Spiel entfernen"
+      aria-label={t("gameCard.removeAriaLabel")}
+      title={t("gameCard.removeAriaLabel")}
     >
       ✕
     </button>
 
     {#if runState?.running}
-      <button type="button" class="kill-sm" onclick={onKill}>Beenden</button>
+      <button type="button" class="kill-sm" onclick={onKill}>{t("gameCard.kill")}</button>
     {:else}
       <button
         type="button"
@@ -204,7 +205,7 @@
         onclick={onLaunch}
         disabled={runState?.initializing}
       >
-        {runState?.initializing ? "Initialisiere…" : "▶ Start"}
+        {runState?.initializing ? t("gameCard.initializingShort") : t("gameCard.start")}
       </button>
     {/if}
   </div>
@@ -215,7 +216,7 @@
     <span>{runState.error}</span>
     {#if runState.logPath}
       <button type="button" class="ghost" onclick={() => onShowLog(runState.logPath!)}>
-        Log anzeigen
+        {t("gameCard.showLog")}
       </button>
     {/if}
   </div>
@@ -223,14 +224,17 @@
 
 {#if shortcutState !== "idle" && shortcutState !== "creating" && shortcutState !== "done"}
   <div class="toast">
-    <span>Verknüpfung fehlgeschlagen: {shortcutState}</span>
+    <span>{t("gameCard.shortcutFailed", { error: shortcutState })}</span>
   </div>
 {/if}
 
 <ConfirmDialog
   open={confirmingRemove}
-  title="Spiel entfernen?"
-  message={`„${game.name}“ wird aus der Bibliothek${inSteam ? " und aus Steam" : ""} entfernt. Der Prefix und die Spieldateien bleiben erhalten.`}
+  title={t("gameCard.removeConfirmTitle")}
+  message={t("gameCard.removeConfirmMessage", {
+    name: game.name,
+    steamPart: inSteam ? t("gameCard.removeConfirmSteamPart") : "",
+  })}
   onConfirm={() => {
     confirmingRemove = false;
     onRemove();

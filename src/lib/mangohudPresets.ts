@@ -1,18 +1,15 @@
 import type { MangoHudLayout, MangoHudPosition } from "$lib/types";
 
 // Starting points for the overlay's look — see OverlayEditor.svelte.
+// Labels/descriptions live in the i18n dictionaries under mangohud.presets.<key>.
 export interface MangoHudPreset {
   key: string;
-  label: string;
-  description: string;
   values: Omit<MangoHudLayout, "preset">;
 }
 
 export const PRESETS: MangoHudPreset[] = [
   {
     key: "minimal",
-    label: "Minimal",
-    description: "Nur die FPS-Zahl, dezent in der Ecke.",
     values: {
       position: "top-right",
       theme_color: "ffffff",
@@ -38,8 +35,6 @@ export const PRESETS: MangoHudPreset[] = [
   },
   {
     key: "standard",
-    label: "Standard",
-    description: "FPS, Auslastung und Temperaturen im Überblick.",
     values: {
       position: "top-left",
       theme_color: "ffffff",
@@ -65,8 +60,6 @@ export const PRESETS: MangoHudPreset[] = [
   },
   {
     key: "detailed",
-    label: "Ausführlich",
-    description: "Alle Werte, inklusive Status-Icons und technischer Infos.",
     values: {
       position: "top-left",
       theme_color: "00e5ff",
@@ -92,8 +85,6 @@ export const PRESETS: MangoHudPreset[] = [
   },
   {
     key: "competitive",
-    label: "Wettkampf",
-    description: "Groß, knallig, sonst nichts — für maximale Übersicht.",
     values: {
       position: "top-right",
       theme_color: "39ff14",
@@ -119,18 +110,20 @@ export const PRESETS: MangoHudPreset[] = [
   },
 ];
 
+// Names live in the i18n dictionaries under mangohud.colors.<hex>.
 export const COLORS = [
-  { name: "Weiß", hex: "ffffff" },
-  { name: "Cyan", hex: "00e5ff" },
-  { name: "Grün", hex: "39ff14" },
-  { name: "Orange", hex: "ff9100" },
-  { name: "Pink", hex: "ff4da6" },
+  { hex: "ffffff" },
+  { hex: "00e5ff" },
+  { hex: "39ff14" },
+  { hex: "ff9100" },
+  { hex: "ff4da6" },
 ];
 
-export const POSITIONS: { value: MangoHudPosition; label: string }[] = [
-  { value: "top-left", label: "Oben links" },
-  { value: "top-right", label: "Oben rechts" },
-  { value: "bottom-left", label: "Unten links" },
-  { value: "bottom-right", label: "Unten rechts" },
+// Labels live in the i18n dictionaries under mangohud.positions.<value>.
+export const POSITIONS: { value: MangoHudPosition }[] = [
+  { value: "top-left" },
+  { value: "top-right" },
+  { value: "bottom-left" },
+  { value: "bottom-right" },
 ];
 

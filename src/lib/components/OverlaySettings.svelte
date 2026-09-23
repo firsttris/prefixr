@@ -4,6 +4,7 @@
   import SettingsPanel from "$lib/components/SettingsPanel.svelte";
   import { mangoHudConfig, refreshMangoHudConfig, saveMangoHudConfig } from "$lib/stores/mangohud";
   import type { MangoHudConfig } from "$lib/types";
+  import { t } from "$lib/i18n/index.svelte";
 
   let draft = $state<MangoHudConfig | null>(null);
   let saving = $state(false);
@@ -35,8 +36,8 @@
 </script>
 
 <SettingsPanel
-  title="Overlay"
-  hint="Das MangoHud-Overlay im Spiel. An/Aus und Aussehen gelten für alle Spiele und lassen sich pro Spiel überschreiben (Spiel bearbeiten → Overlay)."
+  title={t("overlaySettings.title")}
+  hint={t("overlaySettings.hint")}
   {saving}
   {saved}
   {error}

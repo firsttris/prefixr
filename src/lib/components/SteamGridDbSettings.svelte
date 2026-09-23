@@ -6,6 +6,7 @@
     saveSteamGridDbConfig,
   } from "$lib/stores/steamgriddb";
   import type { SteamGridDbConfig } from "$lib/types";
+  import { t } from "$lib/i18n/index.svelte";
 
   const FALLBACK: SteamGridDbConfig = { api_key: "" };
 
@@ -45,20 +46,16 @@
   <div class="header-row">
     <div>
       <h2>SteamGridDB</h2>
-      <p class="hint">
-        Damit sich Cover-Art für die Bibliothek abrufen lässt, wird ein kostenloser
-        SteamGridDB-API-Key benötigt. Erstelle einen auf
-        steamgriddb.com/profile/preferences/api und füge ihn hier ein.
-      </p>
+      <p class="hint">{t("steamGridDbSettings.hint")}</p>
     </div>
   </div>
 
   <label class="control-group">
-    <span class="tune-title">API-Key</span>
+    <span class="tune-title">{t("steamGridDbSettings.apiKeyLabel")}</span>
     <input
       type="password"
       class="text-input"
-      placeholder="API-Key einfügen…"
+      placeholder={t("steamGridDbSettings.apiKeyPlaceholder")}
       bind:value={config.api_key}
       oninput={() => (saved = false)}
     />
@@ -70,10 +67,10 @@
 
   <div class="save-row">
     <button type="button" class="primary" disabled={saving} onclick={handleSave}>
-      {saving ? "Wird gespeichert…" : "Änderungen speichern"}
+      {saving ? t("common.saving") : t("settingsPanel.saveChanges")}
     </button>
     {#if saved}
-      <span class="saved-hint">Gespeichert.</span>
+      <span class="saved-hint">{t("common.saved")}</span>
     {/if}
   </div>
 </section>

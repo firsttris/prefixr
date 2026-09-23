@@ -8,6 +8,7 @@
   import RunnerDownloads from "./RunnerDownloads.svelte";
   import GitHubSettings from "./GitHubSettings.svelte";
   import UmuSettings from "./UmuSettings.svelte";
+  import { t } from "$lib/i18n/index.svelte";
 
   let showDownloads = $state(false);
   let deleting = $state<Runner | null>(null);
@@ -23,8 +24,8 @@
   );
 
   function usageLabel(count: number): string {
-    if (count === 0) return "Nicht verwendet";
-    return count === 1 ? "Von 1 Spiel verwendet" : `Von ${count} Spielen verwendet`;
+    if (count === 0) return t("runnerList.unused");
+    return count === 1 ? t("runnerList.usedByOne") : t("runnerList.usedByMany", { count });
   }
 
   async function confirmDelete() {
@@ -47,18 +48,17 @@
 
 <section class="panel">
   <p class="explainer">
-    Ein Runner ist die Kompatibilitätsschicht, die ein Windows-Spiel unter Linux überhaupt zum
-    Laufen bringt — z. B. <strong>Proton</strong> (bekannt von Steam) oder <strong>Wine</strong>.
-    Er übersetzt die Windows-Programmaufrufe des Spiels ins Linux-System, quasi eine
-    Übersetzungsschicht zwischen den beiden Welten.
+    {t("runnerList.explainerBefore")} <strong>{t("runnerList.explainerProton")}</strong>
+    {t("runnerList.explainerOr")} <strong>{t("runnerList.explainerWine")}</strong>.
+    {t("runnerList.explainerAfter")}
   </p>
 
   <div class="panel-header">
-    <h2>Installierte Runner</h2>
+    <h2>{t("runnerList.heading")}</h2>
     <div class="actions">
-      <button type="button" class="ghost" onclick={refreshRunners}>Aktualisieren</button>
+      <button type="button" class="ghost" onclick={refreshRunners}>{t("runnerList.refresh")}</button>
       <button type="button" class="primary" onclick={() => (showDownloads = true)}>
-        Runner herunterladen
+        {t("runnerList.downloadRunner")}
       </button>
     </div>
   </div>
@@ -67,7 +67,7 @@
   <UmuSettings />
 
   {#if $runners.length === 0}
-    <p class="hint">Keine Runner gefunden. Lege Proton- oder Wine-Builds im Runner-Verzeichnis ab.</p>
+    <p class="hint">{t("runnerList.empty")}</p>
   {:else}
     <ul>
       {#each $runners as runner (runner.id)}
@@ -79,7 +79,7 @@
             <span class="kind">{runner.kind}</span>
             {#if count === 0}
               <button type="button" class="ghost small" onclick={() => (deleting = runner)}>
-                Löschen
+                {t("runnerList.delete")}
               </button>
             {/if}
           </span>
@@ -94,16 +94,16 @@
 
 <ConfirmDialog
   open={deleting !== null}
-  title="Runner löschen"
-  message={`„${deleting?.name ?? ""}“ wird von keinem Spiel verwendet. Den Runner-Ordner endgültig löschen?`}
-  confirmLabel="Löschen"
+  title={t("runnerList.deleteConfirmTitle")}
+  message={t("runnerList.deleteConfirmMessage", { name: deleting?.name ?? "" })}
+  confirmLabel={t("runnerList.delete")}
   onConfirm={confirmDelete}
   onCancel={() => (deleting = null)}
 />
 
 <Modal
   open={showDownloads}
-  title="Runner herunterladen"
+  title={t("runnerList.downloadRunner")}
   onClose={() => (showDownloads = false)}
 >
   <RunnerDownloads />

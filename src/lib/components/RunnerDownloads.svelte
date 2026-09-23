@@ -10,6 +10,7 @@
     downloadRunner,
     initRunnerDownloadEvents,
   } from "$lib/stores/runners";
+  import { t, getLocale } from "$lib/i18n/index.svelte";
 
   let loading = $state(true);
   let loadError = $state("");
@@ -53,7 +54,7 @@
   }
 
   function formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString("de-DE", {
+    return new Date(iso).toLocaleDateString(getLocale() === "de" ? "de-DE" : "en-US", {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -75,11 +76,11 @@
 </div>
 
 {#if loading}
-  <p class="hint">Lade Versionen von GitHub…</p>
+  <p class="hint">{t("runnerDownloads.loading")}</p>
 {:else if loadError}
   <p class="error">{loadError}</p>
 {:else if $runnerReleases.length === 0}
-  <p class="hint">Keine Releases gefunden.</p>
+  <p class="hint">{t("runnerDownloads.noReleases")}</p>
 {:else}
   <ul>
     {#each $runnerReleases as release (release.tag)}
@@ -93,7 +94,7 @@
           </div>
 
           {#if installed || state?.done}
-            <span class="badge">Installiert</span>
+            <span class="badge">{t("runnerDownloads.installed")}</span>
           {:else if state && !state.error}
             <div class="progress">
               <div
@@ -108,7 +109,7 @@
               type="button"
               onclick={() => downloadRunner(release.source, release.tag, release.download_url)}
             >
-              Herunterladen
+              {t("runnerDownloads.download")}
             </button>
           {/if}
         </div>

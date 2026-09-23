@@ -14,25 +14,26 @@
     removeGameArtwork,
   } from "$lib/stores/steamgriddb";
   import { prettifyExeName } from "$lib/gameName";
+  import { t } from "$lib/i18n/index.svelte";
 
   let { game, onDone }: { game: Game; onDone: () => void } = $props();
 
   type Kind = "cover" | "icon" | ArtworkKind;
 
-  const kindLabels: Record<Kind, string> = {
-    cover: "Cover",
-    icon: "Icon",
-    wide: "Breites Cover",
-    hero: "Hero",
-    logo: "Logo",
-  };
+  const kindLabels: Record<Kind, string> = $derived({
+    cover: t("artworkPicker.kindCover"),
+    icon: t("artworkPicker.kindIcon"),
+    wide: t("artworkPicker.kindWide"),
+    hero: t("artworkPicker.kindHero"),
+    logo: t("artworkPicker.kindLogo"),
+  });
 
   // Only Steam shows these; Prefixr itself uses the cover and icon.
-  const steamOnlyHints: Partial<Record<Kind, string>> = {
-    wide: "Nur für Steam: das breite Bild, z. B. unter „Zuletzt gespielt“.",
-    hero: "Nur für Steam: das Banner oben auf der Seite des Spiels.",
-    logo: "Nur für Steam: das Logo über dem Hero-Banner.",
-  };
+  const steamOnlyHints: Partial<Record<Kind, string>> = $derived({
+    wide: t("artworkPicker.hintWide"),
+    hero: t("artworkPicker.hintHero"),
+    logo: t("artworkPicker.hintLogo"),
+  });
 
   // `game` is only read here to seed this picker's initial state — a fresh
   // instance is mounted per game (see +page.svelte), so a one-time snapshot
@@ -185,11 +186,11 @@
 
   {#if currentUrl}
     <div class="current">
-      <span class="tune-title">Aktuelle Auswahl</span>
+      <span class="tune-title">{t("artworkPicker.currentSelection")}</span>
       <div class="current-row">
         <img class="current-asset shape-{kind}" src={currentUrl} alt="" />
         <button type="button" class="ghost" disabled={removing} onclick={handleRemove}>
-          {removing ? "Wird entfernt…" : "Entfernen"}
+          {removing ? t("artworkPicker.removing") : t("common.remove")}
         </button>
       </div>
     </div>
@@ -200,40 +201,44 @@
       <input
         type="text"
         class="text-input"
-        placeholder="Spielname…"
+        placeholder={t("artworkPicker.searchPlaceholder")}
         bind:value={query}
         onkeydown={(e) => e.key === "Enter" && handleSearch()}
       />
-      <button type="button" onclick={handleSearch} disabled={loading}>Suchen</button>
+      <button type="button" onclick={handleSearch} disabled={loading}
+        >{t("artworkPicker.searchButton")}</button
+      >
     </div>
 
     {#if loading}
-      <p class="hint">Suche…</p>
+      <p class="hint">{t("artworkPicker.searching")}</p>
     {:else if error}
       <p class="error">{error}</p>
     {:else if matches.length === 0}
-      <p class="hint">Keine Treffer für „{query}".</p>
+      <p class="hint">{t("artworkPicker.noMatches", { query })}</p>
     {:else}
       <ul class="matches">
         {#each matches as match (match.id)}
           <li>
             <button type="button" class="match" onclick={() => selectMatch(match)}>
               <span>{match.name}</span>
-              {#if match.verified}<span class="badge">verifiziert</span>{/if}
+              {#if match.verified}<span class="badge">{t("artworkPicker.verified")}</span>{/if}
             </button>
           </li>
         {/each}
       </ul>
     {/if}
   {:else}
-    <button type="button" class="ghost back" onclick={backToSearch}>← Andere Suche</button>
+    <button type="button" class="ghost back" onclick={backToSearch}
+      >{t("artworkPicker.backToSearch")}</button
+    >
 
     {#if loading}
-      <p class="hint">Lade {kindLabels[kind]}-Vorschläge…</p>
+      <p class="hint">{t("artworkPicker.loadingKind", { kind: kindLabels[kind] })}</p>
     {:else if error}
       <p class="error">{error}</p>
     {:else if assetOptions.length === 0}
-      <p class="hint">Keine {kindLabels[kind]}-Optionen gefunden.</p>
+      <p class="hint">{t("artworkPicker.noKindOptions", { kind: kindLabels[kind] })}</p>
     {:else}
       <div class="grid-options" class:landscape={kind === "wide" || kind === "hero" || kind === "logo"}>
         {#each assetOptions as asset (asset.id)}

@@ -7,6 +7,7 @@
   import Modal from "$lib/components/Modal.svelte";
   import WinetricksInstaller from "$lib/components/WinetricksInstaller.svelte";
   import WineToolsLauncher from "$lib/components/WineToolsLauncher.svelte";
+  import { t } from "$lib/i18n/index.svelte";
 
   let path = $state("");
   let busy = $state(false);
@@ -72,29 +73,24 @@
 
 <section class="panel">
   <p class="explainer">
-    Ein Prefix ist ein eigenständiges, virtuelles Windows-Dateisystem — mit eigenem
-    <strong>C:-Laufwerk</strong> und eigener Registry — für installierte Programme. Jeder Prefix ist
-    komplett getrennt von deinem echten Linux-System und von anderen Prefixen, so wie eine eigene
-    kleine Windows-Installation nur für dieses eine Spiel.
+    {t("prefixManager.explainerBefore")}
+    <strong>{t("prefixManager.explainerDrive")}</strong>
+    {t("prefixManager.explainerAfter")}
   </p>
 
-  <p class="hint">
-    Neuer, leerer Ordner oder ein bereits vorhandener Wine-Prefix (z. B. aus PortProton, Lutris
-    oder Bottles) — initialisiert wird er automatisch beim ersten Spielstart, mit dem Runner, den
-    du für dieses Spiel wählst.
-  </p>
+  <p class="hint">{t("prefixManager.hint")}</p>
 
   <form onsubmit={handleSubmit}>
     <label>
-      Pfad
+      {t("prefixManager.pathLabel")}
       <div class="row">
-        <input placeholder="z. B. /home/du/prefixes/mein-spiel" bind:value={path} />
-        <button type="button" onclick={pickFolder}>Ordner wählen</button>
+        <input placeholder={t("prefixManager.pathPlaceholder")} bind:value={path} />
+        <button type="button" onclick={pickFolder}>{t("prefixManager.chooseFolder")}</button>
       </div>
     </label>
 
     <button type="submit" class="primary" disabled={busy || !path}>
-      {busy ? "Füge hinzu…" : "Prefix hinzufügen"}
+      {busy ? t("prefixManager.adding") : t("prefixManager.addPrefix")}
     </button>
   </form>
 
@@ -112,7 +108,7 @@
               type="button"
               class="ghost"
               onclick={() => (winetricksFor = prefix.path)}
-              aria-label="Abhängigkeiten installieren"
+              aria-label={t("prefixManager.installDeps")}
             >
               📦
             </button>
@@ -120,12 +116,12 @@
               type="button"
               class="ghost"
               onclick={() => (wineToolsFor = prefix.path)}
-              aria-label="Wine-Werkzeuge öffnen"
+              aria-label={t("prefixManager.openWineTools")}
             >
               🛠️
             </button>
             <button type="button" class="ghost" onclick={() => askDelete(prefix.path)}>
-              Löschen
+              {t("prefixManager.delete")}
             </button>
           </div>
         </li>
@@ -134,27 +130,29 @@
   {/if}
 </section>
 
-<Modal open={deleting !== null} title="Prefix entfernen" onClose={() => (deleting = null)}>
+<Modal
+  open={deleting !== null}
+  title={t("prefixManager.removeTitle")}
+  onClose={() => (deleting = null)}
+>
   {#if deleting}
     <p class="path">{deleting}</p>
     {#if affectedGames.length > 0}
       <p>
-        Verwendet von: <strong>{affectedGames.join(", ")}</strong>. Diese Spiele behalten den
-        Prefix, auch wenn er nur aus Prefixr entfernt wird.
+        {t("prefixManager.usedByBefore")}
+        <strong>{affectedGames.join(", ")}</strong>. {t("prefixManager.usedByAfter")}
       </p>
     {/if}
-    <p>
-      „Ordner löschen“ löscht den Prefix endgültig, mit allen installierten Programmen und
-      Spielständen darin. Bei einem Prefix aus Lutris, Bottles oder PortProton reicht meist „Nur
-      aus Prefixr entfernen“.
-    </p>
+    <p>{t("prefixManager.deleteExplain")}</p>
     {#if deleteError}
       <p class="error">{deleteError}</p>
     {/if}
     <div class="dialog-actions">
-      <button type="button" class="ghost" onclick={() => (deleting = null)}>Abbrechen</button>
+      <button type="button" class="ghost" onclick={() => (deleting = null)}
+        >{t("common.cancel")}</button
+      >
       <button type="button" disabled={deleteBusy} onclick={() => confirmDelete(false)}>
-        Nur aus Prefixr entfernen
+        {t("prefixManager.removeFromAppOnly")}
       </button>
       <button
         type="button"
@@ -162,7 +160,7 @@
         disabled={deleteBusy}
         onclick={() => confirmDelete(true)}
       >
-        Ordner löschen
+        {t("prefixManager.deleteFolder")}
       </button>
     </div>
   {/if}
@@ -170,7 +168,7 @@
 
 <Modal
   open={winetricksFor !== null}
-  title="Abhängigkeiten installieren"
+  title={t("prefixManager.installDeps")}
   onClose={() => (winetricksFor = null)}
 >
   {#if winetricksFor}
@@ -180,7 +178,7 @@
 
 <Modal
   open={wineToolsFor !== null}
-  title="Wine-Werkzeuge"
+  title={t("prefixManager.wineToolsTitle")}
   onClose={() => (wineToolsFor = null)}
 >
   {#if wineToolsFor}
