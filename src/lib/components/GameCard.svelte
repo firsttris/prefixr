@@ -100,92 +100,98 @@
     {:else if runState?.initializing}
       <span class="status-badge init"><span class="dot"></span>Startet…</span>
     {/if}
-  </div>
 
-  <div class="info">
-    <h3 title={game.name}>{game.name}</h3>
-    <span class="runner">{game.runner_id}</span>
-  </div>
+    <div class="overlay">
+      <div class="info">
+        <h3 title={game.name}>{game.name}</h3>
+        <span class="runner">{game.runner_id}</span>
+      </div>
 
-  <div class="actions-row">
-    <div class="shortcut-menu">
-      <button
-        bind:this={shortcutButtonEl}
-        type="button"
-        class="icon-btn"
-        onclick={toggleShortcutMenu}
-        disabled={shortcutState === "creating"}
-        aria-haspopup="true"
-        aria-expanded={shortcutMenuOpen}
-        aria-label="Verknüpfung erstellen"
-        title="Verknüpfung erstellen"
-      >
-        {shortcutState === "done" ? "✓" : "🔗"}
-      </button>
-      {#if shortcutMenuOpen}
-        <div
-          class="menu-backdrop"
-          onclick={() => (shortcutMenuOpen = false)}
-          role="presentation"
-        ></div>
-        <div class="menu" class:menu-up={shortcutMenuUpward} role="menu">
-          <button type="button" role="menuitem" onclick={() => handleCreateShortcut("desktop")}>
-            Auf Desktop
+      <div class="actions-row">
+        <div class="shortcut-menu">
+          <button
+            bind:this={shortcutButtonEl}
+            type="button"
+            class="icon-btn on-image"
+            onclick={toggleShortcutMenu}
+            disabled={shortcutState === "creating"}
+            aria-haspopup="true"
+            aria-expanded={shortcutMenuOpen}
+            aria-label="Verknüpfung erstellen"
+            title="Verknüpfung erstellen"
+          >
+            {shortcutState === "done" ? "✓" : "🔗"}
           </button>
-          <button type="button" role="menuitem" onclick={() => handleCreateShortcut("menu")}>
-            Ins Startmenü
-          </button>
+          {#if shortcutMenuOpen}
+            <div
+              class="menu-backdrop"
+              onclick={() => (shortcutMenuOpen = false)}
+              role="presentation"
+            ></div>
+            <div class="menu" class:menu-up={shortcutMenuUpward} role="menu">
+              <button
+                type="button"
+                role="menuitem"
+                onclick={() => handleCreateShortcut("desktop")}
+              >
+                Auf Desktop
+              </button>
+              <button type="button" role="menuitem" onclick={() => handleCreateShortcut("menu")}>
+                Ins Startmenü
+              </button>
+            </div>
+          {/if}
         </div>
+        <button
+          type="button"
+          class="icon-btn on-image"
+          onclick={onEditArtwork}
+          aria-label="Artwork auswählen"
+          title="Artwork auswählen"
+        >
+          🖼
+        </button>
+        <button
+          type="button"
+          class="icon-btn on-image"
+          onclick={onEdit}
+          aria-label="Spiel bearbeiten"
+          title="Spiel bearbeiten"
+        >
+          ✎
+        </button>
+        <span class="divider"></span>
+        <button
+          type="button"
+          class="icon-btn on-image danger"
+          onclick={() => (confirmingRemove = true)}
+          aria-label="Spiel entfernen"
+          title="Spiel entfernen"
+        >
+          ✕
+        </button>
+      </div>
+
+      <button
+        type="button"
+        class="primary start"
+        onclick={onLaunch}
+        disabled={runState?.running || runState?.initializing}
+      >
+        {#if runState?.initializing}
+          Initialisiere…
+        {:else if runState?.running}
+          Läuft…
+        {:else}
+          ▶ Start
+        {/if}
+      </button>
+
+      {#if runState?.running}
+        <button type="button" class="kill" onclick={onKill}> Beenden (Prozess killen) </button>
       {/if}
     </div>
-    <button
-      type="button"
-      class="icon-btn"
-      onclick={onEditArtwork}
-      aria-label="Artwork auswählen"
-      title="Artwork auswählen"
-    >
-      🖼
-    </button>
-    <button
-      type="button"
-      class="icon-btn"
-      onclick={onEdit}
-      aria-label="Spiel bearbeiten"
-      title="Spiel bearbeiten"
-    >
-      ✎
-    </button>
-    <span class="divider"></span>
-    <button
-      type="button"
-      class="icon-btn danger"
-      onclick={() => (confirmingRemove = true)}
-      aria-label="Spiel entfernen"
-      title="Spiel entfernen"
-    >
-      ✕
-    </button>
   </div>
-
-  <button
-    type="button"
-    class="primary start"
-    onclick={onLaunch}
-    disabled={runState?.running || runState?.initializing}
-  >
-    {#if runState?.initializing}
-      Initialisiere…
-    {:else if runState?.running}
-      Läuft…
-    {:else}
-      ▶ Start
-    {/if}
-  </button>
-
-  {#if runState?.running}
-    <button type="button" class="kill" onclick={onKill}> Beenden (Prozess killen) </button>
-  {/if}
 
   {#if runState?.error}
     <div class="toast">
@@ -246,6 +252,8 @@
   }
 
   .cover.placeholder {
+    position: absolute;
+    inset: 0;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -306,29 +314,51 @@
     }
   }
 
+  /* Bottom overlay: sits on top of the cover art, scrim fades from
+     near-opaque at the bottom (where text/buttons live) to fully
+     transparent, so it works on both bright and dark cover art. */
+  .overlay {
+    position: absolute;
+    inset: auto 0 0 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+    padding: 2.6em 0.65em 0.65em;
+    background: linear-gradient(
+      to top,
+      rgba(8, 9, 12, 0.95) 0%,
+      rgba(8, 9, 12, 0.86) 35%,
+      rgba(8, 9, 12, 0.5) 65%,
+      rgba(8, 9, 12, 0) 100%
+    );
+  }
+
   .info {
     display: flex;
     flex-direction: column;
-    gap: 0.35em;
-    padding: 0.8em 0.9em 0;
+    gap: 0.3em;
     text-align: left;
   }
 
   h3 {
-    font-size: 0.95em;
+    font-size: 0.92em;
+    color: #fff;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
     display: -webkit-box;
     -webkit-line-clamp: 2;
     line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
-    min-height: 2.6em;
   }
 
   .runner {
     align-self: flex-start;
-    font-size: 0.75em;
-    color: var(--text-muted);
-    background: var(--surface-raised);
+    font-size: 0.72em;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(6px);
     padding: 0.15em 0.6em;
     border-radius: 999px;
   }
@@ -336,7 +366,6 @@
   .actions-row {
     display: flex;
     gap: 0.4em;
-    padding: 0.7em 0.9em 0;
   }
 
   .actions-row .icon-btn {
@@ -352,6 +381,26 @@
 
   .shortcut-menu .icon-btn {
     flex: 1;
+  }
+
+  /* Icon buttons need their own translucent + blurred background here
+     since they float directly on cover art instead of a themed surface. */
+  .icon-btn.on-image {
+    background: rgba(15, 16, 20, 0.55);
+    border-color: rgba(255, 255, 255, 0.18);
+    color: #fff;
+    backdrop-filter: blur(8px);
+  }
+
+  .icon-btn.on-image:hover:not(:disabled) {
+    background: rgba(15, 16, 20, 0.75);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .icon-btn.on-image.danger:hover:not(:disabled) {
+    border-color: var(--danger);
+    color: var(--danger);
   }
 
   .menu-backdrop {
@@ -399,19 +448,19 @@
     align-self: center;
     width: 1px;
     height: 1.4em;
-    background: var(--border);
+    background: rgba(255, 255, 255, 0.22);
     margin: 0 0.1em;
   }
 
   .start {
-    margin: 0.7em 0.9em 0.9em;
+    margin: 0;
   }
 
   .kill {
-    margin: 0 0.9em 0.9em;
-    background: var(--danger-bg);
+    margin: 0;
+    background: rgba(239, 83, 80, 0.85);
     border-color: transparent;
-    color: var(--danger);
+    color: #fff;
     font-size: 0.85em;
   }
 
@@ -427,7 +476,7 @@
     color: var(--danger);
     border-radius: 8px;
     padding: 0.5em 0.7em;
-    margin: 0 0.9em 0.9em;
+    margin: 0.6em 0.9em 0.9em;
     font-size: 0.85em;
     text-align: left;
   }
