@@ -1,4 +1,5 @@
 use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -73,11 +74,12 @@ pub fn load_config(app: &AppHandle) -> Result<AppConfig, String> {
     if !path.exists() {
         return AppConfig::default_for(app);
     }
-    let raw = fs::read_to_string(&path).map_err(|e| format!("Could not read config file: {e}"))?;
-    let mut value: Value =
-        serde_json::from_str(&raw).map_err(|e| format!("Config file is invalid: {e}"))?;
+    let invalid = |e: &dyn std::fmt::Display| format!("{} is invalid: {e}", path.display());
+    let raw = fs::read_to_string(&path)
+        .map_err(|e| format!("Could not read {}: {e}", path.display()))?;
+    let mut value: Value = serde_json::from_str(&raw).map_err(|e| invalid(&e))?;
     migrate(&mut value);
-    serde_json::from_value(value).map_err(|e| format!("Config file is invalid: {e}"))
+    serde_json::from_value(value).map_err(|e| invalid(&e))
 }
 
 /// Brings a config written by an older version into the current shape. The
@@ -135,6 +137,9 @@ fn migrate(config: &mut Value) {
     }
 }
 
+/// Writes the config to a temporary file first and swaps it in with a
+/// rename, so a crash or a full disk mid-write never leaves a truncated
+/// `config.json` behind — `load_config` refuses to start from one.
 pub fn save_config(app: &AppHandle, config: &AppConfig) -> Result<(), String> {
     let path = config_file_path(app)?;
     if let Some(parent) = path.parent() {
@@ -143,7 +148,14 @@ pub fn save_config(app: &AppHandle, config: &AppConfig) -> Result<(), String> {
     }
     let raw = serde_json::to_string_pretty(config)
         .map_err(|e| format!("Could not serialize config: {e}"))?;
-    fs::write(&path, raw).map_err(|e| format!("Could not write config file: {e}"))
+    let tmp = path.with_extension("json.tmp");
+    let write = |tmp: &PathBuf| -> std::io::Result<()> {
+        let mut file = fs::File::create(tmp)?;
+        file.write_all(raw.as_bytes())?;
+        file.sync_all()
+    };
+    write(&tmp).map_err(|e| format!("Could not write config file: {e}"))?;
+    fs::rename(&tmp, &path).map_err(|e| format!("Could not write config file: {e}"))
 }
 
 #[cfg(test)]

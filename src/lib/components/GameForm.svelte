@@ -373,6 +373,10 @@
         {#each $prefixes as prefix (prefix.path)}
           <option value={prefix.path}>{prefix.path}</option>
         {/each}
+        <!-- A prefix removed from the list is still the game's own. -->
+        {#if prefixPath && !$prefixes.some((p) => p.path === prefixPath)}
+          <option value={prefixPath}>{prefixPath}</option>
+        {/if}
       </select>
       {#if $prefixes.length === 0}
         <span class="hint"

@@ -162,6 +162,11 @@ async fn install_latest(app: &AppHandle, token: Option<&str>) -> Result<UmuStatu
     Ok(read_status(&dir))
 }
 
+/// Held around `install_latest`, which stages into one fixed directory: two
+/// games launched at once on a fresh system would otherwise both download
+/// umu and delete each other's half-extracted copy.
+static INSTALL_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 /// Returns the path to our managed `umu-run`, downloading it the first time
 /// it's needed (a no-op afterwards — updating is an explicit user action,
 /// see `install_umu`).
@@ -169,7 +174,11 @@ pub async fn ensure_umu(app: &AppHandle, token: Option<&str>) -> Result<PathBuf,
     let dir = umu_dir(app)?;
     let path = umu_run_path(&dir);
     if !path.is_file() {
-        install_latest(app, token).await?;
+        let _lock = INSTALL_LOCK.lock().await;
+        // Another launch may have installed it while this one waited.
+        if !path.is_file() {
+            install_latest(app, token).await?;
+        }
     }
     Ok(path)
 }
@@ -236,6 +245,7 @@ pub async fn install_umu(
     state: State<'_, ConfigState>,
 ) -> Result<UmuStatus, String> {
     let token = read_token(&state)?;
+    let _lock = INSTALL_LOCK.lock().await;
     install_latest(&app, token.as_deref()).await
 }
 

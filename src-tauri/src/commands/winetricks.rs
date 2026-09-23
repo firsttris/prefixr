@@ -44,24 +44,32 @@ async fn ensure_winetricks_script(app: &AppHandle) -> Result<PathBuf, String> {
             .map_err(|e| format!("Could not create {}: {e}", parent.display()))?;
     }
 
+    // An error status fails here rather than getting saved: the script is
+    // never downloaded again once it's on disk.
     let bytes = reqwest::Client::new()
         .get("https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks")
         .header(USER_AGENT, "prefixr")
         .send()
         .await
-        .map_err(|e| format!("Could not reach GitHub: {e}"))?
+        .and_then(reqwest::Response::error_for_status)
+        .map_err(|e| format!("Could not download winetricks: {e}"))?
         .bytes()
         .await
         .map_err(|e| format!("Could not download winetricks: {e}"))?;
 
-    fs::write(&path, &bytes).map_err(|e| format!("Could not save {}: {e}", path.display()))?;
-
-    let mut perms = fs::metadata(&path)
-        .map_err(|e| format!("Could not read {} metadata: {e}", path.display()))?
+    // Made executable under another name first and renamed into place, so
+    // `path` only ever exists as the complete script.
+    let partial = path.with_extension("part");
+    fs::write(&partial, &bytes)
+        .map_err(|e| format!("Could not save {}: {e}", partial.display()))?;
+    let mut perms = fs::metadata(&partial)
+        .map_err(|e| format!("Could not read {} metadata: {e}", partial.display()))?
         .permissions();
     perms.set_mode(0o755);
-    fs::set_permissions(&path, perms)
-        .map_err(|e| format!("Could not make {} executable: {e}", path.display()))?;
+    fs::set_permissions(&partial, perms)
+        .map_err(|e| format!("Could not make {} executable: {e}", partial.display()))?;
+    fs::rename(&partial, &path)
+        .map_err(|e| format!("Could not save {}: {e}", path.display()))?;
 
     Ok(path)
 }

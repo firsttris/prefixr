@@ -11,11 +11,11 @@ Bereits erledigt: Start von Proton über umu-launcher und Performance-Overrides 
 
 | # | Funktion | Nutzen | Aufwand | Vorbild |
 |---|---|---|---|---|
-| 1 | Proton-Optionen als Schalter pro Spiel | hoch | S–M | Bottles, Lutris |
+| 1 | Proton-Optionen als Schalter pro Spiel ✓ | hoch | S–M | Bottles, Lutris |
 | 2 | Spielzeit und „zuletzt gespielt“ | mittel | S | Lutris, Heroic |
 | 3 | Runner aus Steam/Lutris/umu mitbenutzen | mittel | S | ProtonUp-Qt, Lutris |
 | 4 | Kleine Bugs und Kanten (siehe unten) | mittel | S | – |
-| 5 | GAMEID-Zuordnung für protonfixes | hoch | M | Lutris, Heroic |
+| 5 | GAMEID-Zuordnung für protonfixes ✓ | hoch | M | Lutris, Heroic |
 | 6 | Export nach Steam (Nicht-Steam-Spiel) ✓ | hoch | M | Lutris, Bottles, Heroic |
 | 7 | Prefix-Snapshots, Backup und Restore | hoch | M–L | Bottles, PortProton |
 | 8 | Log-Analyse mit Lösungsvorschlägen | mittel | M | Bottles (ansatzweise) |
@@ -30,7 +30,11 @@ Bereits erledigt: Start von Proton über umu-launcher und Performance-Overrides 
 ## Quick Wins: hoher Nutzen, wenig Aufwand
 
 ### 1. Proton-Optionen als Schalter pro Spiel
-**Nutzen: hoch · Aufwand: S–M**
+**Nutzen: hoch · Aufwand: S–M** · **erledigt**
+
+Global unter „Proton“ und pro Spiel im Spieldialog ([proton_options.rs](src-tauri/src/commands/proton_options.rs)). Die Schalter werden aus den `check_environment("…")`-Aufrufen im `proton`-Skript des gewählten Runners gelesen. Jeder Runner bietet also nur an, was er kennt. Jeder Schalter hat drei Zustände: nicht gesetzt, an (`1`) oder aus (`0`). Die Werte werden vor den eigenen Env-Vars des Spiels gesetzt, manuelle Einträge gewinnen also weiter.
+
+**Ursprünglicher Plan:**
 
 Seit dem Umstieg auf umu wirken alle `PROTON_*`-Variablen. Man muss sie also nur noch in der Oberfläche anbieten, statt dass Nutzer die Namen kennen und von Hand als Env-Var eintragen.
 
@@ -50,7 +54,7 @@ Kandidaten (geprüft im `proton`-Skript von GE-Proton11-7):
 ### 2. Spielzeit und „zuletzt gespielt“
 **Nutzen: mittel · Aufwand: S**
 
-`run_game` wartet ohnehin auf das Ende des Prozesses ([games.rs:1054](src-tauri/src/commands/games.rs#L1054)). Startzeit merken, Dauer auf `Game.playtime_secs` aufaddieren und `last_played` setzen. Danach kann die Bibliothek nach „zuletzt gespielt“ sortieren, und die GameCard zeigt die Spielzeit.
+`run_game` wartet ohnehin auf das Ende des Prozesses ([games.rs:1119](src-tauri/src/commands/games.rs#L1119)). Startzeit merken, Dauer auf `Game.playtime_secs` aufaddieren und `last_played` setzen. Danach kann die Bibliothek nach „zuletzt gespielt“ sortieren, und die GameCard zeigt die Spielzeit.
 
 ### 3. Runner aus Steam/Lutris/umu mitbenutzen
 **Nutzen: mittel · Aufwand: S**
@@ -63,10 +67,29 @@ Kandidaten (geprüft im `proton`-Skript von GE-Proton11-7):
 Die IDs müssen eindeutig bleiben, z. B. mit Quell-Präfix. Beim Löschen nie fremde Ordner anfassen.
 
 ### 4. Kleine Bugs und Kanten
-**Nutzen: mittel · Aufwand: S**
+**Nutzen: mittel · Aufwand: S (je Punkt)**
 
-- **`WINEDLLOVERRIDES` wird überschrieben:** Setzt ein Nutzer die Variable in seinen Env-Vars, ersetzt sein Wert unsere Overrides ([games.rs:901](src-tauri/src/commands/games.rs#L901)). Bei Wine-Runnern gehen damit die DXVK-Overrides verloren. Besser: beide Werte mit `;` zusammenführen.
-- **Manuelles Beenden erscheint als Fehler:** Nach „Beenden“ zeigt die UI „Game exited with status …“ als Startfehler an. `kill_running_game` sollte das Spiel als „vom Nutzer beendet“ markieren, damit `launch_game` dann keinen Fehler meldet.
+**Bugs** · **erledigt**
+
+- Prefix löschen fragt nach, nennt die betroffenen Spiele und bietet „Nur aus Prefixr entfernen“ an. Solange ein Spiel darin läuft, wird der Prefix nicht gelöscht.
+- Ein Spiel kann nicht mehr doppelt gestartet werden: Die UI zeigt „Startet…“ direkt nach dem Klick, und `launch_game` lehnt einen zweiten Start ab (`LaunchingGames`).
+- `WINEDLLOVERRIDES` und `LD_PRELOAD` aus den Env-Vars eines Spiels werden an unsere Werte angehängt, statt sie zu ersetzen.
+- Manuelles Beenden erscheint nicht mehr als Startfehler.
+- Ein Runner-Download, der schon vor dem Start scheitert, zeigt den Fehler an und lässt sich erneut starten.
+- winetricks, wine-mono und DXVK/VKD3D prüfen den HTTP-Status und werden erst nach dem vollständigen Schreiben unter ihrem endgültigen Namen abgelegt.
+- Runner und DXVK/VKD3D werden in einen eigenen temporären Ordner entpackt und dann verschoben. Erstdownloads von umu und dem DirectX-Cache laufen nacheinander.
+- `config.json` wird atomar geschrieben. Ist sie trotzdem kaputt, zeigt Prefixr eine Meldung mit dem Pfad und lässt die Datei unverändert.
+
+**Kanten**
+
+- **Import eines Proton-Prefixes (`pfx/`):** `add_prefix` akzeptiert einen Ordner mit `pfx/` darin ([prefixes.rs:37](src-tauri/src/commands/prefixes.rs#L37)). Beim Start wird aber der Ordner selbst als `WINEPREFIX` genutzt. Ein Wine-Runner legt daneben einen neuen, leeren Prefix an. Auch `prepare_proton` prüft auf `drive_c` direkt im Ordner. Besser: beim Hinzufügen auf `pfx/` umbiegen.
+- **Setup und Wine-Werkzeuge ohne Vorbereitung:** `run_installer` und `launch_wine_tool` laufen direkt über `prefix_command` und nicht über `prepare_wine`. Bei einem Wine-Runner mit frischem Prefix fehlt dann wine-mono. Wine zeigt seinen eigenen Mono-Dialog, den Prefixr sonst vermeidet, und DXVK ist auch nicht eingerichtet. Die Ausgabe des Setups geht außerdem nach `/dev/null` ([games.rs:373](src-tauri/src/commands/games.rs#L373)), bei einem fehlgeschlagenen Setup gibt es also kein Log.
+- **Entfernte Spiele hinterlassen Reste:** `remove_game` löscht nur die MangoHud- und vkBasalt-Konfiguration ([games.rs:481](src-tauri/src/commands/games.rs#L481)). Zurück bleiben das Artwork im Cache, das Verknüpfungs-Icon, `logs/<id>/` und angelegte `.desktop`-Verknüpfungen. Die Verknüpfungen starten danach ein Spiel, das es nicht mehr gibt.
+- **Logs wachsen unbegrenzt:** Jeder Start legt eine neue Datei unter `logs/<id>/` an ([games.rs:514](src-tauri/src/commands/games.rs#L514)), bei Winetricks ebenso. Die letzten N pro Spiel behalten.
+- **winetricks wird nie aktualisiert:** Das Skript wird einmal von `master` geladen und dann für immer benutzt ([winetricks.rs:37](src-tauri/src/commands/winetricks.rs#L37)). Ältere Versionen scheitern, sobald Microsoft Download-URLs oder Prüfsummen ändert. Wie bei umu eine Aktualisierung anbieten oder das Skript nach einer bestimmten Zeit neu laden.
+- **„Beenden“ im Tray ohne Rückfrage:** Das Menü beendet Prefixr sofort, auch wenn noch Spiele laufen ([tray.rs:150](src-tauri/src/tray.rs#L150)). Die Spiele laufen weiter, weil sie in einer eigenen Prozessgruppe laufen. Nach einem Neustart weiß Prefixr aber nicht mehr, dass sie laufen, und kann sie nicht mehr beenden.
+- **Gleichnamige Spiele überschreiben ihre Verknüpfungen:** Der Dateiname der `.desktop`-Datei kommt aus dem bereinigten Spielnamen ([games.rs:1302](src-tauri/src/commands/games.rs#L1302)). Zwei Spiele mit gleichem Namen, etwa „X: Y“ und „X_ Y“, landen in derselben Datei. Besser: die Spiel-ID in den Dateinamen aufnehmen.
+- **Startargumente ohne Anführungszeichen:** `launch_args` wird nur an Leerzeichen getrennt ([games.rs:1060](src-tauri/src/commands/games.rs#L1060)). Argumente mit Leerzeichen, z. B. Pfade, gehen deshalb nicht. Besser: shell-artig parsen (`shlex`).
 - **umu-Updates anzeigen:** Die Einstellungen zeigen nur die installierte Version. Eine Abfrage „neuere Version verfügbar“ fehlt, die neueste Version gibt es über `releases/latest`.
 - **Runner-Verwendung anzeigen:** „Von N Spielen verwendet“ in der Runner-Liste. Unbenutzte Runner löschen können.
 
@@ -75,7 +98,11 @@ Die IDs müssen eindeutig bleiben, z. B. mit Quell-Präfix. Beim Löschen nie fr
 ## Große Brocken: hoher Nutzen, mehr Aufwand
 
 ### 5. GAMEID-Zuordnung für protonfixes
-**Nutzen: hoch · Aufwand: M**
+**Nutzen: hoch · Aufwand: M** · **erledigt**
+
+Neue Felder `Game.umu_id` und `Game.umu_store`, beim Start als `GAMEID` und `STORE` gesetzt (nur Proton-Runner). Eine reine Steam-App-ID wird zu `umu-<id>`. Im Spieldialog schlägt [umu_database.rs](src-tauri/src/commands/umu_database.rs) passende IDs vor. Die Vorschläge kommen aus der umu-database (die komplette Tabelle, einen Tag lang lokal zwischengespeichert) und aus der Steam-App-ID, die SteamGridDB kennt.
+
+**Ursprünglicher Plan:**
 
 Ohne `GAMEID` nutzt umu `umu-default`, dann greifen nur die allgemeinen protonfixes. Die eigentlichen Fixes pro Spiel werden über die umu-database zugeordnet (Titel/Store → UMU-ID, z. B. `umu-1091500`).
 

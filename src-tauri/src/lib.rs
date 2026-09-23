@@ -11,7 +11,7 @@ use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use commands::games::{
     add_game, create_desktop_shortcut, create_menu_shortcut, ensure_install_desktop_entry,
     kill_game, launch_game, launch_game_headless, list_games, remove_game, run_installer, take_pending_install,
-    take_pending_launch, update_game, PendingInstall, PendingLaunch, RunningGames,
+    take_pending_launch, update_game, LaunchingGames, PendingInstall, PendingLaunch, RunningGames,
 };
 use commands::github::{get_github_config, save_github_config};
 use commands::graphics::{get_graphics_config, save_graphics_config};
@@ -138,11 +138,28 @@ pub fn run() {
                 std::process::exit(1);
             }
 
-            let config = load_config(app.handle())?;
+            // A config that can't be read is left exactly as it is: starting
+            // with an empty one instead would overwrite the user's library
+            // on the next save.
+            let config = match load_config(app.handle()) {
+                Ok(config) => config,
+                Err(message) => {
+                    app.dialog()
+                        .message(format!(
+                            "{message}\n\nPrefixr lässt die Datei unverändert. Repariere oder \
+                             entferne sie und starte Prefixr dann neu."
+                        ))
+                        .title("Konfiguration konnte nicht gelesen werden")
+                        .kind(MessageDialogKind::Error)
+                        .blocking_show();
+                    std::process::exit(1);
+                }
+            };
             app.manage(std::sync::Mutex::new(config));
             app.manage(PendingLaunch(std::sync::Mutex::new(find_launch_arg(&args))));
             app.manage(PendingInstall(std::sync::Mutex::new(find_install_arg(&args))));
             app.manage(RunningGames::default());
+            app.manage(LaunchingGames::default());
             app.manage(WindowVisible::new(true));
 
             if let Some(game_id) = run_game_id {

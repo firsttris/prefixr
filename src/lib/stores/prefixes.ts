@@ -13,7 +13,8 @@ export async function addPrefix(path: string): Promise<void> {
   await refreshPrefixes();
 }
 
-export async function deletePrefix(path: string): Promise<void> {
-  await invoke("delete_prefix", { path });
+// Removes the prefix from Prefixr; with `deleteFiles` also its folder.
+export async function deletePrefix(path: string, deleteFiles: boolean): Promise<void> {
+  await invoke("delete_prefix", { path, deleteFiles });
   await refreshPrefixes();
 }

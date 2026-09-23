@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -94,10 +94,49 @@ pub struct RunningGame {
     /// in the command line of the process we spawned and the ones below it,
     /// so it doubles as a `pkill -f` pattern — see `kill_running_game`.
     pub exe_path: PathBuf,
+    /// Set by `kill_running_game`, so `run_game` doesn't report the exit
+    /// status of a game the user ended as a launch error.
+    pub killed: Arc<AtomicBool>,
 }
 
 #[derive(Default)]
 pub struct RunningGames(pub Mutex<HashMap<Uuid, RunningGame>>);
+
+/// Games with a `launch_game` in progress, from the click until the game
+/// exits. Unlike `RunningGames`, this also covers the preparation before
+/// the process is spawned (umu/DXVK/wine-mono downloads, prefix setup),
+/// which can take a while without any window showing up.
+#[derive(Default)]
+pub struct LaunchingGames(Mutex<HashSet<Uuid>>);
+
+impl LaunchingGames {
+    /// Marks `id` as launching, or `None` if it already is.
+    fn claim(&self, id: Uuid) -> Option<LaunchGuard<'_>> {
+        // The lock is released before a guard exists: dropping one locks
+        // again (and must never happen for a refused claim, whose drop
+        // would end the launch already in progress).
+        let inserted = self.0.lock().ok()?.insert(id);
+        inserted.then(|| LaunchGuard { launching: self, id })
+    }
+
+    pub fn contains(&self, id: Uuid) -> bool {
+        self.0.lock().is_ok_and(|launching| launching.contains(&id))
+    }
+}
+
+/// Keeps a game in `LaunchingGames` until dropped.
+struct LaunchGuard<'a> {
+    launching: &'a LaunchingGames,
+    id: Uuid,
+}
+
+impl Drop for LaunchGuard<'_> {
+    fn drop(&mut self) {
+        if let Ok(mut launching) = self.launching.0.lock() {
+            launching.remove(&self.id);
+        }
+    }
+}
 
 /// PIDs of every process below `root`, from each process's `PPid:` in
 /// `/proc/<pid>/status` — the same way umu walks its own process tree.
@@ -250,6 +289,7 @@ pub async fn kill_running_game(running: &RunningGames, id: Uuid) -> Result<(), S
             .cloned()
             .ok_or_else(|| "Game is not running".to_string())?
     };
+    game.killed.store(true, Ordering::SeqCst);
 
     if let Some(pid) = game.pid {
         kill_process_tree(pid).await;
@@ -803,8 +843,16 @@ pub async fn launch_game(
     app: AppHandle,
     state: State<'_, ConfigState>,
     running: State<'_, RunningGames>,
+    launching: State<'_, LaunchingGames>,
     id: String,
 ) -> Result<(), String> {
+    let game_id = Uuid::parse_str(&id).map_err(|e| format!("Invalid game id: {e}"))?;
+    // Refused without a `game-launch-error`: that would mark the launch
+    // already in progress as failed.
+    let Some(_guard) = launching.claim(game_id) else {
+        return Err("Das Spiel wird bereits gestartet oder läuft schon".to_string());
+    };
+
     let log_path = log_file_path(&app, &id)?;
     if let Some(parent) = log_path.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("Could not create log directory: {e}"))?;
@@ -845,7 +893,7 @@ pub fn launch_game_headless(app: &AppHandle, id: String) {
         let logs_dir = log_file_path(&app, &id)
             .ok()
             .and_then(|path| path.parent().map(Path::to_path_buf));
-        let result = launch_game(app.clone(), app.state(), app.state(), id).await;
+        let result = launch_game(app.clone(), app.state(), app.state(), app.state(), id).await;
         let code = match result {
             Ok(()) => 0,
             Err(message) => {
@@ -963,7 +1011,7 @@ async fn run_game(
         env.extend(game.umu_env());
         env.extend(settings.proton_env());
     }
-    env.extend(game.env_vars.iter().map(|(k, v)| (k.clone(), v.clone())));
+    add_game_env(&mut env, &game.env_vars);
 
     // Builds the actual launch as a chain of wrappers around the runner
     // binary (umu-run or wine), each one prepended in outer-to-inner order
@@ -1094,6 +1142,7 @@ async fn run_game(
         .spawn()
         .map_err(|e| format!("Could not start game: {e}"))?;
 
+    let killed = Arc::new(AtomicBool::new(false));
     if let Ok(mut running) = running.0.lock() {
         running.insert(
             game_id,
@@ -1103,6 +1152,7 @@ async fn run_game(
                 wineserver: wineserver.clone(),
                 wineprefix: wineprefix.clone(),
                 exe_path: game.exe_path.clone(),
+                killed: killed.clone(),
             },
         );
     }
@@ -1133,11 +1183,37 @@ async fn run_game(
         },
     );
 
-    if !status.success() {
+    if !status.success() && !killed.load(Ordering::SeqCst) {
         return Err(format!("Game exited with status {status}"));
     }
 
     Ok(())
+}
+
+/// Variables holding a list, with their separator: a game's own value is
+/// appended to the one set up for the launch rather than replacing it.
+/// Otherwise a hand-written `WINEDLLOVERRIDES` would drop the DXVK/VKD3D
+/// overrides (a later entry for the same DLL still wins in wine), and a
+/// hand-written `LD_PRELOAD` would drop GameMode.
+const LIST_ENV_VARS: &[(&str, &str)] = &[("WINEDLLOVERRIDES", ";"), ("LD_PRELOAD", ":")];
+
+/// Adds a game's own env vars after the ones set up for the launch, so they
+/// win — except for `LIST_ENV_VARS`, which are merged.
+fn add_game_env(env: &mut Vec<(String, String)>, game_vars: &HashMap<String, String>) {
+    for (key, value) in game_vars {
+        let separator = LIST_ENV_VARS
+            .iter()
+            .find(|(name, _)| name == key)
+            .map(|(_, separator)| *separator);
+        let existing = env.iter_mut().find(|(k, _)| k == key);
+        match (separator, existing) {
+            (Some(separator), Some((_, existing))) if !value.is_empty() => {
+                existing.push_str(separator);
+                existing.push_str(value);
+            }
+            _ => env.push((key.clone(), value.clone())),
+        }
+    }
 }
 
 /// The user's Desktop folder, honoring a localized `XDG_DESKTOP_DIR` (e.g.
@@ -1428,6 +1504,44 @@ pub fn ensure_install_desktop_entry(app: &AppHandle) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn game_env_merges_list_variables() {
+        let mut env = vec![
+            ("WINEDLLOVERRIDES".to_string(), "winemenubuilder.exe=;d3d11=n".to_string()),
+            ("LD_PRELOAD".to_string(), "libgamemodeauto.so.0".to_string()),
+            ("DXVK_HUD".to_string(), "0".to_string()),
+        ];
+        let game_vars = HashMap::from([
+            ("WINEDLLOVERRIDES".to_string(), "dinput8=n,b".to_string()),
+            ("LD_PRELOAD".to_string(), "libfoo.so".to_string()),
+            ("DXVK_HUD".to_string(), "fps".to_string()),
+        ]);
+        add_game_env(&mut env, &game_vars);
+
+        let get = |key: &str| {
+            env.iter()
+                .rev()
+                .find(|(k, _)| k == key)
+                .map(|(_, v)| v.as_str())
+        };
+        assert_eq!(get("WINEDLLOVERRIDES"), Some("winemenubuilder.exe=;d3d11=n;dinput8=n,b"));
+        assert_eq!(get("LD_PRELOAD"), Some("libgamemodeauto.so.0:libfoo.so"));
+        // Any other variable is replaced: the game's entry comes last.
+        assert_eq!(get("DXVK_HUD"), Some("fps"));
+    }
+
+    #[test]
+    fn launching_games_refuses_a_second_launch() {
+        let launching = LaunchingGames::default();
+        let id = Uuid::new_v4();
+        let guard = launching.claim(id).unwrap();
+        assert!(launching.claim(id).is_none());
+        assert!(launching.contains(id));
+        drop(guard);
+        assert!(!launching.contains(id));
+        assert!(launching.claim(id).is_some());
+    }
 
     #[test]
     fn pkill_pattern_matches_paths_literally() {

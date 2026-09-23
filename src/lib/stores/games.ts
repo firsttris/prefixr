@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { writable } from "svelte/store";
+import { get, writable } from "svelte/store";
 import type { DetectedShortcut, Game, GameInput, SteamChange } from "$lib/types";
 
 export const games = writable<Game[]>([]);
@@ -95,11 +95,19 @@ export function initGameEvents(): void {
   });
 }
 
+// Shows the game as starting right away: preparing a launch (downloading
+// umu, DXVK or wine-mono) can take a while before the backend sends any
+// event, and the start button must not allow a second launch meanwhile.
 export async function launchGame(id: string): Promise<void> {
+  const current = get(gameRunState)[id];
+  if (current?.running || current?.initializing) return;
+  patchRunState(id, { initializing: true, error: undefined });
   try {
     await invoke("launch_game", { id });
   } catch {
-    // Outcome is already surfaced via the game-launch-error event.
+    // A failed launch is already surfaced via the game-launch-error event;
+    // this only covers a refused one, which sends none.
+    patchRunState(id, { initializing: false });
   }
 }
 

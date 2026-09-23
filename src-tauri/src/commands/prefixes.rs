@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 use tauri::{AppHandle, State};
 
+use crate::commands::games::{LaunchingGames, RunningGames};
 use crate::config::{save_config, ConfigState};
 use crate::models::PrefixInfo;
 
@@ -50,11 +51,17 @@ pub fn add_prefix(app: AppHandle, state: State<ConfigState>, path: String) -> Re
     Ok(())
 }
 
+/// Removes a prefix from the app, and with `delete_files` also its folder.
+/// Refused while a game in it is running or being launched: deleting the
+/// folder would pull it out from under the game.
 #[tauri::command]
 pub fn delete_prefix(
     app: AppHandle,
     state: State<ConfigState>,
+    running: State<RunningGames>,
+    launching: State<LaunchingGames>,
     path: String,
+    delete_files: bool,
 ) -> Result<(), String> {
     let prefix_path = PathBuf::from(&path);
     let mut config = state
@@ -65,7 +72,25 @@ pub fn delete_prefix(
         return Err(format!("No prefix known at {path}"));
     }
 
-    if prefix_path.exists() {
+    let active_game = {
+        let running = running
+            .0
+            .lock()
+            .map_err(|_| "Running games list is locked".to_string())?;
+        config
+            .games
+            .iter()
+            .filter(|g| g.prefix_path == prefix_path)
+            .find(|g| running.contains_key(&g.id) || launching.contains(g.id))
+            .map(|g| g.name.clone())
+    };
+    if let Some(name) = active_game {
+        return Err(format!(
+            "„{name}“ läuft noch in diesem Prefix. Beende das Spiel zuerst."
+        ));
+    }
+
+    if delete_files && prefix_path.exists() {
         fs::remove_dir_all(&prefix_path)
             .map_err(|e| format!("Could not delete prefix directory: {e}"))?;
     }

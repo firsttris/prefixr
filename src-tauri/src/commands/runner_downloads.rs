@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -268,53 +267,41 @@ pub async fn list_runner_releases(
     Ok(result)
 }
 
-/// Names of `runners_dir`'s current top-level entries, used to spot exactly
-/// which directory an extraction just created.
-pub(crate) fn snapshot_entries(runners_dir: &Path) -> HashSet<String> {
-    fs::read_dir(runners_dir)
-        .map(|entries| {
-            entries
-                .filter_map(|e| e.ok())
-                .map(|e| e.file_name().to_string_lossy().to_string())
-                .collect()
-        })
-        .unwrap_or_default()
+/// A fresh, hidden scratch directory inside `parent` to extract an archive
+/// into (see `move_extracted_dir`). Inside `parent` rather than the system
+/// temp dir, so the final move is a plain rename on the same filesystem;
+/// hidden, and one level above the runner itself, so `scan_runners` never
+/// mistakes it for one.
+pub(crate) fn extraction_dir(parent: &Path) -> PathBuf {
+    parent.join(format!(".extract-{}", uuid::Uuid::new_v4()))
 }
 
-/// Renames the directory an extraction just created to `tag`, since sources
-/// don't all name their archive's top-level folder after the GitHub tag
-/// (e.g. Wine-GE names it after the build, not the tag) while the rest of
-/// the app (the "already exists" guard, `isInstalled` in the UI) keys
-/// runners by tag.
-pub(crate) fn normalize_extracted_dir(
-    runners_dir: &Path,
-    before: &HashSet<String>,
-    tag: &str,
-) -> Result<(), String> {
-    let target_dir = runners_dir.join(tag);
-    if target_dir.exists() {
-        return Ok(());
-    }
-
-    let mut new_dirs: Vec<PathBuf> = Vec::new();
-    for entry in fs::read_dir(runners_dir)
-        .map_err(|e| format!("Could not read runners directory: {e}"))?
-    {
-        let entry = entry.map_err(|e| format!("Could not read directory entry: {e}"))?;
-        let name = entry.file_name().to_string_lossy().to_string();
-        if !before.contains(&name) && entry.path().is_dir() {
-            new_dirs.push(entry.path());
+/// Moves the one top-level directory an archive was extracted to inside
+/// `extract_dir` to `target`, then removes `extract_dir` either way. Sources
+/// don't all name that directory after the GitHub tag (e.g. Wine-GE names
+/// it after the build), while the rest of the app (the "already exists"
+/// guard, `isInstalled` in the UI) keys runners by tag. Extracting into a
+/// scratch directory of its own, rather than straight into the shared
+/// parent, keeps two extractions running at once from mistaking each
+/// other's output for their own, and a failed one from leaving a
+/// half-extracted runner behind.
+pub(crate) fn move_extracted_dir(extract_dir: &Path, target: &Path) -> Result<(), String> {
+    let result = (|| {
+        let dirs: Vec<PathBuf> = fs::read_dir(extract_dir)
+            .map_err(|e| format!("Could not read {}: {e}", extract_dir.display()))?
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .filter(|path| path.is_dir())
+            .collect();
+        match dirs.as_slice() {
+            [only] => fs::rename(only, target)
+                .map_err(|e| format!("Could not move extracted directory: {e}")),
+            [] => Err("Archive did not contain a directory".to_string()),
+            _ => Err("Archive contained more than one top-level directory".to_string()),
         }
-    }
-
-    match new_dirs.as_slice() {
-        [only] => fs::rename(only, &target_dir)
-            .map_err(|e| format!("Could not rename extracted runner directory: {e}")),
-        [] => Err(format!("Archive for '{tag}' did not create a runner directory")),
-        _ => Err(format!(
-            "Archive for '{tag}' created more than one new directory; expected exactly one"
-        )),
-    }
+    })();
+    let _ = fs::remove_dir_all(extract_dir);
+    result
 }
 
 /// Hashes a file on disk with the given algorithm, returning its digest as a
@@ -529,9 +516,8 @@ pub async fn download_runner(
         return Err(message);
     }
 
-    let before = snapshot_entries(&runners_dir);
-
-    let extract_dir = runners_dir.clone();
+    let extract_dir = extraction_dir(&runners_dir);
+    let extract_target = extract_dir.clone();
     let archive_path_for_extraction = archive_path.clone();
     let extraction = tokio::task::spawn_blocking(move || -> Result<(), String> {
         let archive_file = fs::File::open(&archive_path_for_extraction)
@@ -539,12 +525,12 @@ pub async fn download_runner(
         if is_xz {
             let decompressed = xz2::read::XzDecoder::new(archive_file);
             tar::Archive::new(decompressed)
-                .unpack(&extract_dir)
+                .unpack(&extract_target)
                 .map_err(|e| format!("Could not extract archive: {e}"))
         } else {
             let decompressed = flate2::read::GzDecoder::new(archive_file);
             tar::Archive::new(decompressed)
-                .unpack(&extract_dir)
+                .unpack(&extract_target)
                 .map_err(|e| format!("Could not extract archive: {e}"))
         }
     })
@@ -554,6 +540,7 @@ pub async fn download_runner(
     let _ = tokio::fs::remove_file(&archive_path).await;
 
     if let Err(message) = extraction {
+        let _ = fs::remove_dir_all(&extract_dir);
         let _ = app.emit(
             "runner-download-error",
             RunnerDownloadErrorPayload {
@@ -564,7 +551,7 @@ pub async fn download_runner(
         return Err(message);
     }
 
-    if let Err(message) = normalize_extracted_dir(&runners_dir, &before, &tag) {
+    if let Err(message) = move_extracted_dir(&extract_dir, &target_dir) {
         let _ = app.emit(
             "runner-download-error",
             RunnerDownloadErrorPayload {
@@ -663,33 +650,38 @@ f899879b8c37e0b20adca19d147cf77436f3f1a37bf16d08d27fa7137a52b9ba  wine-11.18-amd
     }
 
     #[test]
-    fn normalize_renames_mismatched_extracted_dir() {
+    fn move_renames_the_extracted_dir_and_cleans_up() {
         let dir = std::env::temp_dir().join(format!("prefixr-test-{}", uuid::Uuid::new_v4()));
         fs::create_dir_all(&dir).unwrap();
-        let before = snapshot_entries(&dir);
 
-        // Simulate an archive whose top-level folder name doesn't match the
-        // GitHub tag (some sources name it after the build, not the tag).
-        fs::create_dir(dir.join("wine-lutris-GE-Proton8-26-x86_64")).unwrap();
+        // An archive whose top-level folder name doesn't match the GitHub
+        // tag (some sources name it after the build, not the tag), while a
+        // second extraction runs next to it.
+        let extract = extraction_dir(&dir);
+        fs::create_dir_all(extract.join("wine-lutris-GE-Proton8-26-x86_64/bin")).unwrap();
+        let other = extraction_dir(&dir);
+        fs::create_dir_all(other.join("wine-11.18-staging-amd64-wow64")).unwrap();
 
-        normalize_extracted_dir(&dir, &before, "GE-Proton8-26").unwrap();
+        move_extracted_dir(&extract, &dir.join("GE-Proton8-26")).unwrap();
+        assert!(dir.join("GE-Proton8-26/bin").is_dir());
+        assert!(!extract.exists());
 
-        assert!(dir.join("GE-Proton8-26").is_dir());
-        assert!(!dir.join("wine-lutris-GE-Proton8-26-x86_64").exists());
+        move_extracted_dir(&other, &dir.join("wine-11.18")).unwrap();
+        assert!(dir.join("wine-11.18").is_dir());
 
         fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
-    fn normalize_is_noop_when_dir_already_matches_tag() {
+    fn move_rejects_archives_without_a_single_dir() {
         let dir = std::env::temp_dir().join(format!("prefixr-test-{}", uuid::Uuid::new_v4()));
-        fs::create_dir_all(&dir).unwrap();
-        let before = snapshot_entries(&dir);
+        let extract = extraction_dir(&dir);
+        fs::create_dir_all(extract.join("a")).unwrap();
+        fs::create_dir_all(extract.join("b")).unwrap();
 
-        fs::create_dir(dir.join("GE-Proton9-20")).unwrap();
-
-        normalize_extracted_dir(&dir, &before, "GE-Proton9-20").unwrap();
-        assert!(dir.join("GE-Proton9-20").is_dir());
+        assert!(move_extracted_dir(&extract, &dir.join("target")).is_err());
+        assert!(!extract.exists());
+        assert!(!dir.join("target").exists());
 
         fs::remove_dir_all(&dir).unwrap();
     }

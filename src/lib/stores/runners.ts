@@ -98,7 +98,9 @@ export async function downloadRunner(
   patchDownloadState(tag, { downloaded: 0, total: undefined, done: false, error: undefined });
   try {
     await invoke("download_runner", { source, tag, downloadUrl });
-  } catch {
-    // Outcome is already surfaced via the runner-download-error event.
+  } catch (e) {
+    // Usually already set via the runner-download-error event, which isn't
+    // sent for a failure before the download got going (e.g. no network).
+    patchDownloadState(tag, { error: String(e) });
   }
 }

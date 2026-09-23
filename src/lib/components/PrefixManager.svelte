@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { open } from "@tauri-apps/plugin-dialog";
   import { prefixes, refreshPrefixes, addPrefix, deletePrefix } from "$lib/stores/prefixes";
+  import { games, refreshGames } from "$lib/stores/games";
   import { showLog } from "$lib/logViewer";
   import Modal from "$lib/components/Modal.svelte";
   import WinetricksInstaller from "$lib/components/WinetricksInstaller.svelte";
@@ -12,9 +13,19 @@
   let error = $state("");
   let winetricksFor = $state<string | null>(null);
   let wineToolsFor = $state<string | null>(null);
+  let deleting = $state<string | null>(null);
+  let deleteBusy = $state(false);
+  let deleteError = $state("");
+
+  // The games that use the prefix about to be deleted, so the dialog can
+  // name them.
+  let affectedGames = $derived(
+    deleting ? $games.filter((g) => g.prefix_path === deleting).map((g) => g.name) : [],
+  );
 
   onMount(() => {
     refreshPrefixes();
+    refreshGames();
   });
 
   async function pickFolder() {
@@ -39,8 +50,23 @@
     }
   }
 
-  async function handleDelete(prefixPath: string) {
-    await deletePrefix(prefixPath);
+  function askDelete(prefixPath: string) {
+    deleteError = "";
+    deleting = prefixPath;
+  }
+
+  async function confirmDelete(deleteFiles: boolean) {
+    if (!deleting) return;
+    deleteBusy = true;
+    deleteError = "";
+    try {
+      await deletePrefix(deleting, deleteFiles);
+      deleting = null;
+    } catch (e) {
+      deleteError = String(e);
+    } finally {
+      deleteBusy = false;
+    }
   }
 </script>
 
@@ -98,7 +124,7 @@
             >
               🛠️
             </button>
-            <button type="button" class="ghost" onclick={() => handleDelete(prefix.path)}>
+            <button type="button" class="ghost" onclick={() => askDelete(prefix.path)}>
               Löschen
             </button>
           </div>
@@ -107,6 +133,40 @@
     </ul>
   {/if}
 </section>
+
+<Modal open={deleting !== null} title="Prefix entfernen" onClose={() => (deleting = null)}>
+  {#if deleting}
+    <p class="path">{deleting}</p>
+    {#if affectedGames.length > 0}
+      <p>
+        Verwendet von: <strong>{affectedGames.join(", ")}</strong>. Diese Spiele behalten den
+        Prefix, auch wenn er nur aus Prefixr entfernt wird.
+      </p>
+    {/if}
+    <p>
+      „Ordner löschen“ löscht den Prefix endgültig, mit allen installierten Programmen und
+      Spielständen darin. Bei einem Prefix aus Lutris, Bottles oder PortProton reicht meist „Nur
+      aus Prefixr entfernen“.
+    </p>
+    {#if deleteError}
+      <p class="error">{deleteError}</p>
+    {/if}
+    <div class="dialog-actions">
+      <button type="button" class="ghost" onclick={() => (deleting = null)}>Abbrechen</button>
+      <button type="button" disabled={deleteBusy} onclick={() => confirmDelete(false)}>
+        Nur aus Prefixr entfernen
+      </button>
+      <button
+        type="button"
+        class="danger"
+        disabled={deleteBusy}
+        onclick={() => confirmDelete(true)}
+      >
+        Ordner löschen
+      </button>
+    </div>
+  {/if}
+</Modal>
 
 <Modal
   open={winetricksFor !== null}
@@ -202,5 +262,18 @@
     display: flex;
     gap: 0.3em;
     flex-shrink: 0;
+  }
+
+  .path {
+    font-family: monospace;
+    word-break: break-all;
+  }
+
+  .dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.6em;
+    margin-top: 1.2em;
   }
 </style>
