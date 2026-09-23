@@ -116,7 +116,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     } else {
         let mut builder = builder.separator();
         for (id, name) in running_games {
-            let item = MenuItemBuilder::with_id(format!("{KILL_PREFIX}{id}"), format!("„{name}“ beenden (Proton-Prozess killen)"))
+            let item = MenuItemBuilder::with_id(format!("{KILL_PREFIX}{id}"), format!("„{name}“ beenden (erzwingen)"))
                 .build(app)?;
             builder = builder.item(&item);
         }

@@ -103,8 +103,8 @@ export async function launchGame(id: string): Promise<void> {
   }
 }
 
-// Kills the game's whole process group (the Proton/Wine runner and
-// everything it started), e.g. when a game has hung. The actual "not running
+// Kills the game's whole session (for a Proton game, its umu container;
+// for a Wine game, its wine session), e.g. when a game has hung. The actual "not running
 // anymore" state update arrives via the game-exited event once the process
 // is reaped, not from this call directly.
 export async function killGame(id: string): Promise<void> {

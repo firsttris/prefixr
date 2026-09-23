@@ -36,6 +36,7 @@ editpe = "0.2"
 image = { version = "0.25", default-features = false, features = ["png", "bmp", "ico"] }
 base64 = "0.22"
 sha2 = "0.10"
+libc = "0.2"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

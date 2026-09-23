@@ -4,6 +4,7 @@
   import Modal from "./Modal.svelte";
   import RunnerDownloads from "./RunnerDownloads.svelte";
   import GitHubSettings from "./GitHubSettings.svelte";
+  import UmuSettings from "./UmuSettings.svelte";
 
   let showDownloads = $state(false);
 
@@ -31,6 +32,7 @@
   </div>
 
   <GitHubSettings />
+  <UmuSettings />
 
   {#if $runners.length === 0}
     <p class="hint">Keine Runner gefunden. Lege Proton- oder Wine-Builds im Runner-Verzeichnis ab.</p>

@@ -3,7 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Mutex;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
@@ -11,15 +11,19 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 use uuid::Uuid;
 
+use crate::commands::github::read_token;
 use crate::commands::graphics_layers::{ensure_directx_layer_cache, ensure_wine_mono_msi};
 use crate::commands::icons::extract_icon_data_url;
 use crate::commands::mangohud::ensure_mangohud_conf;
 use crate::commands::performance::ensure_vkbasalt_conf;
-use crate::commands::runners::{find_runner, runner_command, wine_binary, wineserver_binary};
+use crate::commands::runners::{
+    find_runner, prefix_command, runner_command, wine_binary, wineserver_binary,
+};
 use crate::commands::shell_link::{find_recently_created_shortcuts, DetectedShortcut};
 use crate::commands::steamgriddb::{artwork_dir, asset_cache_path, image_extension};
+use crate::commands::umu::{ensure_umu, runtime_present};
 use crate::config::{save_config, ConfigState};
-use crate::models::{Game, GameInput, RunnerKind};
+use crate::models::{Game, GameInput, Runner, RunnerKind};
 use crate::tray::rebuild_tray_menu;
 
 /// Checks whether `name` resolves to an executable file somewhere on `PATH`,
@@ -67,76 +71,217 @@ async fn competing_scheduler_active() -> bool {
 #[derive(Clone)]
 pub struct RunningGame {
     pub name: String,
+    /// PID of the process `launch_game` spawned — the outermost wrapper
+    /// (gamescope, systemd-inhibit, ...) if any are in use, otherwise
+    /// umu-run or wine itself. The root of the process tree
+    /// `kill_running_game` takes down. `None` only if the OS didn't report
+    /// one.
+    pub pid: Option<u32>,
     /// Path to the `wineserver` binary belonging to the runner this game was
     /// launched with, and the `WINEPREFIX` it's managing that game's session
-    /// under. Used to shut the session down (see `kill_running_game`) instead
-    /// of tracking a PID: when a runner is invoked through
-    /// `distrobox-host-exec` (see `runner_command`), the process actually
-    /// runs on the host, in a different PID namespace than this app — a PID
-    /// or process-group signal sent from here would only ever reach the
-    /// local `distrobox-host-exec` relay, not the real process, and a
-    /// SIGKILL can't be forwarded through that relay either since it kills
-    /// the relay itself before it gets the chance. Running `wineserver -k`
-    /// through the same `runner_command` reaches the real session either
-    /// way, because wineserver finds it via the prefix's socket file rather
-    /// than by PID.
+    /// under — the fallback half of `kill_running_game`. When a runner is
+    /// invoked through `distrobox-host-exec` (see `runner_command`), the
+    /// process actually runs on the host, in a different PID namespace than
+    /// this app, so `pid` above only ever reaches the local relay, not the
+    /// real process. Running `wineserver -k` through the same
+    /// `runner_command` reaches the real session either way, because
+    /// wineserver finds it via the prefix's socket file rather than by PID.
     pub wineserver: PathBuf,
     pub wineprefix: String,
-    /// The game's own exe path, as passed to wine. Present verbatim in the
-    /// command line of both the `wine` process we spawned and the actual
-    /// Windows process running under it, so it doubles as a `pkill -f`
-    /// pattern that reaches both directly — see `kill_running_game`.
+    /// The game's own exe path, as passed to wine/umu-run. Present verbatim
+    /// in the command line of the process we spawned and the ones below it,
+    /// so it doubles as a `pkill -f` pattern — see `kill_running_game`.
     pub exe_path: PathBuf,
 }
 
 #[derive(Default)]
 pub struct RunningGames(pub Mutex<HashMap<Uuid, RunningGame>>);
 
-/// Kills a running game's whole wine session, used by both the `kill_game`
+/// PIDs of every process below `root`, from each process's `PPid:` in
+/// `/proc/<pid>/status` — the same way umu walks its own process tree.
+fn process_descendants(root: u32) -> Vec<u32> {
+    let Ok(entries) = fs::read_dir("/proc") else {
+        return Vec::new();
+    };
+    let mut children: HashMap<u32, Vec<u32>> = HashMap::new();
+    for entry in entries.flatten() {
+        let Some(pid) = entry.file_name().to_str().and_then(|n| n.parse::<u32>().ok()) else {
+            continue;
+        };
+        let Ok(status) = fs::read_to_string(entry.path().join("status")) else {
+            continue;
+        };
+        let Some(ppid) = status
+            .lines()
+            .find_map(|line| line.strip_prefix("PPid:"))
+            .and_then(|value| value.trim().parse::<u32>().ok())
+        else {
+            continue;
+        };
+        children.entry(ppid).or_default().push(pid);
+    }
+
+    let mut descendants = Vec::new();
+    let mut queue = vec![root];
+    while let Some(pid) = queue.pop() {
+        for &child in children.get(&pid).into_iter().flatten() {
+            if !descendants.contains(&child) {
+                descendants.push(child);
+                queue.push(child);
+            }
+        }
+    }
+    descendants
+}
+
+/// Whether `pid` is still actually running — a zombie (exited, just not
+/// reaped yet) counts as gone.
+fn process_running(pid: u32) -> bool {
+    fs::read_to_string(format!("/proc/{pid}/stat"))
+        .ok()
+        .and_then(|stat| {
+            stat.rsplit_once(')')
+                .map(|(_, rest)| !rest.trim_start().starts_with('Z'))
+        })
+        .unwrap_or(false)
+}
+
+fn send_signal(pid: u32, signal: libc::c_int) {
+    // SAFETY: kill(2) has no memory-safety preconditions; a pid that's
+    // already gone just makes it fail with ESRCH, which is fine here.
+    unsafe {
+        libc::kill(pid as libc::pid_t, signal);
+    }
+}
+
+/// Grace period between SIGTERM and SIGKILL in `kill_process_tree`.
+const KILL_GRACE_PERIOD: Duration = Duration::from_secs(3);
+
+/// SIGTERMs `root`, gives it `KILL_GRACE_PERIOD` to shut down, then
+/// SIGKILLs whatever is left of it and its whole process tree.
+///
+/// For a Proton game this is effectively "kill the container": umu-run
+/// registers itself as a child subreaper, so every process of the game's
+/// session — including ones that daemonize, like wineserver — stays
+/// somewhere below it rather than escaping to init, and it forwards a
+/// SIGTERM to that entire tree itself.
+async fn kill_process_tree(root: u32) {
+    // Collected before signalling anything: once `root` is gone, its
+    // orphaned descendants get reparented away and can't be found through it
+    // anymore.
+    let mut targets = process_descendants(root);
+    send_signal(root, libc::SIGTERM);
+
+    let deadline = Instant::now() + KILL_GRACE_PERIOD;
+    while process_running(root) && Instant::now() < deadline {
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+
+    if process_running(root) {
+        targets.extend(process_descendants(root));
+        targets.push(root);
+    }
+    for pid in targets {
+        if process_running(pid) {
+            send_signal(pid, libc::SIGKILL);
+        }
+    }
+}
+
+/// Turns `text` into a `pkill -f` pattern (a POSIX extended regex) that
+/// matches it literally. Metacharacters are escaped — game paths routinely
+/// contain them, e.g. the parentheses in `Program Files (x86)`, which would
+/// otherwise make the pattern silently never match. The first character is
+/// wrapped in a bracket expression so the pattern doesn't match its own
+/// literal text: through `distrobox-host-exec` (see `runner_command`), the
+/// relay process carrying the pattern as an argument is visible to the
+/// host-side pkill, which would otherwise kill it too.
+fn pkill_pattern(text: &str) -> String {
+    let mut pattern = String::with_capacity(text.len() + 2);
+    for (i, c) in text.chars().enumerate() {
+        if i == 0 {
+            pattern.push('[');
+            if c == '\\' || c == '^' || c == ']' {
+                // Can't be escaped inside a bracket expression; the escaped
+                // form below matches the same character without one.
+                pattern.pop();
+            } else {
+                pattern.push(c);
+                pattern.push(']');
+                continue;
+            }
+        }
+        if "\\^$.|?*+()[]{}".contains(c) {
+            pattern.push('\\');
+        }
+        pattern.push(c);
+    }
+    pattern
+}
+
+/// Kills a running game's whole session, used by both the `kill_game`
 /// command and the tray menu's per-game "beenden" entries. The tracked entry
 /// itself is removed once `launch_game`'s `child.wait()` observes the
 /// process actually exiting, not here.
 ///
-/// Uses two mechanisms together, the same way PortProton's `kill_portwine`
-/// combines a wineserver shutdown with directly hard-killing the
-/// wine-preloader:
-///
-/// 1. `wineserver -k9` asks the whole wine session (game exe, services.exe,
-///    explorer.exe, ...) to terminate via wineserver's own IPC — thorough
-///    when it works, but it never reaches the `wine` process we spawned
-///    itself, since wineserver has no notion of its own parent.
-/// 2. `pkill -9 -f` on the game's exe path directly hard-kills anything
-///    whose command line mentions it — both that process and the game's own
-///    process.
+/// 1. `kill_process_tree` on the process `launch_game` spawned — for a
+///    Proton game, this takes down the whole umu container session.
+/// 2. SIGTERM to umu-run found by its command line, via `pkill` through
+///    `runner_command`: the same container shutdown for a game started
+///    through `distrobox-host-exec`, whose real process tree runs on the
+///    host and isn't below the relay process we spawned. A no-op for a Wine
+///    game, or once step 1 already got it.
+/// 3. As a fallback, the same two mechanisms PortProton's `kill_portwine`
+///    combines: `wineserver -k9` (asks the whole wine session to terminate
+///    via wineserver's own IPC) and `pkill -9 -f` on the game's exe path.
+///    These cover a Wine game's wineserver, which detaches from the process
+///    tree, and a game started through `distrobox-host-exec`, where the tree
+///    visible to us only contains the relay (see `RunningGame::wineserver`).
 pub async fn kill_running_game(running: &RunningGames, id: Uuid) -> Result<(), String> {
-    let (wineserver, wineprefix, exe_path) = {
+    let game = {
         let games = running
             .0
             .lock()
             .map_err(|_| "Running games list is locked".to_string())?;
-        let game = games.get(&id).ok_or_else(|| "Game is not running".to_string())?;
-        (
-            game.wineserver.clone(),
-            game.wineprefix.clone(),
-            game.exe_path.clone(),
-        )
+        games
+            .get(&id)
+            .cloned()
+            .ok_or_else(|| "Game is not running".to_string())?
     };
 
-    let wineserver_result = runner_command(&wineserver, [("WINEPREFIX", wineprefix.as_str())])
-        .arg("-k9")
+    if let Some(pid) = game.pid {
+        kill_process_tree(pid).await;
+    }
+
+    let exe_path = game.exe_path.to_string_lossy();
+    // umu-run's command line is `<python> .../umu/umu-run <exe> <args...>`.
+    let umu_signalled = runner_command(Path::new("pkill"), [])
+        .args(["-TERM", "-f"])
+        .arg(pkill_pattern(&format!("umu-run {exe_path}")))
         .status()
-        .await;
+        .await
+        .is_ok_and(|status| status.success());
+    if umu_signalled {
+        tokio::time::sleep(KILL_GRACE_PERIOD).await;
+    }
+
+    let wineserver_result =
+        runner_command(&game.wineserver, [("WINEPREFIX", game.wineprefix.as_str())])
+            .arg("-k9")
+            .status()
+            .await;
 
     let pkill_result = runner_command(Path::new("pkill"), [])
         .args(["-9", "-f"])
-        .arg(&exe_path)
+        .arg(pkill_pattern(&exe_path))
         .status()
         .await;
 
-    // Either one actually killing something is a success; only report an
-    // error if both failed to even run (a real environment problem, e.g.
-    // neither binary exists) rather than surfacing e.g. wineserver's "no
-    // session found" exit code as a failure when pkill already got it.
+    // Either one actually running is a success; only report an error if
+    // both failed to even run (a real environment problem, e.g. neither
+    // binary exists) rather than surfacing e.g. wineserver's "no session
+    // found" exit code as a failure when the process tree kill already got
+    // it.
     match (wineserver_result, pkill_result) {
         (Err(e), Err(_)) => Err(format!("Could not run wineserver: {e}")),
         _ => Ok(()),
@@ -189,6 +334,7 @@ pub fn take_pending_install(state: State<PendingInstall>) -> Option<String> {
 /// actually interacts with in the meantime, not this command.
 #[tauri::command]
 pub async fn run_installer(
+    app: AppHandle,
     state: State<'_, ConfigState>,
     prefix_path: String,
     runner_id: String,
@@ -200,18 +346,13 @@ pub async fn run_installer(
             .map_err(|_| "Configuration is locked".to_string())?;
         config.runners_dir.clone()
     };
+    let token = read_token(&state)?;
 
     let runner = find_runner(&runners_dir, &runner_id)?;
-    let wine = wine_binary(&runner.path)?;
     let prefix = PathBuf::from(&prefix_path);
 
-    // Must run before wineboot's first initialization of this prefix (see
-    // `steer_profile_to_steamuser`), which the installer itself can trigger
-    // on a fresh, still-uninitialized prefix.
-    steer_profile_to_steamuser(&prefix)?;
-
     let exe = PathBuf::from(&exe_path);
-    let mut command = runner_command(&wine, [("WINEPREFIX", prefix_path.as_str())]);
+    let mut command = prefix_command(&app, token.as_deref(), &runner, &prefix_path).await?;
     command.arg(&exe);
     // Installers commonly expect to run from their own directory (sibling
     // data files, relative paths) — mirrors how a user would run it by hand.
@@ -365,62 +506,6 @@ fn log_file_path(app: &AppHandle, game_id: &str) -> Result<PathBuf, String> {
         .join(format!("{timestamp}.txt")))
 }
 
-/// Direct3D/DXGI/VKD3D files a Proton runner ships pre-linked into its own
-/// template prefix (`files/share/default_pfx/`) — what it copies from into a
-/// fresh `pfx/` on first run. GE-Proton bakes DXVK/VKD3D directly into its
-/// wine build as the builtin implementation of these modules (unlike a tool
-/// that bolts external DXVK onto a plain Wine build), so no `WINEDLLOVERRIDES`
-/// is needed to make wine prefer them — it uses them automatically once
-/// they're the ones actually reachable at these paths.
-const DIRECTX_OVERRIDE_FILES: &[&str] = &[
-    "d3d8.dll",
-    "d3d8thk.dll",
-    "d3d9.dll",
-    "d3d10core.dll",
-    "d3d11.dll",
-    "d3d12.dll",
-    "d3d12core.dll",
-    "dxgi.dll",
-    "wined3d.dll",
-    "libvkd3d-1.dll",
-    "libvkd3d-shader-1.dll",
-    "libvkd3d-utils-1.dll",
-];
-
-/// Re-links the given runner's own Direct3D/DXGI/VKD3D files into a prefix's
-/// `system32`/`syswow64`. Mirrors what Proton's own wrapper script does for
-/// its nested `pfx/` (see the comment on `wineprefix` in `launch_game`) and
-/// what PortProton does on every launch for the same reason (its
-/// `functions_helper`, `CP_DXVK_FILES`/`CP_VKD3D_FILES`): a prefix driven
-/// directly by wine — because it's imported from another tool, or was last
-/// used with a different runner — may have these files symlinked to a
-/// completely different, binary-incompatible build, or be
-/// missing them entirely, which breaks the moment this runner's wine tries
-/// to load them (its own builtin version depends on companions, like
-/// `wined3d.dll` on `libvkd3d-utils-1.dll`, that a foreign build won't have
-/// next to it). Runners with no bundled DXVK/VKD3D (plain Wine builds, no
-/// `files/share/default_pfx`) leave the prefix untouched.
-fn sync_directx_overrides(runner_path: &Path, prefix_path: &Path) -> Result<(), String> {
-    let template_windows = runner_path.join("files/share/default_pfx/drive_c/windows");
-    if !template_windows.is_dir() {
-        return Ok(());
-    }
-
-    for subdir in ["system32", "syswow64"] {
-        let src_dir = template_windows.join(subdir);
-        let dst_dir = prefix_path.join("drive_c/windows").join(subdir);
-        if !dst_dir.is_dir() {
-            continue;
-        }
-
-        for file_name in DIRECTX_OVERRIDE_FILES {
-            relink_if_needed(&src_dir.join(file_name), &dst_dir.join(file_name))?;
-        }
-    }
-
-    Ok(())
-}
-
 /// Symlinks `dst_path` to `src_path`'s fully-resolved target, replacing
 /// whatever (if anything) is already there — unless it's already correctly
 /// linked, in which case it's left untouched. A missing `src_path` is not an
@@ -442,9 +527,8 @@ fn relink_if_needed(src_path: &Path, dst_path: &Path) -> Result<(), String> {
 }
 
 /// Direct3D/DXGI modules DXVK provides, and D3D12 modules VKD3D-Proton
-/// provides — forced to load as native (unlike a Proton runner's own
-/// builtin copies, see `sync_directx_overrides`) since a plain Wine build's
-/// own builtin implementations of these are the unaccelerated, OpenGL-backed
+/// provides — forced to load as native since a plain Wine build's own
+/// builtin implementations of these are the unaccelerated, OpenGL-backed
 /// ones DXVK/VKD3D-Proton exist to replace.
 const DXVK_MODULES: &[&str] = &["d3d8", "d3d9", "d3d10core", "d3d11", "dxgi"];
 const VKD3D_MODULES: &[&str] = &["d3d12", "d3d12core"];
@@ -453,11 +537,10 @@ const VKD3D_MODULES: &[&str] = &["d3d12", "d3d12core"];
 /// `graphics_layers::ensure_directx_layer_cache`) into a Wine prefix's
 /// `system32`/`syswow64`, and returns the `WINEDLLOVERRIDES` value that
 /// forces wine to actually load them. Mirrors PortProton's own
-/// `CP_DXVK_FILES`/`CP_VKD3D_FILES` handling in `functions_helper` — the
-/// same trick `sync_directx_overrides` uses for a Proton runner, just
-/// sourced from a separately downloaded DXVK/VKD3D-Proton instead of a
-/// runner's bundled copy, and (unlike a Proton runner, whose builtin modules
-/// already *are* DXVK/VKD3D) needing the override to actually take effect.
+/// `CP_DXVK_FILES`/`CP_VKD3D_FILES` handling in `functions_helper`: a
+/// prefix imported from another tool, or last used with a Proton runner,
+/// may have these files pointing at a different build or be missing them
+/// entirely, so they're re-linked on every launch rather than once.
 fn sync_directx_overrides_from_cache(cache_dir: &Path, prefix_path: &Path) -> Result<String, String> {
     let windows_dir = prefix_path.join("drive_c/windows");
 
@@ -570,6 +653,124 @@ pub(crate) fn steer_profile_to_steamuser(prefix_path: &Path) -> Result<(), Strin
         .map_err(|e| format!("Could not link {}: {e}", user_dir.display()))
 }
 
+/// Opens a launch's log file for appending, as a stdout/stderr pair for a
+/// child process.
+fn log_stdio(log_path: &Path) -> Result<(Stdio, Stdio), String> {
+    let out = fs::OpenOptions::new()
+        .append(true)
+        .open(log_path)
+        .map_err(|e| format!("Could not open log file: {e}"))?;
+    let err = out
+        .try_clone()
+        .map_err(|e| format!("Could not open log file: {e}"))?;
+    Ok((Stdio::from(out), Stdio::from(err)))
+}
+
+/// Readies a Proton runner's launch and returns the binary to launch the
+/// game through: umu-run (see `commands::umu`), which hands it to the
+/// runner's real `proton` script inside the Steam Linux Runtime. Proton then
+/// creates the prefix, keeps its DXVK/VKD3D in sync with the runner and
+/// installs Mono/fonts itself, so nothing in the prefix needs setting up by
+/// hand here — umu even steers the user profile to `steamuser` the same way
+/// `steer_profile_to_steamuser` does for a Wine runner.
+///
+/// The one thing done up front is an explicit `createprefix` whenever the
+/// prefix or the Steam Runtime this runner needs doesn't exist yet: both can
+/// take minutes on first use (the runtime alone is several hundred MB),
+/// which this surfaces as the frontend's "initializing" state instead of an
+/// unexplained wait before the game appears.
+async fn prepare_proton(
+    app: &AppHandle,
+    token: Option<&str>,
+    runner: &Runner,
+    game: &Game,
+    id: &str,
+    log_path: &Path,
+    env: &mut Vec<(String, String)>,
+) -> Result<PathBuf, String> {
+    let prefix_path_str = game.prefix_path.to_string_lossy();
+    let is_set_up =
+        || game.prefix_path.join("drive_c").is_dir() && runtime_present(&runner.path);
+    if !is_set_up() {
+        let _ = app.emit("game-initializing", GameInitializingPayload { id });
+        let (out, err) = log_stdio(log_path)?;
+        // Exit status deliberately not checked: after setting everything up,
+        // GE-Proton still tries to launch the empty exe `createprefix` hands
+        // it and exits 1 on "file not found", even on complete success.
+        prefix_command(app, token, runner, &prefix_path_str)
+            .await?
+            .arg("createprefix")
+            .stdout(out)
+            .stderr(err)
+            .status()
+            .await
+            .map_err(|e| format!("Could not initialize prefix: {e}"))?;
+        if !is_set_up() {
+            return Err("Prefix initialization failed".to_string());
+        }
+    }
+
+    env.push(("PROTONPATH".to_string(), runner.path.display().to_string()));
+    ensure_umu(app, token).await
+}
+
+/// Readies a Wine runner's launch and returns its `wine` binary, which the
+/// game is launched with directly. Unlike Proton, a plain Wine build does
+/// none of its own prefix setup, so that happens here: a fresh prefix gets
+/// initialized with wineboot, wine-mono installed, and DXVK/VKD3D-Proton
+/// linked in (see `sync_directx_overrides_from_cache`), with the
+/// `WINEDLLOVERRIDES` entries those need appended to `dll_overrides`.
+async fn prepare_wine(
+    app: &AppHandle,
+    runner: &Runner,
+    game: &Game,
+    id: &str,
+    log_path: &Path,
+    dll_overrides: &mut Vec<String>,
+) -> Result<PathBuf, String> {
+    let wine = wine_binary(&runner.path)?;
+    let prefix_path_str = game.prefix_path.to_string_lossy();
+
+    // Must run before wineboot's first initialization of this prefix (see
+    // `steer_profile_to_steamuser`), but is otherwise idempotent, so it's
+    // simplest to just always ensure it — cheap, and self-healing if
+    // something ever removed the symlink.
+    steer_profile_to_steamuser(&game.prefix_path)?;
+    // A prefix is created without ever running wineboot (see `add_prefix`),
+    // so an empty one — no `drive_c` yet — is initialized here on first use.
+    if !game.prefix_path.join("drive_c").is_dir() {
+        let _ = app.emit("game-initializing", GameInitializingPayload { id });
+        let (out, err) = log_stdio(log_path)?;
+        let status = runner_command(&wine, [("WINEPREFIX", prefix_path_str.as_ref())])
+            .arg("wineboot")
+            .stdout(out)
+            .stderr(err)
+            .status()
+            .await
+            .map_err(|e| format!("Could not initialize prefix: {e}"))?;
+        if !status.success() {
+            return Err(format!("Prefix initialization failed with status {status}"));
+        }
+    }
+
+    install_wine_mono(app, &wine, &game.prefix_path, log_path).await?;
+    let cache = ensure_directx_layer_cache(app).await?;
+    dll_overrides.push(sync_directx_overrides_from_cache(&cache, &game.prefix_path)?);
+
+    // Proton only re-copies its own DXVK/VKD3D (and builtin DLLs) into a
+    // prefix when its `config_info` marker says the prefix was last set up
+    // differently. The files were just replaced here, so drop that marker —
+    // otherwise switching this prefix back to the same Proton runner later
+    // would keep running on this upstream DXVK instead of Proton's own.
+    let config_info = game.prefix_path.join("config_info");
+    if config_info.exists() {
+        fs::remove_file(&config_info)
+            .map_err(|e| format!("Could not remove {}: {e}", config_info.display()))?;
+    }
+
+    Ok(wine)
+}
+
 /// Launches a game's exe under its configured runner and prefix. stdout/stderr
 /// are redirected straight into a per-run log file. The frontend is told about
 /// the outcome both via the command's own `Result` and via `game-started` /
@@ -582,7 +783,38 @@ pub async fn launch_game(
     running: State<'_, RunningGames>,
     id: String,
 ) -> Result<(), String> {
-    let game_id = Uuid::parse_str(&id).map_err(|e| format!("Invalid game id: {e}"))?;
+    let log_path = log_file_path(&app, &id)?;
+    if let Some(parent) = log_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("Could not create log directory: {e}"))?;
+    }
+    fs::File::create(&log_path).map_err(|e| format!("Could not create log file: {e}"))?;
+
+    // Every failure from here on is reported in this one place — including
+    // ones while still preparing, after `game-initializing` already went out
+    // (e.g. a failed umu or Steam Runtime download) — so the frontend never
+    // gets stuck showing a launch as still in progress.
+    let result = run_game(&app, &state, &running, &id, &log_path).await;
+    if let Err(message) = &result {
+        let _ = app.emit(
+            "game-launch-error",
+            GameLaunchErrorPayload {
+                id: &id,
+                message: message.clone(),
+                log_path: Some(log_path.display().to_string()),
+            },
+        );
+    }
+    result
+}
+
+async fn run_game(
+    app: &AppHandle,
+    state: &State<'_, ConfigState>,
+    running: &State<'_, RunningGames>,
+    id: &str,
+    log_path: &Path,
+) -> Result<(), String> {
+    let game_id = Uuid::parse_str(id).map_err(|e| format!("Invalid game id: {e}"))?;
 
     let (game, runners_dir, mangohud, performance) = {
         let config = state
@@ -601,6 +833,7 @@ pub async fn launch_game(
             config.performance.clone(),
         )
     };
+    let token = read_token(state)?;
 
     let runner = find_runner(&runners_dir, &game.runner_id)?;
     let prefix_path_str = game.prefix_path.to_str().ok_or_else(|| {
@@ -609,99 +842,33 @@ pub async fn launch_game(
             game.prefix_path.display()
         )
     })?;
-
-    let log_path = log_file_path(&app, &id)?;
-    if let Some(parent) = log_path.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("Could not create log directory: {e}"))?;
-    }
-    fs::File::create(&log_path).map_err(|e| format!("Could not create log file: {e}"))?;
     let log_path_string = log_path.display().to_string();
 
-    // Every prefix is driven directly by the runner's own wine binary,
-    // against `<prefix>` itself — never through Proton's `proton` wrapper
-    // script, which pins its prefix to `<STEAM_COMPAT_DATA_PATH>/pfx` with no
-    // way to point it at `<prefix>` instead. That's deliberate, not just a
-    // shortcut: it's the only way a game can be freely reassigned between a
-    // Proton and a Wine runner and keep seeing the same installed files and
-    // saves either way (both PortProton and Bottles manage DXVK/VKD3D this
-    // same way, independently of which wine build is running them, for the
-    // same reason). `kill_running_game` needs this exact value to reach the
-    // right wineserver session.
+    // `kill_running_game` needs this exact value to reach the right
+    // wineserver session.
     let wineprefix = prefix_path_str.to_string();
     let wineserver = wineserver_binary(&runner.path)?;
-    let wine = wine_binary(&runner.path)?;
-
-    // A prefix is created without ever running wineboot (see `add_prefix`),
-    // so an empty one — no `drive_c` yet — is initialized here on first use,
-    // with that game's own runner.
-    let is_uninitialized_prefix = !game.prefix_path.join("drive_c").is_dir();
-    // Must run before wineboot's first initialization of this prefix (see
-    // `steer_profile_to_steamuser`), but is otherwise idempotent, so it's
-    // simplest to just always ensure it — cheap, and self-healing if
-    // something ever removed the symlink.
-    steer_profile_to_steamuser(&game.prefix_path)?;
-    if is_uninitialized_prefix {
-        let _ = app.emit("game-initializing", GameInitializingPayload { id: &id });
-
-        let init_out = fs::OpenOptions::new()
-            .append(true)
-            .open(&log_path)
-            .map_err(|e| format!("Could not open log file: {e}"))?;
-        let init_err = init_out
-            .try_clone()
-            .map_err(|e| format!("Could not open log file: {e}"))?;
-
-        let status = runner_command(&wine, [("WINEPREFIX", prefix_path_str)])
-            .arg("wineboot")
-            .stdout(Stdio::from(init_out))
-            .stderr(Stdio::from(init_err))
-            .status()
-            .await
-            .map_err(|e| format!("Could not initialize prefix: {e}"))?;
-
-        if !status.success() {
-            let message = format!("Prefix initialization failed with status {status}");
-            let _ = app.emit(
-                "game-launch-error",
-                GameLaunchErrorPayload {
-                    id: &id,
-                    message: message.clone(),
-                    log_path: Some(log_path_string.clone()),
-                },
-            );
-            return Err(message);
-        }
-    }
-
-    let dll_overrides = match runner.kind {
-        RunnerKind::Proton => {
-            sync_directx_overrides(&runner.path, &game.prefix_path)?;
-            None
-        }
-        RunnerKind::Wine => {
-            install_wine_mono(&app, &wine, &game.prefix_path, &log_path).await?;
-            let cache = ensure_directx_layer_cache(&app).await?;
-            Some(sync_directx_overrides_from_cache(
-                &cache,
-                &game.prefix_path,
-            )?)
-        }
-    };
 
     let mut env = vec![("WINEPREFIX".to_string(), prefix_path_str.to_string())];
     // `winemenubuilder.exe=` is disabled unconditionally: wine's default
     // behavior of registering .desktop entries and file associations for
     // whatever the game installs is never wanted here, since this app is
-    // itself the game's launcher/menu.
-    let mut dll_override_parts = Vec::new();
-    if let Some(overrides) = dll_overrides {
-        dll_override_parts.push(overrides);
-    }
-    dll_override_parts.push("winemenubuilder.exe=".to_string());
-    env.push(("WINEDLLOVERRIDES".to_string(), dll_override_parts.join(";")));
+    // itself the game's launcher/menu. Proton appends its own overrides to
+    // this rather than replacing it.
+    let mut dll_overrides = vec!["winemenubuilder.exe=".to_string()];
+
+    let runner_binary = match runner.kind {
+        RunnerKind::Proton => {
+            prepare_proton(app, token.as_deref(), &runner, &game, id, log_path, &mut env).await?
+        }
+        RunnerKind::Wine => {
+            prepare_wine(app, &runner, &game, id, log_path, &mut dll_overrides).await?
+        }
+    };
+    env.push(("WINEDLLOVERRIDES".to_string(), dll_overrides.join(";")));
 
     if mangohud.enabled {
-        let conf_path = ensure_mangohud_conf(&app, &mangohud)?;
+        let conf_path = ensure_mangohud_conf(app, &mangohud)?;
         env.push(("MANGOHUD".to_string(), "1".to_string()));
         env.push((
             "MANGOHUD_CONFIGFILE".to_string(),
@@ -718,7 +885,7 @@ pub async fn launch_game(
         env.push(("LD_PRELOAD".to_string(), "libgamemodeauto.so.0".to_string()));
     }
     if performance.vkbasalt_enabled {
-        let vkbasalt_conf = ensure_vkbasalt_conf(&app, &performance)?;
+        let vkbasalt_conf = ensure_vkbasalt_conf(app, &performance)?;
         env.push(("ENABLE_VKBASALT".to_string(), "1".to_string()));
         env.push((
             "VKBASALT_CONFIG_FILE".to_string(),
@@ -727,13 +894,14 @@ pub async fn launch_game(
     }
     env.extend(game.env_vars.iter().map(|(k, v)| (k.clone(), v.clone())));
 
-    // Builds the actual launch as a chain of wrappers around wine, each one
-    // prepended in outer-to-inner order (so the last one added is the one
-    // that directly execs wine). Both wrappers are only attempted once their
-    // binary and backing service actually look reachable — otherwise the
-    // wrapper itself would exit immediately, taking the whole game launch
-    // down with it since it'd be the process we spawn.
-    let mut launch_chain = vec![wine.display().to_string()];
+    // Builds the actual launch as a chain of wrappers around the runner
+    // binary (umu-run or wine), each one prepended in outer-to-inner order
+    // (so the last one added is the one that directly execs the runner
+    // binary). Both wrappers are only attempted once their binary and
+    // backing service actually look reachable — otherwise the wrapper itself
+    // would exit immediately, taking the whole game launch down with it
+    // since it'd be the process we spawn.
+    let mut launch_chain = vec![runner_binary.display().to_string()];
 
     // `powerprofilesctl launch` holds the desktop at the "performance" power
     // profile for exactly as long as this launch runs, releasing it
@@ -832,17 +1000,11 @@ pub async fn launch_game(
         };
         let _ = fs::OpenOptions::new()
             .append(true)
-            .open(&log_path)
+            .open(log_path)
             .and_then(|mut f| std::io::Write::write_all(&mut f, note.as_bytes()));
     }
 
-    let log_out = fs::OpenOptions::new()
-        .append(true)
-        .open(&log_path)
-        .map_err(|e| format!("Could not open log file: {e}"))?;
-    let log_err = log_out
-        .try_clone()
-        .map_err(|e| format!("Could not open log file: {e}"))?;
+    let (log_out, log_err) = log_stdio(log_path)?;
 
     let env_pairs: Vec<(&str, &str)> = launch_env
         .iter()
@@ -853,45 +1015,33 @@ pub async fn launch_game(
         .args(&wrapper_args)
         .arg(&game.exe_path)
         .args(&game_launch_args)
-        .stdout(Stdio::from(log_out))
-        .stderr(Stdio::from(log_err))
-        // Makes this process (the `proton` script, or `wine` itself) the
-        // leader of a fresh process group, so `kill_running_game` can reach
-        // everything it spawns (wineserver, the game exe, ...) by signalling
-        // the group instead of just this one PID.
+        .stdout(log_out)
+        .stderr(log_err)
+        // Detaches the game from this app's own process group, so e.g. a
+        // Ctrl+C on a dev server running Prefixr doesn't also hit the game.
         .process_group(0)
         .spawn()
-        .map_err(|e| {
-            let message = format!("Could not start game: {e}");
-            let _ = app.emit(
-                "game-launch-error",
-                GameLaunchErrorPayload {
-                    id: &id,
-                    message: message.clone(),
-                    log_path: Some(log_path_string.clone()),
-                },
-            );
-            message
-        })?;
+        .map_err(|e| format!("Could not start game: {e}"))?;
 
     if let Ok(mut running) = running.0.lock() {
         running.insert(
             game_id,
             RunningGame {
                 name: game.name.clone(),
+                pid: child.id(),
                 wineserver: wineserver.clone(),
                 wineprefix: wineprefix.clone(),
                 exe_path: game.exe_path.clone(),
             },
         );
     }
-    rebuild_tray_menu(&app);
+    rebuild_tray_menu(app);
 
     let _ = app.emit(
         "game-started",
         GameStartedPayload {
-            id: &id,
-            log_path: log_path_string.clone(),
+            id,
+            log_path: log_path_string,
         },
     );
 
@@ -900,29 +1050,20 @@ pub async fn launch_game(
     if let Ok(mut running) = running.0.lock() {
         running.remove(&game_id);
     }
-    rebuild_tray_menu(&app);
+    rebuild_tray_menu(app);
 
     let status = wait_result.map_err(|e| format!("Game process failed: {e}"))?;
 
     let _ = app.emit(
         "game-exited",
         GameExitedPayload {
-            id: &id,
+            id,
             exit_code: status.code(),
         },
     );
 
     if !status.success() {
-        let message = format!("Game exited with status {status}");
-        let _ = app.emit(
-            "game-launch-error",
-            GameLaunchErrorPayload {
-                id: &id,
-                message: message.clone(),
-                log_path: Some(log_path_string),
-            },
-        );
-        return Err(message);
+        return Err(format!("Game exited with status {status}"));
     }
 
     Ok(())
@@ -1211,4 +1352,88 @@ pub fn ensure_install_desktop_entry(app: &AppHandle) -> Result<(), String> {
         .status();
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pkill_pattern_matches_paths_literally() {
+        assert_eq!(
+            pkill_pattern("/drive_c/Program Files (x86)/Game [v1.2]/game+.exe"),
+            r"[/]drive_c/Program Files \(x86\)/Game \[v1\.2\]/game\+\.exe"
+        );
+        assert_eq!(pkill_pattern("umu-run /g.exe"), r"[u]mu-run /g\.exe");
+        assert_eq!(pkill_pattern("^x"), r"\^x");
+    }
+
+    #[test]
+    fn pkill_pattern_matches_the_process_but_not_itself() {
+        // GNU sleep sums its arguments; the random fraction makes this
+        // command line unique on the system.
+        let fraction = format!("0.{}", Uuid::new_v4().as_u128() % 1_000_000_000);
+        let target = format!("sleep 30 {fraction}");
+        let mut child = std::process::Command::new("sleep")
+            .args(["30", &fraction])
+            .spawn()
+            .unwrap();
+        let pattern = pkill_pattern(&target);
+
+        // `pgrep -f` matches exactly like `pkill -f`, without killing.
+        let found = std::process::Command::new("pgrep")
+            .args(["-f", &pattern])
+            .output()
+            .unwrap();
+        let pids = String::from_utf8_lossy(&found.stdout);
+        assert_eq!(pids.trim(), child.id().to_string());
+        assert!(!regex_self_match(&pattern));
+
+        child.kill().unwrap();
+        child.wait().unwrap();
+    }
+
+    /// Whether `pattern` would match a command line containing `pattern`
+    /// itself — checked with `grep -E`, which uses the same regex flavor.
+    fn regex_self_match(pattern: &str) -> bool {
+        use std::io::Write;
+        let mut grep = std::process::Command::new("grep")
+            .args(["-qE", pattern])
+            .stdin(Stdio::piped())
+            .spawn()
+            .unwrap();
+        grep.stdin.take().unwrap().write_all(pattern.as_bytes()).unwrap();
+        grep.wait().unwrap().success()
+    }
+
+    #[test]
+    fn process_tree_helpers_see_real_processes() {
+        let mut child = std::process::Command::new("sh")
+            .args(["-c", "sleep 30 & wait"])
+            .spawn()
+            .unwrap();
+        let pid = child.id();
+        // Give `sh` a moment to fork its `sleep`.
+        std::thread::sleep(Duration::from_millis(200));
+
+        assert!(process_running(pid));
+        let descendants = process_descendants(pid);
+        assert_eq!(descendants.len(), 1);
+
+        tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .unwrap()
+            .block_on(kill_process_tree(pid));
+        child.wait().unwrap();
+
+        assert!(!process_running(pid));
+        // SIGKILL is delivered asynchronously, so the grandchild can take a
+        // moment to actually disappear.
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while process_running(descendants[0]) && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert!(!process_running(descendants[0]));
+    }
 }

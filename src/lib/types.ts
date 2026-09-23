@@ -129,3 +129,10 @@ export interface MaxMapCountStatus {
   sufficient: boolean;
   can_fix: boolean;
 }
+
+// Our managed copy of umu-launcher, which every Proton runner is launched
+// through — see `commands::umu`.
+export interface UmuStatus {
+  installed: boolean;
+  version: string | null;
+}

@@ -9,5 +9,6 @@ pub mod runner_downloads;
 pub mod runners;
 pub mod shell_link;
 pub mod steamgriddb;
+pub mod umu;
 pub mod wine_tools;
 pub mod winetricks;

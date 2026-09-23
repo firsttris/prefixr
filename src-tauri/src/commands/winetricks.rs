@@ -9,8 +9,12 @@ use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
 
 use crate::commands::games::steer_profile_to_steamuser;
-use crate::commands::runners::{find_runner, runner_command, wine_binary, wineserver_binary};
+use crate::commands::github::read_token;
+use crate::commands::runners::{
+    find_runner, prefix_command, runner_command, wine_binary, wineserver_binary,
+};
 use crate::config::ConfigState;
+use crate::models::{Runner, RunnerKind};
 
 fn winetricks_script_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(app
@@ -173,6 +177,12 @@ pub fn list_installed_winetricks_verbs(prefix_path: String) -> Result<Vec<String
 /// build. `-q` puts winetricks in unattended mode — no license/confirmation
 /// dialogs blocking a headless run. Returns the log file's path so the
 /// frontend can offer it on failure, the same way `launch_game` does.
+///
+/// On a Proton runner that ships protonfixes (GE-Proton does), this goes
+/// through `umu-run winetricks` instead, so the verbs get installed from
+/// inside the same Steam Runtime container, by the same Proton setup, the
+/// game itself later runs under — using the winetricks copy bundled in
+/// protonfixes (umu requires that one; it adds `-q` itself).
 #[tauri::command]
 pub async fn install_winetricks_verbs(
     app: AppHandle,
@@ -191,11 +201,63 @@ pub async fn install_winetricks_verbs(
             .map_err(|_| "Configuration is locked".to_string())?;
         config.runners_dir.clone()
     };
+    let token = read_token(&state)?;
 
     let runner = find_runner(&runners_dir, &runner_id)?;
+    let prefix = PathBuf::from(&prefix_path);
+
+    let log_path = winetricks_log_path(&app, &prefix)?;
+    if let Some(parent) = log_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("Could not create log directory: {e}"))?;
+    }
+    let log_out =
+        fs::File::create(&log_path).map_err(|e| format!("Could not create log file: {e}"))?;
+    let log_err = log_out
+        .try_clone()
+        .map_err(|e| format!("Could not open log file: {e}"))?;
+
+    let mut command = if uses_umu_winetricks(&runner) {
+        let mut command = prefix_command(&app, token.as_deref(), &runner, &prefix_path).await?;
+        command.arg("winetricks").args(&verbs);
+        command
+    } else {
+        direct_winetricks_command(&app, &runner, &prefix, &prefix_path, &verbs).await?
+    };
+
+    let status = command
+        .stdout(Stdio::from(log_out))
+        .stderr(Stdio::from(log_err))
+        .status()
+        .await
+        .map_err(|e| format!("Could not run winetricks: {e}"))?;
+
+    let log_path_string = log_path.display().to_string();
+    if !status.success() {
+        return Err(format!(
+            "winetricks beendete sich mit Status {status} — Details im Log: {log_path_string}"
+        ));
+    }
+    Ok(log_path_string)
+}
+
+/// Whether `umu-run winetricks` works for this runner: it only supports a
+/// Proton build that bundles protonfixes, which is where both its winetricks
+/// copy and the hook that actually runs it live.
+fn uses_umu_winetricks(runner: &Runner) -> bool {
+    runner.kind == RunnerKind::Proton && runner.path.join("protonfixes/winetricks").is_file()
+}
+
+/// Runs our own downloaded winetricks script directly against the runner's
+/// wine binary — for a Wine runner, or a Proton build without protonfixes.
+async fn direct_winetricks_command(
+    app: &AppHandle,
+    runner: &Runner,
+    prefix: &Path,
+    prefix_path: &str,
+    verbs: &[String],
+) -> Result<tokio::process::Command, String> {
     let wine = wine_binary(&runner.path)?;
     let wineserver = wineserver_binary(&runner.path)?;
-    let prefix = PathBuf::from(&prefix_path);
     let wine_str = wine
         .to_str()
         .ok_or_else(|| format!("Wine path is not valid UTF-8: {}", wine.display()))?;
@@ -209,43 +271,18 @@ pub async fn install_winetricks_verbs(
     // Must run before wineboot's first initialization of this prefix — see
     // `steer_profile_to_steamuser` — which winetricks can trigger itself via
     // its own implicit `wine cmd /c echo init` if this is a fresh prefix.
-    steer_profile_to_steamuser(&prefix)?;
+    steer_profile_to_steamuser(prefix)?;
 
-    let script = ensure_winetricks_script(&app).await?;
+    let script = ensure_winetricks_script(app).await?;
 
-    let log_path = winetricks_log_path(&app, &prefix)?;
-    if let Some(parent) = log_path.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("Could not create log directory: {e}"))?;
-    }
-    let log_out =
-        fs::File::create(&log_path).map_err(|e| format!("Could not create log file: {e}"))?;
-    let log_err = log_out
-        .try_clone()
-        .map_err(|e| format!("Could not open log file: {e}"))?;
-
-    let mut args = vec!["-q".to_string()];
-    args.extend(verbs);
-
-    let status = runner_command(
+    let mut command = runner_command(
         &script,
         [
-            ("WINEPREFIX", prefix_path.as_str()),
+            ("WINEPREFIX", prefix_path),
             ("WINE", wine_str),
             ("WINESERVER", wineserver_str),
         ],
-    )
-    .args(&args)
-    .stdout(Stdio::from(log_out))
-    .stderr(Stdio::from(log_err))
-    .status()
-    .await
-    .map_err(|e| format!("Could not run winetricks: {e}"))?;
-
-    let log_path_string = log_path.display().to_string();
-    if !status.success() {
-        return Err(format!(
-            "winetricks beendete sich mit Status {status} — Details im Log: {log_path_string}"
-        ));
-    }
-    Ok(log_path_string)
+    );
+    command.arg("-q").args(verbs);
+    Ok(command)
 }

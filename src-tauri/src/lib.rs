@@ -26,6 +26,7 @@ use commands::steamgriddb::{
     list_steamgriddb_icons, remove_game_cover, remove_game_icon, save_steamgriddb_config,
     search_steamgriddb_games, set_game_cover, set_game_icon,
 };
+use commands::umu::{get_umu_status, install_umu};
 use commands::wine_tools::launch_wine_tool;
 use commands::winetricks::{
     install_winetricks_verbs, list_all_winetricks_verbs, list_installed_winetricks_verbs,
@@ -181,7 +182,9 @@ pub fn run() {
             get_game_icon,
             remove_game_icon,
             get_github_config,
-            save_github_config
+            save_github_config,
+            get_umu_status,
+            install_umu
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

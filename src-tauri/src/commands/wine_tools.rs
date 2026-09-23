@@ -1,10 +1,9 @@
-use std::path::PathBuf;
 use std::process::Stdio;
 
-use tauri::State;
+use tauri::{AppHandle, State};
 
-use crate::commands::games::steer_profile_to_steamuser;
-use crate::commands::runners::{find_runner, runner_command, wine_binary};
+use crate::commands::github::read_token;
+use crate::commands::runners::{find_runner, prefix_command};
 use crate::config::ConfigState;
 
 /// Wine's own built-in GUI utilities — the same set PortProton, Lutris and
@@ -14,9 +13,10 @@ use crate::config::ConfigState;
 /// no on-disk exe required — which matters here because not every runner
 /// ships a same-named binary next to `wine` (a plain Wine build does for some
 /// of these, e.g. `winecfg`/`winefile`, but Proton runners generally don't).
-/// So this always goes through the runner's own `wine`/`wine64` binary rather
-/// than looking for a matching binary alongside it, the one path that works
-/// uniformly across both runner kinds.
+/// So this always goes through `prefix_command` (umu-run or the runner's own
+/// `wine`/`wine64`, both of which resolve a bare name like this as a builtin)
+/// rather than looking for a matching binary alongside it, the one path that
+/// works uniformly across both runner kinds.
 fn tool_arg(tool: &str) -> Result<&'static str, String> {
     match tool {
         "winecfg" => Ok("winecfg"),
@@ -35,6 +35,7 @@ fn tool_arg(tool: &str) -> Result<&'static str, String> {
 /// of.
 #[tauri::command]
 pub async fn launch_wine_tool(
+    app: AppHandle,
     state: State<'_, ConfigState>,
     prefix_path: String,
     runner_id: String,
@@ -48,17 +49,11 @@ pub async fn launch_wine_tool(
             .map_err(|_| "Configuration is locked".to_string())?;
         config.runners_dir.clone()
     };
+    let token = read_token(&state)?;
 
     let runner = find_runner(&runners_dir, &runner_id)?;
-    let wine = wine_binary(&runner.path)?;
-    let prefix = PathBuf::from(&prefix_path);
-
-    // Must run before wineboot's first initialization of this prefix (see
-    // `steer_profile_to_steamuser`), which any of these tools can trigger
-    // themselves on a fresh, still-uninitialized prefix.
-    steer_profile_to_steamuser(&prefix)?;
-
-    runner_command(&wine, [("WINEPREFIX", prefix_path.as_str())])
+    prefix_command(&app, token.as_deref(), &runner, &prefix_path)
+        .await?
         .arg(arg)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
