@@ -25,6 +25,7 @@ export interface Game {
   cover_url: string | null;
   steamgriddb_icon_grid_id: number | null;
   steamgriddb_icon_url: string | null;
+  overrides: GameOverrides;
 }
 
 export interface GameInput {
@@ -34,6 +35,32 @@ export interface GameInput {
   runner_id: string;
   env_vars: Record<string, string>;
   launch_args: string;
+  overrides: GameOverrides;
+}
+
+// Per-game deviations from the global MangoHud/performance settings; `null`
+// inherits the global value — see `GameOverrides` in models.rs.
+export interface GameOverrides {
+  mangohud_enabled: boolean | null;
+  gamemode_enabled: boolean | null;
+  vkbasalt: VkBasaltSettings | null;
+  gamescope: GamescopeSettings | null;
+}
+
+export interface VkBasaltSettings {
+  enabled: boolean;
+  sharpen: boolean;
+  sharpness: number;
+  smaa: boolean;
+  deband: boolean;
+}
+
+export interface GamescopeSettings {
+  enabled: boolean;
+  width: number | null;
+  height: number | null;
+  fps_limit: number | null;
+  fullscreen: boolean;
 }
 
 // An .exe shortcut found on the Desktop/Start Menu right after an

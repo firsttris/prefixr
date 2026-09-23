@@ -209,7 +209,8 @@
       <h2>MangoHud-Overlay</h2>
       <p class="hint">
         Zeigt FPS, Auslastung und Temperaturen direkt im Spiel an — die Einstellungen gelten für
-        alle Spiele. Setzt voraus, dass MangoHud auf deinem System installiert ist.
+        alle Spiele, ein-/ausschalten lässt es sich aber auch pro Spiel. Setzt voraus, dass
+        MangoHud auf deinem System installiert ist.
       </p>
     </div>
     <label class="switch">

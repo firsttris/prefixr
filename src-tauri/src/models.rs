@@ -76,6 +76,11 @@ pub struct Game {
     /// `commands::steamgriddb`.
     #[serde(default)]
     pub steamgriddb_icon_url: Option<String>,
+    /// Per-game deviations from the global MangoHud/performance settings.
+    /// Defaults to "inherit everything", so games from older configs behave
+    /// exactly as before.
+    #[serde(default)]
+    pub overrides: GameOverrides,
 }
 
 /// Payload for `add_game`; the id is assigned by the backend.
@@ -89,6 +94,80 @@ pub struct GameInput {
     pub env_vars: HashMap<String, String>,
     #[serde(default)]
     pub launch_args: String,
+    #[serde(default)]
+    pub overrides: GameOverrides,
+}
+
+/// Per-game overrides layered over the global `MangoHudConfig` and
+/// `PerformanceConfig` at launch — see `GameOverrides::apply`. Every field
+/// is `None` to inherit the global setting. vkBasalt and gamescope are
+/// overridden as a whole block rather than field by field: a global
+/// `gamescope_width: None` already means "native", so per-field options
+/// couldn't tell "inherit the width" apart from "explicitly no width".
+/// MangoHud only gets an on/off switch here — its layout is a matter of
+/// taste, not of the game, so it stays global.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct GameOverrides {
+    #[serde(default)]
+    pub mangohud_enabled: Option<bool>,
+    #[serde(default)]
+    pub gamemode_enabled: Option<bool>,
+    #[serde(default)]
+    pub vkbasalt: Option<VkBasaltSettings>,
+    #[serde(default)]
+    pub gamescope: Option<GamescopeSettings>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct VkBasaltSettings {
+    pub enabled: bool,
+    pub sharpen: bool,
+    pub sharpness: f32,
+    pub smaa: bool,
+    pub deband: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct GamescopeSettings {
+    pub enabled: bool,
+    #[serde(default)]
+    pub width: Option<u32>,
+    #[serde(default)]
+    pub height: Option<u32>,
+    #[serde(default)]
+    pub fps_limit: Option<u32>,
+    #[serde(default)]
+    pub fullscreen: bool,
+}
+
+impl GameOverrides {
+    /// Writes this game's overrides into copies of the global settings,
+    /// leaving everything it doesn't override untouched.
+    pub fn apply(&self, mangohud: &mut MangoHudConfig, performance: &mut PerformanceConfig) {
+        if let Some(enabled) = self.mangohud_enabled {
+            mangohud.enabled = enabled;
+        }
+        if let Some(enabled) = self.gamemode_enabled {
+            performance.gamemode_enabled = enabled;
+        }
+        if let Some(vkbasalt) = &self.vkbasalt {
+            performance.vkbasalt_enabled = vkbasalt.enabled;
+            performance.vkbasalt_sharpen = vkbasalt.sharpen;
+            performance.vkbasalt_sharpness = vkbasalt.sharpness;
+            performance.vkbasalt_smaa = vkbasalt.smaa;
+            performance.vkbasalt_deband = vkbasalt.deband;
+        }
+        if let Some(gamescope) = &self.gamescope {
+            performance.gamescope_enabled = gamescope.enabled;
+            performance.gamescope_width = gamescope.width;
+            performance.gamescope_height = gamescope.height;
+            performance.gamescope_fps_limit = gamescope.fps_limit;
+            performance.gamescope_fullscreen = gamescope.fullscreen;
+        }
+    }
 }
 
 /// Global MangoHud (the in-game performance overlay) settings, applied to
@@ -247,5 +326,77 @@ impl Default for MangoHudConfig {
             show_resolution: false,
             horizontal: false,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn empty_overrides_keep_global_settings() {
+        let mut mangohud = MangoHudConfig {
+            enabled: true,
+            ..MangoHudConfig::default()
+        };
+        let mut performance = PerformanceConfig {
+            gamemode_enabled: true,
+            gamescope_enabled: true,
+            gamescope_width: Some(1920),
+            ..PerformanceConfig::default()
+        };
+        GameOverrides::default().apply(&mut mangohud, &mut performance);
+        assert!(mangohud.enabled);
+        assert!(performance.gamemode_enabled);
+        assert!(performance.gamescope_enabled);
+        assert_eq!(performance.gamescope_width, Some(1920));
+    }
+
+    #[test]
+    fn overrides_replace_only_their_own_settings() {
+        let mut mangohud = MangoHudConfig {
+            enabled: true,
+            ..MangoHudConfig::default()
+        };
+        let mut performance = PerformanceConfig {
+            gamemode_enabled: true,
+            vkbasalt_enabled: true,
+            gamescope_enabled: true,
+            gamescope_width: Some(1920),
+            gamescope_height: Some(1080),
+            ..PerformanceConfig::default()
+        };
+        let overrides = GameOverrides {
+            mangohud_enabled: Some(false),
+            gamemode_enabled: None,
+            vkbasalt: None,
+            gamescope: Some(GamescopeSettings {
+                enabled: true,
+                width: Some(1280),
+                height: None,
+                fps_limit: Some(40),
+                fullscreen: true,
+            }),
+        };
+        overrides.apply(&mut mangohud, &mut performance);
+        assert!(!mangohud.enabled);
+        assert!(performance.gamemode_enabled);
+        assert!(performance.vkbasalt_enabled);
+        assert_eq!(performance.gamescope_width, Some(1280));
+        // The gamescope block is replaced as a whole, so the global height
+        // doesn't leak through.
+        assert_eq!(performance.gamescope_height, None);
+        assert_eq!(performance.gamescope_fps_limit, Some(40));
+        assert!(performance.gamescope_fullscreen);
+    }
+
+    #[test]
+    fn games_without_overrides_deserialize() {
+        let game: Game = serde_json::from_str(
+            r#"{"id":"00000000-0000-0000-0000-000000000000","name":"x","exe_path":"/x.exe","prefix_path":"/p","runner_id":"r"}"#,
+        )
+        .unwrap();
+        assert!(game.overrides.mangohud_enabled.is_none());
+        assert!(game.overrides.gamescope.is_none());
     }
 }

@@ -8,13 +8,16 @@ use crate::commands::games::command_on_path;
 use crate::config::{save_config, ConfigState};
 use crate::models::PerformanceConfig;
 
-fn vkbasalt_conf_path(app: &AppHandle) -> Result<PathBuf, String> {
+/// One file per game, since vkBasalt settings can be overridden per game
+/// (see `GameOverrides`) — a shared file would let a second game's launch
+/// rewrite the effects of one that's still running.
+pub(crate) fn vkbasalt_conf_path(app: &AppHandle, game_id: &str) -> Result<PathBuf, String> {
     Ok(app
         .path()
         .app_data_dir()
         .map_err(|e| format!("Could not resolve data directory: {e}"))?
         .join("vkbasalt")
-        .join("vkBasalt.conf"))
+        .join(format!("{game_id}.conf")))
 }
 
 /// Builds a vkBasalt.conf (see https://github.com/DadSchoorse/vkBasalt) from
@@ -55,12 +58,16 @@ fn render_vkbasalt_conf(config: &PerformanceConfig) -> String {
     lines.join("\n") + "\n"
 }
 
-/// Writes the app's own `vkBasalt.conf` from the given settings and returns
+/// Writes this game's `vkBasalt.conf` from the given settings and returns
 /// its path, for `launch_game` to point `VKBASALT_CONFIG_FILE` at.
 /// Regenerated on every launch — same rationale as
 /// `mangohud::ensure_mangohud_conf`.
-pub fn ensure_vkbasalt_conf(app: &AppHandle, config: &PerformanceConfig) -> Result<PathBuf, String> {
-    let path = vkbasalt_conf_path(app)?;
+pub fn ensure_vkbasalt_conf(
+    app: &AppHandle,
+    game_id: &str,
+    config: &PerformanceConfig,
+) -> Result<PathBuf, String> {
+    let path = vkbasalt_conf_path(app, game_id)?;
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
             .map_err(|e| format!("Could not create {}: {e}", parent.display()))?;

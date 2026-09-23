@@ -15,7 +15,7 @@ use crate::commands::github::read_token;
 use crate::commands::graphics_layers::{ensure_directx_layer_cache, ensure_wine_mono_msi};
 use crate::commands::icons::extract_icon_data_url;
 use crate::commands::mangohud::ensure_mangohud_conf;
-use crate::commands::performance::ensure_vkbasalt_conf;
+use crate::commands::performance::{ensure_vkbasalt_conf, vkbasalt_conf_path};
 use crate::commands::runners::{
     find_runner, prefix_command, runner_command, wine_binary, wineserver_binary,
 };
@@ -408,6 +408,7 @@ pub fn add_game(
         cover_url: None,
         steamgriddb_icon_grid_id: None,
         steamgriddb_icon_url: None,
+        overrides: game.overrides,
     };
 
     let mut config = state
@@ -443,6 +444,7 @@ pub fn update_game(
     existing.runner_id = game.runner_id;
     existing.env_vars = game.env_vars;
     existing.launch_args = game.launch_args;
+    existing.overrides = game.overrides;
     let updated = existing.clone();
 
     save_config(&app, &config)?;
@@ -462,6 +464,9 @@ pub fn remove_game(app: AppHandle, state: State<ConfigState>, id: String) -> Res
 
     config.games.retain(|g| g.id != game_id);
     save_config(&app, &config)?;
+    if let Ok(path) = vkbasalt_conf_path(&app, &id) {
+        let _ = fs::remove_file(path);
+    }
     Ok(())
 }
 
@@ -816,7 +821,7 @@ async fn run_game(
 ) -> Result<(), String> {
     let game_id = Uuid::parse_str(id).map_err(|e| format!("Invalid game id: {e}"))?;
 
-    let (game, runners_dir, mangohud, performance) = {
+    let (game, runners_dir, mut mangohud, mut performance) = {
         let config = state
             .lock()
             .map_err(|_| "Configuration is locked".to_string())?;
@@ -833,6 +838,7 @@ async fn run_game(
             config.performance.clone(),
         )
     };
+    game.overrides.apply(&mut mangohud, &mut performance);
     let token = read_token(state)?;
 
     let runner = find_runner(&runners_dir, &game.runner_id)?;
@@ -885,7 +891,7 @@ async fn run_game(
         env.push(("LD_PRELOAD".to_string(), "libgamemodeauto.so.0".to_string()));
     }
     if performance.vkbasalt_enabled {
-        let vkbasalt_conf = ensure_vkbasalt_conf(app, &performance)?;
+        let vkbasalt_conf = ensure_vkbasalt_conf(app, id, &performance)?;
         env.push(("ENABLE_VKBASALT".to_string(), "1".to_string()));
         env.push((
             "VKBASALT_CONFIG_FILE".to_string(),

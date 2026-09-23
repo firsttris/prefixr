@@ -126,8 +126,9 @@
   <div class="section">
     <h2>Performance</h2>
     <p class="hint">
-      Systemweite Optimierungen, gelten für alle Spiele. Setzt jeweils voraus, dass das
-      zugrunde liegende Tool auf deinem System installiert ist.
+      Systemweite Optimierungen, gelten für alle Spiele. GameMode, Gamescope und vkBasalt
+      lassen sich pro Spiel überschreiben (Spiel bearbeiten → „Leistung &amp; Overlay“). Setzt
+      jeweils voraus, dass das zugrunde liegende Tool auf deinem System installiert ist.
     </p>
 
     <div class="toggle-list">

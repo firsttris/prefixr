@@ -4,8 +4,11 @@
   import { runners, refreshRunners } from "$lib/stores/runners";
   import { prefixes, refreshPrefixes } from "$lib/stores/prefixes";
   import { addGame, updateGame } from "$lib/stores/games";
+  import { performanceConfig, refreshPerformanceConfig } from "$lib/stores/performance";
+  import { mangoHudConfig, refreshMangoHudConfig } from "$lib/stores/mangohud";
   import { prettifyExeName } from "$lib/gameName";
-  import type { Game, GameInput } from "$lib/types";
+  import InfoIcon from "$lib/components/InfoIcon.svelte";
+  import type { Game, GameInput, GamescopeSettings, VkBasaltSettings } from "$lib/types";
 
   let {
     existingGame,
@@ -40,6 +43,7 @@
     runnerId: existingGame?.runner_id ?? initialRunnerId ?? "",
     envVarsText: existingGame ? formatEnvVars(existingGame.env_vars) : "",
     launchArgs: existingGame?.launch_args ?? "",
+    overrides: existingGame?.overrides,
   }));
 
   let name = $state(defaults.name);
@@ -48,13 +52,115 @@
   let runnerId = $state(defaults.runnerId);
   let envVarsText = $state(defaults.envVarsText);
   let launchArgs = $state(defaults.launchArgs);
+  // Per-game overrides; `null` inherits the global setting. The toggles
+  // below always show the effective value; changing one (or one of the
+  // vkBasalt/gamescope details) stores an override, which is dropped again
+  // as soon as it matches the global setting — see `setMangohud` etc.
+  let mangohudOverride = $state<boolean | null>(defaults.overrides?.mangohud_enabled ?? null);
+  let gamemodeOverride = $state<boolean | null>(defaults.overrides?.gamemode_enabled ?? null);
+  let vkbasalt = $state<VkBasaltSettings | null>(
+    defaults.overrides?.vkbasalt ? { ...defaults.overrides.vkbasalt } : null,
+  );
+  let gamescope = $state<GamescopeSettings | null>(
+    defaults.overrides?.gamescope ? { ...defaults.overrides.gamescope } : null,
+  );
   let error = $state("");
   let submitting = $state(false);
+
+  const mangohudOn = $derived(mangohudOverride ?? $mangoHudConfig?.enabled ?? false);
+  const gamemodeOn = $derived(gamemodeOverride ?? $performanceConfig?.gamemode_enabled ?? false);
+  const vkbasaltShown = $derived(vkbasalt ?? globalVkbasalt());
+  const gamescopeShown = $derived(gamescope ?? globalGamescope());
+  const overrideCount = $derived(
+    [mangohudOverride, gamemodeOverride, vkbasalt, gamescope].filter((o) => o !== null).length,
+  );
+  // Starts expanded if the game already has overrides. Bound two-way rather
+  // than passed as `open={...}`: Svelte re-applies every attribute of the
+  // form in one shared effect, so a one-way value would snap the section
+  // back to it on every toggle click.
+  let overridesOpen = $state(untrack(() => overrideCount > 0));
 
   onMount(() => {
     refreshRunners();
     refreshPrefixes();
+    refreshPerformanceConfig();
+    refreshMangoHudConfig();
   });
+
+  function globalVkbasalt(): VkBasaltSettings {
+    const global = $performanceConfig;
+    return {
+      enabled: global?.vkbasalt_enabled ?? false,
+      sharpen: global?.vkbasalt_sharpen ?? true,
+      sharpness: global?.vkbasalt_sharpness ?? 0.4,
+      smaa: global?.vkbasalt_smaa ?? false,
+      deband: global?.vkbasalt_deband ?? false,
+    };
+  }
+
+  function globalGamescope(): GamescopeSettings {
+    const global = $performanceConfig;
+    return {
+      enabled: global?.gamescope_enabled ?? false,
+      width: global?.gamescope_width ?? null,
+      height: global?.gamescope_height ?? null,
+      fps_limit: global?.gamescope_fps_limit ?? null,
+      fullscreen: global?.gamescope_fullscreen ?? false,
+    };
+  }
+
+  function setMangohud(enabled: boolean) {
+    mangohudOverride = enabled === $mangoHudConfig?.enabled ? null : enabled;
+  }
+
+  function setGamemode(enabled: boolean) {
+    gamemodeOverride = enabled === $performanceConfig?.gamemode_enabled ? null : enabled;
+  }
+
+  // While both are switched off, the remaining values have no effect, so
+  // they don't count as a difference.
+  function sameVkbasalt(a: VkBasaltSettings, b: VkBasaltSettings): boolean {
+    if (!a.enabled && !b.enabled) return true;
+    return (
+      a.enabled === b.enabled &&
+      a.sharpen === b.sharpen &&
+      Math.abs(a.sharpness - b.sharpness) < 1e-6 &&
+      a.smaa === b.smaa &&
+      a.deband === b.deband
+    );
+  }
+
+  function sameGamescope(a: GamescopeSettings, b: GamescopeSettings): boolean {
+    if (!a.enabled && !b.enabled) return true;
+    return (
+      a.enabled === b.enabled &&
+      a.width === b.width &&
+      a.height === b.height &&
+      a.fps_limit === b.fps_limit &&
+      a.fullscreen === b.fullscreen
+    );
+  }
+
+  function editVkbasalt(patch: Partial<VkBasaltSettings>) {
+    const next = { ...vkbasaltShown, ...patch };
+    vkbasalt = sameVkbasalt(next, globalVkbasalt()) ? null : next;
+  }
+
+  function editGamescope(patch: Partial<GamescopeSettings>) {
+    const next = { ...gamescopeShown, ...patch };
+    gamescope = sameGamescope(next, globalGamescope()) ? null : next;
+  }
+
+  // Emptied number inputs read as NaN; 0 is no valid size or limit either.
+  function numberOrNull(input: HTMLInputElement): number | null {
+    const value = input.valueAsNumber;
+    return Number.isFinite(value) && value > 0 ? value : null;
+  }
+
+  function resetTitle(globalOn: boolean | undefined): string {
+    if (globalOn === undefined) return "Globale Einstellung übernehmen";
+    return `Globale Einstellung übernehmen (${globalOn ? "an" : "aus"})`;
+  }
 
   async function pickExe() {
     const selected = await open({
@@ -94,6 +200,12 @@
       runner_id: runnerId,
       env_vars: parseEnvVars(envVarsText),
       launch_args: launchArgs.trim(),
+      overrides: {
+        mangohud_enabled: mangohudOverride,
+        gamemode_enabled: gamemodeOverride,
+        vkbasalt,
+        gamescope,
+      },
     };
     try {
       if (existingGame) {
@@ -157,6 +269,235 @@
     <input placeholder="z. B. --launcher-skip -dx11" bind:value={launchArgs} />
   </label>
 
+  <details class="overrides" bind:open={overridesOpen}>
+    <summary>
+      Leistung &amp; Overlay
+      {#if overrideCount > 0}
+        <span class="badge">{overrideCount} angepasst</span>
+      {/if}
+    </summary>
+    <p class="hint">
+      Standardmäßig gelten die globalen Einstellungen. Hier kannst du sie nur für dieses Spiel
+      überschreiben.
+    </p>
+
+    <div class="toggle-list">
+      <div class="toggle-row" class:overridden={mangohudOverride !== null}>
+        <div>
+          <span class="toggle-label">MangoHud</span>
+          <p class="toggle-desc">Zeigt FPS, Auslastung und Temperaturen direkt im Spiel an.</p>
+        </div>
+        <div class="toggle-controls">
+          {#if mangohudOverride !== null}
+            <button
+              type="button"
+              class="reset"
+              title={resetTitle($mangoHudConfig?.enabled)}
+              onclick={() => (mangohudOverride = null)}
+            >
+              Zurücksetzen
+            </button>
+          {/if}
+          <label class="switch">
+            <input
+              type="checkbox"
+              checked={mangohudOn}
+              onchange={(e) => setMangohud(e.currentTarget.checked)}
+            />
+            <span class="track"><span class="thumb"></span></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="toggle-row" class:overridden={gamemodeOverride !== null}>
+        <div>
+          <span class="toggle-label">
+            GameMode
+            <InfoIcon
+              text="Empfehlung: Wenn installiert, ruhig aktivieren — bringt oft spürbar mehr Leistung, besonders auf Laptops oder mit Energiesparmodus. Kein Nachteil, wenn GameMode fehlt. Läuft gerade ein konkurrierender Scheduler-Daemon (z. B. ananicy-cpp, scx), wird GameMode automatisch übersprungen und stattdessen auf das Performance-Energieprofil ausgewichen, um Konflikte um CPU-Priorität zu vermeiden."
+            />
+          </span>
+          <p class="toggle-desc">Optimiert CPU-Takt und Priorität, solange das Spiel läuft.</p>
+        </div>
+        <div class="toggle-controls">
+          {#if gamemodeOverride !== null}
+            <button
+              type="button"
+              class="reset"
+              title={resetTitle($performanceConfig?.gamemode_enabled)}
+              onclick={() => (gamemodeOverride = null)}
+            >
+              Zurücksetzen
+            </button>
+          {/if}
+          <label class="switch">
+            <input
+              type="checkbox"
+              checked={gamemodeOn}
+              onchange={(e) => setGamemode(e.currentTarget.checked)}
+            />
+            <span class="track"><span class="thumb"></span></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="toggle-group" class:overridden={gamescope !== null}>
+        <div class="toggle-row">
+          <div>
+            <span class="toggle-label">
+              Gamescope
+              <InfoIcon
+                text="Empfehlung: Für Handhelds/TV-Setups oder um Auflösung und FPS-Limit unabhängig vom Spiel zu erzwingen. Braucht das gamescope-Paket; ohne das passiert einfach nichts. Wird übersprungen, wenn prefixr selbst schon in einer Gamescope-Session läuft."
+              />
+            </span>
+            <p class="toggle-desc">
+              Startet das Spiel in einer eigenen, verschachtelten Compositor-Session.
+            </p>
+          </div>
+          <div class="toggle-controls">
+            {#if gamescope !== null}
+              <button
+                type="button"
+                class="reset"
+                title={resetTitle($performanceConfig?.gamescope_enabled)}
+                onclick={() => (gamescope = null)}
+              >
+                Zurücksetzen
+              </button>
+            {/if}
+            <label class="switch">
+              <input
+                type="checkbox"
+                checked={gamescopeShown.enabled}
+                onchange={(e) => editGamescope({ enabled: e.currentTarget.checked })}
+              />
+              <span class="track"><span class="thumb"></span></span>
+            </label>
+          </div>
+        </div>
+        {#if gamescopeShown.enabled}
+          <div class="details">
+            <div class="detail-grid">
+              <label>
+                Breite (px)
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="native"
+                  value={gamescopeShown.width ?? ""}
+                  oninput={(e) => editGamescope({ width: numberOrNull(e.currentTarget) })}
+                />
+              </label>
+              <label>
+                Höhe (px)
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="native"
+                  value={gamescopeShown.height ?? ""}
+                  oninput={(e) => editGamescope({ height: numberOrNull(e.currentTarget) })}
+                />
+              </label>
+              <label>
+                FPS-Limit
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="unbegrenzt"
+                  value={gamescopeShown.fps_limit ?? ""}
+                  oninput={(e) => editGamescope({ fps_limit: numberOrNull(e.currentTarget) })}
+                />
+              </label>
+            </div>
+            <label class="check">
+              <input
+                type="checkbox"
+                checked={gamescopeShown.fullscreen}
+                onchange={(e) => editGamescope({ fullscreen: e.currentTarget.checked })}
+              />
+              Vollbild erzwingen
+            </label>
+          </div>
+        {/if}
+      </div>
+
+      <div class="toggle-group" class:overridden={vkbasalt !== null}>
+        <div class="toggle-row">
+          <div>
+            <span class="toggle-label">
+              vkBasalt
+              <InfoIcon
+                text="Empfehlung: Kostet immer etwas Leistung (zusätzlicher Bildbearbeitungsschritt) — nur aktivieren, wenn du GPU-Leistung übrig hast und dir das Ergebnis optisch wichtiger ist als die letzten FPS."
+              />
+            </span>
+            <p class="toggle-desc">Bildnachbearbeitung direkt im Spiel — kostet etwas Leistung.</p>
+          </div>
+          <div class="toggle-controls">
+            {#if vkbasalt !== null}
+              <button
+                type="button"
+                class="reset"
+                title={resetTitle($performanceConfig?.vkbasalt_enabled)}
+                onclick={() => (vkbasalt = null)}
+              >
+                Zurücksetzen
+              </button>
+            {/if}
+            <label class="switch">
+              <input
+                type="checkbox"
+                checked={vkbasaltShown.enabled}
+                onchange={(e) => editVkbasalt({ enabled: e.currentTarget.checked })}
+              />
+              <span class="track"><span class="thumb"></span></span>
+            </label>
+          </div>
+        </div>
+        {#if vkbasaltShown.enabled}
+          <div class="details">
+            <label class="check">
+              <input
+                type="checkbox"
+                checked={vkbasaltShown.sharpen}
+                onchange={(e) => editVkbasalt({ sharpen: e.currentTarget.checked })}
+              />
+              Schärfen (CAS)
+            </label>
+            {#if vkbasaltShown.sharpen}
+              <label>
+                Stärke: {vkbasaltShown.sharpness.toFixed(2)}
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={vkbasaltShown.sharpness}
+                  oninput={(e) => editVkbasalt({ sharpness: e.currentTarget.valueAsNumber })}
+                />
+              </label>
+            {/if}
+            <label class="check">
+              <input
+                type="checkbox"
+                checked={vkbasaltShown.smaa}
+                onchange={(e) => editVkbasalt({ smaa: e.currentTarget.checked })}
+              />
+              Kantenglättung (SMAA)
+            </label>
+            <label class="check">
+              <input
+                type="checkbox"
+                checked={vkbasaltShown.deband}
+                onchange={(e) => editVkbasalt({ deband: e.currentTarget.checked })}
+              />
+              Farbverläufe glätten (Deband)
+            </label>
+          </div>
+        {/if}
+      </div>
+    </div>
+  </details>
+
   {#if error}
     <p class="error">{error}</p>
   {/if}
@@ -198,5 +539,165 @@
   .hint {
     color: var(--text-muted);
     font-size: 0.85em;
+  }
+
+  .overrides {
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.6em 0.8em;
+  }
+
+  .overrides[open] {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8em;
+  }
+
+  summary {
+    cursor: pointer;
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 0.9em;
+  }
+
+  .badge {
+    margin-left: 0.4em;
+    padding: 0.1em 0.5em;
+    border-radius: 999px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.8em;
+    font-weight: 600;
+  }
+
+  .overrides .hint {
+    margin: 0;
+  }
+
+  .toggle-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6em;
+  }
+
+  .toggle-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1em;
+    padding: 0.6em 0.8em;
+    border-radius: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+  }
+
+  .toggle-group {
+    border-radius: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+  }
+
+  .toggle-group .toggle-row {
+    border: none;
+    background: none;
+  }
+
+  .toggle-row.overridden,
+  .toggle-group.overridden {
+    border-color: var(--accent);
+  }
+
+  .toggle-label {
+    font-weight: 600;
+    color: var(--text);
+    display: block;
+  }
+
+  .toggle-desc {
+    color: var(--text-muted);
+    font-size: 0.82em;
+    margin: 0.25em 0 0;
+  }
+
+  .toggle-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+    flex-shrink: 0;
+  }
+
+  .reset {
+    padding: 0.25em 0.6em;
+    font-size: 0.8em;
+  }
+
+  .switch {
+    flex-direction: row;
+    align-items: center;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .switch input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+  }
+
+  .track {
+    width: 44px;
+    height: 24px;
+    border-radius: 999px;
+    background: var(--border);
+    position: relative;
+    transition: background-color 0.15s;
+  }
+
+  .switch input:checked + .track {
+    background: var(--accent);
+  }
+
+  .thumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.15s;
+  }
+
+  .switch input:checked + .track .thumb {
+    transform: translateX(20px);
+  }
+
+  .details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6em;
+    padding: 0 0.8em 0.8em;
+  }
+
+  .detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8em, 1fr));
+    gap: 0.6em;
+  }
+
+  .detail-grid input {
+    width: 100%;
+  }
+
+  .check {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5em;
+  }
+
+  .check input {
+    padding: 0;
   }
 </style>
