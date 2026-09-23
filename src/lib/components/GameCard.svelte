@@ -229,29 +229,52 @@
     </div>
 
     <div class="overlay">
-      <div class="info">
-        <h3 title={game.name}>{game.name}</h3>
-        <span class="runner">{game.runner_id}</span>
+      <div class="bottom-row">
+        <div class="info">
+          <h3 title={game.name}>{game.name}</h3>
+          <span class="runner">{game.runner_id}</span>
+        </div>
+
+        <button
+          type="button"
+          class="play-btn"
+          class:running={runState?.running}
+          onclick={runState?.running ? onKill : onLaunch}
+          disabled={runState?.initializing}
+          aria-label={runState?.running
+            ? "Beenden (Prozess killen)"
+            : runState?.initializing
+              ? "Initialisiert…"
+              : "Starten"}
+          title={runState?.running
+            ? "Beenden (Prozess killen)"
+            : runState?.initializing
+              ? "Initialisiert…"
+              : "Starten"}
+        >
+          {#if runState?.initializing}
+            <svg class="play-icon spin" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <circle
+                cx="10"
+                cy="10"
+                r="7"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-dasharray="24 20"
+              />
+            </svg>
+          {:else if runState?.running}
+            <svg class="play-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <rect x="6" y="6" width="8" height="8" rx="1.5" fill="currentColor" />
+            </svg>
+          {:else}
+            <svg class="play-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <path d="M7.2 5.3v9.4l7.6-4.7-7.6-4.7z" fill="currentColor" />
+            </svg>
+          {/if}
+        </button>
       </div>
-
-      <button
-        type="button"
-        class="primary start"
-        onclick={onLaunch}
-        disabled={runState?.running || runState?.initializing}
-      >
-        {#if runState?.initializing}
-          Initialisiere…
-        {:else if runState?.running}
-          Läuft…
-        {:else}
-          ▶ Start
-        {/if}
-      </button>
-
-      {#if runState?.running}
-        <button type="button" class="kill" onclick={onKill}> Beenden (Prozess killen) </button>
-      {/if}
     </div>
   </div>
 
@@ -516,20 +539,66 @@
     margin: 0.25em 0.4em;
   }
 
-  .start {
-    margin: 0;
+  .bottom-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.6em;
   }
 
-  .kill {
-    margin: 0;
-    background: rgba(239, 83, 80, 0.85);
-    border-color: transparent;
+  .bottom-row .info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* Play/stop control: a translucent glass circle, not a solid CTA bar,
+     so the cover art still shows through underneath it. */
+  .play-btn {
+    flex-shrink: 0;
+    width: 2.9em;
+    height: 2.9em;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(20, 20, 24, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(8px);
     color: #fff;
-    font-size: 0.85em;
+    transition:
+      background-color 0.15s,
+      border-color 0.15s;
   }
 
-  .kill:hover:not(:disabled) {
+  .play-btn:hover:not(:disabled) {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .play-btn.running {
+    background: rgba(239, 83, 80, 0.5);
+    border-color: rgba(239, 83, 80, 0.8);
+  }
+
+  .play-btn.running:hover:not(:disabled) {
+    background: var(--danger);
     border-color: var(--danger);
+  }
+
+  .play-icon {
+    width: 1.5em;
+    height: 1.5em;
+  }
+
+  .play-icon.spin {
+    animation: spin 0.9s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
 
   .toast {
