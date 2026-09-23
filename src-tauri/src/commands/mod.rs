@@ -1,5 +1,6 @@
 pub mod games;
 pub mod github;
+pub mod graphics;
 pub mod graphics_layers;
 pub mod icons;
 pub mod mangohud;

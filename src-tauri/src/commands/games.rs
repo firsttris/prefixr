@@ -14,8 +14,8 @@ use uuid::Uuid;
 use crate::commands::github::read_token;
 use crate::commands::graphics_layers::{ensure_directx_layer_cache, ensure_wine_mono_msi};
 use crate::commands::icons::extract_icon_data_url;
-use crate::commands::mangohud::ensure_mangohud_conf;
-use crate::commands::performance::{ensure_vkbasalt_conf, vkbasalt_conf_path};
+use crate::commands::graphics::{ensure_vkbasalt_conf, vkbasalt_conf_path};
+use crate::commands::mangohud::{ensure_mangohud_conf, mangohud_conf_path};
 use crate::commands::runners::{
     find_runner, prefix_command, runner_command, wine_binary, wineserver_binary,
 };
@@ -464,7 +464,10 @@ pub fn remove_game(app: AppHandle, state: State<ConfigState>, id: String) -> Res
 
     config.games.retain(|g| g.id != game_id);
     save_config(&app, &config)?;
-    if let Ok(path) = vkbasalt_conf_path(&app, &id) {
+    for path in [vkbasalt_conf_path(&app, &id), mangohud_conf_path(&app, &id)]
+        .into_iter()
+        .flatten()
+    {
         let _ = fs::remove_file(path);
     }
     Ok(())
@@ -821,7 +824,7 @@ async fn run_game(
 ) -> Result<(), String> {
     let game_id = Uuid::parse_str(id).map_err(|e| format!("Invalid game id: {e}"))?;
 
-    let (game, runners_dir, mut mangohud, mut performance) = {
+    let (game, runners_dir, settings) = {
         let config = state
             .lock()
             .map_err(|_| "Configuration is locked".to_string())?;
@@ -831,14 +834,17 @@ async fn run_game(
             .find(|g| g.id == game_id)
             .cloned()
             .ok_or_else(|| format!("No game with id {id}"))?;
-        (
-            game,
-            config.runners_dir.clone(),
-            config.mangohud.clone(),
-            config.performance.clone(),
-        )
+        let settings = game.overrides.resolve(
+            &config.performance,
+            &config.graphics,
+            &config.mangohud,
+            &config.proton,
+        );
+        (game, config.runners_dir.clone(), settings)
     };
-    game.overrides.apply(&mut mangohud, &mut performance);
+    let performance = &settings.performance;
+    let graphics = &settings.graphics;
+    let mangohud = &settings.mangohud;
     let token = read_token(state)?;
 
     let runner = find_runner(&runners_dir, &game.runner_id)?;
@@ -874,7 +880,7 @@ async fn run_game(
     env.push(("WINEDLLOVERRIDES".to_string(), dll_overrides.join(";")));
 
     if mangohud.enabled {
-        let conf_path = ensure_mangohud_conf(app, &mangohud)?;
+        let conf_path = ensure_mangohud_conf(app, id, &mangohud.layout)?;
         env.push(("MANGOHUD".to_string(), "1".to_string()));
         env.push((
             "MANGOHUD_CONFIGFILE".to_string(),
@@ -890,8 +896,8 @@ async fn run_game(
     if performance.gamemode_enabled && !scheduler_conflict {
         env.push(("LD_PRELOAD".to_string(), "libgamemodeauto.so.0".to_string()));
     }
-    if performance.vkbasalt_enabled {
-        let vkbasalt_conf = ensure_vkbasalt_conf(app, id, &performance)?;
+    if graphics.vkbasalt.enabled {
+        let vkbasalt_conf = ensure_vkbasalt_conf(app, id, &graphics.vkbasalt)?;
         env.push(("ENABLE_VKBASALT".to_string(), "1".to_string()));
         env.push((
             "VKBASALT_CONFIG_FILE".to_string(),
@@ -901,7 +907,7 @@ async fn run_game(
     // Before the game's own env vars, so a hand-written entry for the same
     // variable still wins. Wine runners don't read these names at all.
     if runner.kind == RunnerKind::Proton {
-        env.extend(game.overrides.proton_env());
+        env.extend(settings.proton_env());
     }
     env.extend(game.env_vars.iter().map(|(k, v)| (k.clone(), v.clone())));
 
@@ -966,24 +972,24 @@ async fn run_game(
     // and everything else (wine, the other wrappers) runs inside it. Skipped
     // if we're already inside a gamescope session ourselves — nesting it
     // again is pointless and often broken.
-    let use_gamescope = performance.gamescope_enabled
+    let use_gamescope = graphics.gamescope.enabled
         && command_on_path("gamescope")
         && std::env::var_os("GAMESCOPE_WAYLAND_DISPLAY").is_none();
     if use_gamescope {
         let mut wrapped = vec!["gamescope".to_string()];
-        if let Some(width) = performance.gamescope_width {
+        if let Some(width) = graphics.gamescope.width {
             wrapped.push("-w".to_string());
             wrapped.push(width.to_string());
         }
-        if let Some(height) = performance.gamescope_height {
+        if let Some(height) = graphics.gamescope.height {
             wrapped.push("-h".to_string());
             wrapped.push(height.to_string());
         }
-        if let Some(fps) = performance.gamescope_fps_limit {
+        if let Some(fps) = graphics.gamescope.fps_limit {
             wrapped.push("-r".to_string());
             wrapped.push(fps.to_string());
         }
-        if performance.gamescope_fullscreen {
+        if graphics.gamescope.fullscreen {
             wrapped.push("-f".to_string());
         }
         wrapped.push("--".to_string());

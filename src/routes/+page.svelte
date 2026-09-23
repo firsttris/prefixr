@@ -4,8 +4,10 @@
   import GameForm from "$lib/components/GameForm.svelte";
   import RunnerList from "$lib/components/RunnerList.svelte";
   import PrefixManager from "$lib/components/PrefixManager.svelte";
-  import MangoHudSettings from "$lib/components/MangoHudSettings.svelte";
   import PerformanceSettings from "$lib/components/PerformanceSettings.svelte";
+  import GraphicsSettings from "$lib/components/GraphicsSettings.svelte";
+  import OverlaySettings from "$lib/components/OverlaySettings.svelte";
+  import ProtonSettings from "$lib/components/ProtonSettings.svelte";
   import SteamGridDbSettings from "$lib/components/SteamGridDbSettings.svelte";
   import ArtworkPicker from "$lib/components/ArtworkPicker.svelte";
   import InstallDialog from "$lib/components/InstallDialog.svelte";
@@ -20,9 +22,25 @@
   } from "$lib/stores/games";
   import type { Game } from "$lib/types";
 
-  let view = $state<"library" | "prefixes" | "runners" | "mangohud" | "performance" | "steamgriddb">(
-    "library",
-  );
+  type View =
+    | "library"
+    | "prefixes"
+    | "runners"
+    | "performance"
+    | "graphics"
+    | "overlay"
+    | "proton"
+    | "steamgriddb";
+  let view = $state<View>("library");
+
+  // The game settings categories: set globally here, overridable per game
+  // in the game dialog's tabs of the same names.
+  const SETTINGS_VIEWS: { view: View; label: string }[] = [
+    { view: "performance", label: "Leistung" },
+    { view: "graphics", label: "Bild" },
+    { view: "overlay", label: "Overlay" },
+    { view: "proton", label: "Proton" },
+  ];
   let editing = $state<Game | "new" | null>(null);
   let pickingArtworkFor = $state<Game | null>(null);
   let installingExePath = $state<string | null>(null);
@@ -78,22 +96,20 @@
     >
       Runner
     </button>
-    <button
-      type="button"
-      class="nav-item"
-      class:active={view === "mangohud"}
-      onclick={() => (view = "mangohud")}
-    >
-      MangoHud
-    </button>
-    <button
-      type="button"
-      class="nav-item"
-      class:active={view === "performance"}
-      onclick={() => (view = "performance")}
-    >
-      Performance
-    </button>
+    <div class="nav-group" title="Gilt für alle Spiele, pro Spiel überschreibbar">
+      Standard für alle Spiele
+    </div>
+    {#each SETTINGS_VIEWS as item (item.view)}
+      <button
+        type="button"
+        class="nav-item"
+        class:active={view === item.view}
+        onclick={() => (view = item.view)}
+      >
+        {item.label}
+      </button>
+    {/each}
+    <div class="nav-divider"></div>
     <button
       type="button"
       class="nav-item"
@@ -132,16 +148,14 @@
         <h1>Runner</h1>
       </div>
       <RunnerList />
-    {:else if view === "mangohud"}
-      <div class="page-header">
-        <h1>MangoHud</h1>
-      </div>
-      <MangoHudSettings />
     {:else if view === "performance"}
-      <div class="page-header">
-        <h1>Performance</h1>
-      </div>
       <PerformanceSettings />
+    {:else if view === "graphics"}
+      <GraphicsSettings />
+    {:else if view === "overlay"}
+      <OverlaySettings />
+    {:else if view === "proton"}
+      <ProtonSettings />
     {:else}
       <div class="page-header">
         <h1>SteamGridDB</h1>
@@ -151,7 +165,7 @@
   </main>
 </div>
 
-<Modal open={editing !== null} title={modalTitle} onClose={() => (editing = null)}>
+<Modal open={editing !== null} title={modalTitle} wide onClose={() => (editing = null)}>
   <GameForm existingGame={modalGame} onSuccess={() => (editing = null)} />
 </Modal>
 
@@ -211,6 +225,21 @@
   .nav-item:hover {
     background: var(--surface-raised);
     border-color: transparent;
+  }
+
+  .nav-group {
+    margin-top: 1em;
+    padding: 0.4em 0.8em 0.2em;
+    font-size: 0.72em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+  }
+
+  .nav-divider {
+    margin: 0.6em 0.8em;
+    border-top: 1px solid var(--border);
   }
 
   .nav-item.active {

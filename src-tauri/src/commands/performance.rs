@@ -1,81 +1,11 @@
 use std::fs;
-use std::path::PathBuf;
 
 use serde::Serialize;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, State};
 
 use crate::commands::games::command_on_path;
 use crate::config::{save_config, ConfigState};
 use crate::models::PerformanceConfig;
-
-/// One file per game, since vkBasalt settings can be overridden per game
-/// (see `GameOverrides`) — a shared file would let a second game's launch
-/// rewrite the effects of one that's still running.
-pub(crate) fn vkbasalt_conf_path(app: &AppHandle, game_id: &str) -> Result<PathBuf, String> {
-    Ok(app
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("Could not resolve data directory: {e}"))?
-        .join("vkbasalt")
-        .join(format!("{game_id}.conf")))
-}
-
-/// Builds a vkBasalt.conf (see https://github.com/DadSchoorse/vkBasalt) from
-/// the app's settings. Unlike MangoHud's boolean-by-presence format, vkBasalt
-/// needs an explicit `effects = ` chain (colon-separated, applied in that
-/// order) plus each active effect's own parameters — so, unlike
-/// `mangohud::render_conf`, this always writes the enabled effects' tuning
-/// values rather than just their presence.
-fn render_vkbasalt_conf(config: &PerformanceConfig) -> String {
-    let mut effects = Vec::new();
-    if config.vkbasalt_sharpen {
-        effects.push("cas");
-    }
-    if config.vkbasalt_smaa {
-        effects.push("smaa");
-    }
-    if config.vkbasalt_deband {
-        effects.push("deband");
-    }
-
-    let mut lines = vec![format!("effects = {}", effects.join(":"))];
-
-    if config.vkbasalt_sharpen {
-        lines.push(format!("casSharpness = {}", config.vkbasalt_sharpness));
-    }
-    if config.vkbasalt_smaa {
-        lines.push("smaaEdgeDetection = luma".to_string());
-        lines.push("smaaThreshold = 0.05".to_string());
-        lines.push("smaaMaxSearchSteps = 32".to_string());
-        lines.push("smaaMaxSearchStepsDiag = 16".to_string());
-        lines.push("smaaCornerRounding = 25".to_string());
-    }
-    if config.vkbasalt_deband {
-        lines.push("debandAvoidBanding = 3".to_string());
-    }
-
-    lines.push("enableOnLaunch = True".to_string());
-    lines.join("\n") + "\n"
-}
-
-/// Writes this game's `vkBasalt.conf` from the given settings and returns
-/// its path, for `launch_game` to point `VKBASALT_CONFIG_FILE` at.
-/// Regenerated on every launch — same rationale as
-/// `mangohud::ensure_mangohud_conf`.
-pub fn ensure_vkbasalt_conf(
-    app: &AppHandle,
-    game_id: &str,
-    config: &PerformanceConfig,
-) -> Result<PathBuf, String> {
-    let path = vkbasalt_conf_path(app, game_id)?;
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| format!("Could not create {}: {e}", parent.display()))?;
-    }
-    fs::write(&path, render_vkbasalt_conf(config))
-        .map_err(|e| format!("Could not write {}: {e}", path.display()))?;
-    Ok(path)
-}
 
 #[tauri::command]
 pub fn get_performance_config(state: State<ConfigState>) -> Result<PerformanceConfig, String> {

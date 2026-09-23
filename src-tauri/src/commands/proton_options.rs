@@ -1,11 +1,11 @@
 use std::fs;
 
 use serde::Serialize;
-use tauri::State;
+use tauri::{AppHandle, State};
 
 use crate::commands::runners::find_runner;
-use crate::config::ConfigState;
-use crate::models::RunnerKind;
+use crate::config::{save_config, ConfigState};
+use crate::models::{ProtonConfig, RunnerKind};
 
 /// One on/off option a Proton build's `proton` script reads from the
 /// environment. `env` is the variable to set; `aliases` are further names the
@@ -22,7 +22,7 @@ pub struct ProtonOption {
 /// offering them again as a raw switch would only create two places for the
 /// same thing.
 const MANAGED_ELSEWHERE: &[&str] = &[
-    // Per-game vkBasalt override, see `GameOverrides::vkbasalt`.
+    // Has its own setting under "Bild", see `GraphicsConfig::vkbasalt`.
     "ENABLE_VKBASALT",
 ];
 
@@ -88,7 +88,7 @@ fn parse_call_args(s: &str) -> Option<(&str, &str)> {
 }
 
 /// Lists the switches the given runner's `proton` script understands, for
-/// the per-game "Proton-Optionen" section. Wine runners have none.
+/// the "Proton" settings, both global and per game. Wine runners have none.
 #[tauri::command]
 pub fn list_proton_options(
     state: State<ConfigState>,
@@ -108,6 +108,28 @@ pub fn list_proton_options(
     let script = fs::read_to_string(&script_path)
         .map_err(|e| format!("Could not read {}: {e}", script_path.display()))?;
     Ok(parse_proton_options(&script))
+}
+
+#[tauri::command]
+pub fn get_proton_config(state: State<ConfigState>) -> Result<ProtonConfig, String> {
+    let config = state
+        .lock()
+        .map_err(|_| "Configuration is locked".to_string())?;
+    Ok(config.proton.clone())
+}
+
+#[tauri::command]
+pub fn save_proton_config(
+    app: AppHandle,
+    state: State<ConfigState>,
+    config: ProtonConfig,
+) -> Result<ProtonConfig, String> {
+    let mut app_config = state
+        .lock()
+        .map_err(|_| "Configuration is locked".to_string())?;
+    app_config.proton = config;
+    save_config(&app, &app_config)?;
+    Ok(app_config.proton.clone())
 }
 
 #[cfg(test)]

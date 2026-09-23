@@ -98,46 +98,177 @@ pub struct GameInput {
     pub overrides: GameOverrides,
 }
 
-/// Per-game overrides layered over the global `MangoHudConfig` and
-/// `PerformanceConfig` at launch — see `GameOverrides::apply`. Every field
-/// is `None` to inherit the global setting. vkBasalt and gamescope are
-/// overridden as a whole block rather than field by field: a global
-/// `gamescope_width: None` already means "native", so per-field options
-/// couldn't tell "inherit the width" apart from "explicitly no width".
-/// MangoHud only gets an on/off switch here — its layout is a matter of
-/// taste, not of the game, so it stays global.
-///
-/// `proton_options` has no global counterpart: it's the set of `PROTON_*`
-/// switches (see `commands::proton_options`) this game sets explicitly,
-/// keyed by variable name; a missing key leaves Proton's own default.
+
+// Game settings come in four categories, each with a global config in
+// `AppConfig` and a matching block in `GameOverrides`:
+//
+// - Leistung (`PerformanceConfig`): GameMode, power profile, sleep inhibit.
+// - Bild (`GraphicsConfig`): gamescope and vkBasalt.
+// - Overlay (`MangoHudConfig`): MangoHud.
+// - Proton (`ProtonConfig`): `PROTON_*` switches.
+//
+// A game inherits everything it doesn't override; `GameOverrides::resolve`
+// layers the two at launch.
+
+/// Per-game overrides of the global settings, one block per category. Every
+/// field is `None` (or, for Proton, a missing key) to inherit the global
+/// setting.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
 pub struct GameOverrides {
     #[serde(default)]
-    pub mangohud_enabled: Option<bool>,
+    pub performance: PerformanceOverrides,
+    #[serde(default)]
+    pub graphics: GraphicsOverrides,
+    #[serde(default)]
+    pub overlay: OverlayOverrides,
+    /// `PROTON_*` variable → on/off, layered key by key over
+    /// `ProtonConfig::options`.
+    #[serde(default)]
+    pub proton: BTreeMap<String, bool>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PerformanceOverrides {
     #[serde(default)]
     pub gamemode_enabled: Option<bool>,
     #[serde(default)]
-    pub vkbasalt: Option<VkBasaltSettings>,
+    pub power_profile_enabled: Option<bool>,
+    #[serde(default)]
+    pub inhibit_sleep_enabled: Option<bool>,
+}
+
+/// gamescope and vkBasalt are overridden as a whole block rather than field
+/// by field: a global `gamescope.width: None` already means "native", so
+/// per-field options couldn't tell "inherit the width" apart from
+/// "explicitly no width".
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct GraphicsOverrides {
     #[serde(default)]
     pub gamescope: Option<GamescopeSettings>,
     #[serde(default)]
-    pub proton_options: BTreeMap<String, bool>,
+    pub vkbasalt: Option<VkBasaltSettings>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct VkBasaltSettings {
-    pub enabled: bool,
-    pub sharpen: bool,
-    pub sharpness: f32,
-    pub smaa: bool,
-    pub deband: bool,
+/// On/off separately from the look, so a game can switch MangoHud off (or
+/// on) while still following the global layout.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct OverlayOverrides {
+    #[serde(default)]
+    pub enabled: Option<bool>,
+    #[serde(default)]
+    pub layout: Option<MangoHudLayout>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+/// The settings a launch actually runs with, after `GameOverrides::resolve`.
+#[derive(Debug, Clone)]
+pub struct EffectiveSettings {
+    pub performance: PerformanceConfig,
+    pub graphics: GraphicsConfig,
+    pub mangohud: MangoHudConfig,
+    pub proton: BTreeMap<String, bool>,
+}
+
+impl GameOverrides {
+    /// Layers this game's overrides over copies of the global settings.
+    pub fn resolve(
+        &self,
+        performance: &PerformanceConfig,
+        graphics: &GraphicsConfig,
+        mangohud: &MangoHudConfig,
+        proton: &ProtonConfig,
+    ) -> EffectiveSettings {
+        let perf = &self.performance;
+        let performance = PerformanceConfig {
+            gamemode_enabled: perf.gamemode_enabled.unwrap_or(performance.gamemode_enabled),
+            power_profile_enabled: perf
+                .power_profile_enabled
+                .unwrap_or(performance.power_profile_enabled),
+            inhibit_sleep_enabled: perf
+                .inhibit_sleep_enabled
+                .unwrap_or(performance.inhibit_sleep_enabled),
+        };
+        let graphics = GraphicsConfig {
+            gamescope: self
+                .graphics
+                .gamescope
+                .clone()
+                .unwrap_or_else(|| graphics.gamescope.clone()),
+            vkbasalt: self
+                .graphics
+                .vkbasalt
+                .clone()
+                .unwrap_or_else(|| graphics.vkbasalt.clone()),
+        };
+        let mangohud = MangoHudConfig {
+            enabled: self.overlay.enabled.unwrap_or(mangohud.enabled),
+            layout: self
+                .overlay
+                .layout
+                .clone()
+                .unwrap_or_else(|| mangohud.layout.clone()),
+        };
+        let mut proton_options = proton.options.clone();
+        proton_options.extend(self.proton.iter().map(|(k, v)| (k.clone(), *v)));
+        EffectiveSettings {
+            performance,
+            graphics,
+            mangohud,
+            proton: proton_options,
+        }
+    }
+}
+
+impl EffectiveSettings {
+    /// The env vars for the Proton switches. `"0"` is an explicit off rather
+    /// than a no-op: Proton turns some flags on by itself (e.g. `nvml` on
+    /// Nvidia), and only a `0` switches those back off.
+    pub fn proton_env(&self) -> impl Iterator<Item = (String, String)> + '_ {
+        self.proton
+            .iter()
+            .map(|(name, on)| (name.clone(), if *on { "1" } else { "0" }.to_string()))
+    }
+}
+
+/// Leistung: toggles that change how the system treats a running game.
+/// Kept opt-in (all off by default), since we can't know whether the
+/// underlying tool is even installed, so nothing gets silently switched on.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PerformanceConfig {
+    #[serde(default)]
+    pub gamemode_enabled: bool,
+    /// Holds the desktop's power-profiles-daemon at the "performance" profile
+    /// for the duration of the game (via `powerprofilesctl launch`), released
+    /// automatically on exit. GameMode does *not* reliably do this itself —
+    /// it writes the CPU governor directly, which power-profiles-daemon (the
+    /// governor owner on most modern distros) can just overwrite again, so
+    /// `gamemoderun` alone often leaves the profile on "balanced". See
+    /// `launch_game`.
+    #[serde(default)]
+    pub power_profile_enabled: bool,
+    /// Wraps the game process with `systemd-inhibit` so the screensaver/sleep
+    /// don't kick in mid-session. No-op if `systemd-inhibit` or the D-Bus
+    /// system bus isn't available.
+    #[serde(default)]
+    pub inhibit_sleep_enabled: bool,
+}
+
+/// Bild: what the game's output goes through on its way to the screen.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct GraphicsConfig {
+    #[serde(default)]
+    pub gamescope: GamescopeSettings,
+    #[serde(default)]
+    pub vkbasalt: VkBasaltSettings,
+}
+
+/// Wraps the game in `gamescope`, giving it its own nested compositor
+/// session with independent resolution/refresh-rate — useful on
+/// handhelds/TVs. No-op if `gamescope` isn't installed, and skipped entirely
+/// if we're already running inside a gamescope session ourselves (nesting it
+/// again is pointless). See `launch_game`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct GamescopeSettings {
+    #[serde(default)]
     pub enabled: bool,
     #[serde(default)]
     pub width: Option<u32>,
@@ -149,51 +280,46 @@ pub struct GamescopeSettings {
     pub fullscreen: bool,
 }
 
-impl GameOverrides {
-    /// Writes this game's overrides into copies of the global settings,
-    /// leaving everything it doesn't override untouched.
-    pub fn apply(&self, mangohud: &mut MangoHudConfig, performance: &mut PerformanceConfig) {
-        if let Some(enabled) = self.mangohud_enabled {
-            mangohud.enabled = enabled;
-        }
-        if let Some(enabled) = self.gamemode_enabled {
-            performance.gamemode_enabled = enabled;
-        }
-        if let Some(vkbasalt) = &self.vkbasalt {
-            performance.vkbasalt_enabled = vkbasalt.enabled;
-            performance.vkbasalt_sharpen = vkbasalt.sharpen;
-            performance.vkbasalt_sharpness = vkbasalt.sharpness;
-            performance.vkbasalt_smaa = vkbasalt.smaa;
-            performance.vkbasalt_deband = vkbasalt.deband;
-        }
-        if let Some(gamescope) = &self.gamescope {
-            performance.gamescope_enabled = gamescope.enabled;
-            performance.gamescope_width = gamescope.width;
-            performance.gamescope_height = gamescope.height;
-            performance.gamescope_fps_limit = gamescope.fps_limit;
-            performance.gamescope_fullscreen = gamescope.fullscreen;
-        }
-    }
+/// vkBasalt post-processing — see `commands::graphics`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct VkBasaltSettings {
+    pub enabled: bool,
+    pub sharpen: bool,
+    pub sharpness: f32,
+    pub smaa: bool,
+    pub deband: bool,
+}
 
-    /// The env vars for this game's Proton switches. `"0"` is an explicit
-    /// off rather than a no-op: Proton turns some flags on by itself (e.g.
-    /// `nvml` on Nvidia), and only a `0` switches those back off.
-    pub fn proton_env(&self) -> impl Iterator<Item = (String, String)> + '_ {
-        self.proton_options
-            .iter()
-            .map(|(name, on)| (name.clone(), if *on { "1" } else { "0" }.to_string()))
+impl Default for VkBasaltSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            sharpen: true,
+            sharpness: 0.4,
+            smaa: false,
+            deband: false,
+        }
     }
 }
 
-/// Global MangoHud (the in-game performance overlay) settings, applied to
-/// every game's launch — see `commands::mangohud`. Kept as a handful of
-/// friendly knobs plus a `preset` label rather than exposing MangoHud's own
-/// sprawling config format, since the point of this tab is to make "looking
-/// good" a couple of clicks rather than hand-editing a `MangoHud.conf`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+/// Overlay: MangoHud (the in-game performance overlay) — see
+/// `commands::mangohud`. Kept as a handful of friendly knobs plus a `preset`
+/// label rather than exposing MangoHud's own sprawling config format, since
+/// the point is to make "looking good" a couple of clicks rather than
+/// hand-editing a `MangoHud.conf`. The layout is flattened into the same JSON
+/// object, so it's stored exactly as before the split.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MangoHudConfig {
+    #[serde(default)]
     pub enabled: bool,
+    #[serde(flatten)]
+    pub layout: MangoHudLayout,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct MangoHudLayout {
     pub preset: String,
     pub position: String,
     pub theme_color: String,
@@ -207,118 +333,26 @@ pub struct MangoHudConfig {
     pub show_vram: bool,
     pub show_temps: bool,
     /// Small on/off indicator icons for other tools in the stack.
-    #[serde(default)]
     pub show_gamemode: bool,
-    #[serde(default)]
     pub show_vkbasalt: bool,
-    #[serde(default)]
     pub show_hdr: bool,
     /// Static diagnostic info, handy since this app manages the runner and
     /// DXVK/VKD3D build a game actually ends up using (see
     /// `graphics_layers.rs`) — `show_engine_version` in particular surfaces
     /// the DXVK/VKD3D version MangoHud detects at runtime.
-    #[serde(default)]
     pub show_driver: bool,
-    #[serde(default)]
     pub show_engine_version: bool,
-    #[serde(default)]
     pub show_wine: bool,
-    #[serde(default)]
     pub show_gpu_name: bool,
-    #[serde(default)]
     pub show_resolution: bool,
     /// Lays the stats out in a row instead of a column (MangoHud's
     /// `horizontal` option).
-    #[serde(default)]
     pub horizontal: bool,
 }
 
-/// Global performance-tuning toggles applied to every game's launch — see
-/// `commands::performance`. Kept opt-in (all off by default) for the same
-/// reason as `MangoHudConfig`: we can't know whether the underlying tool
-/// (GameMode, vkBasalt) is even installed, so nothing gets silently switched
-/// on for the user.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct PerformanceConfig {
-    pub gamemode_enabled: bool,
-    pub vkbasalt_enabled: bool,
-    pub vkbasalt_sharpen: bool,
-    pub vkbasalt_sharpness: f32,
-    pub vkbasalt_smaa: bool,
-    pub vkbasalt_deband: bool,
-    /// Wraps the game process with `systemd-inhibit` so the screensaver/sleep
-    /// don't kick in mid-session. No-op if `systemd-inhibit` or the D-Bus
-    /// system bus isn't available.
-    #[serde(default)]
-    pub inhibit_sleep_enabled: bool,
-    /// Holds the desktop's power-profiles-daemon at the "performance" profile
-    /// for the duration of the game (via `powerprofilesctl launch`), released
-    /// automatically on exit. GameMode does *not* reliably do this itself —
-    /// it writes the CPU governor directly, which power-profiles-daemon (the
-    /// governor owner on most modern distros) can just overwrite again, so
-    /// `gamemoderun` alone often leaves the profile on "balanced". See
-    /// `launch_game`.
-    #[serde(default)]
-    pub power_profile_enabled: bool,
-    /// Wraps the game in `gamescope`, giving it its own nested compositor
-    /// session with independent resolution/refresh-rate — useful on
-    /// handhelds/TVs. No-op if `gamescope` isn't installed, and skipped
-    /// entirely if we're already running inside a gamescope session
-    /// ourselves (nesting it again is pointless). See `launch_game`.
-    #[serde(default)]
-    pub gamescope_enabled: bool,
-    #[serde(default)]
-    pub gamescope_width: Option<u32>,
-    #[serde(default)]
-    pub gamescope_height: Option<u32>,
-    #[serde(default)]
-    pub gamescope_fps_limit: Option<u32>,
-    #[serde(default)]
-    pub gamescope_fullscreen: bool,
-}
-
-/// SteamGridDB API settings — see `commands::steamgriddb`.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct SteamGridDbConfig {
-    #[serde(default)]
-    pub api_key: Option<String>,
-}
-
-/// GitHub settings — see `commands::github`. An optional personal access
-/// token, sent as a bearer token on requests to `api.github.com` (runner
-/// release listings) to raise its rate limit from 60 to 5000 requests/hour;
-/// GitHub accepts unauthenticated requests too, so this stays optional.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct GitHubConfig {
-    #[serde(default)]
-    pub token: Option<String>,
-}
-
-impl Default for PerformanceConfig {
+impl Default for MangoHudLayout {
     fn default() -> Self {
         Self {
-            gamemode_enabled: false,
-            vkbasalt_enabled: false,
-            vkbasalt_sharpen: true,
-            vkbasalt_sharpness: 0.4,
-            vkbasalt_smaa: false,
-            vkbasalt_deband: false,
-            inhibit_sleep_enabled: false,
-            power_profile_enabled: false,
-            gamescope_enabled: false,
-            gamescope_width: None,
-            gamescope_height: None,
-            gamescope_fps_limit: None,
-            gamescope_fullscreen: false,
-        }
-    }
-}
-
-impl Default for MangoHudConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
             preset: "standard".to_string(),
             position: "top-left".to_string(),
             theme_color: "ffffff".to_string(),
@@ -344,66 +378,137 @@ impl Default for MangoHudConfig {
     }
 }
 
+/// Proton: `PROTON_*` switches (see `commands::proton_options`) set for every
+/// game on a Proton runner, keyed by variable name; a missing key leaves
+/// Proton's own default.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ProtonConfig {
+    #[serde(default)]
+    pub options: BTreeMap<String, bool>,
+}
+
+/// SteamGridDB API settings — see `commands::steamgriddb`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SteamGridDbConfig {
+    #[serde(default)]
+    pub api_key: Option<String>,
+}
+
+/// GitHub settings — see `commands::github`. An optional personal access
+/// token, sent as a bearer token on requests to `api.github.com` (runner
+/// release listings) to raise its rate limit from 60 to 5000 requests/hour;
+/// GitHub accepts unauthenticated requests too, so this stays optional.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct GitHubConfig {
+    #[serde(default)]
+    pub token: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn globals() -> (PerformanceConfig, GraphicsConfig, MangoHudConfig, ProtonConfig) {
+        (
+            PerformanceConfig {
+                gamemode_enabled: true,
+                power_profile_enabled: true,
+                inhibit_sleep_enabled: false,
+            },
+            GraphicsConfig {
+                gamescope: GamescopeSettings {
+                    enabled: true,
+                    width: Some(1920),
+                    height: Some(1080),
+                    ..GamescopeSettings::default()
+                },
+                vkbasalt: VkBasaltSettings {
+                    enabled: true,
+                    ..VkBasaltSettings::default()
+                },
+            },
+            MangoHudConfig {
+                enabled: true,
+                layout: MangoHudLayout::default(),
+            },
+            ProtonConfig {
+                options: BTreeMap::from([
+                    ("PROTON_ENABLE_HDR".to_string(), true),
+                    ("PROTON_NO_NTSYNC".to_string(), true),
+                ]),
+            },
+        )
+    }
+
     #[test]
     fn empty_overrides_keep_global_settings() {
-        let mut mangohud = MangoHudConfig {
-            enabled: true,
-            ..MangoHudConfig::default()
-        };
-        let mut performance = PerformanceConfig {
-            gamemode_enabled: true,
-            gamescope_enabled: true,
-            gamescope_width: Some(1920),
-            ..PerformanceConfig::default()
-        };
-        GameOverrides::default().apply(&mut mangohud, &mut performance);
-        assert!(mangohud.enabled);
-        assert!(performance.gamemode_enabled);
-        assert!(performance.gamescope_enabled);
-        assert_eq!(performance.gamescope_width, Some(1920));
+        let (performance, graphics, mangohud, proton) = globals();
+        let settings =
+            GameOverrides::default().resolve(&performance, &graphics, &mangohud, &proton);
+        assert!(settings.performance.gamemode_enabled);
+        assert!(settings.performance.power_profile_enabled);
+        assert_eq!(settings.graphics.gamescope, graphics.gamescope);
+        assert!(settings.mangohud.enabled);
+        assert_eq!(settings.proton, proton.options);
     }
 
     #[test]
     fn overrides_replace_only_their_own_settings() {
-        let mut mangohud = MangoHudConfig {
-            enabled: true,
-            ..MangoHudConfig::default()
-        };
-        let mut performance = PerformanceConfig {
-            gamemode_enabled: true,
-            vkbasalt_enabled: true,
-            gamescope_enabled: true,
-            gamescope_width: Some(1920),
-            gamescope_height: Some(1080),
-            ..PerformanceConfig::default()
-        };
+        let (performance, graphics, mangohud, proton) = globals();
         let overrides = GameOverrides {
-            mangohud_enabled: Some(false),
-            gamemode_enabled: None,
-            vkbasalt: None,
-            gamescope: Some(GamescopeSettings {
-                enabled: true,
-                width: Some(1280),
-                height: None,
-                fps_limit: Some(40),
-                fullscreen: true,
-            }),
-            proton_options: BTreeMap::new(),
+            performance: PerformanceOverrides {
+                power_profile_enabled: Some(false),
+                ..PerformanceOverrides::default()
+            },
+            graphics: GraphicsOverrides {
+                gamescope: Some(GamescopeSettings {
+                    enabled: true,
+                    width: Some(1280),
+                    fps_limit: Some(40),
+                    ..GamescopeSettings::default()
+                }),
+                vkbasalt: None,
+            },
+            overlay: OverlayOverrides {
+                enabled: Some(false),
+                layout: None,
+            },
+            proton: BTreeMap::from([
+                ("PROTON_NO_NTSYNC".to_string(), false),
+                ("PROTON_ENABLE_WAYLAND".to_string(), true),
+            ]),
         };
-        overrides.apply(&mut mangohud, &mut performance);
-        assert!(!mangohud.enabled);
-        assert!(performance.gamemode_enabled);
-        assert!(performance.vkbasalt_enabled);
-        assert_eq!(performance.gamescope_width, Some(1280));
+        let settings = overrides.resolve(&performance, &graphics, &mangohud, &proton);
+        assert!(settings.performance.gamemode_enabled);
+        assert!(!settings.performance.power_profile_enabled);
+        assert!(settings.graphics.vkbasalt.enabled);
+        assert_eq!(settings.graphics.gamescope.width, Some(1280));
         // The gamescope block is replaced as a whole, so the global height
         // doesn't leak through.
-        assert_eq!(performance.gamescope_height, None);
-        assert_eq!(performance.gamescope_fps_limit, Some(40));
-        assert!(performance.gamescope_fullscreen);
+        assert_eq!(settings.graphics.gamescope.height, None);
+        assert!(!settings.mangohud.enabled);
+        assert_eq!(settings.mangohud.layout.preset, "standard");
+        let env: Vec<_> = settings.proton_env().collect();
+        assert_eq!(
+            env,
+            vec![
+                ("PROTON_ENABLE_HDR".to_string(), "1".to_string()),
+                ("PROTON_ENABLE_WAYLAND".to_string(), "1".to_string()),
+                ("PROTON_NO_NTSYNC".to_string(), "0".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn mangohud_config_keeps_its_flat_json_shape() {
+        let json = serde_json::to_value(MangoHudConfig::default()).unwrap();
+        assert_eq!(json["enabled"], false);
+        assert_eq!(json["preset"], "standard");
+        let parsed: MangoHudConfig =
+            serde_json::from_str(r#"{"enabled":true,"position":"top-right"}"#).unwrap();
+        assert!(parsed.enabled);
+        assert_eq!(parsed.layout.position, "top-right");
+        assert_eq!(parsed.layout.preset, "standard");
     }
 
     #[test]
@@ -412,27 +517,8 @@ mod tests {
             r#"{"id":"00000000-0000-0000-0000-000000000000","name":"x","exe_path":"/x.exe","prefix_path":"/p","runner_id":"r"}"#,
         )
         .unwrap();
-        assert!(game.overrides.mangohud_enabled.is_none());
-        assert!(game.overrides.gamescope.is_none());
-        assert!(game.overrides.proton_options.is_empty());
-    }
-
-    #[test]
-    fn proton_options_map_to_one_and_zero() {
-        let overrides = GameOverrides {
-            proton_options: BTreeMap::from([
-                ("PROTON_ENABLE_HDR".to_string(), true),
-                ("PROTON_NO_NTSYNC".to_string(), false),
-            ]),
-            ..GameOverrides::default()
-        };
-        let env: Vec<_> = overrides.proton_env().collect();
-        assert_eq!(
-            env,
-            vec![
-                ("PROTON_ENABLE_HDR".to_string(), "1".to_string()),
-                ("PROTON_NO_NTSYNC".to_string(), "0".to_string()),
-            ]
-        );
+        assert!(game.overrides.performance.gamemode_enabled.is_none());
+        assert!(game.overrides.graphics.gamescope.is_none());
+        assert!(game.overrides.proton.is_empty());
     }
 }

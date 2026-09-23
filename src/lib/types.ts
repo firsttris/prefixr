@@ -38,16 +38,30 @@ export interface GameInput {
   overrides: GameOverrides;
 }
 
-// Per-game deviations from the global MangoHud/performance settings; `null`
-// inherits the global value — see `GameOverrides` in models.rs.
-// `proton_options` maps a `PROTON_*` variable to on/off; a missing key keeps
-// Proton's own default.
+// Per-game overrides, one block per settings category (Leistung, Bild,
+// Overlay, Proton); `null` or a missing key inherits the global value — see
+// `GameOverrides` in models.rs.
 export interface GameOverrides {
-  mangohud_enabled: boolean | null;
+  performance: PerformanceOverrides;
+  graphics: GraphicsOverrides;
+  overlay: OverlayOverrides;
+  proton: Record<string, boolean>;
+}
+
+export interface PerformanceOverrides {
   gamemode_enabled: boolean | null;
-  vkbasalt: VkBasaltSettings | null;
+  power_profile_enabled: boolean | null;
+  inhibit_sleep_enabled: boolean | null;
+}
+
+export interface GraphicsOverrides {
   gamescope: GamescopeSettings | null;
-  proton_options: Record<string, boolean>;
+  vkbasalt: VkBasaltSettings | null;
+}
+
+export interface OverlayOverrides {
+  enabled: boolean | null;
+  layout: MangoHudLayout | null;
 }
 
 // A switch found in a Proton runner's `proton` script — see
@@ -56,22 +70,6 @@ export interface ProtonOption {
   env: string;
   config: string;
   aliases: string[];
-}
-
-export interface VkBasaltSettings {
-  enabled: boolean;
-  sharpen: boolean;
-  sharpness: number;
-  smaa: boolean;
-  deband: boolean;
-}
-
-export interface GamescopeSettings {
-  enabled: boolean;
-  width: number | null;
-  height: number | null;
-  fps_limit: number | null;
-  fullscreen: boolean;
 }
 
 // An .exe shortcut found on the Desktop/Start Menu right after an
@@ -98,8 +96,8 @@ export interface RunnerRelease {
 
 export type MangoHudPosition = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
-export interface MangoHudConfig {
-  enabled: boolean;
+// Overlay. Stored as one flat object; `layout` is everything but `enabled`.
+export interface MangoHudLayout {
   preset: string;
   position: MangoHudPosition;
   theme_color: string;
@@ -123,20 +121,42 @@ export interface MangoHudConfig {
   horizontal: boolean;
 }
 
+export interface MangoHudConfig extends MangoHudLayout {
+  enabled: boolean;
+}
+
+// Leistung.
 export interface PerformanceConfig {
   gamemode_enabled: boolean;
-  vkbasalt_enabled: boolean;
-  vkbasalt_sharpen: boolean;
-  vkbasalt_sharpness: number;
-  vkbasalt_smaa: boolean;
-  vkbasalt_deband: boolean;
-  inhibit_sleep_enabled: boolean;
   power_profile_enabled: boolean;
-  gamescope_enabled: boolean;
-  gamescope_width: number | null;
-  gamescope_height: number | null;
-  gamescope_fps_limit: number | null;
-  gamescope_fullscreen: boolean;
+  inhibit_sleep_enabled: boolean;
+}
+
+// Bild.
+export interface GraphicsConfig {
+  gamescope: GamescopeSettings;
+  vkbasalt: VkBasaltSettings;
+}
+
+export interface VkBasaltSettings {
+  enabled: boolean;
+  sharpen: boolean;
+  sharpness: number;
+  smaa: boolean;
+  deband: boolean;
+}
+
+export interface GamescopeSettings {
+  enabled: boolean;
+  width: number | null;
+  height: number | null;
+  fps_limit: number | null;
+  fullscreen: boolean;
+}
+
+// Proton: `PROTON_*` variable → on/off; a missing key keeps Proton's default.
+export interface ProtonConfig {
+  options: Record<string, boolean>;
 }
 
 export interface SteamGridDbConfig {

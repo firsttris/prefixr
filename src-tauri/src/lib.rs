@@ -14,12 +14,13 @@ use commands::games::{
     take_pending_launch, update_game, PendingInstall, PendingLaunch, RunningGames,
 };
 use commands::github::{get_github_config, save_github_config};
+use commands::graphics::{get_graphics_config, save_graphics_config};
 use commands::mangohud::{get_mangohud_config, save_mangohud_config};
 use commands::performance::{
     check_max_map_count, fix_max_map_count, get_performance_config, save_performance_config,
 };
 use commands::prefixes::{add_prefix, delete_prefix, list_prefixes};
-use commands::proton_options::list_proton_options;
+use commands::proton_options::{get_proton_config, list_proton_options, save_proton_config};
 use commands::runner_downloads::{download_runner, list_runner_releases, list_runner_sources};
 use commands::runners::list_runners;
 use commands::steamgriddb::{
@@ -166,6 +167,10 @@ pub fn run() {
             save_mangohud_config,
             get_performance_config,
             save_performance_config,
+            get_graphics_config,
+            save_graphics_config,
+            get_proton_config,
+            save_proton_config,
             check_max_map_count,
             fix_max_map_count,
             install_winetricks_verbs,

@@ -4,14 +4,14 @@ use std::path::PathBuf;
 use tauri::{AppHandle, Manager, State};
 
 use crate::config::{save_config, ConfigState};
-use crate::models::MangoHudConfig;
+use crate::models::{MangoHudConfig, MangoHudLayout};
 
 /// Builds the contents of a `MangoHud.conf` (see
 /// https://github.com/flightlessmango/MangoHud) from the app's friendlier
 /// settings. MangoHud treats a boolean option as enabled simply by its key
 /// being present in the file — there's no `=0` form — so a disabled stat is
 /// left out entirely rather than written with a falsy value.
-fn render_conf(config: &MangoHudConfig) -> String {
+fn render_conf(config: &MangoHudLayout) -> String {
     let mut lines = Vec::new();
 
     if config.show_fps {
@@ -74,26 +74,32 @@ fn render_conf(config: &MangoHudConfig) -> String {
     lines.join("\n") + "\n"
 }
 
-fn conf_path(app: &AppHandle) -> Result<PathBuf, String> {
+/// One file per game, since the layout can be overridden per game (see
+/// `OverlayOverrides`) — same reasoning as `graphics::vkbasalt_conf_path`.
+pub(crate) fn mangohud_conf_path(app: &AppHandle, game_id: &str) -> Result<PathBuf, String> {
     Ok(app
         .path()
         .app_data_dir()
         .map_err(|e| format!("Could not resolve data directory: {e}"))?
         .join("mangohud")
-        .join("MangoHud.conf"))
+        .join(format!("{game_id}.conf")))
 }
 
-/// Writes the app's own `MangoHud.conf` from the given settings and returns
+/// Writes this game's `MangoHud.conf` from the given layout and returns
 /// its path, for `launch_game` to point `MANGOHUD_CONFIGFILE` at. Rewritten
 /// on every launch rather than only on save — cheap, and avoids needing to
 /// track whether the on-disk file is stale relative to `AppConfig`.
-pub fn ensure_mangohud_conf(app: &AppHandle, config: &MangoHudConfig) -> Result<PathBuf, String> {
-    let path = conf_path(app)?;
+pub fn ensure_mangohud_conf(
+    app: &AppHandle,
+    game_id: &str,
+    layout: &MangoHudLayout,
+) -> Result<PathBuf, String> {
+    let path = mangohud_conf_path(app, game_id)?;
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
             .map_err(|e| format!("Could not create {}: {e}", parent.display()))?;
     }
-    fs::write(&path, render_conf(config))
+    fs::write(&path, render_conf(layout))
         .map_err(|e| format!("Could not write {}: {e}", path.display()))?;
     Ok(path)
 }

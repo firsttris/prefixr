@@ -1,19 +1,31 @@
 <script lang="ts">
   import { onMount, untrack } from "svelte";
-  import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-dialog";
   import { runners, refreshRunners } from "$lib/stores/runners";
   import { prefixes, refreshPrefixes } from "$lib/stores/prefixes";
   import { addGame, updateGame } from "$lib/stores/games";
   import { performanceConfig, refreshPerformanceConfig } from "$lib/stores/performance";
+  import { graphicsConfig, refreshGraphicsConfig } from "$lib/stores/graphics";
   import { mangoHudConfig, refreshMangoHudConfig } from "$lib/stores/mangohud";
+  import { listProtonOptions, protonConfig, refreshProtonConfig } from "$lib/stores/proton";
   import { prettifyExeName } from "$lib/gameName";
-  import { PROTON_OPTION_INFO, PROTON_OPTION_ORDER } from "$lib/protonOptions";
-  import InfoIcon from "$lib/components/InfoIcon.svelte";
+  import { PRESETS } from "$lib/mangohudPresets";
+  import { onOff, sameBlock, sameFields, type OverrideHooks } from "$lib/settings";
+  import PerformanceEditor from "$lib/components/PerformanceEditor.svelte";
+  import GraphicsEditor from "$lib/components/GraphicsEditor.svelte";
+  import OverlayEditor from "$lib/components/OverlayEditor.svelte";
+  import ProtonEditor from "$lib/components/ProtonEditor.svelte";
   import type {
     Game,
     GameInput,
     GamescopeSettings,
+    GraphicsConfig,
+    GraphicsOverrides,
+    MangoHudConfig,
+    MangoHudLayout,
+    OverlayOverrides,
+    PerformanceConfig,
+    PerformanceOverrides,
     ProtonOption,
     VkBasaltSettings,
   } from "$lib/types";
@@ -60,82 +72,174 @@
   let runnerId = $state(defaults.runnerId);
   let envVarsText = $state(defaults.envVarsText);
   let launchArgs = $state(defaults.launchArgs);
-  // Per-game overrides; `null` inherits the global setting. The toggles
-  // below always show the effective value; changing one (or one of the
-  // vkBasalt/gamescope details) stores an override, which is dropped again
-  // as soon as it matches the global setting — see `setMangohud` etc.
-  let mangohudOverride = $state<boolean | null>(defaults.overrides?.mangohud_enabled ?? null);
-  let gamemodeOverride = $state<boolean | null>(defaults.overrides?.gamemode_enabled ?? null);
-  let vkbasalt = $state<VkBasaltSettings | null>(
-    defaults.overrides?.vkbasalt ? { ...defaults.overrides.vkbasalt } : null,
-  );
-  let gamescope = $state<GamescopeSettings | null>(
-    defaults.overrides?.gamescope ? { ...defaults.overrides.gamescope } : null,
-  );
-  // Proton switches this game sets, by variable name; a missing key keeps
-  // Proton's default. Kept when switching to a Wine runner (which ignores
-  // them), so switching back doesn't lose them.
-  let protonOptions = $state<Record<string, boolean>>({
-    ...(defaults.overrides?.proton_options ?? {}),
-  });
-  // What the selected runner's `proton` script understands.
-  let availableProtonOptions = $state<ProtonOption[]>([]);
-  let protonOptionsError = $state("");
   let error = $state("");
   let submitting = $state(false);
 
-  const mangohudOn = $derived(mangohudOverride ?? $mangoHudConfig?.enabled ?? false);
-  const gamemodeOn = $derived(gamemodeOverride ?? $performanceConfig?.gamemode_enabled ?? false);
-  const vkbasaltShown = $derived(vkbasalt ?? globalVkbasalt());
-  const gamescopeShown = $derived(gamescope ?? globalGamescope());
-  const overrideCount = $derived(
-    [mangohudOverride, gamemodeOverride, vkbasalt, gamescope].filter((o) => o !== null).length,
-  );
-  const isProton = $derived($runners.find((r) => r.id === runnerId)?.kind === "proton");
-  const curatedProtonOptions = $derived(
-    availableProtonOptions
-      .filter((o) => o.config in PROTON_OPTION_INFO)
-      .sort(
-        (a, b) => PROTON_OPTION_ORDER.indexOf(a.config) - PROTON_OPTION_ORDER.indexOf(b.config),
-      ),
-  );
-  const otherProtonOptions = $derived(
-    availableProtonOptions.filter((o) => !(o.config in PROTON_OPTION_INFO)),
-  );
-  // Set on this game, but unknown to the selected runner — e.g. carried over
-  // from a previous Proton version. Harmless, but shown so they can be
-  // cleared.
-  const unknownProtonOptions = $derived(
-    Object.keys(protonOptions).filter(
-      (name) => !availableProtonOptions.some((o) => o.env === name || o.aliases.includes(name)),
-    ),
-  );
-  const protonOptionCount = $derived(Object.keys(protonOptions).length);
+  // Per-game overrides, one block per settings category; `null` (or a
+  // missing Proton key) inherits the global setting. The editors always get
+  // the effective values; a change is stored as an override, which is
+  // dropped again as soon as it matches the global setting.
+  const saved = defaults.overrides;
+  let perf = $state<PerformanceOverrides>({
+    gamemode_enabled: saved?.performance.gamemode_enabled ?? null,
+    power_profile_enabled: saved?.performance.power_profile_enabled ?? null,
+    inhibit_sleep_enabled: saved?.performance.inhibit_sleep_enabled ?? null,
+  });
+  let gfx = $state<GraphicsOverrides>({
+    gamescope: saved?.graphics.gamescope ? { ...saved.graphics.gamescope } : null,
+    vkbasalt: saved?.graphics.vkbasalt ? { ...saved.graphics.vkbasalt } : null,
+  });
+  let overlay = $state<OverlayOverrides>({
+    enabled: saved?.overlay.enabled ?? null,
+    layout: saved?.overlay.layout ? { ...saved.overlay.layout } : null,
+  });
+  // Kept when switching to a Wine runner (which ignores them), so switching
+  // back doesn't lose them.
+  let proton = $state<Record<string, boolean>>({ ...(saved?.proton ?? {}) });
 
-  // Starts expanded if the game already has overrides. Bound two-way rather
-  // than passed as `open={...}`: Svelte re-applies every attribute of the
-  // form in one shared effect, so a one-way value would snap the section
-  // back to it on every toggle click.
-  let overridesOpen = $state(untrack(() => overrideCount > 0));
-  let protonOptionsOpen = $state(untrack(() => protonOptionCount > 0));
+  onMount(() => {
+    refreshRunners();
+    refreshPrefixes();
+    refreshPerformanceConfig();
+    refreshGraphicsConfig();
+    refreshMangoHudConfig();
+    refreshProtonConfig();
+  });
+
+  // --- Leistung ---
+
+  const PERF_KEYS = ["gamemode_enabled", "power_profile_enabled", "inhibit_sleep_enabled"] as const;
+  const globalPerf = $derived<PerformanceConfig>(
+    $performanceConfig ?? {
+      gamemode_enabled: false,
+      power_profile_enabled: false,
+      inhibit_sleep_enabled: false,
+    },
+  );
+  const perfShown = $derived<PerformanceConfig>({
+    gamemode_enabled: perf.gamemode_enabled ?? globalPerf.gamemode_enabled,
+    power_profile_enabled: perf.power_profile_enabled ?? globalPerf.power_profile_enabled,
+    inhibit_sleep_enabled: perf.inhibit_sleep_enabled ?? globalPerf.inhibit_sleep_enabled,
+  });
+  const perfCount = $derived(PERF_KEYS.filter((k) => perf[k] !== null).length);
+
+  function changePerf(patch: Partial<PerformanceConfig>) {
+    for (const key of PERF_KEYS) {
+      const value = patch[key];
+      if (value !== undefined) perf[key] = value === globalPerf[key] ? null : value;
+    }
+  }
+
+  const perfHooks: OverrideHooks<keyof PerformanceConfig> = {
+    isOverridden: (key) => perf[key] !== null,
+    reset: (key) => (perf[key] = null),
+    resetTitle: (key) => `Globale Einstellung übernehmen (${onOff(globalPerf[key])})`,
+  };
+
+  // --- Bild ---
+
+  const globalGfx = $derived<GraphicsConfig>(
+    $graphicsConfig ?? {
+      gamescope: { enabled: false, width: null, height: null, fps_limit: null, fullscreen: false },
+      vkbasalt: { enabled: false, sharpen: true, sharpness: 0.4, smaa: false, deband: false },
+    },
+  );
+  const gfxShown = $derived<GraphicsConfig>({
+    gamescope: gfx.gamescope ?? globalGfx.gamescope,
+    vkbasalt: gfx.vkbasalt ?? globalGfx.vkbasalt,
+  });
+  const gfxCount = $derived([gfx.gamescope, gfx.vkbasalt].filter((o) => o !== null).length);
+
+  function changeGfx(patch: {
+    gamescope?: Partial<GamescopeSettings>;
+    vkbasalt?: Partial<VkBasaltSettings>;
+  }) {
+    if (patch.gamescope) {
+      const next = { ...gfxShown.gamescope, ...patch.gamescope };
+      gfx.gamescope = sameBlock(next, globalGfx.gamescope) ? null : next;
+    }
+    if (patch.vkbasalt) {
+      const next = { ...gfxShown.vkbasalt, ...patch.vkbasalt };
+      gfx.vkbasalt = sameBlock(next, globalGfx.vkbasalt) ? null : next;
+    }
+  }
+
+  const gfxHooks: OverrideHooks<keyof GraphicsConfig> = {
+    isOverridden: (key) => gfx[key] !== null,
+    reset: (key) => (gfx[key] = null),
+    resetTitle: (key) => `Globale Einstellung übernehmen (${onOff(globalGfx[key].enabled)})`,
+  };
+
+  // --- Overlay ---
+
+  function layoutOf(config: MangoHudConfig): MangoHudLayout {
+    const layout: Partial<MangoHudConfig> = { ...config };
+    delete layout.enabled;
+    return layout as MangoHudLayout;
+  }
+
+  const standardPreset = PRESETS.find((p) => p.key === "standard")!;
+  const globalOverlay = $derived<MangoHudConfig>(
+    $mangoHudConfig ?? { enabled: false, preset: "standard", ...standardPreset.values },
+  );
+  const overlayShown = $derived<MangoHudConfig>({
+    ...(overlay.layout ?? layoutOf(globalOverlay)),
+    enabled: overlay.enabled ?? globalOverlay.enabled,
+  });
+  const overlayCount = $derived(
+    [overlay.enabled, overlay.layout].filter((o) => o !== null).length,
+  );
+
+  function changeOverlay(patch: Partial<MangoHudConfig>) {
+    const { enabled, ...layoutPatch } = patch;
+    if (enabled !== undefined) {
+      overlay.enabled = enabled === globalOverlay.enabled ? null : enabled;
+    }
+    if (Object.keys(layoutPatch).length > 0) {
+      const next = { ...layoutOf(overlayShown), ...layoutPatch };
+      // The preset name alone ("custom" after a manual tweak) is no reason
+      // to keep an override whose values match the global look.
+      const same = sameFields(
+        { ...next, preset: "" },
+        { ...layoutOf(globalOverlay), preset: "" },
+      );
+      overlay.layout = same ? null : next;
+    }
+  }
+
+  const overlayHooks: OverrideHooks<"enabled" | "layout"> = {
+    isOverridden: (key) => overlay[key] !== null,
+    reset: (key) => (overlay[key] = null),
+    resetTitle: (key) =>
+      key === "enabled"
+        ? `Globale Einstellung übernehmen (${onOff(globalOverlay.enabled)})`
+        : "Globales Aussehen übernehmen",
+  };
+
+  // --- Proton ---
+
+  const isProton = $derived($runners.find((r) => r.id === runnerId)?.kind === "proton");
+  let protonOptions = $state<ProtonOption[]>([]);
+  let protonOptionsError = $state("");
+  const protonCount = $derived(Object.keys(proton).length);
 
   $effect(() => {
     const id = runnerId;
     if (!isProton) {
-      availableProtonOptions = [];
+      protonOptions = [];
       protonOptionsError = "";
       return;
     }
     let cancelled = false;
-    invoke<ProtonOption[]>("list_proton_options", { runnerId: id })
+    listProtonOptions(id)
       .then((options) => {
         if (cancelled) return;
-        availableProtonOptions = options;
+        protonOptions = options;
         protonOptionsError = "";
       })
       .catch((e) => {
         if (cancelled) return;
-        availableProtonOptions = [];
+        protonOptions = [];
         protonOptionsError = String(e);
       });
     return () => {
@@ -143,110 +247,20 @@
     };
   });
 
-  onMount(() => {
-    refreshRunners();
-    refreshPrefixes();
-    refreshPerformanceConfig();
-    refreshMangoHudConfig();
-  });
+  // --- Tabs ---
 
-  function globalVkbasalt(): VkBasaltSettings {
-    const global = $performanceConfig;
-    return {
-      enabled: global?.vkbasalt_enabled ?? false,
-      sharpen: global?.vkbasalt_sharpen ?? true,
-      sharpness: global?.vkbasalt_sharpness ?? 0.4,
-      smaa: global?.vkbasalt_smaa ?? false,
-      deband: global?.vkbasalt_deband ?? false,
-    };
-  }
-
-  function globalGamescope(): GamescopeSettings {
-    const global = $performanceConfig;
-    return {
-      enabled: global?.gamescope_enabled ?? false,
-      width: global?.gamescope_width ?? null,
-      height: global?.gamescope_height ?? null,
-      fps_limit: global?.gamescope_fps_limit ?? null,
-      fullscreen: global?.gamescope_fullscreen ?? false,
-    };
-  }
-
-  function setMangohud(enabled: boolean) {
-    mangohudOverride = enabled === $mangoHudConfig?.enabled ? null : enabled;
-  }
-
-  function setGamemode(enabled: boolean) {
-    gamemodeOverride = enabled === $performanceConfig?.gamemode_enabled ? null : enabled;
-  }
-
-  // While both are switched off, the remaining values have no effect, so
-  // they don't count as a difference.
-  function sameVkbasalt(a: VkBasaltSettings, b: VkBasaltSettings): boolean {
-    if (!a.enabled && !b.enabled) return true;
-    return (
-      a.enabled === b.enabled &&
-      a.sharpen === b.sharpen &&
-      Math.abs(a.sharpness - b.sharpness) < 1e-6 &&
-      a.smaa === b.smaa &&
-      a.deband === b.deband
-    );
-  }
-
-  function sameGamescope(a: GamescopeSettings, b: GamescopeSettings): boolean {
-    if (!a.enabled && !b.enabled) return true;
-    return (
-      a.enabled === b.enabled &&
-      a.width === b.width &&
-      a.height === b.height &&
-      a.fps_limit === b.fps_limit &&
-      a.fullscreen === b.fullscreen
-    );
-  }
-
-  function editVkbasalt(patch: Partial<VkBasaltSettings>) {
-    const next = { ...vkbasaltShown, ...patch };
-    vkbasalt = sameVkbasalt(next, globalVkbasalt()) ? null : next;
-  }
-
-  function editGamescope(patch: Partial<GamescopeSettings>) {
-    const next = { ...gamescopeShown, ...patch };
-    gamescope = sameGamescope(next, globalGamescope()) ? null : next;
-  }
-
-  // Looks under every name the runner accepts for this switch, so a value
-  // saved under an alias (or under a name an older runner preferred) shows up.
-  function protonOptionValue(option: ProtonOption): boolean | null {
-    for (const name of [option.env, ...option.aliases]) {
-      if (name in protonOptions) return protonOptions[name];
-    }
-    return null;
-  }
-
-  function setProtonOption(option: ProtonOption, value: boolean | null) {
-    const next = { ...protonOptions };
-    for (const alias of option.aliases) delete next[alias];
-    if (value === null) delete next[option.env];
-    else next[option.env] = value;
-    protonOptions = next;
-  }
-
-  function clearProtonOption(name: string) {
-    const next = { ...protonOptions };
-    delete next[name];
-    protonOptions = next;
-  }
-
-  // Emptied number inputs read as NaN; 0 is no valid size or limit either.
-  function numberOrNull(input: HTMLInputElement): number | null {
-    const value = input.valueAsNumber;
-    return Number.isFinite(value) && value > 0 ? value : null;
-  }
-
-  function resetTitle(globalOn: boolean | undefined): string {
-    if (globalOn === undefined) return "Globale Einstellung übernehmen";
-    return `Globale Einstellung übernehmen (${globalOn ? "an" : "aus"})`;
-  }
+  type Tab = "general" | "performance" | "graphics" | "overlay" | "proton";
+  let tab = $state<Tab>("general");
+  const tabs = $derived(
+    [
+      { id: "general" as Tab, label: "Allgemein", count: 0 },
+      { id: "performance" as Tab, label: "Leistung", count: perfCount },
+      { id: "graphics" as Tab, label: "Bild", count: gfxCount },
+      { id: "overlay" as Tab, label: "Overlay", count: overlayCount },
+      { id: "proton" as Tab, label: "Proton", count: protonCount },
+    ].filter((t) => t.id !== "proton" || isProton),
+  );
+  const activeTab = $derived(tabs.some((t) => t.id === tab) ? tab : "general");
 
   async function pickExe() {
     const selected = await open({
@@ -276,7 +290,10 @@
 
   async function handleSubmit(event: Event) {
     event.preventDefault();
-    if (!name || !exePath || !prefixPath || !runnerId) return;
+    if (!name || !exePath || !prefixPath || !runnerId) {
+      tab = "general";
+      return;
+    }
     error = "";
     submitting = true;
     const input: GameInput = {
@@ -286,13 +303,7 @@
       runner_id: runnerId,
       env_vars: parseEnvVars(envVarsText),
       launch_args: launchArgs.trim(),
-      overrides: {
-        mangohud_enabled: mangohudOverride,
-        gamemode_enabled: gamemodeOverride,
-        vkbasalt,
-        gamescope,
-        proton_options: protonOptions,
-      },
+      overrides: $state.snapshot({ performance: perf, graphics: gfx, overlay, proton }),
     };
     try {
       if (existingGame) {
@@ -309,376 +320,98 @@
   }
 </script>
 
+{#snippet inheritHint(page: string)}
+  <p class="hint">
+    Standardmäßig gelten die globalen Einstellungen unter „{page}“. Was du hier änderst, gilt nur
+    für dieses Spiel und ist farbig markiert.
+  </p>
+{/snippet}
+
 <form onsubmit={handleSubmit}>
-  <label>
-    Name
-    <input bind:value={name} placeholder="z. B. Baldur's Gate 3" />
-  </label>
-
-  <label>
-    Programm (.exe)
-    <div class="row">
-      <input bind:value={exePath} readonly placeholder="Noch keine Datei gewählt" />
-      <button type="button" onclick={pickExe}>Wählen…</button>
-    </div>
-  </label>
-
-  <label>
-    Prefix
-    <select bind:value={prefixPath}>
-      <option value="" disabled selected>Prefix wählen</option>
-      {#each $prefixes as prefix (prefix.path)}
-        <option value={prefix.path}>{prefix.path}</option>
-      {/each}
-    </select>
-    {#if $prefixes.length === 0}
-      <span class="hint">Noch kein Prefix vorhanden — leg zuerst einen unter "Prefixe & Runner" an.</span>
-    {/if}
-  </label>
-
-  <label>
-    Runner
-    <select bind:value={runnerId}>
-      <option value="" disabled selected>Runner wählen</option>
-      {#each $runners as runner (runner.id)}
-        <option value={runner.id}>{runner.name} ({runner.kind})</option>
-      {/each}
-    </select>
-  </label>
-
-  <label>
-    Umgebungsvariablen
-    <textarea placeholder={"KEY=WERT, eine pro Zeile"} bind:value={envVarsText}></textarea>
-  </label>
-
-  <label>
-    Startparameter
-    <input placeholder="z. B. --launcher-skip -dx11" bind:value={launchArgs} />
-  </label>
-
-  <details class="overrides" bind:open={overridesOpen}>
-    <summary>
-      Leistung &amp; Overlay
-      {#if overrideCount > 0}
-        <span class="badge">{overrideCount} angepasst</span>
-      {/if}
-    </summary>
-    <p class="hint">
-      Standardmäßig gelten die globalen Einstellungen. Hier kannst du sie nur für dieses Spiel
-      überschreiben.
-    </p>
-
-    <div class="toggle-list">
-      <div class="toggle-row" class:overridden={mangohudOverride !== null}>
-        <div>
-          <span class="toggle-label">MangoHud</span>
-          <p class="toggle-desc">Zeigt FPS, Auslastung und Temperaturen direkt im Spiel an.</p>
-        </div>
-        <div class="toggle-controls">
-          {#if mangohudOverride !== null}
-            <button
-              type="button"
-              class="reset"
-              title={resetTitle($mangoHudConfig?.enabled)}
-              onclick={() => (mangohudOverride = null)}
-            >
-              Zurücksetzen
-            </button>
-          {/if}
-          <label class="switch">
-            <input
-              type="checkbox"
-              checked={mangohudOn}
-              onchange={(e) => setMangohud(e.currentTarget.checked)}
-            />
-            <span class="track"><span class="thumb"></span></span>
-          </label>
-        </div>
-      </div>
-
-      <div class="toggle-row" class:overridden={gamemodeOverride !== null}>
-        <div>
-          <span class="toggle-label">
-            GameMode
-            <InfoIcon
-              text="Empfehlung: Wenn installiert, ruhig aktivieren — bringt oft spürbar mehr Leistung, besonders auf Laptops oder mit Energiesparmodus. Kein Nachteil, wenn GameMode fehlt. Läuft gerade ein konkurrierender Scheduler-Daemon (z. B. ananicy-cpp, scx), wird GameMode automatisch übersprungen und stattdessen auf das Performance-Energieprofil ausgewichen, um Konflikte um CPU-Priorität zu vermeiden."
-            />
-          </span>
-          <p class="toggle-desc">Optimiert CPU-Takt und Priorität, solange das Spiel läuft.</p>
-        </div>
-        <div class="toggle-controls">
-          {#if gamemodeOverride !== null}
-            <button
-              type="button"
-              class="reset"
-              title={resetTitle($performanceConfig?.gamemode_enabled)}
-              onclick={() => (gamemodeOverride = null)}
-            >
-              Zurücksetzen
-            </button>
-          {/if}
-          <label class="switch">
-            <input
-              type="checkbox"
-              checked={gamemodeOn}
-              onchange={(e) => setGamemode(e.currentTarget.checked)}
-            />
-            <span class="track"><span class="thumb"></span></span>
-          </label>
-        </div>
-      </div>
-
-      <div class="toggle-group" class:overridden={gamescope !== null}>
-        <div class="toggle-row">
-          <div>
-            <span class="toggle-label">
-              Gamescope
-              <InfoIcon
-                text="Empfehlung: Für Handhelds/TV-Setups oder um Auflösung und FPS-Limit unabhängig vom Spiel zu erzwingen. Braucht das gamescope-Paket; ohne das passiert einfach nichts. Wird übersprungen, wenn prefixr selbst schon in einer Gamescope-Session läuft."
-              />
-            </span>
-            <p class="toggle-desc">
-              Startet das Spiel in einer eigenen, verschachtelten Compositor-Session.
-            </p>
-          </div>
-          <div class="toggle-controls">
-            {#if gamescope !== null}
-              <button
-                type="button"
-                class="reset"
-                title={resetTitle($performanceConfig?.gamescope_enabled)}
-                onclick={() => (gamescope = null)}
-              >
-                Zurücksetzen
-              </button>
-            {/if}
-            <label class="switch">
-              <input
-                type="checkbox"
-                checked={gamescopeShown.enabled}
-                onchange={(e) => editGamescope({ enabled: e.currentTarget.checked })}
-              />
-              <span class="track"><span class="thumb"></span></span>
-            </label>
-          </div>
-        </div>
-        {#if gamescopeShown.enabled}
-          <div class="details">
-            <div class="detail-grid">
-              <label>
-                Breite (px)
-                <input
-                  type="number"
-                  min="0"
-                  placeholder="native"
-                  value={gamescopeShown.width ?? ""}
-                  oninput={(e) => editGamescope({ width: numberOrNull(e.currentTarget) })}
-                />
-              </label>
-              <label>
-                Höhe (px)
-                <input
-                  type="number"
-                  min="0"
-                  placeholder="native"
-                  value={gamescopeShown.height ?? ""}
-                  oninput={(e) => editGamescope({ height: numberOrNull(e.currentTarget) })}
-                />
-              </label>
-              <label>
-                FPS-Limit
-                <input
-                  type="number"
-                  min="0"
-                  placeholder="unbegrenzt"
-                  value={gamescopeShown.fps_limit ?? ""}
-                  oninput={(e) => editGamescope({ fps_limit: numberOrNull(e.currentTarget) })}
-                />
-              </label>
-            </div>
-            <label class="check">
-              <input
-                type="checkbox"
-                checked={gamescopeShown.fullscreen}
-                onchange={(e) => editGamescope({ fullscreen: e.currentTarget.checked })}
-              />
-              Vollbild erzwingen
-            </label>
-          </div>
+  <div class="tabs" role="tablist">
+    {#each tabs as t (t.id)}
+      <button
+        type="button"
+        role="tab"
+        aria-selected={activeTab === t.id}
+        class:active={activeTab === t.id}
+        onclick={() => (tab = t.id)}
+      >
+        {t.label}
+        {#if t.count > 0}
+          <span class="count" title="{t.count} für dieses Spiel angepasst">{t.count}</span>
         {/if}
+      </button>
+    {/each}
+  </div>
+
+  {#if activeTab === "general"}
+    <label>
+      Name
+      <input bind:value={name} placeholder="z. B. Baldur's Gate 3" />
+    </label>
+
+    <label>
+      Programm (.exe)
+      <div class="row">
+        <input bind:value={exePath} readonly placeholder="Noch keine Datei gewählt" />
+        <button type="button" onclick={pickExe}>Wählen…</button>
       </div>
+    </label>
 
-      <div class="toggle-group" class:overridden={vkbasalt !== null}>
-        <div class="toggle-row">
-          <div>
-            <span class="toggle-label">
-              vkBasalt
-              <InfoIcon
-                text="Empfehlung: Kostet immer etwas Leistung (zusätzlicher Bildbearbeitungsschritt) — nur aktivieren, wenn du GPU-Leistung übrig hast und dir das Ergebnis optisch wichtiger ist als die letzten FPS."
-              />
-            </span>
-            <p class="toggle-desc">Bildnachbearbeitung direkt im Spiel — kostet etwas Leistung.</p>
-          </div>
-          <div class="toggle-controls">
-            {#if vkbasalt !== null}
-              <button
-                type="button"
-                class="reset"
-                title={resetTitle($performanceConfig?.vkbasalt_enabled)}
-                onclick={() => (vkbasalt = null)}
-              >
-                Zurücksetzen
-              </button>
-            {/if}
-            <label class="switch">
-              <input
-                type="checkbox"
-                checked={vkbasaltShown.enabled}
-                onchange={(e) => editVkbasalt({ enabled: e.currentTarget.checked })}
-              />
-              <span class="track"><span class="thumb"></span></span>
-            </label>
-          </div>
-        </div>
-        {#if vkbasaltShown.enabled}
-          <div class="details">
-            <label class="check">
-              <input
-                type="checkbox"
-                checked={vkbasaltShown.sharpen}
-                onchange={(e) => editVkbasalt({ sharpen: e.currentTarget.checked })}
-              />
-              Schärfen (CAS)
-            </label>
-            {#if vkbasaltShown.sharpen}
-              <label>
-                Stärke: {vkbasaltShown.sharpness.toFixed(2)}
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={vkbasaltShown.sharpness}
-                  oninput={(e) => editVkbasalt({ sharpness: e.currentTarget.valueAsNumber })}
-                />
-              </label>
-            {/if}
-            <label class="check">
-              <input
-                type="checkbox"
-                checked={vkbasaltShown.smaa}
-                onchange={(e) => editVkbasalt({ smaa: e.currentTarget.checked })}
-              />
-              Kantenglättung (SMAA)
-            </label>
-            <label class="check">
-              <input
-                type="checkbox"
-                checked={vkbasaltShown.deband}
-                onchange={(e) => editVkbasalt({ deband: e.currentTarget.checked })}
-              />
-              Farbverläufe glätten (Deband)
-            </label>
-          </div>
-        {/if}
-      </div>
-    </div>
-  </details>
-
-  {#if isProton}
-    <details class="overrides" bind:open={protonOptionsOpen}>
-      <summary>
-        Proton-Optionen
-        {#if protonOptionCount > 0}
-          <span class="badge">{protonOptionCount} gesetzt</span>
-        {/if}
-      </summary>
-      <p class="hint">
-        Schalter, die der gewählte Runner kennt. „Standard“ überlässt die Entscheidung Proton und
-        den protonfixes. Einträge unter „Umgebungsvariablen“ haben Vorrang.
-      </p>
-
-      {#if protonOptionsError}
-        <p class="error">{protonOptionsError}</p>
-      {/if}
-
-      {#snippet tristate(option: ProtonOption)}
-        {@const value = protonOptionValue(option)}
-        <div class="tristate" role="group" aria-label={option.env}>
-          <button
-            type="button"
-            aria-pressed={value === null}
-            onclick={() => setProtonOption(option, null)}
-          >
-            Standard
-          </button>
-          <button
-            type="button"
-            aria-pressed={value === true}
-            onclick={() => setProtonOption(option, true)}
-          >
-            An
-          </button>
-          <button
-            type="button"
-            aria-pressed={value === false}
-            onclick={() => setProtonOption(option, false)}
-          >
-            Aus
-          </button>
-        </div>
-      {/snippet}
-
-      <div class="toggle-list">
-        {#each curatedProtonOptions as option (option.config)}
-          {@const info = PROTON_OPTION_INFO[option.config]}
-          <div class="toggle-row" class:overridden={protonOptionValue(option) !== null}>
-            <div>
-              <span class="toggle-label">{info.label}</span>
-              <p class="toggle-desc">{info.description}</p>
-              <code class="env-name">{option.env}</code>
-            </div>
-            <div class="toggle-controls">
-              {@render tristate(option)}
-            </div>
-          </div>
+    <label>
+      Prefix
+      <select bind:value={prefixPath}>
+        <option value="" disabled selected>Prefix wählen</option>
+        {#each $prefixes as prefix (prefix.path)}
+          <option value={prefix.path}>{prefix.path}</option>
         {/each}
-      </div>
-
-      {#if otherProtonOptions.length > 0}
-        <details class="advanced">
-          <summary>Erweitert ({otherProtonOptions.length})</summary>
-          <p class="hint">
-            Weitere Schalter aus dem Skript des Runners, ohne Beschreibung. Nur ändern, wenn ein
-            Fix für ein Spiel genau das verlangt.
-          </p>
-          <div class="compact-list">
-            {#each otherProtonOptions as option (option.config)}
-              <div class="compact-row" class:overridden={protonOptionValue(option) !== null}>
-                <code title={option.aliases.length ? `auch: ${option.aliases.join(", ")}` : ""}>
-                  {option.env}
-                </code>
-                {@render tristate(option)}
-              </div>
-            {/each}
-          </div>
-        </details>
+      </select>
+      {#if $prefixes.length === 0}
+        <span class="hint"
+          >Noch kein Prefix vorhanden — leg zuerst einen unter "Prefixe & Runner" an.</span
+        >
       {/if}
+    </label>
 
-      {#if availableProtonOptions.length > 0 && unknownProtonOptions.length > 0}
-        <div class="compact-list">
-          <p class="hint">Gesetzt, aber vom gewählten Runner nicht erkannt:</p>
-          {#each unknownProtonOptions as name (name)}
-            <div class="compact-row overridden">
-              <code>{name}={protonOptions[name] ? "1" : "0"}</code>
-              <button type="button" class="reset" onclick={() => clearProtonOption(name)}>
-                Entfernen
-              </button>
-            </div>
-          {/each}
-        </div>
-      {/if}
-    </details>
+    <label>
+      Runner
+      <select bind:value={runnerId}>
+        <option value="" disabled selected>Runner wählen</option>
+        {#each $runners as runner (runner.id)}
+          <option value={runner.id}>{runner.name} ({runner.kind})</option>
+        {/each}
+      </select>
+    </label>
+
+    <label>
+      Umgebungsvariablen
+      <textarea placeholder={"KEY=WERT, eine pro Zeile"} bind:value={envVarsText}></textarea>
+      <span class="hint">Haben Vorrang vor allen Schaltern in den anderen Tabs.</span>
+    </label>
+
+    <label>
+      Startparameter
+      <input placeholder="z. B. --launcher-skip -dx11" bind:value={launchArgs} />
+    </label>
+  {:else if activeTab === "performance"}
+    {@render inheritHint("Leistung")}
+    <PerformanceEditor value={perfShown} onchange={changePerf} overrides={perfHooks} />
+  {:else if activeTab === "graphics"}
+    {@render inheritHint("Bild")}
+    <GraphicsEditor value={gfxShown} onchange={changeGfx} overrides={gfxHooks} compact />
+  {:else if activeTab === "overlay"}
+    {@render inheritHint("Overlay")}
+    <OverlayEditor value={overlayShown} onchange={changeOverlay} overrides={overlayHooks} />
+  {:else if activeTab === "proton"}
+    {@render inheritHint("Proton")}
+    <ProtonEditor
+      options={protonOptions}
+      values={proton}
+      inherited={$protonConfig?.options ?? {}}
+      error={protonOptionsError}
+      onchange={(next) => (proton = next)}
+    />
   {/if}
 
   {#if error}
@@ -699,6 +432,46 @@
     display: flex;
     flex-direction: column;
     gap: 1em;
+  }
+
+  .tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3em;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.5em;
+  }
+
+  .tabs button {
+    background: none;
+    border: 1px solid transparent;
+    color: var(--text-muted);
+    padding: 0.4em 0.8em;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+  }
+
+  .tabs button:hover {
+    background: var(--surface-raised);
+  }
+
+  .tabs button.active {
+    background: var(--surface-raised);
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .count {
+    min-width: 1.4em;
+    padding: 0 0.4em;
+    border-radius: 999px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.75em;
+    font-weight: 600;
+    text-align: center;
   }
 
   .row {
@@ -722,231 +495,6 @@
   .hint {
     color: var(--text-muted);
     font-size: 0.85em;
-  }
-
-  .overrides {
-    background: var(--surface-raised);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 0.6em 0.8em;
-  }
-
-  .overrides[open] {
-    display: flex;
-    flex-direction: column;
-    gap: 0.8em;
-  }
-
-  summary {
-    cursor: pointer;
-    color: var(--text-muted);
-    font-weight: 600;
-    font-size: 0.9em;
-  }
-
-  .badge {
-    margin-left: 0.4em;
-    padding: 0.1em 0.5em;
-    border-radius: 999px;
-    background: var(--accent);
-    color: #fff;
-    font-size: 0.8em;
-    font-weight: 600;
-  }
-
-  .overrides .hint {
     margin: 0;
-  }
-
-  .toggle-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.6em;
-  }
-
-  .toggle-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1em;
-    padding: 0.6em 0.8em;
-    border-radius: 10px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-  }
-
-  .toggle-group {
-    border-radius: 10px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-  }
-
-  .toggle-group .toggle-row {
-    border: none;
-    background: none;
-  }
-
-  .toggle-row.overridden,
-  .toggle-group.overridden {
-    border-color: var(--accent);
-  }
-
-  .toggle-label {
-    font-weight: 600;
-    color: var(--text);
-    display: block;
-  }
-
-  .toggle-desc {
-    color: var(--text-muted);
-    font-size: 0.82em;
-    margin: 0.25em 0 0;
-  }
-
-  .toggle-controls {
-    display: flex;
-    align-items: center;
-    gap: 0.6em;
-    flex-shrink: 0;
-  }
-
-  .reset {
-    padding: 0.25em 0.6em;
-    font-size: 0.8em;
-  }
-
-  .switch {
-    flex-direction: row;
-    align-items: center;
-    cursor: pointer;
-    flex-shrink: 0;
-  }
-
-  .switch input {
-    position: absolute;
-    opacity: 0;
-    width: 1px;
-    height: 1px;
-  }
-
-  .track {
-    width: 44px;
-    height: 24px;
-    border-radius: 999px;
-    background: var(--border);
-    position: relative;
-    transition: background-color 0.15s;
-  }
-
-  .switch input:checked + .track {
-    background: var(--accent);
-  }
-
-  .thumb {
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: #fff;
-    transition: transform 0.15s;
-  }
-
-  .switch input:checked + .track .thumb {
-    transform: translateX(20px);
-  }
-
-  .details {
-    display: flex;
-    flex-direction: column;
-    gap: 0.6em;
-    padding: 0 0.8em 0.8em;
-  }
-
-  .detail-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(8em, 1fr));
-    gap: 0.6em;
-  }
-
-  .detail-grid input {
-    width: 100%;
-  }
-
-  .env-name {
-    display: inline-block;
-    margin-top: 0.3em;
-    color: var(--text-muted);
-    font-size: 0.75em;
-  }
-
-  .tristate {
-    display: flex;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-  }
-
-  .tristate button {
-    border: none;
-    border-radius: 0;
-    padding: 0.3em 0.7em;
-    font-size: 0.8em;
-    background: none;
-  }
-
-  .tristate button + button {
-    border-left: 1px solid var(--border);
-  }
-
-  .tristate button[aria-pressed="true"] {
-    background: var(--accent);
-    color: #fff;
-  }
-
-  .advanced summary {
-    font-weight: 500;
-  }
-
-  .advanced[open] {
-    display: flex;
-    flex-direction: column;
-    gap: 0.6em;
-  }
-
-  .compact-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.3em;
-  }
-
-  .compact-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1em;
-    padding: 0.3em 0.6em;
-    border-radius: 8px;
-    border: 1px solid transparent;
-  }
-
-  .compact-row code {
-    font-size: 0.8em;
-    overflow-wrap: anywhere;
-  }
-
-  .compact-row.overridden {
-    border-color: var(--accent);
-  }
-
-  .check {
-    flex-direction: row;
-    align-items: center;
-    gap: 0.5em;
-  }
-
-  .check input {
-    padding: 0;
   }
 </style>

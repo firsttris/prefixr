@@ -5,8 +5,16 @@
     open,
     title,
     onClose,
+    wide = false,
     children,
-  }: { open: boolean; title: string; onClose: () => void; children: Snippet } = $props();
+  }: {
+    open: boolean;
+    title: string;
+    onClose: () => void;
+    // For content with side-by-side layouts, like the game settings tabs.
+    wide?: boolean;
+    children: Snippet;
+  } = $props();
 
   function handleKeydown(event: KeyboardEvent) {
     if (event.key === "Escape") onClose();
@@ -19,6 +27,7 @@
   <div class="backdrop" onclick={onClose} role="presentation">
     <div
       class="panel"
+      class:wide
       role="dialog"
       aria-modal="true"
       aria-label={title}
@@ -57,6 +66,10 @@
     max-height: 85vh;
     overflow-y: auto;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+
+  .panel.wide {
+    width: min(760px, 100%);
   }
 
   header {
