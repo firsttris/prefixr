@@ -1,17 +1,20 @@
+use std::fs;
 use std::io::Cursor;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use editpe::Image as PeImage;
+use tauri::{AppHandle, Manager};
+use uuid::Uuid;
 
 const PNG_SIGNATURE: [u8; 8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
-/// Extracts an executable's embedded icon and returns it as a ready-to-use
-/// `data:image/png;base64,...` URI. Returns `None` whenever the file can't be
-/// parsed or has no icon resource — this is a cosmetic nicety for the game
-/// library, never a reason to fail adding or updating a game.
-pub fn extract_icon_data_url(exe_path: &Path) -> Option<String> {
+/// Extracts an executable's embedded icon as PNG. Returns `None` whenever
+/// the file can't be parsed or has no icon resource — this is a cosmetic
+/// nicety for the game library, never a reason to fail adding or updating a
+/// game.
+pub fn extract_icon_png(exe_path: &Path) -> Option<Vec<u8>> {
     let pe_image = PeImage::parse_file(exe_path).ok()?;
     let resources = pe_image.resource_directory()?;
     let icon_bytes = resources.get_main_icon().ok()??;
@@ -21,11 +24,56 @@ pub fn extract_icon_data_url(exe_path: &Path) -> Option<String> {
     decoded
         .write_to(&mut Cursor::new(&mut png_bytes), image::ImageFormat::Png)
         .ok()?;
+    Some(png_bytes)
+}
 
-    Some(format!(
-        "data:image/png;base64,{}",
-        STANDARD.encode(png_bytes)
-    ))
+/// A PNG as the `data:` URI the frontend shows as `Game::icon`.
+pub fn png_data_url(png: &[u8]) -> String {
+    format!("data:image/png;base64,{}", STANDARD.encode(png))
+}
+
+/// Where a game's exe icon is kept. Only in memory is it part of the
+/// `Game` (as `icon`), for the frontend; `config.json` leaves it out (see
+/// `config::save_config`), since a few dozen KB per game would otherwise
+/// make up nearly all of that file, rewritten on every settings change.
+/// Also what a shortcut's `Icon=` points to, as a real file.
+pub fn exe_icon_path(app: &AppHandle, id: Uuid) -> Result<PathBuf, String> {
+    Ok(app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Could not resolve data directory: {e}"))?
+        .join("exe-icons")
+        .join(format!("{id}.png")))
+}
+
+/// Saves a game's exe icon, or removes the old one when there is none.
+pub fn store_exe_icon(app: &AppHandle, id: Uuid, png: Option<&[u8]>) -> Result<(), String> {
+    let path = exe_icon_path(app, id)?;
+    let Some(png) = png else {
+        return match fs::remove_file(&path) {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
+                Err(format!("Could not remove {}: {e}", path.display()))
+            }
+            _ => Ok(()),
+        };
+    };
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir).map_err(|e| format!("Could not create {}: {e}", dir.display()))?;
+    }
+    fs::write(&path, png).map_err(|e| format!("Could not write {}: {e}", path.display()))
+}
+
+/// A game's saved exe icon as a `data:` URI, if it has one.
+pub fn load_exe_icon(app: &AppHandle, id: Uuid) -> Option<String> {
+    let png = fs::read(exe_icon_path(app, id).ok()?).ok()?;
+    Some(png_data_url(&png))
+}
+
+/// The PNG inside an icon `data:` URI, as older versions kept in
+/// `config.json`.
+pub fn data_url_png(data_url: &str) -> Option<Vec<u8>> {
+    let (_, payload) = data_url.split_once(',')?;
+    STANDARD.decode(payload).ok()
 }
 
 /// `editpe::get_main_icon` hands back a single icon entry's raw image bytes —

@@ -85,7 +85,7 @@ fn winetricks_log_path(app: &AppHandle, prefix_path: &Path) -> Result<PathBuf, S
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(|e| format!("Could not read system time: {e}"))?
-        .as_secs();
+        .as_millis();
     let dir_name = prefix_path.to_string_lossy().replace(['/', '\\'], "_");
     Ok(data_dir
         .join("logs")

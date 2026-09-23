@@ -1,6 +1,7 @@
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 use futures_util::StreamExt;
 use reqwest::RequestBuilder;
@@ -389,6 +390,29 @@ async fn verify_checksum(
     }
 }
 
+/// Checks the `tag` and `download_url` the frontend passes back from
+/// `list_runner_releases`: the tag becomes a directory name inside the
+/// runners directory, and the URL gets the GitHub token, so neither is
+/// taken on trust — only a plain name, and only a release asset of this
+/// source's own repo.
+fn check_download_request(source: &RunnerSource, tag: &str, download_url: &str) -> Result<(), String> {
+    if tag.is_empty() || tag.starts_with('.') || tag.contains(['/', '\\', '\0']) {
+        return Err(format!("Invalid runner tag '{tag}'"));
+    }
+    let expected = format!("https://github.com/{}/releases/download/", source.repo);
+    let matches = download_url
+        .get(..expected.len())
+        .is_some_and(|start| start.eq_ignore_ascii_case(&expected));
+    if !matches {
+        return Err(format!("Not a {} release download: {download_url}", source.label));
+    }
+    Ok(())
+}
+
+/// How often `runner-download-progress` goes out at most: once per chunk
+/// would be tens of thousands of events for a single runner.
+const PROGRESS_INTERVAL: Duration = Duration::from_millis(100);
+
 /// Downloads a runner release into the runners directory and extracts it.
 /// Progress (bytes downloaded so far, and the total if known) is streamed via
 /// `runner-download-progress` events; the final outcome is reported both as
@@ -402,6 +426,7 @@ pub async fn download_runner(
     download_url: String,
 ) -> Result<(), String> {
     let runner_source = find_source(&source)?;
+    check_download_request(runner_source, &tag, &download_url)?;
     let asset_name = download_url
         .rsplit('/')
         .next()
@@ -449,7 +474,13 @@ pub async fn download_runner(
 
     let total = response.content_length();
     let archive_suffix = if is_xz { "tar.xz" } else { "tar.gz" };
-    let archive_path = std::env::temp_dir().join(format!("prefixr-{tag}.{archive_suffix}"));
+    // Next to the runners rather than in /tmp, which is often a RAM-backed
+    // tmpfs too small for a runner of several hundred MB; hidden and not a
+    // directory, so `scan_runners` never lists it.
+    let archive_path = runners_dir.join(format!(
+        ".download-{}.{archive_suffix}",
+        uuid::Uuid::new_v4()
+    ));
 
     let download_result: Result<(), String> = async {
         let mut file = tokio::fs::File::create(&archive_path)
@@ -457,6 +488,7 @@ pub async fn download_runner(
             .map_err(|e| format!("Could not create temp file: {e}"))?;
 
         let mut downloaded: u64 = 0;
+        let mut last_progress: Option<Instant> = None;
         let mut stream = response.bytes_stream();
         while let Some(chunk) = stream.next().await {
             let chunk = chunk.map_err(|e| format!("Download interrupted: {e}"))?;
@@ -464,14 +496,18 @@ pub async fn download_runner(
             file.write_all(&chunk)
                 .await
                 .map_err(|e| format!("Could not write temp file: {e}"))?;
-            let _ = app.emit(
-                "runner-download-progress",
-                RunnerDownloadProgressPayload {
-                    tag: &tag,
-                    downloaded,
-                    total,
-                },
-            );
+            let finished = total == Some(downloaded);
+            if finished || last_progress.is_none_or(|at| at.elapsed() >= PROGRESS_INTERVAL) {
+                last_progress = Some(Instant::now());
+                let _ = app.emit(
+                    "runner-download-progress",
+                    RunnerDownloadProgressPayload {
+                        tag: &tag,
+                        downloaded,
+                        total,
+                    },
+                );
+            }
         }
         file.flush()
             .await
@@ -642,6 +678,23 @@ f899879b8c37e0b20adca19d147cf77436f3f1a37bf16d08d27fa7137a52b9ba  wine-11.18-amd
         assert!(!(find_source("proton-cachyos").unwrap().matches_asset)(
             "proton-cachyos-11.0-20260703-slr-arm64.tar.xz"
         ));
+    }
+
+    #[test]
+    fn download_requests_are_checked() {
+        let source = find_source("proton-ge").unwrap();
+        let url = "https://github.com/GloriousEggroll/proton-ge-custom/releases/download/GE-Proton11-7/GE-Proton11-7.tar.gz";
+        assert!(check_download_request(source, "GE-Proton11-7", url).is_ok());
+        for tag in ["", "..", ".hidden", "../x", "a/b", "/abs"] {
+            assert!(check_download_request(source, tag, url).is_err(), "{tag}");
+        }
+        for url in [
+            "https://evil.example/GloriousEggroll/proton-ge-custom/releases/download/x.tar.gz",
+            "https://github.com/Kron4ek/Wine-Builds/releases/download/x/x.tar.xz",
+            "http://github.com/GloriousEggroll/proton-ge-custom/releases/download/x.tar.gz",
+        ] {
+            assert!(check_download_request(source, "x", url).is_err(), "{url}");
+        }
     }
 
     #[test]

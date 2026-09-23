@@ -6,8 +6,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use base64::engine::general_purpose::STANDARD;
-use base64::Engine;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Listener, Manager, State};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
@@ -15,7 +13,7 @@ use uuid::Uuid;
 
 use crate::commands::github::read_token;
 use crate::commands::graphics_layers::{ensure_directx_layer_cache, ensure_wine_mono_msi};
-use crate::commands::icons::extract_icon_data_url;
+use crate::commands::icons::{exe_icon_path, extract_icon_png, png_data_url, store_exe_icon};
 use crate::commands::graphics::{ensure_vkbasalt_conf, vkbasalt_conf_path};
 use crate::commands::mangohud::{ensure_mangohud_conf, mangohud_conf_path};
 use crate::commands::runners::{
@@ -106,17 +104,42 @@ pub struct RunningGames(pub Mutex<HashMap<Uuid, RunningGame>>);
 /// exits. Unlike `RunningGames`, this also covers the preparation before
 /// the process is spawned (umu/DXVK/wine-mono downloads, prefix setup),
 /// which can take a while without any window showing up.
+///
+/// Each claim also holds a lock file per game (see `lock_launch_file`),
+/// which is what makes it visible to other Prefixr processes: a game Steam
+/// started via `--run` runs in a windowless Prefixr of its own, and the
+/// open one must neither start it a second time nor delete its prefix.
 #[derive(Default)]
 pub struct LaunchingGames(Mutex<HashSet<Uuid>>);
 
 impl LaunchingGames {
-    /// Marks `id` as launching, or `None` if it already is.
+    /// Marks `id` as launching, or `None` if it already is — in this
+    /// process or another one.
     pub(crate) fn claim(&self, id: Uuid) -> Option<LaunchGuard<'_>> {
         // The lock is released before a guard exists: dropping one locks
         // again (and must never happen for a refused claim, whose drop
         // would end the launch already in progress).
         let inserted = self.0.lock().ok()?.insert(id);
-        inserted.then(|| LaunchGuard { launching: self, id })
+        if !inserted {
+            return None;
+        }
+        let mut guard = LaunchGuard {
+            launching: self,
+            id,
+            _lock_file: None,
+        };
+        // Refused by another process: dropping the guard takes `id` back
+        // out of this process's set, where it was only just inserted.
+        guard._lock_file = lock_launch_file(id).ok()?;
+        Some(guard)
+    }
+
+    /// The games launching or running in this process.
+    pub(crate) fn ids(&self) -> Vec<Uuid> {
+        self.0
+            .lock()
+            .map(|launching| launching.iter().copied().collect())
+            .unwrap_or_default()
     }
 }
 
@@ -124,6 +147,43 @@ impl LaunchingGames {
 pub(crate) struct LaunchGuard<'a> {
     launching: &'a LaunchingGames,
     id: Uuid,
+    /// Held locked for as long as the guard lives; closing it unlocks it,
+    /// and so does the process ending in any way.
+    _lock_file: Option<fs::File>,
+}
+
+/// Where the per-game lock files live: the user's runtime directory, which
+/// every Prefixr process of the same user shares, including one started by
+/// Steam.
+fn launch_lock_dir() -> PathBuf {
+    match std::env::var_os("XDG_RUNTIME_DIR") {
+        Some(dir) => PathBuf::from(dir).join("prefixr"),
+        // SAFETY: getuid(2) can't fail and has no preconditions.
+        None => std::env::temp_dir().join(format!("prefixr-{}", unsafe { libc::getuid() })),
+    }
+}
+
+/// Locks the game's lock file, `Err` if another process holds it. A file
+/// that can't be created or locked for any other reason gives `Ok(None)`:
+/// the launch then goes ahead, guarded only within this process as before.
+fn lock_launch_file(id: Uuid) -> Result<Option<fs::File>, ()> {
+    let dir = launch_lock_dir();
+    if fs::create_dir_all(&dir).is_err() {
+        return Ok(None);
+    }
+    let Ok(file) = fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(dir.join(format!("{id}.lock")))
+    else {
+        return Ok(None);
+    };
+    match file.try_lock() {
+        Ok(()) => Ok(Some(file)),
+        Err(fs::TryLockError::WouldBlock) => Err(()),
+        Err(fs::TryLockError::Error(_)) => Ok(None),
+    }
 }
 
 impl Drop for LaunchGuard<'_> {
@@ -326,6 +386,36 @@ pub async fn kill_running_game(running: &RunningGames, id: Uuid) -> Result<(), S
     }
 }
 
+/// A game this Prefixr is launching or running, for the frontend to pick
+/// its state back up after the webview reloaded (the launch events it
+/// tracks that state from are gone by then).
+#[derive(Serialize)]
+pub struct ActiveGame {
+    id: String,
+    /// The process runs; otherwise it's still being prepared.
+    running: bool,
+}
+
+#[tauri::command]
+pub fn list_active_games(
+    running: State<RunningGames>,
+    launching: State<LaunchingGames>,
+) -> Vec<ActiveGame> {
+    let running = running
+        .0
+        .lock()
+        .map(|games| games.keys().copied().collect::<HashSet<_>>())
+        .unwrap_or_default();
+    launching
+        .ids()
+        .into_iter()
+        .map(|id| ActiveGame {
+            id: id.to_string(),
+            running: running.contains(&id),
+        })
+        .collect()
+}
+
 #[tauri::command]
 pub async fn kill_game(running: State<'_, RunningGames>, id: String) -> Result<(), String> {
     let game_id = Uuid::parse_str(&id).map_err(|e| format!("Invalid game id: {e}"))?;
@@ -438,17 +528,20 @@ pub fn add_game(
     state: State<ConfigState>,
     game: GameInput,
 ) -> Result<Game, String> {
-    let icon = extract_icon_data_url(&game.exe_path);
+    let icon = extract_icon_png(&game.exe_path);
     let (umu_id, umu_store) = umu_fields(game.umu_id, game.umu_store);
+    let id = Uuid::new_v4();
+    // Best-effort, like the icon itself: it's only cosmetic.
+    let _ = store_exe_icon(&app, id, icon.as_deref());
     let new_game = Game {
-        id: Uuid::new_v4(),
+        id,
         name: game.name,
         exe_path: game.exe_path,
         prefix_path: game.prefix_path,
         runner_id: game.runner_id,
         env_vars: game.env_vars,
         launch_args: game.launch_args,
-        icon,
+        icon: icon.as_deref().map(png_data_url),
         steamgriddb_id: None,
         cover_grid_id: None,
         cover_url: None,
@@ -492,7 +585,10 @@ pub fn update_game(
         let existing = &config.games[find(&config.games)?];
         existing.exe_path != game.exe_path || existing.icon.is_none()
     };
-    let icon = needs_icon.then(|| extract_icon_data_url(&game.exe_path));
+    let icon = needs_icon.then(|| extract_icon_png(&game.exe_path));
+    if let Some(icon) = &icon {
+        let _ = store_exe_icon(&app, game_id, icon.as_deref());
+    }
 
     let mut config = state
         .lock()
@@ -501,7 +597,7 @@ pub fn update_game(
     let existing = &mut config.games[index];
 
     if let Some(icon) = icon {
-        existing.icon = icon;
+        existing.icon = icon.as_deref().map(png_data_url);
     }
     existing.name = game.name;
     existing.exe_path = game.exe_path;
@@ -530,9 +626,13 @@ pub fn remove_game(app: AppHandle, state: State<ConfigState>, id: String) -> Res
 
     config.games.retain(|g| g.id != game_id);
     save_config(&app, &config)?;
-    for path in [vkbasalt_conf_path(&app, &id), mangohud_conf_path(&app, &id)]
-        .into_iter()
-        .flatten()
+    for path in [
+        vkbasalt_conf_path(&app, &id),
+        mangohud_conf_path(&app, &id),
+        exe_icon_path(&app, game_id),
+    ]
+    .into_iter()
+    .flatten()
     {
         let _ = fs::remove_file(path);
     }
@@ -568,10 +668,12 @@ fn log_file_path(app: &AppHandle, game_id: &str) -> Result<PathBuf, String> {
         .path()
         .app_data_dir()
         .map_err(|e| format!("Could not resolve data directory: {e}"))?;
+    // Milliseconds, so two launches within the same second (a quick retry
+    // after a failed start) don't share, and truncate, one log file.
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(|e| format!("Could not read system time: {e}"))?
-        .as_secs();
+        .as_millis();
     // .txt rather than .log: most Linux desktops have no default app
     // registered for .log, so "Log anzeigen" would silently fail to open it.
     Ok(data_dir
@@ -601,9 +703,11 @@ fn relink_if_needed(src_path: &Path, dst_path: &Path) -> Result<(), String> {
 }
 
 /// Direct3D/DXGI modules DXVK provides, and D3D12 modules VKD3D-Proton
-/// provides — forced to load as native since a plain Wine build's own
-/// builtin implementations of these are the unaccelerated, OpenGL-backed
-/// ones DXVK/VKD3D-Proton exist to replace.
+/// provides — preferred as native since a plain Wine build's own builtin
+/// implementations of these are the unaccelerated, OpenGL-backed ones
+/// DXVK/VKD3D-Proton exist to replace. Builtin stays the fallback (`n,b`,
+/// as Bottles does) for a module the cached release doesn't ship, e.g.
+/// `d3d8` in DXVK before 2.1, which would otherwise not load at all.
 const DXVK_MODULES: &[&str] = &["d3d8", "d3d9", "d3d10core", "d3d11", "dxgi"];
 const VKD3D_MODULES: &[&str] = &["d3d12", "d3d12core"];
 
@@ -617,12 +721,20 @@ const VKD3D_MODULES: &[&str] = &["d3d12", "d3d12core"];
 /// entirely, so they're re-linked on every launch rather than once.
 fn sync_directx_overrides_from_cache(cache_dir: &Path, prefix_path: &Path) -> Result<String, String> {
     let windows_dir = prefix_path.join("drive_c/windows");
+    let win32 = is_win32_prefix(prefix_path);
 
     for (layer_dir, dir64, dir32, modules) in [
         ("dxvk", "x64", "x32", DXVK_MODULES),
         ("vkd3d-proton", "x64", "x86", VKD3D_MODULES),
     ] {
-        for (arch_dir, subdir) in [(dir64, "system32"), (dir32, "syswow64")] {
+        // A 32-bit prefix's `system32` holds 32-bit DLLs, and it has no
+        // `syswow64` at all.
+        let targets: &[(&str, &str)] = if win32 {
+            &[(dir32, "system32")]
+        } else {
+            &[(dir64, "system32"), (dir32, "syswow64")]
+        };
+        for &(arch_dir, subdir) in targets {
             let src_dir = cache_dir.join(layer_dir).join(arch_dir);
             let dst_dir = windows_dir.join(subdir);
             if !dst_dir.is_dir() {
@@ -640,7 +752,18 @@ fn sync_directx_overrides_from_cache(cache_dir: &Path, prefix_path: &Path) -> Re
         .chain(VKD3D_MODULES.iter())
         .copied()
         .collect();
-    Ok(format!("{}=n", modules.join(",")))
+    Ok(format!("{}=n,b", modules.join(",")))
+}
+
+/// Whether a prefix was created as 32-bit only (`WINEARCH=win32`), as older
+/// prefixes imported from other tools sometimes are. Wine records that in
+/// the header of `system.reg`, e.g. `#arch=win32`.
+fn is_win32_prefix(prefix_path: &Path) -> bool {
+    use std::io::Read;
+    let mut header = String::new();
+    fs::File::open(prefix_path.join("system.reg"))
+        .and_then(|file| file.take(512).read_to_string(&mut header))
+        .is_ok_and(|_| header.lines().any(|line| line.trim() == "#arch=win32"))
 }
 
 /// Installs wine-mono into `prefix_path` via `msiexec`, unless it's already
@@ -1003,18 +1126,41 @@ async fn run_game(
             prepare_proton(app, token.as_deref(), &runner, &game, id, log_path, &mut env).await?
         }
         RunnerKind::Wine => {
+            // Proton turns wine's debug channels off itself unless asked to
+            // log; plain Wine would write every `fixme:` into the log, which
+            // costs some games noticeable performance. Before the game's own
+            // env vars, so a hand-written `WINEDEBUG` still wins.
+            env.push(("WINEDEBUG".to_string(), "-all".to_string()));
             prepare_wine(app, &runner, &game, id, log_path, &mut dll_overrides).await?
         }
     };
     env.push(("WINEDLLOVERRIDES".to_string(), dll_overrides.join(";")));
 
+    // Gamescope goes outermost (see below). It's a Vulkan program itself, so
+    // the implicit-layer switches meant for the game would also load
+    // MangoHud and vkBasalt into gamescope, drawing the overlay and applying
+    // the effects a second time on its output. With gamescope, those go into
+    // `game_only_env` instead, which only the command inside it gets, and
+    // MangoHud preferably runs as gamescope's own `--mangoapp`. Skipped if
+    // we're already inside a gamescope session ourselves — nesting it again
+    // is pointless and often broken.
+    let use_gamescope = graphics.gamescope.enabled
+        && command_on_path("gamescope")
+        && std::env::var_os("GAMESCOPE_WAYLAND_DISPLAY").is_none();
+    let use_mangoapp = use_gamescope && mangohud.enabled && command_on_path("mangoapp");
+    let mut game_only_env: Vec<(String, String)> = Vec::new();
+
     if mangohud.enabled {
         let conf_path = ensure_mangohud_conf(app, id, &mangohud.layout)?;
-        env.push(("MANGOHUD".to_string(), "1".to_string()));
+        // Also read by mangoapp, which gamescope starts with its own env.
         env.push((
             "MANGOHUD_CONFIGFILE".to_string(),
             conf_path.display().to_string(),
         ));
+        if !use_mangoapp {
+            let target = if use_gamescope { &mut game_only_env } else { &mut env };
+            target.push(("MANGOHUD".to_string(), "1".to_string()));
+        }
     }
     // GameMode writes niceness/CPU-governor directly, which fights a
     // competing auto-nice/scheduler daemon if one is running — so in that
@@ -1027,8 +1173,9 @@ async fn run_game(
     }
     if graphics.vkbasalt.enabled {
         let vkbasalt_conf = ensure_vkbasalt_conf(app, id, &graphics.vkbasalt)?;
-        env.push(("ENABLE_VKBASALT".to_string(), "1".to_string()));
-        env.push((
+        let target = if use_gamescope { &mut game_only_env } else { &mut env };
+        target.push(("ENABLE_VKBASALT".to_string(), "1".to_string()));
+        target.push((
             "VKBASALT_CONFIG_FILE".to_string(),
             vkbasalt_conf.display().to_string(),
         ));
@@ -1100,12 +1247,7 @@ async fn run_game(
     }
 
     // Gamescope goes outermost: it opens its own nested compositor session
-    // and everything else (wine, the other wrappers) runs inside it. Skipped
-    // if we're already inside a gamescope session ourselves — nesting it
-    // again is pointless and often broken.
-    let use_gamescope = graphics.gamescope.enabled
-        && command_on_path("gamescope")
-        && std::env::var_os("GAMESCOPE_WAYLAND_DISPLAY").is_none();
+    // and everything else (wine, the other wrappers) runs inside it.
     if use_gamescope {
         let mut wrapped = vec!["gamescope".to_string()];
         if let Some(width) = graphics.gamescope.width {
@@ -1123,7 +1265,14 @@ async fn run_game(
         if graphics.gamescope.fullscreen {
             wrapped.push("-f".to_string());
         }
+        if use_mangoapp {
+            wrapped.push("--mangoapp".to_string());
+        }
         wrapped.push("--".to_string());
+        if !game_only_env.is_empty() {
+            wrapped.push("env".to_string());
+            wrapped.extend(game_only_env.iter().map(|(key, value)| format!("{key}={value}")));
+        }
         wrapped.append(&mut launch_chain);
         launch_chain = wrapped;
     }
@@ -1333,35 +1482,8 @@ pub(crate) fn write_shortcut_icon(app: &AppHandle, game: &Game) -> Result<Option
             return Ok(Some(path));
         }
     }
-    write_exe_icon_file(app, game)
-}
-
-/// Decodes a game's `icon` data URI (the exe's embedded icon) to a cached
-/// PNG file, since a `.desktop` entry's `Icon=` needs a real file path, not
-/// inline image data.
-fn write_exe_icon_file(app: &AppHandle, game: &Game) -> Result<Option<PathBuf>, String> {
-    let Some(data_url) = &game.icon else {
-        return Ok(None);
-    };
-    let payload = data_url
-        .split_once(',')
-        .map(|(_, payload)| payload)
-        .ok_or_else(|| "Icon data is not a valid data URI".to_string())?;
-    let bytes = STANDARD
-        .decode(payload)
-        .map_err(|e| format!("Could not decode icon data: {e}"))?;
-
-    let icons_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("Could not resolve data directory: {e}"))?
-        .join("shortcut-icons");
-    fs::create_dir_all(&icons_dir)
-        .map_err(|e| format!("Could not create shortcut icons directory: {e}"))?;
-
-    let icon_path = icons_dir.join(format!("{}.png", game.id));
-    fs::write(&icon_path, bytes).map_err(|e| format!("Could not write icon file: {e}"))?;
-    Ok(Some(icon_path))
+    let path = exe_icon_path(app, game.id)?;
+    Ok(path.is_file().then_some(path))
 }
 
 /// Resolves the path a `.desktop` shortcut should point to. When running from
@@ -1375,6 +1497,42 @@ pub(crate) fn own_executable_path() -> Result<PathBuf, String> {
         return Ok(PathBuf::from(appimage_path));
     }
     std::env::current_exe().map_err(|e| format!("Could not resolve own executable path: {e}"))
+}
+
+/// Escapes a value for a `.desktop` file: a backslash starts an escape
+/// sequence there, and a line break would end the entry — e.g. a game name
+/// pasted with a trailing newline.
+fn desktop_string(value: &str) -> String {
+    value
+        .chars()
+        .map(|c| match c {
+            '\\' => "\\\\".to_string(),
+            c if c.is_control() => " ".to_string(),
+            c => c.to_string(),
+        })
+        .collect()
+}
+
+/// Quotes a path as one argument of an `Exec=` line, per the Desktop Entry
+/// spec: inside the quotes, `"`, `` ` ``, `$` and `\` take a backslash; the
+/// whole line is then a string value, whose own escaping doubles every
+/// backslash; and a literal `%` is `%%`, since `%` starts a field code.
+fn desktop_exec_arg(path: &Path) -> String {
+    let mut quoted = String::from("\"");
+    for c in path.to_string_lossy().chars() {
+        match c {
+            '"' | '`' | '$' => {
+                quoted.push_str("\\\\");
+                quoted.push(c);
+            }
+            '\\' => quoted.push_str("\\\\\\\\"),
+            '%' => quoted.push_str("%%"),
+            c if c.is_control() => quoted.push(' '),
+            c => quoted.push(c),
+        }
+    }
+    quoted.push('"');
+    quoted
 }
 
 /// Looks up a game by id and writes a `.desktop` file for it into
@@ -1411,14 +1569,14 @@ fn write_game_shortcut(
     let mut contents = String::new();
     contents.push_str("[Desktop Entry]\n");
     contents.push_str("Type=Application\n");
-    contents.push_str(&format!("Name={}\n", game.name));
+    contents.push_str(&format!("Name={}\n", desktop_string(&game.name)));
     contents.push_str(&format!(
-        "Exec=\"{}\" --launch {}\n",
-        exe_path.display(),
+        "Exec={} --launch {}\n",
+        desktop_exec_arg(&exe_path),
         game.id
     ));
     if let Some(icon_path) = &icon_path {
-        contents.push_str(&format!("Icon={}\n", icon_path.display()));
+        contents.push_str(&format!("Icon={}\n", desktop_string(&icon_path.to_string_lossy())));
     }
     contents.push_str("Terminal=false\n");
     contents.push_str("Categories=Game;\n");
@@ -1521,8 +1679,8 @@ pub fn ensure_install_desktop_entry(app: &AppHandle) -> Result<(), String> {
     // compose its own sentence around it, same as every other app's entry.
     contents.push_str("Name=Prefixr installieren\n");
     contents.push_str("Name[en]=Install Prefixr\n");
-    contents.push_str(&format!("Exec=\"{}\" --install %f\n", exe_path.display()));
-    contents.push_str(&format!("Icon={}\n", icon_path.display()));
+    contents.push_str(&format!("Exec={} --install %f\n", desktop_exec_arg(&exe_path)));
+    contents.push_str(&format!("Icon={}\n", desktop_string(&icon_path.to_string_lossy())));
     contents.push_str("Terminal=false\n");
     contents.push_str("NoDisplay=true\n");
     contents.push_str(&format!("MimeType={EXE_MIME_TYPES}\n"));
@@ -1601,13 +1759,68 @@ mod tests {
     }
 
     #[test]
+    fn desktop_entries_are_escaped() {
+        assert_eq!(desktop_string("Game: Part\\2\n"), "Game: Part\\\\2 ");
+        assert_eq!(
+            desktop_exec_arg(Path::new("/Apps/100% \"Pre$fixr\"/a\\b.AppImage")),
+            r#""/Apps/100%% \\"Pre\\$fixr\\"/a\\\\b.AppImage""#
+        );
+        assert_eq!(desktop_exec_arg(Path::new("/opt/prefixr")), "\"/opt/prefixr\"");
+    }
+
+    #[test]
+    fn detects_32_bit_prefixes() {
+        let dir = std::env::temp_dir().join(format!("prefixr-test-{}", Uuid::new_v4()));
+        fs::create_dir_all(&dir).unwrap();
+        assert!(!is_win32_prefix(&dir));
+        let header = |arch: &str| {
+            format!("WINE REGISTRY Version 2\n;; All keys relative to \\\\Machine\n\n#arch={arch}\n\n")
+        };
+        fs::write(dir.join("system.reg"), header("win64")).unwrap();
+        assert!(!is_win32_prefix(&dir));
+        fs::write(dir.join("system.reg"), header("win32")).unwrap();
+        assert!(is_win32_prefix(&dir));
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// Claims `id`, retrying for a moment: a process another test spawns at
+    /// the same time shares every open file, the lock files included, from
+    /// its fork until its exec (they're close-on-exec), and so briefly the
+    /// lock too. A real relaunch — a click — never races against that.
+    fn claim_eventually(launching: &LaunchingGames, id: Uuid) -> Option<LaunchGuard<'_>> {
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            if let Some(guard) = launching.claim(id) {
+                return Some(guard);
+            }
+            if Instant::now() > deadline {
+                return None;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+
+    #[test]
+    fn launching_games_refuses_a_launch_in_another_process() {
+        // Two `LaunchingGames` stand in for two Prefixr processes: each
+        // opens the lock file on its own, as another process would.
+        let (here, elsewhere) = (LaunchingGames::default(), LaunchingGames::default());
+        let id = Uuid::new_v4();
+        let guard = elsewhere.claim(id).unwrap();
+        assert!(here.claim(id).is_none());
+        assert!(here.ids().is_empty());
+        drop(guard);
+        assert!(claim_eventually(&here, id).is_some());
+    }
+
+    #[test]
     fn launching_games_refuses_a_second_launch() {
         let launching = LaunchingGames::default();
         let id = Uuid::new_v4();
         let guard = launching.claim(id).unwrap();
         assert!(launching.claim(id).is_none());
         drop(guard);
-        assert!(launching.claim(id).is_some());
+        assert!(claim_eventually(&launching, id).is_some());
     }
 
     #[test]

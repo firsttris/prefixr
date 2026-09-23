@@ -54,23 +54,28 @@
   // If it was started via the "Mit Prefixr installieren" context menu entry
   // (--install <exe-path>) — or a second such click handed its path off to
   // this already-running instance — open the install dialog instead.
+  // The listeners go in first: a handoff arriving while the startup
+  // arguments are still being read would otherwise be lost.
   onMount(async () => {
+    await Promise.all([
+      listenForPendingLaunch((gameId) => {
+        initGameEvents();
+        launchGame(gameId);
+      }),
+      listenForPendingInstall((exePath) => (installingExePath = exePath)),
+    ]);
+
     const pendingGameId = await takePendingLaunch();
     if (pendingGameId) {
       view = "library";
       initGameEvents();
       launchGame(pendingGameId);
     }
-    listenForPendingLaunch((gameId) => {
-      initGameEvents();
-      launchGame(gameId);
-    });
 
     const pendingExePath = await takePendingInstall();
     if (pendingExePath) {
       installingExePath = pendingExePath;
     }
-    listenForPendingInstall((exePath) => (installingExePath = exePath));
   });
 </script>
 

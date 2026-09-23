@@ -151,7 +151,9 @@ fn resolve_windows_path(prefix_path: &Path, windows_path: &str) -> Option<PathBu
     if chars.next() != Some(':') {
         return None;
     }
-    let rest = windows_path[2..].trim_start_matches(['\\', '/']);
+    // What's left after `X:` — via the iterator, since a drive "letter"
+    // from a malformed shortcut needn't be one byte long.
+    let rest = chars.as_str().trim_start_matches(['\\', '/']);
 
     let drive_link = prefix_path.join("dosdevices").join(format!("{drive}:"));
     let mut resolved = fs::canonicalize(&drive_link).ok()?;

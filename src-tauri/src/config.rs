@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 use tauri::{AppHandle, Manager};
 
+use crate::commands::icons;
 use crate::models::{
     Game, GitHubConfig, GraphicsConfig, MangoHudConfig, PerformanceConfig, PrefixInfo,
     ProtonConfig, SteamGridDbConfig,
@@ -79,7 +80,41 @@ pub fn load_config(app: &AppHandle) -> Result<AppConfig, String> {
         .map_err(|e| format!("Could not read {}: {e}", path.display()))?;
     let mut value: Value = serde_json::from_str(&raw).map_err(|e| invalid(&e))?;
     migrate(&mut value);
-    serde_json::from_value(value).map_err(|e| invalid(&e))
+    let mut config: AppConfig = serde_json::from_value(value).map_err(|e| invalid(&e))?;
+    load_icons(app, &mut config);
+    Ok(config)
+}
+
+/// Fills in each game's exe icon from its file (see `icons::exe_icon_path`).
+/// A config from before those files existed still has the icons inline:
+/// they're moved to files here, and `save_config` leaves them out from then
+/// on. Best-effort throughout, the icons are only cosmetic.
+fn load_icons(app: &AppHandle, config: &mut AppConfig) {
+    for game in &mut config.games {
+        match &game.icon {
+            Some(data_url) => {
+                let missing = icons::exe_icon_path(app, game.id).is_ok_and(|path| !path.exists());
+                if let (true, Some(png)) = (missing, icons::data_url_png(data_url)) {
+                    let _ = icons::store_exe_icon(app, game.id, Some(&png));
+                }
+            }
+            None => game.icon = icons::load_exe_icon(app, game.id),
+        }
+    }
+}
+
+/// The config as written to disk: everything but the games' exe icons,
+/// which live in files of their own (see `load_icons`).
+fn to_disk_json(config: &AppConfig) -> Result<String, String> {
+    let mut value =
+        serde_json::to_value(config).map_err(|e| format!("Could not serialize config: {e}"))?;
+    let games = value.get_mut("games").and_then(Value::as_array_mut);
+    for game in games.into_iter().flatten() {
+        if let Some(game) = game.as_object_mut() {
+            game.remove("icon");
+        }
+    }
+    serde_json::to_string_pretty(&value).map_err(|e| format!("Could not serialize config: {e}"))
 }
 
 /// Brings a config written by an older version into the current shape. The
@@ -146,8 +181,7 @@ pub fn save_config(app: &AppHandle, config: &AppConfig) -> Result<(), String> {
         fs::create_dir_all(parent)
             .map_err(|e| format!("Could not create config directory: {e}"))?;
     }
-    let raw = serde_json::to_string_pretty(config)
-        .map_err(|e| format!("Could not serialize config: {e}"))?;
+    let raw = to_disk_json(config)?;
     let tmp = path.with_extension("json.tmp");
     let write = |tmp: &PathBuf| -> std::io::Result<()> {
         let mut file = fs::File::create(tmp)?;
@@ -216,6 +250,27 @@ mod tests {
         assert!(overrides.graphics.vkbasalt.is_none());
         assert_eq!(overrides.graphics.gamescope.as_ref().unwrap().width, Some(800));
         assert_eq!(overrides.proton.get("PROTON_ENABLE_HDR"), Some(&true));
+    }
+
+    #[test]
+    fn disk_json_leaves_out_icons() {
+        let value = json!({
+            "runners_dir": "/r",
+            "games": [{
+                "id": "00000000-0000-0000-0000-000000000000",
+                "name": "x",
+                "exe_path": "/x.exe",
+                "prefix_path": "/p",
+                "runner_id": "r",
+                "icon": "data:image/png;base64,AAAA"
+            }]
+        });
+        let config: AppConfig = serde_json::from_value(value).unwrap();
+        assert!(config.games[0].icon.is_some());
+
+        let written: Value = serde_json::from_str(&to_disk_json(&config).unwrap()).unwrap();
+        assert!(written["games"][0].get("icon").is_none());
+        assert_eq!(written["games"][0]["name"], "x");
     }
 
     #[test]

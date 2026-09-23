@@ -392,6 +392,23 @@ async fn download_image(image_url: &str) -> Result<Vec<u8>, String> {
         .to_vec())
 }
 
+/// SteamGridDB serves some icons as `.ico`, which `image_extension` files as
+/// `png` — and which Steam's grid folder and a `.desktop` entry's `Icon=`
+/// don't reliably read. Those are converted to an actual PNG (of the
+/// largest image in the file); anything else is kept as it is.
+fn ico_to_png(bytes: Vec<u8>) -> Result<Vec<u8>, String> {
+    if !bytes.starts_with(&[0, 0, 1, 0]) {
+        return Ok(bytes);
+    }
+    let image = image::load_from_memory_with_format(&bytes, image::ImageFormat::Ico)
+        .map_err(|e| format!("Could not read icon: {e}"))?;
+    let mut png = Vec::new();
+    image
+        .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
+        .map_err(|e| format!("Could not convert icon: {e}"))?;
+    Ok(png)
+}
+
 fn find_game<'a>(config: &'a mut crate::config::AppConfig, id: &str) -> Result<&'a mut Game, String> {
     let game_id = Uuid::parse_str(id).map_err(|e| format!("Invalid game id: {e}"))?;
     config
@@ -499,7 +516,7 @@ pub async fn set_game_icon(
     icon_grid_id: i64,
     image_url: String,
 ) -> Result<Game, String> {
-    let bytes = download_image(&image_url).await?;
+    let bytes = ico_to_png(download_image(&image_url).await?)?;
 
     let dir = artwork_dir(&app)?;
     fs::create_dir_all(&dir).map_err(|e| format!("Could not create artwork directory: {e}"))?;
@@ -623,4 +640,23 @@ pub fn remove_game_artwork(
     remove_stale_asset_files(&artwork_dir(&app)?, game_uuid, kind.cache_suffix())?;
     save_config(&app, &config)?;
     Ok(updated)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ico_icons_become_png() {
+        let mut ico = Vec::new();
+        image::DynamicImage::new_rgba8(32, 32)
+            .write_to(&mut std::io::Cursor::new(&mut ico), image::ImageFormat::Ico)
+            .unwrap();
+        let png = ico_to_png(ico).unwrap();
+        assert!(png.starts_with(b"\x89PNG"));
+        assert_eq!(image::load_from_memory(&png).unwrap().width(), 32);
+
+        let other = b"\x89PNG not touched".to_vec();
+        assert_eq!(ico_to_png(other.clone()).unwrap(), other);
+    }
 }

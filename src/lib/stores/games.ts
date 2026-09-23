@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { get, writable } from "svelte/store";
 import type { DetectedShortcut, Game, GameInput, SteamChange } from "$lib/types";
 
@@ -60,6 +60,11 @@ interface LaunchErrorPayload {
   log_path: string | null;
 }
 
+interface ActiveGame {
+  id: string;
+  running: boolean;
+}
+
 let eventsInitialized = false;
 
 // Registers the launch-status listeners once; must run client-side only
@@ -68,31 +73,45 @@ export function initGameEvents(): void {
   if (eventsInitialized) return;
   eventsInitialized = true;
 
-  listen<InitializingPayload>("game-initializing", (event) => {
-    patchRunState(event.payload.id, { initializing: true, error: undefined });
-  });
+  const listeners = [
+    listen<InitializingPayload>("game-initializing", (event) => {
+      patchRunState(event.payload.id, { initializing: true, error: undefined });
+    }),
 
-  listen<StartedPayload>("game-started", (event) => {
-    patchRunState(event.payload.id, {
-      initializing: false,
-      running: true,
-      logPath: event.payload.log_path,
-      error: undefined,
-    });
-  });
+    listen<StartedPayload>("game-started", (event) => {
+      patchRunState(event.payload.id, {
+        initializing: false,
+        running: true,
+        logPath: event.payload.log_path,
+        error: undefined,
+      });
+    }),
 
-  listen<ExitedPayload>("game-exited", (event) => {
-    patchRunState(event.payload.id, { running: false });
-  });
+    listen<ExitedPayload>("game-exited", (event) => {
+      patchRunState(event.payload.id, { running: false });
+    }),
 
-  listen<LaunchErrorPayload>("game-launch-error", (event) => {
-    patchRunState(event.payload.id, {
-      initializing: false,
-      running: false,
-      error: event.payload.message,
-      logPath: event.payload.log_path ?? undefined,
-    });
-  });
+    listen<LaunchErrorPayload>("game-launch-error", (event) => {
+      patchRunState(event.payload.id, {
+        initializing: false,
+        running: false,
+        error: event.payload.message,
+        logPath: event.payload.log_path ?? undefined,
+      });
+    }),
+  ];
+
+  // Games launched before the webview (re)loaded sent their events to a
+  // page that's gone; their current state comes from the backend instead,
+  // once the listeners for anything after that are in place.
+  Promise.all(listeners)
+    .then(() => invoke<ActiveGame[]>("list_active_games"))
+    .then((active) => {
+      for (const { id, running } of active) {
+        patchRunState(id, { initializing: !running, running });
+      }
+    })
+    .catch(() => {});
 }
 
 // Shows the game as starting right away: preparing a launch (downloading
@@ -104,10 +123,12 @@ export async function launchGame(id: string): Promise<void> {
   patchRunState(id, { initializing: true, error: undefined });
   try {
     await invoke("launch_game", { id });
-  } catch {
+  } catch (e) {
     // A failed launch is already surfaced via the game-launch-error event;
-    // this only covers a refused one, which sends none.
-    patchRunState(id, { initializing: false });
+    // this only covers a refused one, which sends none — e.g. because Steam
+    // already runs the game in a Prefixr of its own.
+    const failed = get(gameRunState)[id]?.error;
+    patchRunState(id, { initializing: false, error: failed ?? String(e) });
   }
 }
 
@@ -128,8 +149,8 @@ export async function takePendingLaunch(): Promise<string | null> {
 // Listens for a `pending-launch` event, fired when a desktop shortcut is
 // used while Prefixr is already running: that second instance hands its
 // game id off to this one instead.
-export function listenForPendingLaunch(callback: (id: string) => void): void {
-  listen<string>("pending-launch", (event) => callback(event.payload));
+export function listenForPendingLaunch(callback: (id: string) => void): Promise<UnlistenFn> {
+  return listen<string>("pending-launch", (event) => callback(event.payload));
 }
 
 // Checks whether the app was started via the "Mit Prefixr installieren"
@@ -144,8 +165,10 @@ export async function takePendingInstall(): Promise<string | null> {
 // Listens for a `pending-install` event, fired when a second "Mit Prefixr
 // installieren" click hands its exe path off to this already-running
 // instance instead of opening a new one.
-export function listenForPendingInstall(callback: (exePath: string) => void): void {
-  listen<string>("pending-install", (event) => callback(event.payload));
+export function listenForPendingInstall(
+  callback: (exePath: string) => void,
+): Promise<UnlistenFn> {
+  return listen<string>("pending-install", (event) => callback(event.payload));
 }
 
 // Runs the installer exe under the given prefix/runner and waits for it to

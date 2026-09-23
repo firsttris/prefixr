@@ -136,7 +136,9 @@
     if ($steamGameIds.has(game.id)) {
       runSteamAction(game, "remove-game");
     } else {
-      removeGame(game.id);
+      removeGame(game.id).catch((e) =>
+        notify(`„${game.name}“ konnte nicht entfernt werden: ${e}`, "error"),
+      );
     }
   }
 </script>

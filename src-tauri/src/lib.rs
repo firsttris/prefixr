@@ -11,8 +11,9 @@ use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
 use commands::games::{
     add_game, create_desktop_shortcut, create_menu_shortcut, ensure_install_desktop_entry,
-    kill_game, launch_game, launch_game_headless, list_games, remove_game, run_installer, take_pending_install,
-    take_pending_launch, update_game, LaunchingGames, PendingInstall, PendingLaunch, RunningGames,
+    kill_game, launch_game, launch_game_headless, list_active_games, list_games, remove_game,
+    run_installer, take_pending_install, take_pending_launch, update_game, LaunchingGames,
+    PendingInstall, PendingLaunch, RunningGames,
 };
 use commands::github::{get_github_config, save_github_config};
 use commands::graphics::{get_graphics_config, save_graphics_config};
@@ -38,7 +39,10 @@ use commands::winetricks::{
     install_winetricks_verbs, list_all_winetricks_verbs, list_installed_winetricks_verbs,
 };
 use config::load_config;
-use tray::{hide_main_window, rebuild_tray_menu, setup_tray, show_and_focus, WindowVisible};
+use tray::{
+    hide_main_window, rebuild_tray_menu, setup_tray, show_and_focus, tray_host_available,
+    TrayAvailable, WindowVisible,
+};
 
 /// Checks the real (not effective) UID via `/proc/self/status`, mirroring
 /// what PortProton's own launcher script checks via `id -u`. A prefix set up
@@ -173,6 +177,7 @@ pub fn run() {
             for window in app.config().app.windows.clone() {
                 WebviewWindowBuilder::from_config(app.handle(), &window)?.build()?;
             }
+            app.manage(TrayAvailable(tray_host_available()));
             setup_tray(app.handle())?;
             // Best-effort: a file manager's "Öffnen mit" context menu working
             // is a nice-to-have, not something worth failing startup over —
@@ -188,12 +193,25 @@ pub fn run() {
             // tray so a launched game (and the ability to kill it if it hangs)
             // isn't tied to the window staying open. "Beenden" in the tray
             // menu is the actual quit.
-            if window.label() == "main" {
-                if let WindowEvent::CloseRequested { api, .. } = event {
-                    api.prevent_close();
-                    hide_main_window(window.app_handle());
-                    rebuild_tray_menu(window.app_handle());
-                }
+            //
+            // Without a tray to come back from, closing quits as usual —
+            // unless a game is launching or running, whose window is then
+            // only minimized so it stays reachable to end the game.
+            if window.label() != "main" {
+                return;
+            }
+            let WindowEvent::CloseRequested { api, .. } = event else {
+                return;
+            };
+            let app = window.app_handle();
+            api.prevent_close();
+            if app.state::<TrayAvailable>().0 {
+                hide_main_window(app);
+                rebuild_tray_menu(app);
+            } else if !app.state::<LaunchingGames>().ids().is_empty() {
+                let _ = window.minimize();
+            } else {
+                app.exit(0);
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -205,6 +223,7 @@ pub fn run() {
             remove_game,
             launch_game,
             kill_game,
+            list_active_games,
             take_pending_launch,
             take_pending_install,
             run_installer,

@@ -27,6 +27,37 @@ impl WindowVisible {
     }
 }
 
+/// Whether a tray host is there to show the tray icon. GNOME without the
+/// AppIndicator extension has none: the icon then silently doesn't appear,
+/// and a window closed "into the tray" could only be brought back by
+/// starting Prefixr again. See `lib.rs`'s close handling.
+pub struct TrayAvailable(pub bool);
+
+/// Asks the session bus whether a StatusNotifier host (what Tauri's tray
+/// icon registers with) is running. `gdbus` ships with GLib, which Prefixr
+/// needs anyway; if it can't answer, a tray is assumed as before.
+pub fn tray_host_available() -> bool {
+    let output = std::process::Command::new("gdbus")
+        .args([
+            "call",
+            "--session",
+            "--timeout",
+            "2",
+            "--dest",
+            "org.freedesktop.DBus",
+            "--object-path",
+            "/org/freedesktop/DBus",
+            "--method",
+            "org.freedesktop.DBus.NameHasOwner",
+            "org.kde.StatusNotifierWatcher",
+        ])
+        .output();
+    match output {
+        Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout).contains("true"),
+        _ => true,
+    }
+}
+
 fn set_main_window_visible(app: &AppHandle, visible: bool) {
     app.state::<WindowVisible>().0.store(visible, Ordering::SeqCst);
 }
