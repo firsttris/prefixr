@@ -410,7 +410,10 @@
 
     <label>
       Startparameter
-      <input placeholder="z. B. --launcher-skip -dx11" bind:value={launchArgs} />
+      <input
+        placeholder={`z. B. --launcher-skip -dx11 oder -path "C:\\Mein Spiel"`}
+        bind:value={launchArgs}
+      />
     </label>
   {:else if activeTab === "performance"}
     {@render inheritHint("Leistung")}

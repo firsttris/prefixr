@@ -372,6 +372,23 @@ fn remove_stale_asset_files(dir: &Path, id: Uuid, kind: &str) -> Result<(), Stri
     Ok(())
 }
 
+/// Removes every cached artwork file of a game, whatever its kind — for a
+/// game removed from the library. Best-effort.
+pub(crate) fn remove_game_artwork_files(app: &AppHandle, id: Uuid) {
+    let Ok(dir) = artwork_dir(app) else {
+        return;
+    };
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
+    let id = id.to_string();
+    for entry in entries.flatten() {
+        if entry.file_name().to_string_lossy().starts_with(&id) {
+            let _ = fs::remove_file(entry.path());
+        }
+    }
+}
+
 /// Downloads an artwork image from its source URL.
 async fn download_image(image_url: &str) -> Result<Vec<u8>, String> {
     let response = crate::http::client()

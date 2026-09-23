@@ -8,6 +8,23 @@ export async function refreshUmuStatus(): Promise<void> {
   umuStatus.set(await invoke<UmuStatus>("get_umu_status"));
 }
 
+// The tag of umu's latest release, or null while unknown (not checked yet,
+// or GitHub unreachable). Checked at most once per session: each check is a
+// GitHub API request, whose anonymous rate limit is low.
+export const latestUmuVersion = writable<string | null>(null);
+let latestChecked = false;
+
+export async function checkUmuUpdate(): Promise<void> {
+  if (latestChecked) return;
+  latestChecked = true;
+  try {
+    latestUmuVersion.set(await invoke<string>("latest_umu_version"));
+  } catch {
+    // Only a hint; the install button still fetches the latest release.
+    latestChecked = false;
+  }
+}
+
 // Downloads the latest umu release, replacing the installed copy if any.
 export async function installUmu(): Promise<void> {
   umuStatus.set(await invoke<UmuStatus>("install_umu"));

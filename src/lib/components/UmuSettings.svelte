@@ -1,13 +1,29 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { umuStatus, refreshUmuStatus, installUmu } from "$lib/stores/umu";
+  import {
+    umuStatus,
+    latestUmuVersion,
+    refreshUmuStatus,
+    installUmu,
+    checkUmuUpdate,
+  } from "$lib/stores/umu";
 
   let installing = $state(false);
   let error = $state("");
   let updated = $state(false);
 
+  // Only when both are known: a missing version file (older installs) or
+  // an unreachable GitHub is no reason to claim an update.
+  let updateAvailable = $derived(
+    !!$umuStatus?.installed &&
+      !!$umuStatus.version &&
+      !!$latestUmuVersion &&
+      $latestUmuVersion !== $umuStatus.version,
+  );
+
   onMount(() => {
     refreshUmuStatus();
+    checkUmuUpdate();
   });
 
   async function handleInstall() {
@@ -30,6 +46,9 @@
     umu-launcher
     {#if $umuStatus?.installed}
       <span class="status">{$umuStatus.version ?? "installiert"}</span>
+      {#if updateAvailable}
+        <span class="update">Update auf {$latestUmuVersion} verfügbar</span>
+      {/if}
     {:else if $umuStatus}
       <span class="status">nicht installiert</span>
     {/if}
@@ -46,6 +65,10 @@
     <button type="button" class="ghost" disabled={installing} onclick={handleInstall}>
       {#if installing}
         Lädt…
+      {:else if updateAvailable}
+        Auf {$latestUmuVersion} aktualisieren
+      {:else if $umuStatus?.installed && $latestUmuVersion === $umuStatus.version}
+        Neu installieren
       {:else if $umuStatus?.installed}
         Auf neueste Version aktualisieren
       {:else}
@@ -81,6 +104,12 @@
   .status {
     font-weight: 400;
     margin-left: 0.4em;
+  }
+
+  .update {
+    font-weight: 400;
+    margin-left: 0.4em;
+    color: var(--accent);
   }
 
   .hint {

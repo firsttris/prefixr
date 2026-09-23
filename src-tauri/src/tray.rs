@@ -1,11 +1,13 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use futures_util::future::join_all;
 use tauri::menu::{Menu, MenuBuilder, MenuItemBuilder};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager};
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use uuid::Uuid;
 
-use crate::commands::games::{kill_running_game, RunningGames};
+use crate::commands::games::{kill_running_game, LaunchingGames, RunningGames};
 
 pub const TRAY_ID: &str = "main-tray";
 const MAIN_WINDOW: &str = "main";
@@ -178,7 +180,7 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
         return;
     }
     if id == QUIT_ID {
-        app.exit(0);
+        quit(app);
         return;
     }
     if let Some(game_id) = id.strip_prefix(KILL_PREFIX) {
@@ -190,6 +192,49 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
             });
         }
     }
+}
+
+/// Quits Prefixr — after asking, while games are launching or running.
+/// They'd keep running without it (each in a process group of its own), but
+/// a restarted Prefixr wouldn't know about them anymore and so couldn't end
+/// them either; confirming ends them first.
+fn quit(app: &AppHandle) {
+    let active = app.state::<LaunchingGames>().ids().len();
+    if active == 0 {
+        app.exit(0);
+        return;
+    }
+    let text = match active {
+        1 => "Ein Spiel läuft noch oder wird gerade gestartet.".to_string(),
+        n => format!("{n} Spiele laufen noch oder werden gerade gestartet."),
+    };
+    let app = app.clone();
+    app.dialog()
+        .message(format!(
+            "{text} Beim Beenden von Prefixr werden sie ebenfalls beendet — ungespeicherter \
+             Fortschritt geht dabei verloren."
+        ))
+        .title("Prefixr beenden?")
+        .kind(MessageDialogKind::Warning)
+        .buttons(MessageDialogButtons::OkCancelCustom(
+            "Spiele und Prefixr beenden".to_string(),
+            "Abbrechen".to_string(),
+        ))
+        .show(move |confirmed| {
+            if !confirmed {
+                return;
+            }
+            tauri::async_runtime::spawn(async move {
+                let running = app.state::<RunningGames>();
+                let ids: Vec<Uuid> = running
+                    .0
+                    .lock()
+                    .map(|games| games.keys().copied().collect())
+                    .unwrap_or_default();
+                join_all(ids.into_iter().map(|id| kill_running_game(&running, id))).await;
+                app.exit(0);
+            });
+        });
 }
 
 /// Creates the tray icon shown for the app's whole lifetime. Closing the main

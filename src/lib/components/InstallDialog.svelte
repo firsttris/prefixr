@@ -5,6 +5,7 @@
   import { runners, refreshRunners } from "$lib/stores/runners";
   import { runInstaller } from "$lib/stores/games";
   import { prettifyExeName } from "$lib/gameName";
+  import { showLog } from "$lib/logViewer";
   import GameForm from "./GameForm.svelte";
   import type { DetectedShortcut } from "$lib/types";
 
@@ -26,6 +27,7 @@
   let candidates = $state<DetectedShortcut[]>([]);
   let chosenExePath = $state("");
   let chosenName = $state("");
+  let logPath = $state("");
 
   onMount(() => {
     refreshPrefixes();
@@ -38,8 +40,7 @@
     creatingPrefix = true;
     error = "";
     try {
-      await addPrefix(selected);
-      prefixPath = selected;
+      prefixPath = await addPrefix(selected);
     } catch (e) {
       error = String(e);
     } finally {
@@ -58,7 +59,9 @@
     busy = true;
     error = "";
     try {
-      candidates = await runInstaller(prefixPath, runnerId, exePath);
+      const result = await runInstaller(prefixPath, runnerId, exePath);
+      candidates = result.shortcuts;
+      logPath = result.log_path;
       if (candidates.length === 1) {
         // Only one plausible shortcut — skip straight to confirming it
         // instead of making the user pick from a list of one.
@@ -161,9 +164,15 @@
       </div>
     {:else}
       <p class="hint">
-        Es wurde keine passende Verknüpfung gefunden. Wähle die Spiel-Exe manuell aus.
+        Es wurde keine passende Verknüpfung gefunden. Wähle die Spiel-Exe manuell aus. Ist das
+        Setup gescheitert, steht im Log, woran.
       </p>
-      <button type="button" class="primary" onclick={pickExeManually}>Datei wählen…</button>
+      <div class="row">
+        <button type="button" class="primary" onclick={pickExeManually}>Datei wählen…</button>
+        {#if logPath}
+          <button type="button" onclick={() => showLog(logPath)}>Setup-Log anzeigen</button>
+        {/if}
+      </div>
     {/if}
   {:else if phase === "add"}
     <p class="hint">Spiel zur Bibliothek hinzufügen:</p>

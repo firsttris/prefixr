@@ -4,6 +4,7 @@ pub mod github;
 pub mod graphics;
 pub mod graphics_layers;
 pub mod icons;
+pub mod logs;
 pub mod mangohud;
 pub mod performance;
 pub mod prefixes;

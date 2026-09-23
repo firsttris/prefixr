@@ -195,3 +195,59 @@ pub fn list_runners(state: State<ConfigState>) -> Result<Vec<Runner>, String> {
     };
     scan_runners(&runners_dir)
 }
+
+/// Deletes a runner's folder — only one no game uses, so no game is left
+/// pointing at a runner that's gone. A runner that's a symlink into another
+/// tool's folder (e.g. Steam's `compatibilitytools.d`) only loses the link.
+/// Async, since a runner is several hundred MB of files.
+#[tauri::command]
+pub async fn delete_runner(state: State<'_, ConfigState>, runner_id: String) -> Result<(), String> {
+    let (runner, users) = {
+        let config = state
+            .lock()
+            .map_err(|_| "Configuration is locked".to_string())?;
+        let runner = find_runner(&config.runners_dir, &runner_id)?;
+        let users: Vec<String> = config
+            .games
+            .iter()
+            .filter(|g| g.runner_id == runner_id)
+            .map(|g| format!("„{}“", g.name))
+            .collect();
+        (runner, users)
+    };
+    if !users.is_empty() {
+        return Err(format!(
+            "{} wird noch verwendet von {}.",
+            runner.name,
+            users.join(", ")
+        ));
+    }
+    tauri::async_runtime::spawn_blocking(move || fs::remove_dir_all(&runner.path))
+        .await
+        .map_err(|e| format!("Could not delete runner: {e}"))?
+        .map_err(|e| format!("Could not delete runner: {e}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn deleting_a_linked_runner_keeps_its_target() {
+        // What `delete_runner` relies on for a runner linked in from
+        // elsewhere: `remove_dir_all` doesn't follow the link.
+        let dir = std::env::temp_dir().join(format!("prefixr-test-{}", uuid::Uuid::new_v4()));
+        let target = dir.join("steam/GE-Proton11-7");
+        fs::create_dir_all(&target).unwrap();
+        fs::write(target.join("proton"), "").unwrap();
+        let link = dir.join("runners/GE-Proton11-7");
+        fs::create_dir_all(link.parent().unwrap()).unwrap();
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+        assert_eq!(scan_runners(link.parent().unwrap()).unwrap().len(), 1);
+
+        fs::remove_dir_all(&link).unwrap();
+        assert!(!link.exists());
+        assert!(target.join("proton").is_file());
+        fs::remove_dir_all(&dir).unwrap();
+    }
+}

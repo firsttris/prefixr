@@ -14,7 +14,7 @@ Bereits erledigt: Start von Proton über umu-launcher und Performance-Overrides 
 | 1 | Proton-Optionen als Schalter pro Spiel ✓ | hoch | S–M | Bottles, Lutris |
 | 2 | Spielzeit und „zuletzt gespielt“ | mittel | S | Lutris, Heroic |
 | 3 | Runner aus Steam/Lutris/umu mitbenutzen | mittel | S | ProtonUp-Qt, Lutris |
-| 4 | Kleine Bugs und Kanten (siehe unten) | mittel | S | – |
+| 4 | Kleine Bugs und Kanten (siehe unten) ✓ | mittel | S | – |
 | 5 | GAMEID-Zuordnung für protonfixes ✓ | hoch | M | Lutris, Heroic |
 | 6 | Export nach Steam (Nicht-Steam-Spiel) ✓ | hoch | M | Lutris, Bottles, Heroic |
 | 7 | Prefix-Snapshots, Backup und Restore | hoch | M–L | Bottles, PortProton |
@@ -67,7 +67,7 @@ Kandidaten (geprüft im `proton`-Skript von GE-Proton11-7):
 Die IDs müssen eindeutig bleiben, z. B. mit Quell-Präfix. Beim Löschen nie fremde Ordner anfassen.
 
 ### 4. Kleine Bugs und Kanten
-**Nutzen: mittel · Aufwand: S (je Punkt)**
+**Nutzen: mittel · Aufwand: S (je Punkt)** · **erledigt**
 
 **Bugs** · **erledigt**
 
@@ -80,18 +80,18 @@ Die IDs müssen eindeutig bleiben, z. B. mit Quell-Präfix. Beim Löschen nie fr
 - Runner und DXVK/VKD3D werden in einen eigenen temporären Ordner entpackt und dann verschoben. Erstdownloads von umu und dem DirectX-Cache laufen nacheinander.
 - `config.json` wird atomar geschrieben. Ist sie trotzdem kaputt, zeigt Prefixr eine Meldung mit dem Pfad und lässt die Datei unverändert.
 
-**Kanten**
+**Kanten** · **erledigt**
 
-- **Import eines Proton-Prefixes (`pfx/`):** `add_prefix` akzeptiert einen Ordner mit `pfx/` darin ([prefixes.rs:37](src-tauri/src/commands/prefixes.rs#L37)). Beim Start wird aber der Ordner selbst als `WINEPREFIX` genutzt. Ein Wine-Runner legt daneben einen neuen, leeren Prefix an. Auch `prepare_proton` prüft auf `drive_c` direkt im Ordner. Besser: beim Hinzufügen auf `pfx/` umbiegen.
-- **Setup und Wine-Werkzeuge ohne Vorbereitung:** `run_installer` und `launch_wine_tool` laufen direkt über `prefix_command` und nicht über `prepare_wine`. Bei einem Wine-Runner mit frischem Prefix fehlt dann wine-mono. Wine zeigt seinen eigenen Mono-Dialog, den Prefixr sonst vermeidet, und DXVK ist auch nicht eingerichtet. Die Ausgabe des Setups geht außerdem nach `/dev/null` ([games.rs:373](src-tauri/src/commands/games.rs#L373)), bei einem fehlgeschlagenen Setup gibt es also kein Log.
-- **Entfernte Spiele hinterlassen Reste:** `remove_game` löscht nur die MangoHud- und vkBasalt-Konfiguration ([games.rs:481](src-tauri/src/commands/games.rs#L481)). Zurück bleiben das Artwork im Cache, das Verknüpfungs-Icon, `logs/<id>/` und angelegte `.desktop`-Verknüpfungen. Die Verknüpfungen starten danach ein Spiel, das es nicht mehr gibt.
-- **Logs wachsen unbegrenzt:** Jeder Start legt eine neue Datei unter `logs/<id>/` an ([games.rs:514](src-tauri/src/commands/games.rs#L514)), bei Winetricks ebenso. Die letzten N pro Spiel behalten.
-- **winetricks wird nie aktualisiert:** Das Skript wird einmal von `master` geladen und dann für immer benutzt ([winetricks.rs:37](src-tauri/src/commands/winetricks.rs#L37)). Ältere Versionen scheitern, sobald Microsoft Download-URLs oder Prüfsummen ändert. Wie bei umu eine Aktualisierung anbieten oder das Skript nach einer bestimmten Zeit neu laden.
-- **„Beenden“ im Tray ohne Rückfrage:** Das Menü beendet Prefixr sofort, auch wenn noch Spiele laufen ([tray.rs:150](src-tauri/src/tray.rs#L150)). Die Spiele laufen weiter, weil sie in einer eigenen Prozessgruppe laufen. Nach einem Neustart weiß Prefixr aber nicht mehr, dass sie laufen, und kann sie nicht mehr beenden.
-- **Gleichnamige Spiele überschreiben ihre Verknüpfungen:** Der Dateiname der `.desktop`-Datei kommt aus dem bereinigten Spielnamen ([games.rs:1302](src-tauri/src/commands/games.rs#L1302)). Zwei Spiele mit gleichem Namen, etwa „X: Y“ und „X_ Y“, landen in derselben Datei. Besser: die Spiel-ID in den Dateinamen aufnehmen.
-- **Startargumente ohne Anführungszeichen:** `launch_args` wird nur an Leerzeichen getrennt ([games.rs:1060](src-tauri/src/commands/games.rs#L1060)). Argumente mit Leerzeichen, z. B. Pfade, gehen deshalb nicht. Besser: shell-artig parsen (`shlex`).
-- **umu-Updates anzeigen:** Die Einstellungen zeigen nur die installierte Version. Eine Abfrage „neuere Version verfügbar“ fehlt, die neueste Version gibt es über `releases/latest`.
-- **Runner-Verwendung anzeigen:** „Von N Spielen verwendet“ in der Runner-Liste. Unbenutzte Runner löschen können.
+- **Import eines Proton-Prefixes:** Wer einen Proton-Compat-Ordner hinzufügt, bekommt dessen `pfx/` als Prefix ([prefixes.rs](src-tauri/src/commands/prefixes.rs), `effective_prefix_path`). Schon eingetragene Compat-Ordner werden beim Laden der Konfiguration genauso umgebogen. umus eigenes Layout (`pfx` zeigt auf den Ordner selbst) bleibt, wie es ist.
+- **Setup und Wine-Werkzeuge mit Vorbereitung:** Setup, Wine-Werkzeuge und winetricks bereiten den Prefix genauso vor wie ein Spielstart (`prepare_prefix` in [games.rs](src-tauri/src/commands/games.rs)): wineboot ohne Mono- und Gecko-Dialog, wine-mono, DXVK/VKD3D. Ihre Ausgabe landet im Log des Prefixes, und der Setup-Dialog verlinkt es.
+- **Entfernte Spiele räumen auf:** `remove_game` löscht auch Artwork, Icons, `logs/<id>/` sowie die Desktop- und Menü-Verknüpfungen. Die Verknüpfungen werden am `--launch <id>` erkannt, also auch ältere.
+- **Logs begrenzt:** Pro Spiel und pro Prefix bleiben die letzten 10 Logs ([logs.rs](src-tauri/src/commands/logs.rs)).
+- **winetricks wird aktualisiert:** Ist das Skript älter als 7 Tage, lädt Prefixr es neu. Ohne Netz wird die alte Kopie weiter benutzt.
+- **„Beenden“ im Tray fragt nach**, solange Spiele laufen oder gestartet werden, und beendet sie dann mit.
+- **Verknüpfungen pro Spiel eindeutig:** Der Dateiname enthält den Anfang der Spiel-ID. Eine alte Verknüpfung desselben Spiels wird ersetzt statt verdoppelt.
+- **Startargumente mit Anführungszeichen:** `launch_args` wird wie eine Windows-Kommandozeile getrennt (`split_launch_args` in [models.rs](src-tauri/src/models.rs)): nur doppelte Anführungszeichen gruppieren, Backslashes bleiben stehen. `shlex` hätte aus `C:\Games` ein `C:Games` gemacht. Ein nicht geschlossenes Anführungszeichen fällt schon beim Speichern auf.
+- **umu-Updates anzeigen:** Die umu-Einstellungen zeigen, wenn es eine neuere Version gibt, und bieten die Aktualisierung darauf an.
+- **Runner-Verwendung anzeigen:** Die Runner-Liste zeigt, wie viele Spiele einen Runner nutzen. Unbenutzte Runner lassen sich löschen. Bei einem verlinkten Runner verschwindet dabei nur der Link.
 
 ---
 
@@ -118,7 +118,7 @@ Pro Spiel über „Zu Steam hinzufügen“ ([steam.rs](src-tauri/src/commands/st
 Steam startet `prefixr --run <game-id>`: ohne Fenster, ohne Tray und neben einer offenen Prefixr-Instanz. Der Prozess beendet sich mit dem Spiel, sodass Steam das Spielende sieht. Desktop-Verknüpfungen (`--launch`) reichen den Start jetzt an eine laufende Instanz weiter.
 
 **Offen:**
-- Ein über Steam gestartetes Spiel erscheint in einer offenen Prefixr-Oberfläche nicht als „läuft“.
+- Ein über Steam gestartetes Spiel erscheint in einer offenen Prefixr-Oberfläche nicht als „läuft“. Ein zweiter Start und das Löschen seines Prefixes werden aber abgelehnt (Lock-Datei pro Spiel).
 - Steam als Flatpak wird nicht unterstützt, weil es Prefixr außerhalb seiner Sandbox nicht starten kann.
 
 ### 7. Prefix-Snapshots, Backup und Restore

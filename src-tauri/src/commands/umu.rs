@@ -75,29 +75,34 @@ struct GitHubRelease {
     assets: Vec<GitHubAsset>,
 }
 
-/// Downloads the latest umu release's zipapp, verifies it and swaps it in
-/// place of whatever copy was there before. Unpacked into a staging
-/// directory first, so a failed or interrupted update never leaves a
-/// half-extracted copy behind in place of a working one.
-async fn install_latest(app: &AppHandle, token: Option<&str>) -> Result<UmuStatus, String> {
-    let client = crate::http::client();
-    let with_auth = |builder: reqwest::RequestBuilder| match token {
+fn with_auth(builder: reqwest::RequestBuilder, token: Option<&str>) -> reqwest::RequestBuilder {
+    match token {
         Some(token) => builder.bearer_auth(token),
         None => builder,
-    };
+    }
+}
 
+async fn latest_release(token: Option<&str>) -> Result<GitHubRelease, String> {
     let url = format!("https://api.github.com/repos/{UMU_REPO}/releases/latest");
-    let response = with_auth(client.get(url))
+    let response = with_auth(crate::http::client().get(url), token)
         .send()
         .await
         .map_err(|e| format!("Could not reach GitHub: {e}"))?;
     if !response.status().is_success() {
         return Err(format!("GitHub API returned status {}", response.status()));
     }
-    let release: GitHubRelease = response
+    response
         .json()
         .await
-        .map_err(|e| format!("Could not parse GitHub response: {e}"))?;
+        .map_err(|e| format!("Could not parse GitHub response: {e}"))
+}
+
+/// Downloads the latest umu release's zipapp, verifies it and swaps it in
+/// place of whatever copy was there before. Unpacked into a staging
+/// directory first, so a failed or interrupted update never leaves a
+/// half-extracted copy behind in place of a working one.
+async fn install_latest(app: &AppHandle, token: Option<&str>) -> Result<UmuStatus, String> {
+    let release = latest_release(token).await?;
 
     let asset = release
         .assets
@@ -111,7 +116,7 @@ async fn install_latest(app: &AppHandle, token: Option<&str>) -> Result<UmuStatu
         .ok_or_else(|| format!("GitHub reported no SHA-256 digest for {}", asset.name))?
         .to_string();
 
-    let bytes = with_auth(client.get(&asset.browser_download_url))
+    let bytes = with_auth(crate::http::client().get(&asset.browser_download_url), token)
         .send()
         .await
         .map_err(|e| format!("Could not download {}: {e}", asset.name))?
@@ -227,6 +232,14 @@ pub fn runtime_present(runner_path: &Path) -> bool {
 #[tauri::command]
 pub fn get_umu_status(app: AppHandle) -> Result<UmuStatus, String> {
     Ok(read_status(&umu_dir(&app)?))
+}
+
+/// The tag of umu's latest release, so the settings can offer an update
+/// when it's newer than the installed `UmuStatus::version`.
+#[tauri::command]
+pub async fn latest_umu_version(state: State<'_, ConfigState>) -> Result<String, String> {
+    let token = read_token(&state)?;
+    Ok(latest_release(token.as_deref()).await?.tag_name)
 }
 
 /// Installs the latest umu release, replacing the current copy if there is

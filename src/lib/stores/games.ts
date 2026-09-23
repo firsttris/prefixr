@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { get, writable } from "svelte/store";
-import type { DetectedShortcut, Game, GameInput, SteamChange } from "$lib/types";
+import type { Game, GameInput, InstallerResult, SteamChange } from "$lib/types";
 
 export const games = writable<Game[]>([]);
 
@@ -174,13 +174,14 @@ export function listenForPendingInstall(
 // Runs the installer exe under the given prefix/runner and waits for it to
 // exit, then returns any `.exe` shortcuts it created on the Desktop/Start
 // Menu — candidates for the game's own exe, offered to the user instead of
-// making them hunt for it manually (see InstallDialog.svelte).
+// making them hunt for it manually (see InstallDialog.svelte) — and the
+// installer's log.
 export async function runInstaller(
   prefixPath: string,
   runnerId: string,
   exePath: string,
-): Promise<DetectedShortcut[]> {
-  return await invoke<DetectedShortcut[]>("run_installer", { prefixPath, runnerId, exePath });
+): Promise<InstallerResult> {
+  return await invoke<InstallerResult>("run_installer", { prefixPath, runnerId, exePath });
 }
 
 export async function createDesktopShortcut(id: string): Promise<void> {

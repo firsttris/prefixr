@@ -9,6 +9,12 @@ export async function refreshRunners(): Promise<void> {
   runners.set(await invoke<Runner[]>("list_runners"));
 }
 
+// Deletes a runner's folder; the backend refuses one that games still use.
+export async function deleteRunner(runnerId: string): Promise<void> {
+  await invoke("delete_runner", { runnerId });
+  await refreshRunners();
+}
+
 export const runnerSources = writable<RunnerSourceInfo[]>([]);
 
 export async function refreshRunnerSources(): Promise<void> {

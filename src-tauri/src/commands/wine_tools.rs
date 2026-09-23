@@ -1,9 +1,12 @@
+use std::path::PathBuf;
 use std::process::Stdio;
 
 use tauri::{AppHandle, State};
 
+use crate::commands::games::{env_pairs, log_stdio, prepare_prefix};
 use crate::commands::github::read_token;
-use crate::commands::runners::{find_runner, prefix_command};
+use crate::commands::logs::{new_log_file, prefix_log_dir};
+use crate::commands::runners::{find_runner, runner_command};
 use crate::config::ConfigState;
 
 /// Wine's own built-in GUI utilities — the same set PortProton, Lutris and
@@ -13,7 +16,7 @@ use crate::config::ConfigState;
 /// no on-disk exe required — which matters here because not every runner
 /// ships a same-named binary next to `wine` (a plain Wine build does for some
 /// of these, e.g. `winecfg`/`winefile`, but Proton runners generally don't).
-/// So this always goes through `prefix_command` (umu-run or the runner's own
+/// So this always goes through `prepare_prefix`'s binary (umu-run or the runner's own
 /// `wine`/`wine64`, both of which resolve a bare name like this as a builtin)
 /// rather than looking for a matching binary alongside it, the one path that
 /// works uniformly across both runner kinds.
@@ -32,7 +35,8 @@ fn tool_arg(tool: &str) -> Result<&'static str, String> {
 /// Launches one of Wine's built-in GUI utilities against a prefix. Detached
 /// and untracked, unlike `launch_game` — these are tools the user opens and
 /// closes freely on their own, not something this app manages the lifecycle
-/// of.
+/// of. The prefix is readied first as for a game (see `prepare_prefix`): a
+/// tool can be the first thing to touch a fresh one.
 #[tauri::command]
 pub async fn launch_wine_tool(
     app: AppHandle,
@@ -52,12 +56,17 @@ pub async fn launch_wine_tool(
     let token = read_token(&state)?;
 
     let runner = find_runner(&runners_dir, &runner_id)?;
-    prefix_command(&app, token.as_deref(), &runner, &prefix_path)
-        .await?
+    let prefix = PathBuf::from(&prefix_path);
+    let log_path = new_log_file(&prefix_log_dir(&app, &prefix)?)?;
+    let prepared = prepare_prefix(&app, token.as_deref(), &runner, &prefix, &log_path, &|| {})
+        .await
+        .map_err(|e| format!("{e}\n\nLog: {}", log_path.display()))?;
+    let (out, err) = log_stdio(&log_path)?;
+    runner_command(&prepared.binary, env_pairs(&prepared.env))
         .arg(arg)
         .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stdout(out)
+        .stderr(err)
         .spawn()
         .map_err(|e| format!("Konnte {tool} nicht starten: {e}"))?;
 

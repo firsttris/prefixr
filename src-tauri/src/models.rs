@@ -42,8 +42,8 @@ pub struct Game {
     #[serde(default)]
     pub env_vars: HashMap<String, String>,
     /// Extra arguments passed to the game's exe itself (e.g. `--launcher-skip
-    /// -dx11`), analogous to PortProton's `LAUNCH_PARAMETERS`. Split on
-    /// whitespace at launch time — see `launch_game`.
+    /// -dx11`), analogous to PortProton's `LAUNCH_PARAMETERS`. Split at
+    /// launch time by `split_launch_args`.
     #[serde(default)]
     pub launch_args: String,
     /// The exe's embedded icon, as a `data:image/png;base64,...` URI.
@@ -160,6 +160,45 @@ pub fn normalize_umu_id(id: Option<String>) -> Option<String> {
     } else {
         Some(id)
     }
+}
+
+/// Splits a game's launch arguments the way a Windows command line does:
+/// at whitespace, except inside double quotes, which are removed — so
+/// `-path "C:\My Games\x" -dx11` gives `-path`, `C:\My Games\x`, `-dx11`.
+/// Unlike a shell (or `shlex`), backslashes are kept as they are, since
+/// Windows paths are full of them, and a single quote is an ordinary
+/// character, as in `-name O'Brien`.
+pub fn split_launch_args(args: &str) -> Result<Vec<String>, String> {
+    let mut result = Vec::new();
+    let mut current = String::new();
+    // Tracked apart from `current`, so `""` still counts as an argument.
+    let mut in_arg = false;
+    let mut quoted = false;
+    for c in args.chars() {
+        match c {
+            '"' => {
+                quoted = !quoted;
+                in_arg = true;
+            }
+            c if c.is_whitespace() && !quoted => {
+                if in_arg {
+                    result.push(std::mem::take(&mut current));
+                    in_arg = false;
+                }
+            }
+            c => {
+                current.push(c);
+                in_arg = true;
+            }
+        }
+    }
+    if quoted {
+        return Err("Startargumente: ein Anführungszeichen wird nicht geschlossen".to_string());
+    }
+    if in_arg {
+        result.push(current);
+    }
+    Ok(result)
 }
 
 /// `none` is how the umu-database marks a standalone release; umu and
@@ -610,6 +649,19 @@ mod tests {
         assert!(game.overrides.proton.is_empty());
         assert!(game.umu_id.is_none());
         assert!(game.umu_env().is_empty());
+    }
+
+    #[test]
+    fn launch_args_split_like_a_windows_command_line() {
+        let split = |args: &str| split_launch_args(args).unwrap();
+        assert_eq!(split("  --launcher-skip   -dx11 "), ["--launcher-skip", "-dx11"]);
+        assert_eq!(
+            split(r#"-path "C:\My Games\x" --name=O'Brien"#),
+            ["-path", r"C:\My Games\x", "--name=O'Brien"]
+        );
+        assert_eq!(split(r#"--dir="a b"c "" x"#), ["--dir=a bc", "", "x"]);
+        assert!(split("").is_empty());
+        assert!(split_launch_args(r#"-path "C:\x"#).is_err());
     }
 
     #[test]

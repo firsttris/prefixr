@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
@@ -8,6 +9,7 @@ use serde_json::{json, Map, Value};
 use tauri::{AppHandle, Manager};
 
 use crate::commands::icons;
+use crate::commands::prefixes::effective_prefix_path;
 use crate::models::{
     Game, GitHubConfig, GraphicsConfig, MangoHudConfig, PerformanceConfig, PrefixInfo,
     ProtonConfig, SteamGridDbConfig,
@@ -82,7 +84,23 @@ pub fn load_config(app: &AppHandle) -> Result<AppConfig, String> {
     migrate(&mut value);
     let mut config: AppConfig = serde_json::from_value(value).map_err(|e| invalid(&e))?;
     load_icons(app, &mut config);
+    fix_prefix_paths(&mut config);
     Ok(config)
+}
+
+/// A Proton compat data folder added before `effective_prefix_path` existed
+/// was registered as it is, rather than its `pfx/` — and games set up in it
+/// with it. Both are pointed at the actual prefix; the file follows on the
+/// next save.
+fn fix_prefix_paths(config: &mut AppConfig) {
+    let mut seen = HashSet::new();
+    config.prefixes.retain_mut(|prefix| {
+        prefix.path = effective_prefix_path(&prefix.path);
+        seen.insert(prefix.path.clone())
+    });
+    for game in &mut config.games {
+        game.prefix_path = effective_prefix_path(&game.prefix_path);
+    }
 }
 
 /// Fills in each game's exe icon from its file (see `icons::exe_icon_path`).

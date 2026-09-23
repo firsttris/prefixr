@@ -90,6 +90,12 @@ export interface DetectedShortcut {
   exe_path: string;
 }
 
+// What `run_installer` reports once the installer exited (games.rs).
+export interface InstallerResult {
+  shortcuts: DetectedShortcut[];
+  log_path: string;
+}
+
 // Outcome of `export_to_steam` / `remove_from_steam` (steam.rs).
 // `steam_running`: nothing was changed, since Steam would overwrite it —
 // ask before quitting Steam.

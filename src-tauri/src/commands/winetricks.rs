@@ -2,13 +2,14 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime};
 
 use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
 
-use crate::commands::games::steer_profile_to_steamuser;
+use crate::commands::games::{prepare_prefix, steer_profile_to_steamuser};
 use crate::commands::github::read_token;
+use crate::commands::logs::{new_log_file, prefix_log_dir};
 use crate::commands::runners::{
     find_runner, prefix_command, runner_command, wine_binary, wineserver_binary,
 };
@@ -24,27 +25,56 @@ fn winetricks_script_path(app: &AppHandle) -> Result<PathBuf, String> {
         .join("winetricks"))
 }
 
-/// Downloads and caches winetricks itself (see
-/// https://github.com/Winetricks/winetricks) — a single POSIX shell script,
-/// no build step — the first time it's needed; a no-op afterwards. We shell
-/// out to the real thing rather than reimplementing individual verbs
-/// ourselves: installing e.g. a VC++ redistributable properly means actually
-/// running Microsoft's real installer under Wine (silent flags, cab
-/// extraction, registry bits) — exactly what winetricks already does
-/// reliably for hundreds of packages, so reimplementing even a handful of
-/// verbs natively would just be re-deriving winetricks worse.
+/// How long a downloaded winetricks is used before it's fetched again.
+/// Winetricks downloads Microsoft's installers from fixed URLs and checks
+/// them against fixed checksums, so an old copy starts failing as soon as
+/// Microsoft moves or replaces a file — upstream follows within days.
+const SCRIPT_MAX_AGE: Duration = Duration::from_secs(7 * 24 * 60 * 60);
+
+/// Held around a download, which writes to one fixed `.part` file: listing
+/// verbs and installing them can both ask for the script at once.
+static SCRIPT_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+/// Returns winetricks itself (see https://github.com/Winetricks/winetricks),
+/// a single POSIX shell script, downloading it the first time it's needed
+/// and again once it's older than `SCRIPT_MAX_AGE`. We shell out to the real
+/// thing rather than reimplementing individual verbs ourselves: installing
+/// e.g. a VC++ redistributable properly means actually running Microsoft's
+/// real installer under Wine (silent flags, cab extraction, registry bits)
+/// — exactly what winetricks already does reliably for hundreds of
+/// packages, so reimplementing even a handful of verbs natively would just
+/// be re-deriving winetricks worse.
 async fn ensure_winetricks_script(app: &AppHandle) -> Result<PathBuf, String> {
     let path = winetricks_script_path(app)?;
-    if path.is_file() {
+    let _lock = SCRIPT_LOCK.lock().await;
+    if !path.is_file() {
+        download_script(&path).await?;
         return Ok(path);
     }
+    let age = fs::metadata(&path)
+        .and_then(|m| m.modified())
+        .ok()
+        .and_then(|modified| modified.elapsed().ok());
+    if age.is_some_and(|age| age >= SCRIPT_MAX_AGE) && download_script(&path).await.is_err() {
+        // Offline, say: the old copy still works for most verbs. Marked as
+        // fresh so the next try is in `SCRIPT_MAX_AGE` rather than on every
+        // single use, each waiting for the request to fail.
+        let _ = fs::File::options()
+            .write(true)
+            .open(&path)
+            .and_then(|file| file.set_modified(SystemTime::now()));
+    }
+    Ok(path)
+}
+
+/// Downloads the current winetricks from its `master` branch to `path`.
+async fn download_script(path: &Path) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
             .map_err(|e| format!("Could not create {}: {e}", parent.display()))?;
     }
 
-    // An error status fails here rather than getting saved: the script is
-    // never downloaded again once it's on disk.
+    // An error status fails here rather than getting saved as the script.
     let bytes = crate::http::client()
         .get("https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks")
         .send()
@@ -66,32 +96,7 @@ async fn ensure_winetricks_script(app: &AppHandle) -> Result<PathBuf, String> {
     perms.set_mode(0o755);
     fs::set_permissions(&partial, perms)
         .map_err(|e| format!("Could not make {} executable: {e}", partial.display()))?;
-    fs::rename(&partial, &path)
-        .map_err(|e| format!("Could not save {}: {e}", path.display()))?;
-
-    Ok(path)
-}
-
-/// Logs live under `logs/prefixes/<sanitized-prefix-path>/`, mirroring
-/// `games::log_file_path`'s `logs/<game_id>/` layout — deliberately keyed by
-/// prefix, not by game: winetricks installs into `WINEPREFIX`, which can
-/// (and often does) outlive or be shared across several games, so there's no
-/// single game id that actually owns this log.
-fn winetricks_log_path(app: &AppHandle, prefix_path: &Path) -> Result<PathBuf, String> {
-    let data_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("Could not resolve data directory: {e}"))?;
-    let timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|e| format!("Could not read system time: {e}"))?
-        .as_millis();
-    let dir_name = prefix_path.to_string_lossy().replace(['/', '\\'], "_");
-    Ok(data_dir
-        .join("logs")
-        .join("prefixes")
-        .join(dir_name)
-        .join(format!("{timestamp}.txt")))
+    fs::rename(&partial, path).map_err(|e| format!("Could not save {}: {e}", path.display()))
 }
 
 #[derive(Serialize, Clone)]
@@ -212,12 +217,11 @@ pub async fn install_winetricks_verbs(
     let runner = find_runner(&runners_dir, &runner_id)?;
     let prefix = PathBuf::from(&prefix_path);
 
-    let log_path = winetricks_log_path(&app, &prefix)?;
-    if let Some(parent) = log_path.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("Could not create log directory: {e}"))?;
-    }
-    let log_out =
-        fs::File::create(&log_path).map_err(|e| format!("Could not create log file: {e}"))?;
+    let log_path = new_log_file(&prefix_log_dir(&app, &prefix)?)?;
+    let log_out = fs::OpenOptions::new()
+        .append(true)
+        .open(&log_path)
+        .map_err(|e| format!("Could not open log file: {e}"))?;
     let log_err = log_out
         .try_clone()
         .map_err(|e| format!("Could not open log file: {e}"))?;
@@ -227,6 +231,11 @@ pub async fn install_winetricks_verbs(
         command.arg("winetricks").args(&verbs);
         command
     } else {
+        // Readied as for a game first: winetricks would otherwise initialize
+        // a fresh prefix itself, with Wine asking to download Mono and Gecko.
+        prepare_prefix(&app, token.as_deref(), &runner, &prefix, &log_path, &|| {})
+            .await
+            .map_err(|e| format!("{e} — Details im Log: {}", log_path.display()))?;
         direct_winetricks_command(&app, &runner, &prefix, &prefix_path, &verbs).await?
     };
 

@@ -24,7 +24,7 @@ use commands::performance::{
 use commands::prefixes::{add_prefix, delete_prefix, list_prefixes};
 use commands::proton_options::{get_proton_config, list_proton_options, save_proton_config};
 use commands::runner_downloads::{download_runner, list_runner_releases, list_runner_sources};
-use commands::runners::list_runners;
+use commands::runners::{delete_runner, list_runners};
 use commands::steam::{export_to_steam, list_steam_games, remove_from_steam};
 use commands::steamgriddb::{
     get_game_cover, get_game_icon, get_steamgriddb_config, list_steamgriddb_artwork,
@@ -32,7 +32,7 @@ use commands::steamgriddb::{
     remove_game_icon, save_steamgriddb_config, search_steamgriddb_games, set_game_artwork,
     set_game_cover, set_game_icon,
 };
-use commands::umu::{get_umu_status, install_umu};
+use commands::umu::{get_umu_status, install_umu, latest_umu_version};
 use commands::umu_database::search_umu_ids;
 use commands::wine_tools::launch_wine_tool;
 use commands::winetricks::{
@@ -216,6 +216,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             list_runners,
+            delete_runner,
             list_proton_options,
             list_games,
             add_game,
@@ -270,6 +271,7 @@ pub fn run() {
             save_github_config,
             get_umu_status,
             install_umu,
+            latest_umu_version,
             search_umu_ids
         ])
         .run(tauri::generate_context!())
