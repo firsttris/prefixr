@@ -23,7 +23,7 @@ use crate::commands::shell_link::{find_recently_created_shortcuts, DetectedShort
 use crate::commands::steamgriddb::{artwork_dir, asset_cache_path, image_extension};
 use crate::commands::umu::{ensure_umu, runtime_present};
 use crate::config::{save_config, ConfigState};
-use crate::models::{Game, GameInput, Runner, RunnerKind};
+use crate::models::{normalize_umu_id, normalize_umu_store, Game, GameInput, Runner, RunnerKind};
 use crate::tray::rebuild_tray_menu;
 
 /// Checks whether `name` resolves to an executable file somewhere on `PATH`,
@@ -387,6 +387,13 @@ pub fn list_games(state: State<ConfigState>) -> Result<Vec<Game>, String> {
     Ok(config.games.clone())
 }
 
+/// A store only means something alongside an id.
+fn umu_fields(id: Option<String>, store: Option<String>) -> (Option<String>, Option<String>) {
+    let id = normalize_umu_id(id);
+    let store = id.as_ref().and(normalize_umu_store(store));
+    (id, store)
+}
+
 #[tauri::command]
 pub fn add_game(
     app: AppHandle,
@@ -394,6 +401,7 @@ pub fn add_game(
     game: GameInput,
 ) -> Result<Game, String> {
     let icon = extract_icon_data_url(&game.exe_path);
+    let (umu_id, umu_store) = umu_fields(game.umu_id, game.umu_store);
     let new_game = Game {
         id: Uuid::new_v4(),
         name: game.name,
@@ -408,6 +416,8 @@ pub fn add_game(
         cover_url: None,
         steamgriddb_icon_grid_id: None,
         steamgriddb_icon_url: None,
+        umu_id,
+        umu_store,
         overrides: game.overrides,
     };
 
@@ -444,6 +454,7 @@ pub fn update_game(
     existing.runner_id = game.runner_id;
     existing.env_vars = game.env_vars;
     existing.launch_args = game.launch_args;
+    (existing.umu_id, existing.umu_store) = umu_fields(game.umu_id, game.umu_store);
     existing.overrides = game.overrides;
     let updated = existing.clone();
 
@@ -907,6 +918,7 @@ async fn run_game(
     // Before the game's own env vars, so a hand-written entry for the same
     // variable still wins. Wine runners don't read these names at all.
     if runner.kind == RunnerKind::Proton {
+        env.extend(game.umu_env());
         env.extend(settings.proton_env());
     }
     env.extend(game.env_vars.iter().map(|(k, v)| (k.clone(), v.clone())));

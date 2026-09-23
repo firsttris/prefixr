@@ -25,6 +25,8 @@ export interface Game {
   cover_url: string | null;
   steamgriddb_icon_grid_id: number | null;
   steamgriddb_icon_url: string | null;
+  umu_id: string | null;
+  umu_store: string | null;
   overrides: GameOverrides;
 }
 
@@ -35,6 +37,8 @@ export interface GameInput {
   runner_id: string;
   env_vars: Record<string, string>;
   launch_args: string;
+  umu_id: string | null;
+  umu_store: string | null;
   overrides: GameOverrides;
 }
 
@@ -193,4 +197,13 @@ export interface MaxMapCountStatus {
 export interface UmuStatus {
   installed: boolean;
   version: string | null;
+}
+
+// A suggested UMU id (`GAMEID`) for a game — see `search_umu_ids` in
+// umu_database.rs. `store` is null for Steam and standalone releases.
+export interface UmuMatch {
+  umu_id: string;
+  title: string;
+  store: string | null;
+  source: "steam" | "database";
 }

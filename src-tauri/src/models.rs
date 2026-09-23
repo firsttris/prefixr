@@ -76,11 +76,57 @@ pub struct Game {
     /// `commands::steamgriddb`.
     #[serde(default)]
     pub steamgriddb_icon_url: Option<String>,
+    /// The game's UMU id (e.g. `umu-1091500`), passed to umu as `GAMEID` so
+    /// umu-protonfixes applies this game's own fixes, and Proton its
+    /// per-game hacks (umu derives `SteamAppId` from it). `None` leaves umu
+    /// at `umu-default`, i.e. only the generic fixes. Proton runners only.
+    #[serde(default)]
+    pub umu_id: Option<String>,
+    /// The store the `umu_id` entry belongs to (`gog`, `egs`, …), passed as
+    /// `STORE`: protonfixes then looks in that store's fix folder instead of
+    /// the generic umu one.
+    #[serde(default)]
+    pub umu_store: Option<String>,
     /// Per-game deviations from the global MangoHud/performance settings.
     /// Defaults to "inherit everything", so games from older configs behave
     /// exactly as before.
     #[serde(default)]
     pub overrides: GameOverrides,
+}
+
+impl Game {
+    /// `GAMEID`/`STORE` for umu, empty without a `umu_id`.
+    pub fn umu_env(&self) -> Vec<(String, String)> {
+        let Some(id) = &self.umu_id else {
+            return Vec::new();
+        };
+        let mut env = vec![("GAMEID".to_string(), id.clone())];
+        if let Some(store) = &self.umu_store {
+            env.push(("STORE".to_string(), store.clone()));
+        }
+        env
+    }
+}
+
+/// Cleans up a UMU id as entered or picked in the game dialog: blank means
+/// none, and a bare Steam app id becomes `umu-<id>` — the form umu expects,
+/// and the only one it derives `SteamAppId` from.
+pub fn normalize_umu_id(id: Option<String>) -> Option<String> {
+    let id = id?.trim().to_string();
+    if id.is_empty() {
+        None
+    } else if id.chars().all(|c| c.is_ascii_digit()) {
+        Some(format!("umu-{id}"))
+    } else {
+        Some(id)
+    }
+}
+
+/// `none` is how the umu-database marks a standalone release; umu and
+/// protonfixes treat it the same as no store at all.
+pub fn normalize_umu_store(store: Option<String>) -> Option<String> {
+    let store = store?.trim().to_ascii_lowercase();
+    (!store.is_empty() && store != "none").then_some(store)
 }
 
 /// Payload for `add_game`; the id is assigned by the backend.
@@ -94,6 +140,10 @@ pub struct GameInput {
     pub env_vars: HashMap<String, String>,
     #[serde(default)]
     pub launch_args: String,
+    #[serde(default)]
+    pub umu_id: Option<String>,
+    #[serde(default)]
+    pub umu_store: Option<String>,
     #[serde(default)]
     pub overrides: GameOverrides,
 }
@@ -520,5 +570,17 @@ mod tests {
         assert!(game.overrides.performance.gamemode_enabled.is_none());
         assert!(game.overrides.graphics.gamescope.is_none());
         assert!(game.overrides.proton.is_empty());
+        assert!(game.umu_id.is_none());
+        assert!(game.umu_env().is_empty());
+    }
+
+    #[test]
+    fn umu_ids_are_normalized() {
+        assert_eq!(normalize_umu_id(None), None);
+        assert_eq!(normalize_umu_id(Some("  ".into())), None);
+        assert_eq!(normalize_umu_id(Some(" 1091500 ".into())).as_deref(), Some("umu-1091500"));
+        assert_eq!(normalize_umu_id(Some("umu-61500".into())).as_deref(), Some("umu-61500"));
+        assert_eq!(normalize_umu_store(Some("none".into())), None);
+        assert_eq!(normalize_umu_store(Some("GOG".into())).as_deref(), Some("gog"));
     }
 }

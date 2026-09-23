@@ -16,11 +16,11 @@ const BASE_URL: &str = "https://www.steamgriddb.com/api/v2";
 /// `data`; failures set `success: false` and list human-readable reasons in
 /// `errors` instead of using an HTTP error status.
 #[derive(Debug, Deserialize)]
-#[serde(bound(deserialize = "T: Deserialize<'de>"))]
+#[serde(bound(deserialize = "T: Deserialize<'de> + Default"))]
 struct SgdbEnvelope<T> {
     success: bool,
     #[serde(default)]
-    data: Vec<T>,
+    data: T,
     #[serde(default)]
     errors: Vec<String>,
 }
@@ -31,6 +31,28 @@ struct SgdbGameMatch {
     name: String,
     #[serde(default)]
     verified: bool,
+    /// Platforms SteamGridDB knows the game on, e.g. `steam`.
+    #[serde(default)]
+    types: Vec<String>,
+}
+
+/// A game looked up by id with `platformdata=steam`.
+#[derive(Debug, Default, Deserialize)]
+struct SgdbGame {
+    name: String,
+    #[serde(default)]
+    external_platform_data: SgdbPlatformData,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SgdbPlatformData {
+    #[serde(default)]
+    steam: Vec<SgdbPlatformEntry>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SgdbPlatformEntry {
+    id: String,
 }
 
 /// Shape shared by SteamGridDB's grid and icon endpoints — both return the
@@ -89,22 +111,27 @@ fn build_url(path_segments: &[&str]) -> Result<reqwest::Url, String> {
 
 /// Reads the configured API key, without holding the config lock across an
 /// `.await` point (a `std::sync::MutexGuard` isn't `Send`).
-fn require_api_key(state: &State<ConfigState>) -> Result<String, String> {
+pub(crate) fn read_api_key(state: &State<ConfigState>) -> Result<Option<String>, String> {
     let config = state
         .lock()
         .map_err(|_| "Configuration is locked".to_string())?;
-    match &config.steamgriddb.api_key {
-        Some(key) if !key.trim().is_empty() => Ok(key.clone()),
-        _ => Err("No SteamGridDB API key configured".to_string()),
-    }
+    Ok(config
+        .steamgriddb
+        .api_key
+        .clone()
+        .filter(|key| !key.trim().is_empty()))
+}
+
+fn require_api_key(state: &State<ConfigState>) -> Result<String, String> {
+    read_api_key(state)?.ok_or_else(|| "No SteamGridDB API key configured".to_string())
 }
 
 /// Sends a GET request to a SteamGridDB API endpoint and unwraps its
 /// envelope, mapping an unsuccessful response's `errors` into the `Err`.
-async fn sgdb_get<T: for<'de> Deserialize<'de>>(
+async fn sgdb_get<T: for<'de> Deserialize<'de> + Default>(
     url: reqwest::Url,
     api_key: &str,
-) -> Result<Vec<T>, String> {
+) -> Result<T, String> {
     let response = reqwest::Client::new()
         .get(url)
         .bearer_auth(api_key)
@@ -179,6 +206,54 @@ pub async fn search_steamgriddb_games(
             name: m.name,
             verified: m.verified,
         })
+        .collect())
+}
+
+/// A Steam release of a SteamGridDB game.
+#[derive(Debug, Clone)]
+pub(crate) struct SteamApp {
+    pub app_id: String,
+    /// SteamGridDB's name for the game.
+    pub name: String,
+}
+
+/// The Steam app ids SteamGridDB has on record for a game — usually one,
+/// none for games that were never on Steam.
+pub(crate) async fn steam_apps(api_key: &str, steamgriddb_id: i64) -> Result<Vec<SteamApp>, String> {
+    let mut url = build_url(&["games", "id", &steamgriddb_id.to_string()])?;
+    url.query_pairs_mut().append_pair("platformdata", "steam");
+    let game: SgdbGame = sgdb_get(url, api_key).await?;
+    Ok(game
+        .external_platform_data
+        .steam
+        .into_iter()
+        .map(|entry| SteamApp {
+            app_id: entry.id,
+            name: game.name.clone(),
+        })
+        .collect())
+}
+
+/// Searches SteamGridDB by name and looks up the Steam app ids of the first
+/// `limit` matches that are on Steam at all.
+pub(crate) async fn search_steam_apps(
+    api_key: &str,
+    query: &str,
+    limit: usize,
+) -> Result<Vec<SteamApp>, String> {
+    let url = build_url(&["search", "autocomplete", query])?;
+    let matches: Vec<SgdbGameMatch> = sgdb_get(url, api_key).await?;
+    let lookups = matches
+        .iter()
+        .filter(|m| m.types.iter().any(|t| t == "steam"))
+        .take(limit)
+        .map(|m| steam_apps(api_key, m.id));
+    // A failed lookup only costs that one suggestion.
+    Ok(futures_util::future::join_all(lookups)
+        .await
+        .into_iter()
+        .filter_map(Result::ok)
+        .flatten()
         .collect())
 }
 

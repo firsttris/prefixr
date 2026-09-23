@@ -17,6 +17,12 @@ export default defineConfig(() => ({
     port: 1420,
     strictPort: true,
     host: host || "127.0.0.1",
+    // 3. stop WebKitGTK from caching dev modules across runs. A cached `.svelte` module
+    //    makes the webview request its `?svelte&type=style` CSS before Vite has compiled
+    //    the component, so the raw Svelte source gets served (and cached) as CSS.
+    headers: {
+      "Cache-Control": "no-store",
+    },
     hmr: host
       ? {
           protocol: "ws",
@@ -25,7 +31,7 @@ export default defineConfig(() => ({
         }
       : undefined,
     watch: {
-      // 3. tell Vite to ignore watching `src-tauri`
+      // 4. tell Vite to ignore watching `src-tauri`
       ignored: ["**/src-tauri/**"],
     },
   },

@@ -15,6 +15,7 @@
   import GraphicsEditor from "$lib/components/GraphicsEditor.svelte";
   import OverlayEditor from "$lib/components/OverlayEditor.svelte";
   import ProtonEditor from "$lib/components/ProtonEditor.svelte";
+  import UmuIdPicker from "$lib/components/UmuIdPicker.svelte";
   import type {
     Game,
     GameInput,
@@ -63,6 +64,8 @@
     runnerId: existingGame?.runner_id ?? initialRunnerId ?? "",
     envVarsText: existingGame ? formatEnvVars(existingGame.env_vars) : "",
     launchArgs: existingGame?.launch_args ?? "",
+    umuId: existingGame?.umu_id ?? null,
+    umuStore: existingGame?.umu_store ?? null,
     overrides: existingGame?.overrides,
   }));
 
@@ -72,6 +75,8 @@
   let runnerId = $state(defaults.runnerId);
   let envVarsText = $state(defaults.envVarsText);
   let launchArgs = $state(defaults.launchArgs);
+  let umuId = $state<string | null>(defaults.umuId);
+  let umuStore = $state<string | null>(defaults.umuStore);
   let error = $state("");
   let submitting = $state(false);
 
@@ -303,6 +308,8 @@
       runner_id: runnerId,
       env_vars: parseEnvVars(envVarsText),
       launch_args: launchArgs.trim(),
+      umu_id: umuId,
+      umu_store: umuStore,
       overrides: $state.snapshot({ performance: perf, graphics: gfx, overlay, proton }),
     };
     try {
@@ -382,6 +389,13 @@
           <option value={runner.id}>{runner.name} ({runner.kind})</option>
         {/each}
       </select>
+      {#if isProton && !umuId}
+        <span class="hint">
+          Noch keine protonfixes-Zuordnung, im Tab
+          <button type="button" class="link" onclick={() => (tab = "proton")}>Proton</button>
+          nach einer suchen.
+        </span>
+      {/if}
     </label>
 
     <label>
@@ -404,6 +418,16 @@
     {@render inheritHint("Overlay")}
     <OverlayEditor value={overlayShown} onchange={changeOverlay} overrides={overlayHooks} />
   {:else if activeTab === "proton"}
+    <UmuIdPicker
+      {umuId}
+      {umuStore}
+      {name}
+      steamgriddbId={existingGame?.steamgriddb_id ?? null}
+      onchange={(id, store) => {
+        umuId = id;
+        umuStore = store;
+      }}
+    />
     {@render inheritHint("Proton")}
     <ProtonEditor
       options={protonOptions}
@@ -496,5 +520,15 @@
     color: var(--text-muted);
     font-size: 0.85em;
     margin: 0;
+  }
+
+  .link {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--accent);
+    font-size: inherit;
+    text-decoration: underline;
+    cursor: pointer;
   }
 </style>

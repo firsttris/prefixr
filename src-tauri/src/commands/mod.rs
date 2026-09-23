@@ -12,5 +12,6 @@ pub mod runners;
 pub mod shell_link;
 pub mod steamgriddb;
 pub mod umu;
+pub mod umu_database;
 pub mod wine_tools;
 pub mod winetricks;
