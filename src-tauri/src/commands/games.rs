@@ -111,21 +111,17 @@ pub struct LaunchingGames(Mutex<HashSet<Uuid>>);
 
 impl LaunchingGames {
     /// Marks `id` as launching, or `None` if it already is.
-    fn claim(&self, id: Uuid) -> Option<LaunchGuard<'_>> {
+    pub(crate) fn claim(&self, id: Uuid) -> Option<LaunchGuard<'_>> {
         // The lock is released before a guard exists: dropping one locks
         // again (and must never happen for a refused claim, whose drop
         // would end the launch already in progress).
         let inserted = self.0.lock().ok()?.insert(id);
         inserted.then(|| LaunchGuard { launching: self, id })
     }
-
-    pub fn contains(&self, id: Uuid) -> bool {
-        self.0.lock().is_ok_and(|launching| launching.contains(&id))
-    }
 }
 
 /// Keeps a game in `LaunchingGames` until dropped.
-struct LaunchGuard<'a> {
+pub(crate) struct LaunchGuard<'a> {
     launching: &'a LaunchingGames,
     id: Uuid,
 }
@@ -436,7 +432,7 @@ fn umu_fields(id: Option<String>, store: Option<String>) -> (Option<String>, Opt
     (id, store)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn add_game(
     app: AppHandle,
     state: State<ConfigState>,
@@ -472,7 +468,7 @@ pub fn add_game(
     Ok(new_game)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn update_game(
     app: AppHandle,
     state: State<ConfigState>,
@@ -480,17 +476,33 @@ pub fn update_game(
     game: GameInput,
 ) -> Result<Game, String> {
     let game_id = Uuid::parse_str(&id).map_err(|e| format!("Invalid game id: {e}"))?;
+    let find = |games: &[Game]| -> Result<usize, String> {
+        games
+            .iter()
+            .position(|g| g.id == game_id)
+            .ok_or_else(|| format!("No game with id {id}"))
+    };
+
+    // Parsing the exe for its icon means reading all of it, so that only
+    // happens when there's something new to find — and outside the lock.
+    let needs_icon = {
+        let config = state
+            .lock()
+            .map_err(|_| "Configuration is locked".to_string())?;
+        let existing = &config.games[find(&config.games)?];
+        existing.exe_path != game.exe_path || existing.icon.is_none()
+    };
+    let icon = needs_icon.then(|| extract_icon_data_url(&game.exe_path));
+
     let mut config = state
         .lock()
         .map_err(|_| "Configuration is locked".to_string())?;
+    let index = find(&config.games)?;
+    let existing = &mut config.games[index];
 
-    let existing = config
-        .games
-        .iter_mut()
-        .find(|g| g.id == game_id)
-        .ok_or_else(|| format!("No game with id {id}"))?;
-
-    existing.icon = extract_icon_data_url(&game.exe_path);
+    if let Some(icon) = icon {
+        existing.icon = icon;
+    }
     existing.name = game.name;
     existing.exe_path = game.exe_path;
     existing.prefix_path = game.prefix_path;
@@ -642,6 +654,7 @@ fn sync_directx_overrides_from_cache(cache_dir: &Path, prefix_path: &Path) -> Re
 async fn install_wine_mono(
     app: &AppHandle,
     wine: &Path,
+    runner_path: &Path,
     prefix_path: &Path,
     log_path: &Path,
 ) -> Result<(), String> {
@@ -649,7 +662,7 @@ async fn install_wine_mono(
         return Ok(());
     }
 
-    let msi_path = ensure_wine_mono_msi(app).await?;
+    let msi_path = ensure_wine_mono_msi(app, runner_path).await?;
     let prefix_str = prefix_path
         .to_str()
         .ok_or_else(|| format!("Prefix path is not valid UTF-8: {}", prefix_path.display()))?;
@@ -776,6 +789,14 @@ async fn prepare_proton(
     ensure_umu(app, token).await
 }
 
+/// `WINEDLLOVERRIDES` for a fresh prefix's wineboot. Without `mscoree` and
+/// `mshtml`, wineboot looks for wine-mono and wine-gecko, and a plain Wine
+/// build (e.g. Kron4ek) ships neither, so Wine would ask to download each in
+/// a dialog of its own. Mono is installed right after (`install_wine_mono`);
+/// Gecko is left out, as Lutris does by default. `winemenubuilder.exe` stays
+/// off here too, as in `run_game`.
+const WINEBOOT_DLL_OVERRIDES: &str = "mscoree,mshtml=;winemenubuilder.exe=";
+
 /// Readies a Wine runner's launch and returns its `wine` binary, which the
 /// game is launched with directly. Unlike Proton, a plain Wine build does
 /// none of its own prefix setup, so that happens here: a fresh prefix gets
@@ -793,17 +814,24 @@ async fn prepare_wine(
     let wine = wine_binary(&runner.path)?;
     let prefix_path_str = game.prefix_path.to_string_lossy();
 
+    // A prefix is created without ever running wineboot (see `add_prefix`),
+    // so an empty one — no `drive_c` yet — is initialized here on first use.
+    // Checked before `steer_profile_to_steamuser`, which creates
+    // `drive_c/users/steamuser` and so `drive_c` itself.
+    let fresh = !game.prefix_path.join("drive_c").is_dir();
     // Must run before wineboot's first initialization of this prefix (see
     // `steer_profile_to_steamuser`), but is otherwise idempotent, so it's
     // simplest to just always ensure it — cheap, and self-healing if
     // something ever removed the symlink.
     steer_profile_to_steamuser(&game.prefix_path)?;
-    // A prefix is created without ever running wineboot (see `add_prefix`),
-    // so an empty one — no `drive_c` yet — is initialized here on first use.
-    if !game.prefix_path.join("drive_c").is_dir() {
+    if fresh {
         let _ = app.emit("game-initializing", GameInitializingPayload { id });
         let (out, err) = log_stdio(log_path)?;
-        let status = runner_command(&wine, [("WINEPREFIX", prefix_path_str.as_ref())])
+        let env = [
+            ("WINEPREFIX", prefix_path_str.as_ref()),
+            ("WINEDLLOVERRIDES", WINEBOOT_DLL_OVERRIDES),
+        ];
+        let status = runner_command(&wine, env)
             .arg("wineboot")
             .stdout(out)
             .stderr(err)
@@ -815,7 +843,7 @@ async fn prepare_wine(
         }
     }
 
-    install_wine_mono(app, &wine, &game.prefix_path, log_path).await?;
+    install_wine_mono(app, &wine, &runner.path, &game.prefix_path, log_path).await?;
     let cache = ensure_directx_layer_cache(app).await?;
     dll_overrides.push(sync_directx_overrides_from_cache(&cache, &game.prefix_path)?);
 
@@ -1012,6 +1040,7 @@ async fn run_game(
         env.extend(settings.proton_env());
     }
     add_game_env(&mut env, &game.env_vars);
+    keep_inherited_preload(&mut env, std::env::var("LD_PRELOAD").ok());
 
     // Builds the actual launch as a chain of wrappers around the runner
     // binary (umu-run or wine), each one prepended in outer-to-inner order
@@ -1216,6 +1245,25 @@ fn add_game_env(env: &mut Vec<(String, String)>, game_vars: &HashMap<String, Str
     }
 }
 
+/// Appends the `LD_PRELOAD` Prefixr itself was started with to the one set up
+/// for the launch, which would otherwise replace it. That's how Steam
+/// injects its overlay into a game it started via `--run`, so without this
+/// GameMode (or a game's own `LD_PRELOAD`) would switch the overlay off. A
+/// launch that doesn't set `LD_PRELOAD` inherits it unchanged anyway, and a
+/// game's explicitly empty one still clears it.
+fn keep_inherited_preload(env: &mut [(String, String)], inherited: Option<String>) {
+    let Some(inherited) = inherited.filter(|value| !value.trim().is_empty()) else {
+        return;
+    };
+    // The last entry for a variable is the one the process gets.
+    if let Some((_, value)) = env.iter_mut().rev().find(|(key, _)| key == "LD_PRELOAD") {
+        if !value.is_empty() {
+            value.push(':');
+            value.push_str(&inherited);
+        }
+    }
+}
+
 /// The user's Desktop folder, honoring a localized `XDG_DESKTOP_DIR` (e.g.
 /// "Schreibtisch" on a German system) if `~/.config/user-dirs.dirs` sets one,
 /// falling back to `~/Desktop`.
@@ -1395,7 +1443,7 @@ fn write_game_shortcut(
 
 /// Creates a `.desktop` shortcut on the user's Desktop that launches this
 /// game directly.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn create_desktop_shortcut(
     app: AppHandle,
     state: State<ConfigState>,
@@ -1412,7 +1460,7 @@ pub fn create_desktop_shortcut(
 /// `update-desktop-database` is nudged afterwards, best-effort, so menus
 /// that cache entries (like KDE's) pick up the addition immediately instead
 /// of waiting for their own refresh.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn create_menu_shortcut(
     app: AppHandle,
     state: State<ConfigState>,
@@ -1532,14 +1580,33 @@ mod tests {
     }
 
     #[test]
+    fn inherited_preload_is_kept() {
+        let overlay = "/steam/ubuntu12_64/gameoverlayrenderer.so".to_string();
+        let mut env = vec![("LD_PRELOAD".to_string(), "libgamemodeauto.so.0".to_string())];
+        keep_inherited_preload(&mut env, Some(overlay.clone()));
+        assert_eq!(env[0].1, format!("libgamemodeauto.so.0:{overlay}"));
+
+        // Nothing set up for the launch: the process inherits it by itself.
+        let mut env = vec![("DXVK_HUD".to_string(), "fps".to_string())];
+        keep_inherited_preload(&mut env, Some(overlay.clone()));
+        assert_eq!(env, vec![("DXVK_HUD".to_string(), "fps".to_string())]);
+
+        // A game's own empty value, added last, clears it on purpose.
+        let mut env = vec![
+            ("LD_PRELOAD".to_string(), "libgamemodeauto.so.0".to_string()),
+            ("LD_PRELOAD".to_string(), String::new()),
+        ];
+        keep_inherited_preload(&mut env, Some(overlay));
+        assert_eq!(env[1].1, "");
+    }
+
+    #[test]
     fn launching_games_refuses_a_second_launch() {
         let launching = LaunchingGames::default();
         let id = Uuid::new_v4();
         let guard = launching.claim(id).unwrap();
         assert!(launching.claim(id).is_none());
-        assert!(launching.contains(id));
         drop(guard);
-        assert!(!launching.contains(id));
         assert!(launching.claim(id).is_some());
     }
 

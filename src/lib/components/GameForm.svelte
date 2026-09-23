@@ -146,7 +146,7 @@
   const globalGfx = $derived<GraphicsConfig>(
     $graphicsConfig ?? {
       gamescope: { enabled: false, width: null, height: null, fps_limit: null, fullscreen: false },
-      vkbasalt: { enabled: false, sharpen: true, sharpness: 0.4, smaa: false, deband: false },
+      vkbasalt: { enabled: false, sharpen: true, sharpness: 0.4, smaa: false },
     },
   );
   const gfxShown = $derived<GraphicsConfig>({

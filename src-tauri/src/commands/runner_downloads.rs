@@ -3,7 +3,6 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use futures_util::StreamExt;
-use reqwest::header::USER_AGENT;
 use reqwest::RequestBuilder;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256, Sha512};
@@ -223,7 +222,7 @@ pub async fn list_runner_releases(
     );
 
     let response = with_optional_auth(
-        reqwest::Client::new().get(&url).header(USER_AGENT, "prefixr"),
+        crate::http::client().get(&url),
         token.as_deref(),
     )
     .send()
@@ -353,9 +352,7 @@ async fn verify_checksum(
         .ok_or_else(|| "Could not derive checksum file URL".to_string())?;
 
     let response = with_optional_auth(
-        reqwest::Client::new()
-            .get(&checksum_url)
-            .header(USER_AGENT, "prefixr"),
+        crate::http::client().get(&checksum_url),
         token,
     )
     .send()
@@ -431,9 +428,7 @@ pub async fn download_runner(
     let is_xz = download_url.ends_with(".tar.xz");
 
     let response = with_optional_auth(
-        reqwest::Client::new()
-            .get(&download_url)
-            .header(USER_AGENT, "prefixr"),
+        crate::http::client().get(&download_url),
         token.as_deref(),
     )
     .send()

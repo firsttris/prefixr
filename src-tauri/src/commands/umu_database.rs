@@ -75,7 +75,9 @@ fn read_cache(path: &PathBuf) -> Option<(Vec<DatabaseEntry>, Duration)> {
 }
 
 async fn download_database() -> Result<Vec<DatabaseEntry>, String> {
-    let response = reqwest::get(DATABASE_URL)
+    let response = crate::http::client()
+        .get(DATABASE_URL)
+        .send()
         .await
         .map_err(|e| format!("Could not reach the umu-database: {e}"))?;
     if !response.status().is_success() {

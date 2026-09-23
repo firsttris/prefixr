@@ -1,5 +1,6 @@
 mod commands;
 mod config;
+mod http;
 mod models;
 mod tray;
 
@@ -174,8 +175,12 @@ pub fn run() {
             }
             setup_tray(app.handle())?;
             // Best-effort: a file manager's "Öffnen mit" context menu working
-            // is a nice-to-have, not something worth failing startup over.
-            let _ = ensure_install_desktop_entry(app.handle());
+            // is a nice-to-have, not something worth failing startup over —
+            // or delaying it for, since it waits on update-desktop-database.
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                let _ = ensure_install_desktop_entry(&handle);
+            });
             Ok(())
         })
         .on_window_event(|window, event| {

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use tauri::{AppHandle, State};
 
-use crate::commands::games::{LaunchingGames, RunningGames};
+use crate::commands::games::LaunchingGames;
 use crate::config::{save_config, ConfigState};
 use crate::models::PrefixInfo;
 
@@ -53,51 +53,53 @@ pub fn add_prefix(app: AppHandle, state: State<ConfigState>, path: String) -> Re
 
 /// Removes a prefix from the app, and with `delete_files` also its folder.
 /// Refused while a game in it is running or being launched: deleting the
-/// folder would pull it out from under the game.
+/// folder would pull it out from under the game. Async, since deleting a
+/// prefix of several GB would otherwise freeze the window meanwhile.
 #[tauri::command]
-pub fn delete_prefix(
+pub async fn delete_prefix(
     app: AppHandle,
-    state: State<ConfigState>,
-    running: State<RunningGames>,
-    launching: State<LaunchingGames>,
+    state: State<'_, ConfigState>,
+    launching: State<'_, LaunchingGames>,
     path: String,
     delete_files: bool,
 ) -> Result<(), String> {
     let prefix_path = PathBuf::from(&path);
-    let mut config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
 
-    if !config.prefixes.iter().any(|p| p.path == prefix_path) {
-        return Err(format!("No prefix known at {path}"));
-    }
-
-    let active_game = {
-        let running = running
-            .0
+    // Every game in this prefix is held as launching until the folder is
+    // gone, so none can be started while it's being deleted. A game that
+    // already runs is launching until it exits, so the claim is refused.
+    let mut guards = Vec::new();
+    {
+        let config = state
             .lock()
-            .map_err(|_| "Running games list is locked".to_string())?;
-        config
-            .games
-            .iter()
-            .filter(|g| g.prefix_path == prefix_path)
-            .find(|g| running.contains_key(&g.id) || launching.contains(g.id))
-            .map(|g| g.name.clone())
-    };
-    if let Some(name) = active_game {
-        return Err(format!(
-            "„{name}“ läuft noch in diesem Prefix. Beende das Spiel zuerst."
-        ));
+            .map_err(|_| "Configuration is locked".to_string())?;
+        if !config.prefixes.iter().any(|p| p.path == prefix_path) {
+            return Err(format!("No prefix known at {path}"));
+        }
+        for game in config.games.iter().filter(|g| g.prefix_path == prefix_path) {
+            let Some(guard) = launching.claim(game.id) else {
+                return Err(format!(
+                    "„{}“ läuft noch in diesem Prefix. Beende das Spiel zuerst.",
+                    game.name
+                ));
+            };
+            guards.push(guard);
+        }
     }
 
     if delete_files && prefix_path.exists() {
-        fs::remove_dir_all(&prefix_path)
+        let target = prefix_path.clone();
+        tauri::async_runtime::spawn_blocking(move || fs::remove_dir_all(target))
+            .await
+            .map_err(|e| format!("Could not delete prefix directory: {e}"))?
             .map_err(|e| format!("Could not delete prefix directory: {e}"))?;
     }
 
+    let mut config = state
+        .lock()
+        .map_err(|_| "Configuration is locked".to_string())?;
     config.prefixes.retain(|p| p.path != prefix_path);
-    save_config(&app, &config)?;
-    Ok(())
+    save_config(&app, &config)
 }
 
 #[tauri::command]

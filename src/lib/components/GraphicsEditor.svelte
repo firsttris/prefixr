@@ -160,19 +160,6 @@
                 text="Empfehlung: Spürbarer Leistungseinbruch möglich. Wenn das Spiel schon eigene Kantenglättung hat, hier eher weglassen — sonst kostet es nur zusätzlich Leistung."
               />
             </div>
-            <div class="check-row">
-              <label class="check">
-                <input
-                  type="checkbox"
-                  checked={value.vkbasalt.deband}
-                  onchange={(e) => onchange({ vkbasalt: { deband: e.currentTarget.checked } })}
-                />
-                Farbverläufe glätten (Deband)
-              </label>
-              <InfoIcon
-                text="Empfehlung: Sehr geringe Kosten — nur sinnvoll bei sichtbaren Farbstufen (z. B. im Himmel), sonst kannst du es weglassen."
-              />
-            </div>
           </div>
         </div>
       {/if}

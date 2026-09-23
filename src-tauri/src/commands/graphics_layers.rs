@@ -1,7 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use reqwest::header::USER_AGENT;
 use serde::Deserialize;
 use tauri::{AppHandle, Manager};
 
@@ -33,9 +32,8 @@ static CACHE_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 /// never taken for the file itself — everything here is cached for good once
 /// it's on disk.
 async fn get(url: &str) -> Result<reqwest::Response, String> {
-    reqwest::Client::new()
+    crate::http::client()
         .get(url)
-        .header(USER_AGENT, "prefixr")
         .send()
         .await
         .and_then(reqwest::Response::error_for_status)
@@ -147,27 +145,72 @@ fn hrefs(html: &str) -> Vec<&str> {
         .collect()
 }
 
-/// Downloads (caching it once fetched) the `.msi` for the latest wine-mono
-/// release from WineHQ's own distribution — the same installer Wine's own
-/// "couldn't find wine-mono" dialog offers to run — and returns its local
-/// path. There's no GitHub-releases API here, just a plain Apache directory
-/// listing per version; versions sort the same alphabetically as
-/// numerically for as long as the major version stays a fixed number of
-/// digits (true for the whole 10.x/11.x range so far), so the last `X.Y.Z/`
-/// entry on the index page is the latest.
-pub async fn ensure_wine_mono_msi(app: &AppHandle) -> Result<PathBuf, String> {
-    let _lock = CACHE_LOCK.lock().await;
-    let cache = cache_dir(app)?;
-    if let Ok(entries) = fs::read_dir(&cache) {
-        for entry in entries.flatten() {
-            let name = entry.file_name().to_string_lossy().to_string();
-            if name.starts_with("wine-mono-") && name.ends_with(".msi") {
-                return Ok(entry.path());
+const MONO_BASE_URL: &str = "https://dl.winehq.org/wine/wine-mono/";
+
+/// Where a runner keeps `appwiz.cpl`, the module that installs wine-mono and
+/// so knows which version this Wine build expects: a plain build's layout,
+/// the `lib64` one some builds use, and Proton's under `files/`.
+fn appwiz_candidates(runner_path: &Path) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    for base in ["", "files/"] {
+        for lib in ["lib/wine", "lib64/wine"] {
+            for arch in ["x86_64-windows", "i386-windows"] {
+                candidates.push(runner_path.join(format!("{base}{lib}/{arch}/appwiz.cpl")));
             }
         }
     }
+    candidates
+}
 
-    let index = get("https://dl.winehq.org/wine/wine-mono/")
+/// The wine-mono version a runner's Wine expects. Its `appwiz.cpl` holds
+/// the installer's file name (`wine-mono-11.3.0-x86.msi`) as a UTF-16
+/// string; `None` if no runner module has one.
+fn required_mono_version(runner_path: &Path) -> Option<String> {
+    appwiz_candidates(runner_path)
+        .into_iter()
+        .find_map(|path| mono_version_in(&fs::read(path).ok()?))
+}
+
+/// The version out of the first `wine-mono-<X.Y.Z>-x86.msi` in a module's
+/// UTF-16 strings.
+fn mono_version_in(module: &[u8]) -> Option<String> {
+    let utf16 = |text: &str| -> Vec<u8> { text.encode_utf16().flat_map(u16::to_le_bytes).collect() };
+    let needle = utf16("wine-mono-");
+    let suffix = utf16("-x86.msi");
+    let mut offset = 0;
+    while let Some(found) = module[offset..]
+        .windows(needle.len())
+        .position(|window| window == needle.as_slice())
+    {
+        let start = offset + found + needle.len();
+        offset = start;
+        let version: String = module[start..]
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .map_while(|unit| char::from_u32(unit.into()).filter(|c| c.is_ascii_digit() || *c == '.'))
+            .collect();
+        let end = start + version.len() * 2;
+        if version.contains('.') && module[end..].starts_with(&suffix) {
+            return Some(version);
+        }
+    }
+    None
+}
+
+/// Any wine-mono installer already in the cache.
+fn cached_mono_msi(cache: &Path) -> Option<PathBuf> {
+    fs::read_dir(cache).ok()?.flatten().map(|entry| entry.path()).find(|path| {
+        let name = path.file_name().unwrap_or_default().to_string_lossy();
+        name.starts_with("wine-mono-") && name.ends_with(".msi")
+    })
+}
+
+/// The latest wine-mono release's version and installer file name. There's
+/// no GitHub-releases API here, just a plain Apache directory listing per
+/// version; the index lists them in ascending version order, so the last
+/// `X.Y.Z/` entry is the latest.
+async fn latest_mono_release() -> Result<(String, String), String> {
+    let index = get(MONO_BASE_URL)
         .await?
         .text()
         .await
@@ -186,8 +229,7 @@ pub async fn ensure_wine_mono_msi(app: &AppHandle) -> Result<PathBuf, String> {
         .map(|href| href.trim_end_matches('/').to_string())
         .ok_or_else(|| "Could not find a wine-mono version in the listing".to_string())?;
 
-    let version_url = format!("https://dl.winehq.org/wine/wine-mono/{version}/");
-    let version_index = get(&version_url)
+    let version_index = get(&format!("{MONO_BASE_URL}{version}/"))
         .await?
         .text()
         .await
@@ -198,8 +240,37 @@ pub async fn ensure_wine_mono_msi(app: &AppHandle) -> Result<PathBuf, String> {
         .find(|href| href.ends_with(".msi") && !href.contains("arm64"))
         .map(|href| href.to_string())
         .ok_or_else(|| format!("Could not find a wine-mono installer for {version}"))?;
+    Ok((version, msi_name))
+}
 
-    let bytes = get(&format!("{version_url}{msi_name}"))
+/// Downloads (caching it once fetched) the wine-mono `.msi` a runner's Wine
+/// expects from WineHQ's own distribution — the same installer Wine's own
+/// "couldn't find wine-mono" dialog offers to run — and returns its local
+/// path. Each Wine release asks for one specific wine-mono version, so the
+/// version comes from the runner itself (see `required_mono_version`). Only
+/// if that can't be read does this fall back to any cached installer, or
+/// else the latest release.
+pub async fn ensure_wine_mono_msi(app: &AppHandle, runner_path: &Path) -> Result<PathBuf, String> {
+    let _lock = CACHE_LOCK.lock().await;
+    let cache = cache_dir(app)?;
+    let (version, msi_name) = match required_mono_version(runner_path) {
+        Some(version) => {
+            let msi_name = format!("wine-mono-{version}-x86.msi");
+            (version, msi_name)
+        }
+        None => {
+            if let Some(cached) = cached_mono_msi(&cache) {
+                return Ok(cached);
+            }
+            latest_mono_release().await?
+        }
+    };
+    let msi_path = cache.join(&msi_name);
+    if msi_path.is_file() {
+        return Ok(msi_path);
+    }
+
+    let bytes = get(&format!("{MONO_BASE_URL}{version}/{msi_name}"))
         .await?
         .bytes()
         .await
@@ -207,10 +278,29 @@ pub async fn ensure_wine_mono_msi(app: &AppHandle) -> Result<PathBuf, String> {
 
     fs::create_dir_all(&cache).map_err(|e| format!("Could not create {}: {e}", cache.display()))?;
     // Written under another name and renamed, so an interrupted write never
-    // leaves a truncated `.msi` for the lookup above to pick up.
-    let msi_path = cache.join(&msi_name);
+    // leaves a truncated `.msi` for the lookups above to pick up.
     let partial = cache.join(format!("{msi_name}.part"));
     fs::write(&partial, &bytes).map_err(|e| format!("Could not save {msi_name}: {e}"))?;
     fs::rename(&partial, &msi_path).map_err(|e| format!("Could not save {msi_name}: {e}"))?;
     Ok(msi_path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn utf16(text: &str) -> Vec<u8> {
+        text.encode_utf16().flat_map(u16::to_le_bytes).collect()
+    }
+
+    #[test]
+    fn reads_the_mono_version_from_utf16_strings() {
+        let mut module = b"\x00MZ wine-mono-9.9.9-x86.msi (ASCII, not a resource)".to_vec();
+        module.extend(utf16("wine-mono-%s"));
+        module.push(0);
+        module.extend(utf16("wine-gecko-2.47.4-x86_64.msi\0wine-mono-11.3.0-x86.msi\0mono"));
+        assert_eq!(mono_version_in(&module).as_deref(), Some("11.3.0"));
+        assert_eq!(mono_version_in(&utf16("wine-mono-.msi")), None);
+        assert_eq!(mono_version_in(b"nothing here"), None);
+    }
 }

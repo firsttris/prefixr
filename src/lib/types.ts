@@ -161,7 +161,6 @@ export interface VkBasaltSettings {
   sharpen: boolean;
   sharpness: number;
   smaa: boolean;
-  deband: boolean;
 }
 
 export interface GamescopeSettings {

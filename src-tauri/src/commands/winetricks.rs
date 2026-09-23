@@ -4,7 +4,6 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use reqwest::header::USER_AGENT;
 use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
 
@@ -46,9 +45,8 @@ async fn ensure_winetricks_script(app: &AppHandle) -> Result<PathBuf, String> {
 
     // An error status fails here rather than getting saved: the script is
     // never downloaded again once it's on disk.
-    let bytes = reqwest::Client::new()
+    let bytes = crate::http::client()
         .get("https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks")
-        .header(USER_AGENT, "prefixr")
         .send()
         .await
         .and_then(reqwest::Response::error_for_status)

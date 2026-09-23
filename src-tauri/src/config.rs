@@ -205,7 +205,6 @@ mod tests {
         assert!(config.performance.gamemode_enabled);
         assert!(config.performance.inhibit_sleep_enabled);
         assert!(config.graphics.vkbasalt.enabled);
-        assert!(config.graphics.vkbasalt.deband);
         assert!((config.graphics.vkbasalt.sharpness - 0.6).abs() < 1e-6);
         assert!(config.graphics.gamescope.enabled);
         assert_eq!(config.graphics.gamescope.width, Some(1280));

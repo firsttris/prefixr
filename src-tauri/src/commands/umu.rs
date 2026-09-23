@@ -1,7 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use reqwest::header::USER_AGENT;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Manager, State};
@@ -81,20 +80,17 @@ struct GitHubRelease {
 /// directory first, so a failed or interrupted update never leaves a
 /// half-extracted copy behind in place of a working one.
 async fn install_latest(app: &AppHandle, token: Option<&str>) -> Result<UmuStatus, String> {
-    let client = reqwest::Client::new();
+    let client = crate::http::client();
     let with_auth = |builder: reqwest::RequestBuilder| match token {
         Some(token) => builder.bearer_auth(token),
         None => builder,
     };
 
-    let response = with_auth(
-        client
-            .get(format!("https://api.github.com/repos/{UMU_REPO}/releases/latest"))
-            .header(USER_AGENT, "prefixr"),
-    )
-    .send()
-    .await
-    .map_err(|e| format!("Could not reach GitHub: {e}"))?;
+    let url = format!("https://api.github.com/repos/{UMU_REPO}/releases/latest");
+    let response = with_auth(client.get(url))
+        .send()
+        .await
+        .map_err(|e| format!("Could not reach GitHub: {e}"))?;
     if !response.status().is_success() {
         return Err(format!("GitHub API returned status {}", response.status()));
     }
@@ -115,17 +111,13 @@ async fn install_latest(app: &AppHandle, token: Option<&str>) -> Result<UmuStatu
         .ok_or_else(|| format!("GitHub reported no SHA-256 digest for {}", asset.name))?
         .to_string();
 
-    let bytes = with_auth(
-        client
-            .get(&asset.browser_download_url)
-            .header(USER_AGENT, "prefixr"),
-    )
-    .send()
-    .await
-    .map_err(|e| format!("Could not download {}: {e}", asset.name))?
-    .bytes()
-    .await
-    .map_err(|e| format!("Could not download {}: {e}", asset.name))?;
+    let bytes = with_auth(client.get(&asset.browser_download_url))
+        .send()
+        .await
+        .map_err(|e| format!("Could not download {}: {e}", asset.name))?
+        .bytes()
+        .await
+        .map_err(|e| format!("Could not download {}: {e}", asset.name))?;
 
     let actual = format!("{:x}", Sha256::digest(&bytes));
     if !actual.eq_ignore_ascii_case(&expected) {

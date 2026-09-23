@@ -132,7 +132,7 @@ async fn sgdb_get<T: for<'de> Deserialize<'de> + Default>(
     url: reqwest::Url,
     api_key: &str,
 ) -> Result<T, String> {
-    let response = reqwest::Client::new()
+    let response = crate::http::client()
         .get(url)
         .bearer_auth(api_key)
         .send()
@@ -374,7 +374,7 @@ fn remove_stale_asset_files(dir: &Path, id: Uuid, kind: &str) -> Result<(), Stri
 
 /// Downloads an artwork image from its source URL.
 async fn download_image(image_url: &str) -> Result<Vec<u8>, String> {
-    let response = reqwest::Client::new()
+    let response = crate::http::client()
         .get(image_url)
         .send()
         .await
@@ -440,7 +440,7 @@ pub async fn set_game_cover(
 /// URI. Returns `Ok(None)` (rather than an error) both when the game has no
 /// cover set and when the cache file is unexpectedly missing, since either
 /// case just means the card should fall back to showing no cover.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_game_cover(app: AppHandle, state: State<ConfigState>, game_id: String) -> Result<Option<String>, String> {
     let cover_url = {
         let mut config = state
@@ -525,7 +525,7 @@ pub async fn set_game_icon(
 /// Reads a game's cached icon, if any, as a `data:image/...;base64,...`
 /// URI. Returns `Ok(None)` both when the game has no icon set and when the
 /// cache file is unexpectedly missing.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_game_icon(app: AppHandle, state: State<ConfigState>, game_id: String) -> Result<Option<String>, String> {
     let icon_url = {
         let mut config = state

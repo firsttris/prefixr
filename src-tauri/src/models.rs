@@ -378,7 +378,6 @@ pub struct VkBasaltSettings {
     pub sharpen: bool,
     pub sharpness: f32,
     pub smaa: bool,
-    pub deband: bool,
 }
 
 impl Default for VkBasaltSettings {
@@ -388,7 +387,6 @@ impl Default for VkBasaltSettings {
             sharpen: true,
             sharpness: 0.4,
             smaa: false,
-            deband: false,
         }
     }
 }

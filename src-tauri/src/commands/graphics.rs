@@ -24,6 +24,10 @@ pub(crate) fn vkbasalt_conf_path(app: &AppHandle, game_id: &str) -> Result<PathB
 /// order) plus each active effect's own parameters — so, unlike
 /// `mangohud::render_conf`, this always writes the enabled effects' tuning
 /// values rather than just their presence.
+///
+/// Only vkBasalt's builtin effects (`cas`, `dls`, `fxaa`, `smaa`, `lut`) are
+/// used: any other name in `effects` is looked up as a ReShade shader whose
+/// path the config has to provide, and fails without one.
 fn render_vkbasalt_conf(settings: &VkBasaltSettings) -> String {
     let mut effects = Vec::new();
     if settings.sharpen {
@@ -31,9 +35,6 @@ fn render_vkbasalt_conf(settings: &VkBasaltSettings) -> String {
     }
     if settings.smaa {
         effects.push("smaa");
-    }
-    if settings.deband {
-        effects.push("deband");
     }
 
     let mut lines = vec![format!("effects = {}", effects.join(":"))];
@@ -47,9 +48,6 @@ fn render_vkbasalt_conf(settings: &VkBasaltSettings) -> String {
         lines.push("smaaMaxSearchSteps = 32".to_string());
         lines.push("smaaMaxSearchStepsDiag = 16".to_string());
         lines.push("smaaCornerRounding = 25".to_string());
-    }
-    if settings.deband {
-        lines.push("debandAvoidBanding = 3".to_string());
     }
 
     lines.push("enableOnLaunch = True".to_string());
