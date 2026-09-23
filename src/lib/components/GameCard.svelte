@@ -29,9 +29,9 @@
   } = $props();
 
   let shortcutState = $state<"idle" | "creating" | "done" | string>("idle");
-  let shortcutMenuOpen = $state(false);
-  let shortcutMenuUpward = $state(false);
-  let shortcutButtonEl: HTMLButtonElement | undefined;
+  let menuOpen = $state(false);
+  let menuUpward = $state(false);
+  let menuButtonEl: HTMLButtonElement | undefined;
   let confirmingRemove = $state(false);
 
   let coverDataUrl = $state<string | null>(null);
@@ -46,16 +46,16 @@
       .catch(() => (coverDataUrl = null));
   });
 
-  function toggleShortcutMenu() {
-    if (!shortcutMenuOpen && shortcutButtonEl) {
-      const rect = shortcutButtonEl.getBoundingClientRect();
-      shortcutMenuUpward = window.innerHeight - rect.bottom < 120;
+  function toggleMenu() {
+    if (!menuOpen && menuButtonEl) {
+      const rect = menuButtonEl.getBoundingClientRect();
+      menuUpward = window.innerHeight - rect.bottom < 250;
     }
-    shortcutMenuOpen = !shortcutMenuOpen;
+    menuOpen = !menuOpen;
   }
 
   async function handleCreateShortcut(target: "desktop" | "menu") {
-    shortcutMenuOpen = false;
+    menuOpen = false;
     shortcutState = "creating";
     try {
       await (target === "desktop" ? onCreateDesktopShortcut() : onCreateMenuShortcut());
@@ -101,75 +101,137 @@
       <span class="status-badge init"><span class="dot"></span>Startet…</span>
     {/if}
 
+    <div class="menu-anchor">
+      <button
+        bind:this={menuButtonEl}
+        type="button"
+        class="icon-btn on-image menu-trigger"
+        onclick={toggleMenu}
+        aria-haspopup="true"
+        aria-expanded={menuOpen}
+        aria-label="Weitere Optionen"
+        title="Weitere Optionen"
+      >
+        ⋮
+      </button>
+      {#if menuOpen}
+        <div class="menu-backdrop" onclick={() => (menuOpen = false)} role="presentation"></div>
+        <div class="menu" class:menu-up={menuUpward} role="menu">
+          <button
+            type="button"
+            role="menuitem"
+            onclick={() => {
+              menuOpen = false;
+              onEditArtwork();
+            }}
+          >
+            <svg class="menu-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <rect x="3" y="4" width="14" height="12" rx="2" stroke="currentColor" stroke-width="1.5" />
+              <circle cx="7.5" cy="8.5" r="1.4" stroke="currentColor" stroke-width="1.5" />
+              <path
+                d="M4 14.5l4-4 3 3 2-2 3.5 3.5"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            Artwork auswählen
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onclick={() => {
+              menuOpen = false;
+              onEdit();
+            }}
+          >
+            <svg class="menu-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <path
+                d="M13.4 3.6l3 3L6.3 16.7l-3.6.9.9-3.6L13.4 3.6z"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linejoin="round"
+              />
+            </svg>
+            Spiel bearbeiten
+          </button>
+          <span class="menu-divider"></span>
+          <button
+            type="button"
+            role="menuitem"
+            disabled={shortcutState === "creating"}
+            onclick={() => handleCreateShortcut("desktop")}
+          >
+            <svg class="menu-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <path d="M8 12l4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              <path
+                d="M7.2 13.3L5.6 15a3 3 0 01-4.2-4.2l2.3-2.3a3 3 0 014.2 0"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+              />
+              <path
+                d="M12.8 6.7L14.4 5a3 3 0 014.2 4.2l-2.3 2.3a3 3 0 01-4.2 0"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+              />
+            </svg>
+            Auf Desktop
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            disabled={shortcutState === "creating"}
+            onclick={() => handleCreateShortcut("menu")}
+          >
+            <svg class="menu-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <path d="M8 12l4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              <path
+                d="M7.2 13.3L5.6 15a3 3 0 01-4.2-4.2l2.3-2.3a3 3 0 014.2 0"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+              />
+              <path
+                d="M12.8 6.7L14.4 5a3 3 0 014.2 4.2l-2.3 2.3a3 3 0 01-4.2 0"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+              />
+            </svg>
+            Ins Startmenü
+          </button>
+          <span class="menu-divider"></span>
+          <button
+            type="button"
+            role="menuitem"
+            class="danger"
+            onclick={() => {
+              menuOpen = false;
+              confirmingRemove = true;
+            }}
+          >
+            <svg class="menu-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <path
+                d="M5 6h10M8 6V4.5a1 1 0 011-1h2a1 1 0 011 1V6M6.5 6l.6 8.6a1 1 0 001 .9h3.8a1 1 0 001-.9L13.5 6"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            Entfernen
+          </button>
+        </div>
+      {/if}
+    </div>
+
     <div class="overlay">
       <div class="info">
         <h3 title={game.name}>{game.name}</h3>
         <span class="runner">{game.runner_id}</span>
-      </div>
-
-      <div class="actions-row">
-        <div class="shortcut-menu">
-          <button
-            bind:this={shortcutButtonEl}
-            type="button"
-            class="icon-btn on-image"
-            onclick={toggleShortcutMenu}
-            disabled={shortcutState === "creating"}
-            aria-haspopup="true"
-            aria-expanded={shortcutMenuOpen}
-            aria-label="Verknüpfung erstellen"
-            title="Verknüpfung erstellen"
-          >
-            {shortcutState === "done" ? "✓" : "🔗"}
-          </button>
-          {#if shortcutMenuOpen}
-            <div
-              class="menu-backdrop"
-              onclick={() => (shortcutMenuOpen = false)}
-              role="presentation"
-            ></div>
-            <div class="menu" class:menu-up={shortcutMenuUpward} role="menu">
-              <button
-                type="button"
-                role="menuitem"
-                onclick={() => handleCreateShortcut("desktop")}
-              >
-                Auf Desktop
-              </button>
-              <button type="button" role="menuitem" onclick={() => handleCreateShortcut("menu")}>
-                Ins Startmenü
-              </button>
-            </div>
-          {/if}
-        </div>
-        <button
-          type="button"
-          class="icon-btn on-image"
-          onclick={onEditArtwork}
-          aria-label="Artwork auswählen"
-          title="Artwork auswählen"
-        >
-          🖼
-        </button>
-        <button
-          type="button"
-          class="icon-btn on-image"
-          onclick={onEdit}
-          aria-label="Spiel bearbeiten"
-          title="Spiel bearbeiten"
-        >
-          ✎
-        </button>
-        <span class="divider"></span>
-        <button
-          type="button"
-          class="icon-btn on-image danger"
-          onclick={() => (confirmingRemove = true)}
-          aria-label="Spiel entfernen"
-          title="Spiel entfernen"
-        >
-          ✕
-        </button>
       </div>
 
       <button
@@ -363,24 +425,16 @@
     border-radius: 999px;
   }
 
-  .actions-row {
-    display: flex;
-    gap: 0.4em;
+  .menu-anchor {
+    position: absolute;
+    top: 0.6em;
+    right: 0.6em;
+    z-index: 5;
   }
 
-  .actions-row .icon-btn {
-    flex: 1;
-    width: auto;
-  }
-
-  .shortcut-menu {
-    position: relative;
-    flex: 1;
-    display: flex;
-  }
-
-  .shortcut-menu .icon-btn {
-    flex: 1;
+  .menu-trigger {
+    font-size: 1.1em;
+    font-weight: 700;
   }
 
   /* Icon buttons need their own translucent + blurred background here
@@ -398,11 +452,6 @@
     color: var(--accent);
   }
 
-  .icon-btn.on-image.danger:hover:not(:disabled) {
-    border-color: var(--danger);
-    color: var(--danger);
-  }
-
   .menu-backdrop {
     position: fixed;
     inset: 0;
@@ -412,11 +461,11 @@
   .menu {
     position: absolute;
     top: calc(100% + 0.3em);
-    left: 0;
+    right: 0;
     z-index: 11;
     display: flex;
     flex-direction: column;
-    min-width: 9.5em;
+    min-width: 12em;
     background: var(--surface-raised);
     border: 1px solid var(--border);
     border-radius: 8px;
@@ -430,6 +479,9 @@
   }
 
   .menu button {
+    display: flex;
+    align-items: center;
+    gap: 0.55em;
     text-align: left;
     background: transparent;
     border: none;
@@ -437,19 +489,31 @@
     border-radius: 6px;
     font-size: 0.85em;
     color: var(--text);
+    white-space: nowrap;
   }
 
-  .menu button:hover {
+  .menu button:hover:not(:disabled) {
     background: var(--surface);
   }
 
-  .divider {
+  .menu-icon {
+    width: 1.05em;
+    height: 1.05em;
     flex-shrink: 0;
-    align-self: center;
-    width: 1px;
-    height: 1.4em;
-    background: rgba(255, 255, 255, 0.22);
-    margin: 0 0.1em;
+  }
+
+  .menu button.danger {
+    color: var(--danger);
+  }
+
+  .menu button.danger:hover:not(:disabled) {
+    background: var(--danger-bg);
+  }
+
+  .menu-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 0.25em 0.4em;
   }
 
   .start {
