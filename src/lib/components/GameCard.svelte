@@ -3,7 +3,7 @@
   import type { GameRunState } from "$lib/stores/games";
   import { getGameCover } from "$lib/stores/steamgriddb";
   import ConfirmDialog from "./ConfirmDialog.svelte";
-  import { t } from "$lib/i18n/index.svelte";
+  import { backendError, t } from "$lib/i18n/index.svelte";
 
   let {
     game,
@@ -35,7 +35,7 @@
     onEditArtwork: () => void;
   } = $props();
 
-  let shortcutState = $state<"idle" | "creating" | "done" | string>("idle");
+  let shortcutState = $state<"idle" | "creating" | "done" | { error: unknown }>("idle");
   let menuOpen = $state(false);
   let menuUpward = $state(false);
   let menuButtonEl: HTMLButtonElement | undefined;
@@ -71,7 +71,7 @@
         shortcutState = "idle";
       }, 2000);
     } catch (e) {
-      shortcutState = String(e);
+      shortcutState = { error: e };
     }
   }
 </script>
@@ -317,7 +317,7 @@
 
   {#if runState?.error}
     <div class="toast">
-      <span>{runState.error}</span>
+      <span>{backendError(runState.error)}</span>
       {#if runState.logPath}
         <button type="button" class="ghost" onclick={() => onShowLog(runState.logPath!)}>
           {t("gameCard.showLog")}
@@ -326,9 +326,9 @@
     </div>
   {/if}
 
-  {#if shortcutState !== "idle" && shortcutState !== "creating" && shortcutState !== "done"}
+  {#if typeof shortcutState === "object"}
     <div class="toast">
-      <span>{t("gameCard.shortcutFailed", { error: shortcutState })}</span>
+      <span>{t("gameCard.shortcutFailed", { error: backendError(shortcutState.error) })}</span>
     </div>
   {/if}
 </article>

@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
@@ -200,7 +201,7 @@ pub async fn search_umu_ids(
     state: State<'_, ConfigState>,
     query: String,
     steamgriddb_id: Option<i64>,
-) -> Result<Vec<UmuMatch>, String> {
+) -> Result<Vec<UmuMatch>, AppError> {
     let query = query.trim();
     let api_key = read_api_key(&state)?;
 
@@ -221,7 +222,7 @@ pub async fn search_umu_ids(
         Ok(entries) => search_database(&entries, query),
         // Still worth showing what SteamGridDB found.
         Err(_) if !steam.is_empty() => Vec::new(),
-        Err(e) => return Err(e),
+        Err(e) => return Err(e.into()),
     };
     Ok(merge(steam, database))
 }

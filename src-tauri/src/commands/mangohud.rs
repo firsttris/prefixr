@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use std::fs;
 use std::path::PathBuf;
 
@@ -105,7 +106,7 @@ pub fn ensure_mangohud_conf(
 }
 
 #[tauri::command]
-pub fn get_mangohud_config(state: State<ConfigState>) -> Result<MangoHudConfig, String> {
+pub fn get_mangohud_config(state: State<ConfigState>) -> Result<MangoHudConfig, AppError> {
     let config = state
         .lock()
         .map_err(|_| "Configuration is locked".to_string())?;
@@ -117,7 +118,7 @@ pub fn save_mangohud_config(
     app: AppHandle,
     state: State<ConfigState>,
     config: MangoHudConfig,
-) -> Result<MangoHudConfig, String> {
+) -> Result<MangoHudConfig, AppError> {
     let mut app_config = state
         .lock()
         .map_err(|_| "Configuration is locked".to_string())?;

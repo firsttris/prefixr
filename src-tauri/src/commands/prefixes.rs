@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -37,7 +38,7 @@ pub fn add_prefix(
     app: AppHandle,
     state: State<ConfigState>,
     path: String,
-) -> Result<PathBuf, String> {
+) -> Result<PathBuf, AppError> {
     let prefix_path = effective_prefix_path(Path::new(&path));
 
     let mut config = state
@@ -45,12 +46,14 @@ pub fn add_prefix(
         .map_err(|_| "Configuration is locked".to_string())?;
 
     if config.prefixes.iter().any(|p| p.path == prefix_path) {
-        return Err(format!("Prefix at {} already exists", prefix_path.display()));
+        return Err(AppError::PrefixAlreadyExists {
+            path: prefix_path.display().to_string(),
+        });
     }
 
     if prefix_path.exists() {
         if !prefix_path.is_dir() {
-            return Err(format!("{path} is not a directory"));
+            return Err(AppError::PathNotADirectory { path: path.clone() });
         }
         let has_contents = fs::read_dir(&prefix_path)
             .map_err(|e| format!("Could not read {path}: {e}"))?
@@ -59,9 +62,7 @@ pub fn add_prefix(
         // A Proton "compat data" folder was already swapped for its `pfx/`.
         let looks_like_prefix = prefix_path.join("drive_c").is_dir();
         if has_contents && !looks_like_prefix {
-            return Err(format!(
-                "{path} already contains files but doesn't look like a Wine or Proton prefix"
-            ));
+            return Err(AppError::PrefixDirNotEmpty { path: path.clone() });
         }
     } else {
         fs::create_dir_all(&prefix_path)
@@ -86,7 +87,7 @@ pub async fn delete_prefix(
     launching: State<'_, LaunchingGames>,
     path: String,
     delete_files: bool,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let prefix_path = PathBuf::from(&path);
 
     // Every game in this prefix is held as launching until the folder is
@@ -98,14 +99,13 @@ pub async fn delete_prefix(
             .lock()
             .map_err(|_| "Configuration is locked".to_string())?;
         if !config.prefixes.iter().any(|p| p.path == prefix_path) {
-            return Err(format!("No prefix known at {path}"));
+            return Err(format!("No prefix known at {path}").into());
         }
         for game in config.games.iter().filter(|g| g.prefix_path == prefix_path) {
             let Some(guard) = launching.claim(game.id) else {
-                return Err(format!(
-                    "„{}“ läuft noch in diesem Prefix. Beende das Spiel zuerst.",
-                    game.name
-                ));
+                return Err(AppError::PrefixInUse {
+                    game_name: game.name.clone(),
+                });
             };
             guards.push(guard);
         }
@@ -123,11 +123,11 @@ pub async fn delete_prefix(
         .lock()
         .map_err(|_| "Configuration is locked".to_string())?;
     config.prefixes.retain(|p| p.path != prefix_path);
-    save_config(&app, &config)
+    save_config(&app, &config).map_err(AppError::from)
 }
 
 #[tauri::command]
-pub fn list_prefixes(state: State<ConfigState>) -> Result<Vec<PrefixInfo>, String> {
+pub fn list_prefixes(state: State<ConfigState>) -> Result<Vec<PrefixInfo>, AppError> {
     let config = state
         .lock()
         .map_err(|_| "Configuration is locked".to_string())?;

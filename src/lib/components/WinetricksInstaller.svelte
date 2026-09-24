@@ -8,7 +8,7 @@
     listInstalledWinetricksVerbs,
     type WinetricksVerbMeta,
   } from "$lib/stores/winetricks";
-  import { t, type TranslationKey } from "$lib/i18n/index.svelte";
+  import { backendError, t, type TranslationKey } from "$lib/i18n/index.svelte";
 
   let { prefixPath, onShowLog }: { prefixPath: string; onShowLog: (path: string) => void } =
     $props();
@@ -16,14 +16,14 @@
   let runnerId = $state("");
   let selected = $state<Set<string>>(new Set());
   let installing = $state(false);
-  let error = $state("");
+  let error = $state<unknown>(null);
   let successLogPath = $state("");
 
   let installed = $state<Set<string>>(new Set());
 
   let catalogueOpen = $state(false);
   let catalogueLoading = $state(false);
-  let catalogueError = $state("");
+  let catalogueError = $state<unknown>(null);
   let allVerbs = $state<WinetricksVerbMeta[]>([]);
   let search = $state("");
 
@@ -52,11 +52,11 @@
     catalogueOpen = !catalogueOpen;
     if (catalogueOpen && allVerbs.length === 0 && !catalogueLoading) {
       catalogueLoading = true;
-      catalogueError = "";
+      catalogueError = null;
       try {
         allVerbs = await listAllWinetricksVerbs();
       } catch (e) {
-        catalogueError = String(e);
+        catalogueError = e;
       } finally {
         catalogueLoading = false;
       }
@@ -76,13 +76,13 @@
   async function handleInstall() {
     if (!runnerId || selected.size === 0) return;
     installing = true;
-    error = "";
+    error = null;
     successLogPath = "";
     try {
       successLogPath = await installWinetricksVerbs(prefixPath, runnerId, [...selected]);
       await refreshInstalled();
     } catch (e) {
-      error = String(e);
+      error = e;
     } finally {
       installing = false;
     }
@@ -137,7 +137,7 @@
         {#if catalogueLoading}
           <p class="hint">{t("winetricksInstaller.loadingCatalogue")}</p>
         {:else if catalogueError}
-          <p class="error">{catalogueError}</p>
+          <p class="error">{backendError(catalogueError)}</p>
         {:else}
           <input
             class="search"
@@ -170,7 +170,7 @@
 
   {#if error}
     <div class="toast">
-      <span>{error}</span>
+      <span>{backendError(error)}</span>
     </div>
   {/if}
 

@@ -2,13 +2,13 @@
   import { onMount } from "svelte";
   import { runners, refreshRunners } from "$lib/stores/runners";
   import { WINE_TOOLS, launchWineTool } from "$lib/stores/wineTools";
-  import { t, type TranslationKey } from "$lib/i18n/index.svelte";
+  import { backendError, t, type TranslationKey } from "$lib/i18n/index.svelte";
 
   let { prefixPath }: { prefixPath: string } = $props();
 
   let runnerId = $state("");
   let launching = $state("");
-  let error = $state("");
+  let error = $state<unknown>(null);
 
   onMount(() => {
     refreshRunners();
@@ -17,11 +17,11 @@
   async function handleLaunch(tool: string) {
     if (!runnerId) return;
     launching = tool;
-    error = "";
+    error = null;
     try {
       await launchWineTool(prefixPath, runnerId, tool);
     } catch (e) {
-      error = String(e);
+      error = e;
     } finally {
       launching = "";
     }
@@ -64,7 +64,7 @@
 
   {#if error}
     <div class="toast">
-      <span>{error}</span>
+      <span>{backendError(error)}</span>
     </div>
   {/if}
 </div>

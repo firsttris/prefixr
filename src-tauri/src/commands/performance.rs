@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use std::fs;
 
 use serde::Serialize;
@@ -8,7 +9,7 @@ use crate::config::{save_config, ConfigState};
 use crate::models::PerformanceConfig;
 
 #[tauri::command]
-pub fn get_performance_config(state: State<ConfigState>) -> Result<PerformanceConfig, String> {
+pub fn get_performance_config(state: State<ConfigState>) -> Result<PerformanceConfig, AppError> {
     let config = state
         .lock()
         .map_err(|_| "Configuration is locked".to_string())?;
@@ -20,7 +21,7 @@ pub fn save_performance_config(
     app: AppHandle,
     state: State<ConfigState>,
     config: PerformanceConfig,
-) -> Result<PerformanceConfig, String> {
+) -> Result<PerformanceConfig, AppError> {
     let mut app_config = state
         .lock()
         .map_err(|_| "Configuration is locked".to_string())?;
@@ -79,11 +80,13 @@ pub fn check_max_map_count() -> MaxMapCountStatus {
 /// the limit for this boot only and silently regress after the next reboot,
 /// which would be more confusing than not offering a fix at all.
 #[tauri::command]
-pub async fn fix_max_map_count() -> Result<(), String> {
+pub async fn fix_max_map_count() -> Result<(), AppError> {
     if !command_on_path("pkexec") {
-        return Err(format!(
-            "pkexec ist nicht installiert. Bitte manuell ausführen: sudo sh -c 'echo \"vm.max_map_count = {RECOMMENDED_MAX_MAP_COUNT}\" > {SYSCTL_DROPIN_PATH} && sysctl --system'"
-        ));
+        return Err(AppError::PkexecNotInstalled {
+            command: format!(
+                "sudo sh -c 'echo \"vm.max_map_count = {RECOMMENDED_MAX_MAP_COUNT}\" > {SYSCTL_DROPIN_PATH} && sysctl --system'"
+            ),
+        });
     }
     let script = format!(
         "echo 'vm.max_map_count = {RECOMMENDED_MAX_MAP_COUNT}' > {SYSCTL_DROPIN_PATH} && sysctl --system"
@@ -94,9 +97,9 @@ pub async fn fix_max_map_count() -> Result<(), String> {
         .await
         .map_err(|e| format!("Could not run pkexec: {e}"))?;
     if !status.success() {
-        return Err(format!(
-            "sysctl-Anpassung fehlgeschlagen oder abgebrochen (Status {status})"
-        ));
+        return Err(AppError::SysctlChangeFailed {
+            status: status.to_string(),
+        });
     }
     Ok(())
 }

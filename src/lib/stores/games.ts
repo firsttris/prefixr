@@ -9,7 +9,10 @@ export interface GameRunState {
   initializing: boolean;
   running: boolean;
   logPath?: string;
-  error?: string;
+  // Raw backend error (string or structured AppError) — pass through
+  // backendError() to render it, so it stays correct across a language
+  // switch instead of freezing at whatever language it arrived in.
+  error?: unknown;
 }
 
 export const gameRunState = writable<Record<string, GameRunState>>({});
@@ -56,7 +59,9 @@ interface ExitedPayload {
 
 interface LaunchErrorPayload {
   id: string;
-  message: string;
+  // The backend's structured AppError (see src-tauri/src/error.rs) —
+  // pass it through backendError() to render it, same as a command's Err.
+  message: unknown;
   log_path: string | null;
 }
 
@@ -128,7 +133,7 @@ export async function launchGame(id: string): Promise<void> {
     // this only covers a refused one, which sends none — e.g. because Steam
     // already runs the game in a Prefixr of its own.
     const failed = get(gameRunState)[id]?.error;
-    patchRunState(id, { initializing: false, error: failed ?? String(e) });
+    patchRunState(id, { initializing: false, error: failed ?? e });
   }
 }
 

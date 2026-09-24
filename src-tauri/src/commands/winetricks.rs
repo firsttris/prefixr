@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
@@ -148,7 +149,7 @@ fn parse_verb_catalogue(script: &str) -> Vec<WinetricksVerbMeta> {
 /// shows a small curated subset front-and-center and this behind a "search
 /// everything else" disclosure, rather than a flat 370-item list.
 #[tauri::command]
-pub async fn list_all_winetricks_verbs(app: AppHandle) -> Result<Vec<WinetricksVerbMeta>, String> {
+pub async fn list_all_winetricks_verbs(app: AppHandle) -> Result<Vec<WinetricksVerbMeta>, AppError> {
     let script = ensure_winetricks_script(&app).await?;
     let text =
         fs::read_to_string(&script).map_err(|e| format!("Could not read winetricks script: {e}"))?;
@@ -162,7 +163,7 @@ pub async fn list_all_winetricks_verbs(app: AppHandle) -> Result<Vec<WinetricksV
 /// user to guess or just click install again. Missing file (nothing
 /// installed in this prefix yet) is not an error — just an empty list.
 #[tauri::command]
-pub fn list_installed_winetricks_verbs(prefix_path: String) -> Result<Vec<String>, String> {
+pub fn list_installed_winetricks_verbs(prefix_path: String) -> Result<Vec<String>, AppError> {
     match fs::read_to_string(Path::new(&prefix_path).join("winetricks.log")) {
         Ok(content) => Ok(content
             .lines()
@@ -171,7 +172,7 @@ pub fn list_installed_winetricks_verbs(prefix_path: String) -> Result<Vec<String
             .map(str::to_string)
             .collect()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Vec::new()),
-        Err(e) => Err(format!("Could not read winetricks.log: {e}")),
+        Err(e) => Err(format!("Could not read winetricks.log: {e}").into()),
     }
 }
 
@@ -201,9 +202,9 @@ pub async fn install_winetricks_verbs(
     prefix_path: String,
     runner_id: String,
     verbs: Vec<String>,
-) -> Result<String, String> {
+) -> Result<String, AppError> {
     if verbs.is_empty() {
-        return Err("Keine Pakete ausgewählt".to_string());
+        return Err(AppError::NoPackagesSelected);
     }
 
     let runners_dir = {
@@ -235,7 +236,10 @@ pub async fn install_winetricks_verbs(
         // a fresh prefix itself, with Wine asking to download Mono and Gecko.
         prepare_prefix(&app, token.as_deref(), &runner, &prefix, &log_path, &|| {})
             .await
-            .map_err(|e| format!("{e} — Details im Log: {}", log_path.display()))?;
+            .map_err(|e| AppError::WithLogDetails {
+                message: e,
+                log_path: log_path.display().to_string(),
+            })?;
         direct_winetricks_command(&app, &runner, &prefix, &prefix_path, &verbs).await?
     };
 
@@ -248,9 +252,10 @@ pub async fn install_winetricks_verbs(
 
     let log_path_string = log_path.display().to_string();
     if !status.success() {
-        return Err(format!(
-            "winetricks beendete sich mit Status {status} — Details im Log: {log_path_string}"
-        ));
+        return Err(AppError::WinetricksFailed {
+            status: status.to_string(),
+            log_path: log_path_string,
+        });
     }
     Ok(log_path_string)
 }

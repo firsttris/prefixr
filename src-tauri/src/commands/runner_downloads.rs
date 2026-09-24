@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -199,7 +200,7 @@ struct RunnerDownloadProgressPayload<'a> {
 #[derive(Clone, Serialize)]
 struct RunnerDownloadErrorPayload<'a> {
     tag: &'a str,
-    message: String,
+    message: AppError,
 }
 
 #[derive(Clone, Serialize)]
@@ -214,7 +215,7 @@ struct RunnerDownloadDonePayload<'a> {
 pub async fn list_runner_releases(
     state: State<'_, ConfigState>,
     source: String,
-) -> Result<Vec<RunnerRelease>, String> {
+) -> Result<Vec<RunnerRelease>, AppError> {
     let runner_source = find_source(&source)?;
     let token = read_token(&state)?;
     let url = format!(
@@ -232,13 +233,12 @@ pub async fn list_runner_releases(
 
     if !response.status().is_success() {
         let status = response.status();
-        let hint = if status.as_u16() == 403 && token.is_none() {
-            " (GitHub's rate limit for unauthenticated requests is likely exhausted — \
-              add a GitHub token in the settings to raise it)"
-        } else {
-            ""
-        };
-        return Err(format!("GitHub API returned status {status}{hint}"));
+        if status.as_u16() == 403 && token.is_none() {
+            return Err(AppError::GitHubRateLimited);
+        }
+        return Err(AppError::GitHubApiError {
+            status: status.to_string(),
+        });
     }
 
     let releases: Vec<GitHubRelease> = response
@@ -424,7 +424,7 @@ pub async fn download_runner(
     source: String,
     tag: String,
     download_url: String,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let runner_source = find_source(&source)?;
     check_download_request(runner_source, &tag, &download_url)?;
     let asset_name = download_url
@@ -447,7 +447,7 @@ pub async fn download_runner(
 
     let target_dir = runners_dir.join(&tag);
     if target_dir.exists() {
-        return Err(format!("Runner '{tag}' already exists"));
+        return Err(AppError::RunnerAlreadyExists { tag });
     }
 
     let is_xz = download_url.ends_with(".tar.xz");
@@ -466,10 +466,10 @@ pub async fn download_runner(
             "runner-download-error",
             RunnerDownloadErrorPayload {
                 tag: &tag,
-                message: message.clone(),
+                message: message.clone().into(),
             },
         );
-        return Err(message);
+        return Err(message.into());
     }
 
     let total = response.content_length();
@@ -521,10 +521,10 @@ pub async fn download_runner(
             "runner-download-error",
             RunnerDownloadErrorPayload {
                 tag: &tag,
-                message: message.clone(),
+                message: message.clone().into(),
             },
         );
-        return Err(message);
+        return Err(message.into());
     }
 
     if let Err(message) = verify_checksum(
@@ -541,10 +541,10 @@ pub async fn download_runner(
             "runner-download-error",
             RunnerDownloadErrorPayload {
                 tag: &tag,
-                message: message.clone(),
+                message: message.clone().into(),
             },
         );
-        return Err(message);
+        return Err(message.into());
     }
 
     let extract_dir = extraction_dir(&runners_dir);
@@ -576,10 +576,10 @@ pub async fn download_runner(
             "runner-download-error",
             RunnerDownloadErrorPayload {
                 tag: &tag,
-                message: message.clone(),
+                message: message.clone().into(),
             },
         );
-        return Err(message);
+        return Err(message.into());
     }
 
     if let Err(message) = move_extracted_dir(&extract_dir, &target_dir) {
@@ -587,10 +587,10 @@ pub async fn download_runner(
             "runner-download-error",
             RunnerDownloadErrorPayload {
                 tag: &tag,
-                message: message.clone(),
+                message: message.clone().into(),
             },
         );
-        return Err(message);
+        return Err(message.into());
     }
 
     let _ = app.emit(

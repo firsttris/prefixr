@@ -9,15 +9,15 @@
   } from "$lib/stores/performance";
   import { maxMapCountStatus, refreshMaxMapCountStatus, fixMaxMapCount } from "$lib/stores/system";
   import type { PerformanceConfig } from "$lib/types";
-  import { t, getLocale } from "$lib/i18n/index.svelte";
+  import { backendError, t, getLocale } from "$lib/i18n/index.svelte";
 
   let draft = $state<PerformanceConfig | null>(null);
   let saving = $state(false);
-  let error = $state("");
+  let error = $state<unknown>(null);
   let saved = $state(false);
 
   let fixingMapCount = $state(false);
-  let mapCountFixError = $state("");
+  let mapCountFixError = $state<unknown>(null);
 
   onMount(() => {
     refreshPerformanceConfig();
@@ -30,11 +30,11 @@
 
   async function handleFixMapCount() {
     fixingMapCount = true;
-    mapCountFixError = "";
+    mapCountFixError = null;
     try {
       await fixMaxMapCount();
     } catch (e) {
-      mapCountFixError = String(e);
+      mapCountFixError = e;
     } finally {
       fixingMapCount = false;
     }
@@ -43,13 +43,13 @@
   async function handleSave() {
     if (!draft) return;
     saving = true;
-    error = "";
+    error = null;
     saved = false;
     try {
       await savePerformanceConfig(draft);
       saved = true;
     } catch (e) {
-      error = String(e);
+      error = e;
     } finally {
       saving = false;
     }
@@ -72,7 +72,7 @@
           })}
         </p>
         {#if mapCountFixError}
-          <p class="error">{mapCountFixError}</p>
+          <p class="error">{backendError(mapCountFixError)}</p>
         {/if}
         {#if !$maxMapCountStatus.can_fix}
           <code
@@ -100,7 +100,7 @@
     hint={t("performanceSettings.hint")}
     {saving}
     {saved}
-    {error}
+    error={backendError(error)}
     onSave={handleSave}
   >
     {#if draft}

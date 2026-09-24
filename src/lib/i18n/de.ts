@@ -25,6 +25,7 @@ export const de = {
     overlay: "Overlay",
     proton: "Proton",
     steamgriddb: "SteamGridDB",
+    languageSwitcher: "Sprache",
   },
   library: {
     heading: "Bibliothek",
@@ -451,5 +452,38 @@ export const de = {
     updateToLatest: "Auf neueste Version aktualisieren",
     installNow: "Jetzt installieren",
     installedHint: "umu {version} ist installiert.",
+  },
+  backendErrors: {
+    other: "{message}",
+    game_already_running: "Das Spiel wird bereits gestartet oder läuft schon",
+    prefix_in_use: "„{game_name}“ läuft noch in diesem Prefix. Beende das Spiel zuerst.",
+    steam_command_not_found: "Steam läuft. Bitte beende Steam und versuche es erneut.",
+    steam_shutdown_timed_out: "Steam hat sich nicht innerhalb von 30 Sekunden beendet.",
+    steam_only_flatpak:
+      "Steam ist nur als Flatpak installiert. Das Flatpak darf keine Programme außerhalb seiner Sandbox starten, also auch Prefixr nicht.",
+    steam_not_found: "Steam wurde nicht gefunden. Starte Steam einmal und melde dich an.",
+    no_steam_account_found: "Kein Steam-Konto gefunden. Melde dich einmal in Steam an.",
+    shortcuts_vdf_unreadable:
+      "shortcuts.vdf konnte nicht gelesen werden ({error}). Prefixr lässt die Datei deshalb unverändert.",
+    no_packages_selected: "Keine Pakete ausgewählt",
+    unclosed_quote_in_launch_args:
+      "Startargumente: ein Anführungszeichen wird nicht geschlossen",
+    pkexec_not_installed: "pkexec ist nicht installiert. Bitte manuell ausführen: {command}",
+    sysctl_change_failed: "sysctl-Anpassung fehlgeschlagen oder abgebrochen (Status {status})",
+    runner_in_use: "{runner_name} wird noch verwendet von {games}.",
+    with_log_details: "{message} — Details im Log: {log_path}",
+    winetricks_failed:
+      "winetricks beendete sich mit Status {status} — Details im Log: {log_path}",
+    prefix_already_exists: "Prefix unter {path} existiert bereits",
+    path_not_a_directory: "{path} ist kein Ordner",
+    prefix_dir_not_empty:
+      "{path} enthält bereits Dateien, sieht aber nicht wie ein Wine- oder Proton-Prefix aus",
+    runner_already_exists: "Runner „{tag}“ existiert bereits",
+    git_hub_rate_limited:
+      "GitHubs Limit für nicht angemeldete Anfragen ist ausgeschöpft — ein GitHub-Token in den Einstellungen hebt es an.",
+    git_hub_api_error: "GitHub-API antwortete mit Status {status}",
+    tool_launch_failed: "Konnte {tool} nicht starten: {error}",
+    setup_launch_failed: "Setup konnte nicht gestartet werden: {error} — Details im Log: {log_path}",
+    unknown_wine_tool: "Unbekanntes Wine-Werkzeug: {tool}",
   },
 };

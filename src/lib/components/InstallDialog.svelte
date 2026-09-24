@@ -8,7 +8,7 @@
   import { showLog } from "$lib/logViewer";
   import GameForm from "./GameForm.svelte";
   import type { DetectedShortcut } from "$lib/types";
-  import { t } from "$lib/i18n/index.svelte";
+  import { backendError, t } from "$lib/i18n/index.svelte";
 
   let { exePath, onClose }: { exePath: string; onClose: () => void } = $props();
 
@@ -18,7 +18,7 @@
   let runnerId = $state("");
   let busy = $state(false);
   let creatingPrefix = $state(false);
-  let error = $state("");
+  let error = $state<unknown>(null);
 
   // "setup": choose prefix/runner and run the installer.
   // "review": installer finished — pick a detected shortcut, or fall back
@@ -39,11 +39,11 @@
     const selected = await open({ directory: true });
     if (typeof selected !== "string") return;
     creatingPrefix = true;
-    error = "";
+    error = null;
     try {
       prefixPath = await addPrefix(selected);
     } catch (e) {
-      error = String(e);
+      error = e;
     } finally {
       creatingPrefix = false;
     }
@@ -58,7 +58,7 @@
     event.preventDefault();
     if (!runnerId || !prefixPath) return;
     busy = true;
-    error = "";
+    error = null;
     try {
       const result = await runInstaller(prefixPath, runnerId, exePath);
       candidates = result.shortcuts;
@@ -72,7 +72,7 @@
         phase = "review";
       }
     } catch (e) {
-      error = String(e);
+      error = e;
     } finally {
       busy = false;
     }
@@ -191,7 +191,7 @@
   {/if}
 
   {#if error}
-    <p class="error">{error}</p>
+    <p class="error">{backendError(error)}</p>
   {/if}
 </div>
 

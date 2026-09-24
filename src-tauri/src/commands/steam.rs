@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -32,7 +33,7 @@ fn home_dir() -> Result<PathBuf, String> {
 
 /// Native Steam's data directory. `~/.steam/root` is Steam's own pointer to
 /// it; the others are fallbacks for setups where that link is missing.
-fn steam_root() -> Result<PathBuf, String> {
+fn steam_root() -> Result<PathBuf, AppError> {
     let home = home_dir()?;
     let data_home = std::env::var_os("XDG_DATA_HOME")
         .map(PathBuf::from)
@@ -49,16 +50,14 @@ fn steam_root() -> Result<PathBuf, String> {
         .join(".var/app/com.valvesoftware.Steam/.local/share/Steam/userdata")
         .is_dir()
     {
-        return Err("Steam ist nur als Flatpak installiert. Das Flatpak darf keine Programme \
-                    außerhalb seiner Sandbox starten, also auch Prefixr nicht."
-            .to_string());
+        return Err(AppError::SteamOnlyFlatpak);
     }
-    Err("Steam wurde nicht gefunden. Starte Steam einmal und melde dich an.".to_string())
+    Err(AppError::SteamNotFound)
 }
 
 /// The account that used Steam last: Steam rewrites its `localconfig.vdf`
 /// whenever that account logs in or out. `0` is the anonymous account.
-fn steam_user_dir(root: &Path) -> Result<PathBuf, String> {
+fn steam_user_dir(root: &Path) -> Result<PathBuf, AppError> {
     let entries = fs::read_dir(root.join("userdata"))
         .map_err(|e| format!("Could not read Steam's userdata directory: {e}"))?;
     entries
@@ -76,7 +75,7 @@ fn steam_user_dir(root: &Path) -> Result<PathBuf, String> {
         })
         .max_by_key(|(modified, _)| *modified)
         .map(|(_, path)| path)
-        .ok_or_else(|| "Kein Steam-Konto gefunden. Melde dich einmal in Steam an.".to_string())
+        .ok_or(AppError::NoSteamAccountFound)
 }
 
 /// Whether any `steam` process runs: the client itself or its launcher
@@ -96,9 +95,9 @@ fn steam_running() -> bool {
 
 /// Asks Steam to quit and waits until it has. A running Steam keeps its own
 /// copy of the shortcuts and writes it back, which would undo the export.
-async fn stop_steam() -> Result<(), String> {
+async fn stop_steam() -> Result<(), AppError> {
     if !command_on_path("steam") {
-        return Err("Steam läuft. Bitte beende Steam und versuche es erneut.".to_string());
+        return Err(AppError::SteamCommandNotFound);
     }
     let deadline = Instant::now() + SHUTDOWN_TIMEOUT;
     let mut child = tokio::process::Command::new("steam")
@@ -113,7 +112,7 @@ async fn stop_steam() -> Result<(), String> {
     let _ = tokio::time::timeout(SHUTDOWN_TIMEOUT, child.wait()).await;
     while steam_running() {
         if Instant::now() > deadline {
-            return Err("Steam hat sich nicht innerhalb von 30 Sekunden beendet.".to_string());
+            return Err(AppError::SteamShutdownTimedOut);
         }
         tokio::time::sleep(Duration::from_millis(500)).await;
     }
@@ -260,14 +259,12 @@ fn copy_to_grid(grid_dir: &Path, app_id: u32, suffix: &str, source: &Path) -> Re
     Ok(target)
 }
 
-fn read_shortcuts_file(path: &Path) -> Result<Map, String> {
+fn read_shortcuts_file(path: &Path) -> Result<Map, AppError> {
     if !path.exists() {
         return Ok(Map::new());
     }
     let bytes = fs::read(path).map_err(|e| format!("Could not read shortcuts.vdf: {e}"))?;
-    binary_vdf::parse(&bytes).map_err(|e| {
-        format!("shortcuts.vdf konnte nicht gelesen werden ({e}). Prefixr lässt die Datei deshalb unverändert.")
-    })
+    binary_vdf::parse(&bytes).map_err(|e| AppError::ShortcutsVdfUnreadable { error: e })
 }
 
 /// Keeps the previous file as `shortcuts.vdf.bak` and swaps the new one in
@@ -289,7 +286,7 @@ struct SteamUser {
 }
 
 impl SteamUser {
-    fn find() -> Result<Self, String> {
+    fn find() -> Result<Self, AppError> {
         let config_dir = steam_user_dir(&steam_root()?)?.join("config");
         Ok(Self {
             grid_dir: config_dir.join("grid"),
@@ -298,7 +295,7 @@ impl SteamUser {
     }
 }
 
-fn add_shortcut(app: &AppHandle, game: &Game, user: &SteamUser) -> Result<(), String> {
+fn add_shortcut(app: &AppHandle, game: &Game, user: &SteamUser) -> Result<(), AppError> {
     let grid_dir = &user.grid_dir;
     fs::create_dir_all(grid_dir).map_err(|e| format!("Could not create Steam's grid folder: {e}"))?;
 
@@ -330,10 +327,10 @@ fn add_shortcut(app: &AppHandle, game: &Game, user: &SteamUser) -> Result<(), St
     };
 
     upsert_shortcut(shortcuts, game, app_id, &own_executable_path()?, icon.as_deref());
-    write_shortcuts_file(vdf_path, &file)
+    write_shortcuts_file(vdf_path, &file).map_err(AppError::from)
 }
 
-fn remove_shortcut(game_id: Uuid, user: &SteamUser) -> Result<(), String> {
+fn remove_shortcut(game_id: Uuid, user: &SteamUser) -> Result<(), AppError> {
     let mut file = read_shortcuts_file(&user.shortcuts_path)?;
     let shortcuts = binary_vdf::map_entry(&mut file, "shortcuts");
     let Some(app_id) = remove_entry(shortcuts, game_id) else {
@@ -362,8 +359,8 @@ pub enum SteamChange {
 /// otherwise a running Steam is reported back so the user can decide.
 async fn change_steam(
     shutdown_steam: bool,
-    change: impl FnOnce() -> Result<(), String>,
-) -> Result<SteamChange, String> {
+    change: impl FnOnce() -> Result<(), AppError>,
+) -> Result<SteamChange, AppError> {
     let was_running = steam_running();
     if was_running {
         if !shutdown_steam {
@@ -402,7 +399,7 @@ pub async fn export_to_steam(
     state: State<'_, ConfigState>,
     id: String,
     shutdown_steam: bool,
-) -> Result<SteamChange, String> {
+) -> Result<SteamChange, AppError> {
     let game = find_game(&state, &id)?;
     let user = SteamUser::find()?;
     change_steam(shutdown_steam, || add_shortcut(&app, &game, &user)).await
@@ -414,7 +411,7 @@ pub async fn remove_from_steam(
     state: State<'_, ConfigState>,
     id: String,
     shutdown_steam: bool,
-) -> Result<SteamChange, String> {
+) -> Result<SteamChange, AppError> {
     let game = find_game(&state, &id)?;
     let user = SteamUser::find()?;
     change_steam(shutdown_steam, || remove_shortcut(game.id, &user)).await
@@ -423,7 +420,7 @@ pub async fn remove_from_steam(
 /// The ids of the games that have an entry in Steam. Empty without Steam,
 /// or if its shortcuts can't be read.
 #[tauri::command]
-pub fn list_steam_games(state: State<ConfigState>) -> Result<Vec<String>, String> {
+pub fn list_steam_games(state: State<ConfigState>) -> Result<Vec<String>, AppError> {
     let Ok(user) = SteamUser::find() else {
         return Ok(Vec::new());
     };

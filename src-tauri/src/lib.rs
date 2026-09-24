@@ -1,6 +1,8 @@
 mod commands;
 mod config;
+mod error;
 mod http;
+mod locale;
 mod models;
 mod tray;
 
@@ -16,6 +18,7 @@ use commands::games::{
     PendingInstall, PendingLaunch, RunningGames,
 };
 use commands::github::{get_github_config, save_github_config};
+use commands::locale::set_ui_locale;
 use commands::graphics::{get_graphics_config, save_graphics_config};
 use commands::mangohud::{get_mangohud_config, save_mangohud_config};
 use commands::performance::{
@@ -39,6 +42,7 @@ use commands::winetricks::{
     install_winetricks_verbs, list_all_winetricks_verbs, list_installed_winetricks_verbs,
 };
 use config::load_config;
+use locale::{Locale, LocaleState};
 use tray::{
     hide_main_window, rebuild_tray_menu, setup_tray, show_and_focus, tray_host_available,
     TrayAvailable, WindowVisible,
@@ -129,15 +133,33 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(move |app| {
+            // Managed first and only ever from an env-var best guess here:
+            // the frontend (and its own locale detection/choice) doesn't
+            // exist yet to ask, and won't until well after these two
+            // dialogs could already have fired. It calls `set_ui_locale`
+            // once it's up, correcting this guess for everything after.
+            app.manage(LocaleState::default());
+            let startup_locale = app.state::<LocaleState>().get();
+
             if running_as_root() {
-                app.dialog()
-                    .message(
+                let (message, title) = match startup_locale {
+                    Locale::De => (
                         "Ein als root angelegter oder gestarteter Wine-Prefix gehört danach \
                          root statt dir — deine normale Sitzung kann ihn dann oft nicht mehr \
                          verwenden oder ohne sudo löschen. Bitte Prefixr als normaler Benutzer \
                          starten.",
-                    )
-                    .title("Prefixr nicht als root ausführen")
+                        "Prefixr nicht als root ausführen",
+                    ),
+                    Locale::En => (
+                        "A Wine prefix created or run as root ends up owned by root instead of \
+                         you — your normal session then often can't use it anymore, or delete \
+                         it without sudo. Please start Prefixr as a normal user.",
+                        "Don't run Prefixr as root",
+                    ),
+                };
+                app.dialog()
+                    .message(message)
+                    .title(title)
                     .kind(MessageDialogKind::Error)
                     .blocking_show();
                 std::process::exit(1);
@@ -149,12 +171,25 @@ pub fn run() {
             let config = match load_config(app.handle()) {
                 Ok(config) => config,
                 Err(message) => {
+                    let (body, title) = match startup_locale {
+                        Locale::De => (
+                            format!(
+                                "{message}\n\nPrefixr lässt die Datei unverändert. Repariere \
+                                 oder entferne sie und starte Prefixr dann neu."
+                            ),
+                            "Konfiguration konnte nicht gelesen werden",
+                        ),
+                        Locale::En => (
+                            format!(
+                                "{message}\n\nPrefixr is leaving the file unchanged. Fix or \
+                                 remove it and restart Prefixr."
+                            ),
+                            "Could not read the configuration",
+                        ),
+                    };
                     app.dialog()
-                        .message(format!(
-                            "{message}\n\nPrefixr lässt die Datei unverändert. Repariere oder \
-                             entferne sie und starte Prefixr dann neu."
-                        ))
-                        .title("Konfiguration konnte nicht gelesen werden")
+                        .message(body)
+                        .title(title)
                         .kind(MessageDialogKind::Error)
                         .blocking_show();
                     std::process::exit(1);
@@ -272,7 +307,8 @@ pub fn run() {
             get_umu_status,
             install_umu,
             latest_umu_version,
-            search_umu_ids
+            search_umu_ids,
+            set_ui_locale
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

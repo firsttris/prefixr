@@ -14,7 +14,7 @@
     removeGameArtwork,
   } from "$lib/stores/steamgriddb";
   import { prettifyExeName } from "$lib/gameName";
-  import { t } from "$lib/i18n/index.svelte";
+  import { backendError, t } from "$lib/i18n/index.svelte";
 
   let { game, onDone }: { game: Game; onDone: () => void } = $props();
 
@@ -55,7 +55,7 @@
   let selectedGame = $state<SteamGridDbGameMatch | null>(initial.selectedGame);
   let assetOptions = $state<SteamGridDbGrid[]>([]);
   let loading = $state(false);
-  let error = $state("");
+  let error = $state<unknown>(null);
   let picking = $state(false);
   let removing = $state(false);
 
@@ -78,12 +78,12 @@
   async function handleSearch() {
     if (!query.trim()) return;
     loading = true;
-    error = "";
+    error = null;
     matches = [];
     try {
       matches = await searchSteamGridDbGames(query);
     } catch (e) {
-      error = String(e);
+      error = e;
     } finally {
       loading = false;
     }
@@ -97,7 +97,7 @@
 
   async function loadAssets(steamgriddbId: number) {
     loading = true;
-    error = "";
+    error = null;
     assetOptions = [];
     try {
       assetOptions =
@@ -107,7 +107,7 @@
             ? await listSteamGridDbIcons(steamgriddbId)
             : await listSteamGridDbArtwork(steamgriddbId, kind);
     } catch (e) {
-      error = String(e);
+      error = e;
     } finally {
       loading = false;
     }
@@ -124,7 +124,7 @@
   async function pickAsset(asset: SteamGridDbGrid) {
     if (!selectedGame) return;
     picking = true;
-    error = "";
+    error = null;
     try {
       if (kind === "cover") {
         await setGameCover(game.id, selectedGame.id, asset.id, asset.url);
@@ -135,14 +135,14 @@
       }
       onDone();
     } catch (e) {
-      error = String(e);
+      error = e;
       picking = false;
     }
   }
 
   async function handleRemove() {
     removing = true;
-    error = "";
+    error = null;
     try {
       if (kind === "cover") {
         await removeGameCover(game.id);
@@ -153,7 +153,7 @@
       }
       onDone();
     } catch (e) {
-      error = String(e);
+      error = e;
       removing = false;
     }
   }
@@ -162,7 +162,7 @@
     stage = "search";
     selectedGame = null;
     assetOptions = [];
-    error = "";
+    error = null;
   }
 </script>
 
@@ -213,7 +213,7 @@
     {#if loading}
       <p class="hint">{t("artworkPicker.searching")}</p>
     {:else if error}
-      <p class="error">{error}</p>
+      <p class="error">{backendError(error)}</p>
     {:else if matches.length === 0}
       <p class="hint">{t("artworkPicker.noMatches", { query })}</p>
     {:else}
@@ -236,7 +236,7 @@
     {#if loading}
       <p class="hint">{t("artworkPicker.loadingKind", { kind: kindLabels[kind] })}</p>
     {:else if error}
-      <p class="error">{error}</p>
+      <p class="error">{backendError(error)}</p>
     {:else if assetOptions.length === 0}
       <p class="hint">{t("artworkPicker.noKindOptions", { kind: kindLabels[kind] })}</p>
     {:else}

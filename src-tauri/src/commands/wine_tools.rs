@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use std::path::PathBuf;
 use std::process::Stdio;
 
@@ -20,7 +21,7 @@ use crate::config::ConfigState;
 /// `wine`/`wine64`, both of which resolve a bare name like this as a builtin)
 /// rather than looking for a matching binary alongside it, the one path that
 /// works uniformly across both runner kinds.
-fn tool_arg(tool: &str) -> Result<&'static str, String> {
+fn tool_arg(tool: &str) -> Result<&'static str, AppError> {
     match tool {
         "winecfg" => Ok("winecfg"),
         "regedit" => Ok("regedit"),
@@ -28,7 +29,7 @@ fn tool_arg(tool: &str) -> Result<&'static str, String> {
         "winefile" => Ok("winefile"),
         "uninstaller" => Ok("uninstaller"),
         "taskmgr" => Ok("taskmgr"),
-        _ => Err(format!("Unbekanntes Wine-Werkzeug: {tool}")),
+        _ => Err(AppError::UnknownWineTool { tool: tool.to_string() }),
     }
 }
 
@@ -44,7 +45,7 @@ pub async fn launch_wine_tool(
     prefix_path: String,
     runner_id: String,
     tool: String,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let arg = tool_arg(&tool)?;
 
     let runners_dir = {
@@ -60,7 +61,10 @@ pub async fn launch_wine_tool(
     let log_path = new_log_file(&prefix_log_dir(&app, &prefix)?)?;
     let prepared = prepare_prefix(&app, token.as_deref(), &runner, &prefix, &log_path, &|| {})
         .await
-        .map_err(|e| format!("{e}\n\nLog: {}", log_path.display()))?;
+        .map_err(|e| AppError::WithLogDetails {
+            message: e,
+            log_path: log_path.display().to_string(),
+        })?;
     let (out, err) = log_stdio(&log_path)?;
     runner_command(&prepared.binary, env_pairs(&prepared.env))
         .arg(arg)
@@ -68,7 +72,10 @@ pub async fn launch_wine_tool(
         .stdout(out)
         .stderr(err)
         .spawn()
-        .map_err(|e| format!("Konnte {tool} nicht starten: {e}"))?;
+        .map_err(|e| AppError::ToolLaunchFailed {
+            tool: tool.clone(),
+            error: e.to_string(),
+        })?;
 
     Ok(())
 }

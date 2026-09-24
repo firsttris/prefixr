@@ -4,11 +4,11 @@
   import SettingsPanel from "$lib/components/SettingsPanel.svelte";
   import { mangoHudConfig, refreshMangoHudConfig, saveMangoHudConfig } from "$lib/stores/mangohud";
   import type { MangoHudConfig } from "$lib/types";
-  import { t } from "$lib/i18n/index.svelte";
+  import { backendError, t } from "$lib/i18n/index.svelte";
 
   let draft = $state<MangoHudConfig | null>(null);
   let saving = $state(false);
-  let error = $state("");
+  let error = $state<unknown>(null);
   let saved = $state(false);
 
   onMount(() => {
@@ -22,13 +22,13 @@
   async function handleSave() {
     if (!draft) return;
     saving = true;
-    error = "";
+    error = null;
     saved = false;
     try {
       await saveMangoHudConfig(draft);
       saved = true;
     } catch (e) {
-      error = String(e);
+      error = e;
     } finally {
       saving = false;
     }
@@ -40,7 +40,7 @@
   hint={t("overlaySettings.hint")}
   {saving}
   {saved}
-  {error}
+  error={backendError(error)}
   onSave={handleSave}
 >
   {#if draft}

@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -15,6 +16,7 @@ use crate::commands::github::read_token;
 use crate::commands::graphics_layers::{ensure_directx_layer_cache, ensure_wine_mono_msi};
 use crate::commands::icons::{exe_icon_path, extract_icon_png, png_data_url, store_exe_icon};
 use crate::commands::logs::{game_log_dir, new_log_file, prefix_log_dir};
+use crate::locale::{Locale, LocaleState};
 use crate::commands::graphics::{ensure_vkbasalt_conf, vkbasalt_conf_path};
 use crate::commands::mangohud::{ensure_mangohud_conf, mangohud_conf_path};
 use crate::commands::runners::{
@@ -422,9 +424,9 @@ pub fn list_active_games(
 }
 
 #[tauri::command]
-pub async fn kill_game(running: State<'_, RunningGames>, id: String) -> Result<(), String> {
+pub async fn kill_game(running: State<'_, RunningGames>, id: String) -> Result<(), AppError> {
     let game_id = Uuid::parse_str(&id).map_err(|e| format!("Invalid game id: {e}"))?;
-    kill_running_game(&running, game_id).await
+    kill_running_game(&running, game_id).await.map_err(AppError::from)
 }
 
 /// Holds a `--launch <game-id>` argument found at startup (see `run()` in
@@ -484,7 +486,7 @@ pub async fn run_installer(
     prefix_path: String,
     runner_id: String,
     exe_path: String,
-) -> Result<InstallerResult, String> {
+) -> Result<InstallerResult, AppError> {
     let runners_dir = {
         let config = state
             .lock()
@@ -496,11 +498,14 @@ pub async fn run_installer(
     let runner = find_runner(&runners_dir, &runner_id)?;
     let prefix = PathBuf::from(&prefix_path);
     let log_path = new_log_file(&prefix_log_dir(&app, &prefix)?)?;
-    let with_log = |e: String| format!("{e}\n\nLog: {}", log_path.display());
+    let log_path_string = log_path.display().to_string();
 
     let prepared = prepare_prefix(&app, token.as_deref(), &runner, &prefix, &log_path, &|| {})
         .await
-        .map_err(with_log)?;
+        .map_err(|e| AppError::WithLogDetails {
+            message: e,
+            log_path: log_path_string.clone(),
+        })?;
     let exe = PathBuf::from(&exe_path);
     let mut command = runner_command(&prepared.binary, env_pairs(&prepared.env));
     command.arg(&exe);
@@ -525,7 +530,10 @@ pub async fn run_installer(
         .stderr(err)
         .status()
         .await
-        .map_err(|e| with_log(format!("Konnte Setup nicht starten: {e}")))?;
+        .map_err(|e| AppError::SetupLaunchFailed {
+            error: e.to_string(),
+            log_path: log_path_string.clone(),
+        })?;
 
     Ok(InstallerResult {
         shortcuts: find_recently_created_shortcuts(&prefix, started_at),
@@ -539,7 +547,7 @@ pub(crate) fn env_pairs(env: &[(String, String)]) -> Vec<(&str, &str)> {
 }
 
 #[tauri::command]
-pub fn list_games(state: State<ConfigState>) -> Result<Vec<Game>, String> {
+pub fn list_games(state: State<ConfigState>) -> Result<Vec<Game>, AppError> {
     let config = state
         .lock()
         .map_err(|_| "Configuration is locked".to_string())?;
@@ -558,7 +566,7 @@ pub fn add_game(
     app: AppHandle,
     state: State<ConfigState>,
     game: GameInput,
-) -> Result<Game, String> {
+) -> Result<Game, AppError> {
     // Checked here too, so a typo shows up when saving rather than as a
     // failed launch.
     split_launch_args(&game.launch_args)?;
@@ -601,7 +609,7 @@ pub fn update_game(
     state: State<ConfigState>,
     id: String,
     game: GameInput,
-) -> Result<Game, String> {
+) -> Result<Game, AppError> {
     let game_id = Uuid::parse_str(&id).map_err(|e| format!("Invalid game id: {e}"))?;
     split_launch_args(&game.launch_args)?;
     let find = |games: &[Game]| -> Result<usize, String> {
@@ -654,14 +662,14 @@ pub fn update_game(
 /// Its prefix stays, which other games may share. Best-effort past the
 /// config itself: a leftover file is no reason to keep the game.
 #[tauri::command(async)]
-pub fn remove_game(app: AppHandle, state: State<ConfigState>, id: String) -> Result<(), String> {
+pub fn remove_game(app: AppHandle, state: State<ConfigState>, id: String) -> Result<(), AppError> {
     let game_id = Uuid::parse_str(&id).map_err(|e| format!("Invalid game id: {e}"))?;
     let mut config = state
         .lock()
         .map_err(|_| "Configuration is locked".to_string())?;
 
     if !config.games.iter().any(|g| g.id == game_id) {
-        return Err(format!("No game with id {id}"));
+        return Err(format!("No game with id {id}").into());
     }
 
     config.games.retain(|g| g.id != game_id);
@@ -729,7 +737,7 @@ struct GameExitedPayload<'a> {
 #[derive(Clone, Serialize)]
 struct GameLaunchErrorPayload<'a> {
     id: &'a str,
-    message: String,
+    message: AppError,
     log_path: Option<String>,
 }
 
@@ -1101,12 +1109,12 @@ pub async fn launch_game(
     running: State<'_, RunningGames>,
     launching: State<'_, LaunchingGames>,
     id: String,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let game_id = Uuid::parse_str(&id).map_err(|e| format!("Invalid game id: {e}"))?;
     // Refused without a `game-launch-error`: that would mark the launch
     // already in progress as failed.
     let Some(_guard) = launching.claim(game_id) else {
-        return Err("Das Spiel wird bereits gestartet oder läuft schon".to_string());
+        return Err(AppError::GameAlreadyRunning);
     };
 
     let log_path = new_log_file(&game_log_dir(&app, &id)?)?;
@@ -1126,7 +1134,7 @@ pub async fn launch_game(
             },
         );
     }
-    result
+    result.map_err(AppError::from)
 }
 
 /// Runs a game without any window and exits along with it: how Steam
@@ -1148,14 +1156,19 @@ pub fn launch_game_headless(app: &AppHandle, id: String) {
             Ok(()) => 0,
             Err(message) => {
                 if !started.load(Ordering::SeqCst) {
-                    let mut text = message;
+                    let locale = app.state::<LocaleState>().get();
+                    let mut text = message.localized(locale);
                     if let Some(dir) = logs_dir {
                         text.push_str(&format!("\n\nLogs: {}", dir.display()));
                     }
+                    let title = match locale {
+                        Locale::De => "Spiel konnte nicht gestartet werden",
+                        Locale::En => "Game could not be started",
+                    };
                     let dialog = app
                         .dialog()
                         .message(text)
-                        .title("Spiel konnte nicht gestartet werden")
+                        .title(title)
                         .kind(MessageDialogKind::Error);
                     let _ = tauri::async_runtime::spawn_blocking(move || dialog.blocking_show()).await;
                 }
@@ -1172,7 +1185,7 @@ async fn run_game(
     running: &State<'_, RunningGames>,
     id: &str,
     log_path: &Path,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let game_id = Uuid::parse_str(id).map_err(|e| format!("Invalid game id: {e}"))?;
 
     let (game, runners_dir, settings) = {
@@ -1438,7 +1451,7 @@ async fn run_game(
     );
 
     if !status.success() && !killed.load(Ordering::SeqCst) {
-        return Err(format!("Game exited with status {status}"));
+        return Err(format!("Game exited with status {status}").into());
     }
 
     Ok(())
@@ -1712,9 +1725,9 @@ pub fn create_desktop_shortcut(
     app: AppHandle,
     state: State<ConfigState>,
     id: String,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let desktop_dir = desktop_directory()?;
-    write_game_shortcut(&app, &state, &id, &desktop_dir)
+    write_game_shortcut(&app, &state, &id, &desktop_dir).map_err(AppError::from)
 }
 
 /// Creates a `.desktop` entry in the user's XDG applications directory so
@@ -1729,7 +1742,7 @@ pub fn create_menu_shortcut(
     app: AppHandle,
     state: State<ConfigState>,
     id: String,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let applications_dir = applications_directory()?;
     write_game_shortcut(&app, &state, &id, &applications_dir)?;
     let _ = std::process::Command::new("update-desktop-database")

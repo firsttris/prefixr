@@ -7,10 +7,10 @@
     installUmu,
     checkUmuUpdate,
   } from "$lib/stores/umu";
-  import { t } from "$lib/i18n/index.svelte";
+  import { backendError, t } from "$lib/i18n/index.svelte";
 
   let installing = $state(false);
-  let error = $state("");
+  let error = $state<unknown>(null);
   let updated = $state(false);
 
   // Only when both are known: a missing version file (older installs) or
@@ -29,13 +29,13 @@
 
   async function handleInstall() {
     installing = true;
-    error = "";
+    error = null;
     updated = false;
     try {
       await installUmu();
       updated = true;
     } catch (e) {
-      error = String(e);
+      error = e;
     } finally {
       installing = false;
     }
@@ -77,7 +77,7 @@
   </div>
 
   {#if error}
-    <p class="error">{error}</p>
+    <p class="error">{backendError(error)}</p>
   {:else if updated}
     <p class="saved-hint">
       {t("umuSettings.installedHint", { version: $umuStatus?.version ?? "" })}

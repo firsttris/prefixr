@@ -10,10 +10,10 @@
     downloadRunner,
     initRunnerDownloadEvents,
   } from "$lib/stores/runners";
-  import { t, getLocale } from "$lib/i18n/index.svelte";
+  import { backendError, t, getLocale } from "$lib/i18n/index.svelte";
 
   let loading = $state(true);
-  let loadError = $state("");
+  let loadError = $state<unknown>(null);
   let selectedSource = $state("");
 
   onMount(async () => {
@@ -25,7 +25,7 @@
         await refreshRunnerReleases(selectedSource);
       }
     } catch (e) {
-      loadError = String(e);
+      loadError = e;
     } finally {
       loading = false;
     }
@@ -35,11 +35,11 @@
     if (id === selectedSource) return;
     selectedSource = id;
     loading = true;
-    loadError = "";
+    loadError = null;
     try {
       await refreshRunnerReleases(id);
     } catch (e) {
-      loadError = String(e);
+      loadError = e;
     } finally {
       loading = false;
     }
@@ -78,7 +78,7 @@
 {#if loading}
   <p class="hint">{t("runnerDownloads.loading")}</p>
 {:else if loadError}
-  <p class="error">{loadError}</p>
+  <p class="error">{backendError(loadError)}</p>
 {:else if $runnerReleases.length === 0}
   <p class="hint">{t("runnerDownloads.noReleases")}</p>
 {:else}
@@ -115,7 +115,7 @@
         </div>
 
         {#if state?.error}
-          <p class="error">{state.error}</p>
+          <p class="error">{backendError(state.error)}</p>
         {/if}
       </li>
     {/each}

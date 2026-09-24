@@ -3,7 +3,7 @@
   import { searchUmuIds } from "$lib/stores/umu";
   import { prettifyExeName } from "$lib/gameName";
   import type { UmuMatch } from "$lib/types";
-  import { t } from "$lib/i18n/index.svelte";
+  import { backendError, t } from "$lib/i18n/index.svelte";
 
   // The game's UMU id, which umu gets as `GAMEID` so umu-protonfixes
   // applies this game's own fixes — see `Game::umu_id` in models.rs.
@@ -50,7 +50,7 @@
   let matches = $state<UmuMatch[]>([]);
   let searched = $state(false);
   let loading = $state(false);
-  let error = $state("");
+  let error = $state<unknown>(null);
 
   onMount(() => {
     // Only suggest unasked while nothing is assigned yet.
@@ -60,14 +60,14 @@
   async function handleSearch() {
     if (!query.trim()) return;
     loading = true;
-    error = "";
+    error = null;
     try {
       // The artwork match describes the game's name, not whatever else the
       // user searches for.
       matches = await searchUmuIds(query, query === initialQuery ? steamgriddbId : null);
     } catch (e) {
       matches = [];
-      error = String(e);
+      error = e;
     } finally {
       loading = false;
       searched = true;
@@ -124,7 +124,7 @@
   {#if loading}
     <p class="hint">{t("umuPicker.searching")}</p>
   {:else if error}
-    <p class="error">{error}</p>
+    <p class="error">{backendError(error)}</p>
   {:else if searched && matches.length === 0}
     <p class="hint">{t("umuPicker.noMatches", { query })}</p>
   {:else if matches.length > 0}

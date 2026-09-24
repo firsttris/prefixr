@@ -8,11 +8,11 @@
   import RunnerDownloads from "./RunnerDownloads.svelte";
   import GitHubSettings from "./GitHubSettings.svelte";
   import UmuSettings from "./UmuSettings.svelte";
-  import { t } from "$lib/i18n/index.svelte";
+  import { backendError, t } from "$lib/i18n/index.svelte";
 
   let showDownloads = $state(false);
   let deleting = $state<Runner | null>(null);
-  let error = $state("");
+  let error = $state<unknown>(null);
 
   // How many games use each runner. The library may not have been loaded
   // yet when this view opens first, hence the refresh below.
@@ -32,11 +32,11 @@
     const runner = deleting;
     deleting = null;
     if (!runner) return;
-    error = "";
+    error = null;
     try {
       await deleteRunner(runner.id);
     } catch (e) {
-      error = String(e);
+      error = e;
     }
   }
 
@@ -88,7 +88,7 @@
     </ul>
   {/if}
   {#if error}
-    <p class="error">{error}</p>
+    <p class="error">{backendError(error)}</p>
   {/if}
 </section>
 

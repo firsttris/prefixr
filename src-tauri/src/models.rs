@@ -4,6 +4,8 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::error::AppError;
+
 /// The kind of compatibility layer a runner provides.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -168,7 +170,7 @@ pub fn normalize_umu_id(id: Option<String>) -> Option<String> {
 /// Unlike a shell (or `shlex`), backslashes are kept as they are, since
 /// Windows paths are full of them, and a single quote is an ordinary
 /// character, as in `-name O'Brien`.
-pub fn split_launch_args(args: &str) -> Result<Vec<String>, String> {
+pub fn split_launch_args(args: &str) -> Result<Vec<String>, AppError> {
     let mut result = Vec::new();
     let mut current = String::new();
     // Tracked apart from `current`, so `""` still counts as an argument.
@@ -193,7 +195,7 @@ pub fn split_launch_args(args: &str) -> Result<Vec<String>, String> {
         }
     }
     if quoted {
-        return Err("Startargumente: ein Anführungszeichen wird nicht geschlossen".to_string());
+        return Err(AppError::UnclosedQuoteInLaunchArgs);
     }
     if in_arg {
         result.push(current);

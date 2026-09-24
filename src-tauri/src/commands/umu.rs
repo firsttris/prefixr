@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -230,14 +231,14 @@ pub fn runtime_present(runner_path: &Path) -> bool {
 }
 
 #[tauri::command]
-pub fn get_umu_status(app: AppHandle) -> Result<UmuStatus, String> {
+pub fn get_umu_status(app: AppHandle) -> Result<UmuStatus, AppError> {
     Ok(read_status(&umu_dir(&app)?))
 }
 
 /// The tag of umu's latest release, so the settings can offer an update
 /// when it's newer than the installed `UmuStatus::version`.
 #[tauri::command]
-pub async fn latest_umu_version(state: State<'_, ConfigState>) -> Result<String, String> {
+pub async fn latest_umu_version(state: State<'_, ConfigState>) -> Result<String, AppError> {
     let token = read_token(&state)?;
     Ok(latest_release(token.as_deref()).await?.tag_name)
 }
@@ -248,10 +249,10 @@ pub async fn latest_umu_version(state: State<'_, ConfigState>) -> Result<String,
 pub async fn install_umu(
     app: AppHandle,
     state: State<'_, ConfigState>,
-) -> Result<UmuStatus, String> {
+) -> Result<UmuStatus, AppError> {
     let token = read_token(&state)?;
     let _lock = INSTALL_LOCK.lock().await;
-    install_latest(&app, token.as_deref()).await
+    install_latest(&app, token.as_deref()).await.map_err(AppError::from)
 }
 
 #[cfg(test)]

@@ -132,7 +132,7 @@
       {t("nav.steamgriddb")}
     </button>
     <div class="nav-spacer"></div>
-    <div class="lang-switch" role="group" aria-label="Language">
+    <div class="lang-switch" role="group" aria-label={t("nav.languageSwitcher")}>
       {#each ["de", "en"] as const as lng (lng)}
         <button
           type="button"

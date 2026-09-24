@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use std::fs;
 use std::path::PathBuf;
 
@@ -74,7 +75,7 @@ pub fn ensure_vkbasalt_conf(
 }
 
 #[tauri::command]
-pub fn get_graphics_config(state: State<ConfigState>) -> Result<GraphicsConfig, String> {
+pub fn get_graphics_config(state: State<ConfigState>) -> Result<GraphicsConfig, AppError> {
     let config = state
         .lock()
         .map_err(|_| "Configuration is locked".to_string())?;
@@ -86,7 +87,7 @@ pub fn save_graphics_config(
     app: AppHandle,
     state: State<ConfigState>,
     config: GraphicsConfig,
-) -> Result<GraphicsConfig, String> {
+) -> Result<GraphicsConfig, AppError> {
     let mut app_config = state
         .lock()
         .map_err(|_| "Configuration is locked".to_string())?;

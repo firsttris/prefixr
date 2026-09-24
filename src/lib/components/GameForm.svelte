@@ -11,7 +11,7 @@
   import { prettifyExeName } from "$lib/gameName";
   import { PRESETS } from "$lib/mangohudPresets";
   import { onOff, sameBlock, sameFields, type OverrideHooks } from "$lib/settings";
-  import { t } from "$lib/i18n/index.svelte";
+  import { backendError, t } from "$lib/i18n/index.svelte";
   import PerformanceEditor from "$lib/components/PerformanceEditor.svelte";
   import GraphicsEditor from "$lib/components/GraphicsEditor.svelte";
   import OverlayEditor from "$lib/components/OverlayEditor.svelte";
@@ -78,7 +78,7 @@
   let launchArgs = $state(defaults.launchArgs);
   let umuId = $state<string | null>(defaults.umuId);
   let umuStore = $state<string | null>(defaults.umuStore);
-  let error = $state("");
+  let error = $state<unknown>(null);
   let submitting = $state(false);
 
   // Per-game overrides, one block per settings category; `null` (or a
@@ -226,14 +226,14 @@
 
   const isProton = $derived($runners.find((r) => r.id === runnerId)?.kind === "proton");
   let protonOptions = $state<ProtonOption[]>([]);
-  let protonOptionsError = $state("");
+  let protonOptionsError = $state<unknown>(null);
   const protonCount = $derived(Object.keys(proton).length);
 
   $effect(() => {
     const id = runnerId;
     if (!isProton) {
       protonOptions = [];
-      protonOptionsError = "";
+      protonOptionsError = null;
       return;
     }
     let cancelled = false;
@@ -241,12 +241,12 @@
       .then((options) => {
         if (cancelled) return;
         protonOptions = options;
-        protonOptionsError = "";
+        protonOptionsError = null;
       })
       .catch((e) => {
         if (cancelled) return;
         protonOptions = [];
-        protonOptionsError = String(e);
+        protonOptionsError = e;
       });
     return () => {
       cancelled = true;
@@ -300,7 +300,7 @@
       tab = "general";
       return;
     }
-    error = "";
+    error = null;
     submitting = true;
     const input: GameInput = {
       name,
@@ -321,7 +321,7 @@
       }
       onSuccess?.();
     } catch (e) {
-      error = String(e);
+      error = e;
     } finally {
       submitting = false;
     }
@@ -438,13 +438,13 @@
       options={protonOptions}
       values={proton}
       inherited={$protonConfig?.options ?? {}}
-      error={protonOptionsError}
+      error={backendError(protonOptionsError)}
       onchange={(next) => (proton = next)}
     />
   {/if}
 
   {#if error}
-    <p class="error">{error}</p>
+    <p class="error">{backendError(error)}</p>
   {/if}
 
   <button type="submit" class="primary" disabled={submitting}>

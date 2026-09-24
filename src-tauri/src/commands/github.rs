@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use tauri::{AppHandle, State};
 
 use crate::config::{save_config, ConfigState};
@@ -21,7 +22,7 @@ pub(crate) fn read_token(state: &State<ConfigState>) -> Result<Option<String>, S
 }
 
 #[tauri::command]
-pub fn get_github_config(state: State<ConfigState>) -> Result<GitHubConfig, String> {
+pub fn get_github_config(state: State<ConfigState>) -> Result<GitHubConfig, AppError> {
     let config = state
         .lock()
         .map_err(|_| "Configuration is locked".to_string())?;
@@ -33,7 +34,7 @@ pub fn save_github_config(
     app: AppHandle,
     state: State<ConfigState>,
     config: GitHubConfig,
-) -> Result<GitHubConfig, String> {
+) -> Result<GitHubConfig, AppError> {
     let mut app_config = state
         .lock()
         .map_err(|_| "Configuration is locked".to_string())?;

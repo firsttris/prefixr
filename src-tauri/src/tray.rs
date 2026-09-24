@@ -8,6 +8,7 @@ use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use uuid::Uuid;
 
 use crate::commands::games::{kill_running_game, LaunchingGames, RunningGames};
+use crate::locale::{Locale, LocaleState};
 
 pub const TRAY_ID: &str = "main-tray";
 const MAIN_WINDOW: &str = "main";
@@ -120,14 +121,20 @@ fn toggle_main_window(app: &AppHandle) {
     }
 }
 
-/// Builds the tray's menu from scratch: a show/hide toggle, one "beenden"
-/// entry per currently running game (so a hung Proton process can be killed
-/// without needing the main window), and quit.
+fn tray_locale(app: &AppHandle) -> Locale {
+    app.try_state::<LocaleState>().map(|s| s.get()).unwrap_or(Locale::De)
+}
+
+/// Builds the tray's menu from scratch: a show/hide toggle, one "quit this
+/// game" entry per currently running game (so a hung Proton process can be
+/// killed without needing the main window), and quit.
 fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
-    let toggle_text = if is_main_window_visible(app) {
-        "Fenster verstecken"
-    } else {
-        "Fenster anzeigen"
+    let locale = tray_locale(app);
+    let toggle_text = match (is_main_window_visible(app), locale) {
+        (true, Locale::De) => "Fenster verstecken",
+        (true, Locale::En) => "Hide window",
+        (false, Locale::De) => "Fenster anzeigen",
+        (false, Locale::En) => "Show window",
     };
 
     let builder =
@@ -149,16 +156,23 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     } else {
         let mut builder = builder.separator();
         for (id, name) in running_games {
-            let item = MenuItemBuilder::with_id(format!("{KILL_PREFIX}{id}"), format!("„{name}“ beenden (erzwingen)"))
-                .build(app)?;
+            let label = match locale {
+                Locale::De => format!("„{name}“ beenden (erzwingen)"),
+                Locale::En => format!("Quit “{name}” (force)"),
+            };
+            let item = MenuItemBuilder::with_id(format!("{KILL_PREFIX}{id}"), label).build(app)?;
             builder = builder.item(&item);
         }
         builder
     };
 
+    let quit_label = match locale {
+        Locale::De => "Beenden",
+        Locale::En => "Quit",
+    };
     builder
         .separator()
-        .item(&MenuItemBuilder::with_id(QUIT_ID, "Beenden").build(app)?)
+        .item(&MenuItemBuilder::with_id(QUIT_ID, quit_label).build(app)?)
         .build()
 }
 
@@ -204,22 +218,36 @@ fn quit(app: &AppHandle) {
         app.exit(0);
         return;
     }
-    let text = match active {
-        1 => "Ein Spiel läuft noch oder wird gerade gestartet.".to_string(),
-        n => format!("{n} Spiele laufen noch oder werden gerade gestartet."),
+    let locale = tray_locale(app);
+    let text = match (active, locale) {
+        (1, Locale::De) => "Ein Spiel läuft noch oder wird gerade gestartet.".to_string(),
+        (1, Locale::En) => "A game is still running or starting.".to_string(),
+        (n, Locale::De) => format!("{n} Spiele laufen noch oder werden gerade gestartet."),
+        (n, Locale::En) => format!("{n} games are still running or starting."),
+    };
+    let message = match locale {
+        Locale::De => format!(
+            "{text} Beim Beenden von Prefixr werden sie ebenfalls beendet — ungespeicherter \
+             Fortschritt geht dabei verloren."
+        ),
+        Locale::En => format!(
+            "{text} Quitting Prefixr will end them too — unsaved progress will be lost."
+        ),
+    };
+    let title = match locale {
+        Locale::De => "Prefixr beenden?",
+        Locale::En => "Quit Prefixr?",
+    };
+    let (confirm_label, cancel_label) = match locale {
+        Locale::De => ("Spiele und Prefixr beenden".to_string(), "Abbrechen".to_string()),
+        Locale::En => ("Quit games and Prefixr".to_string(), "Cancel".to_string()),
     };
     let app = app.clone();
     app.dialog()
-        .message(format!(
-            "{text} Beim Beenden von Prefixr werden sie ebenfalls beendet — ungespeicherter \
-             Fortschritt geht dabei verloren."
-        ))
-        .title("Prefixr beenden?")
+        .message(message)
+        .title(title)
         .kind(MessageDialogKind::Warning)
-        .buttons(MessageDialogButtons::OkCancelCustom(
-            "Spiele und Prefixr beenden".to_string(),
-            "Abbrechen".to_string(),
-        ))
+        .buttons(MessageDialogButtons::OkCancelCustom(confirm_label, cancel_label))
         .show(move |confirmed| {
             if !confirmed {
                 return;

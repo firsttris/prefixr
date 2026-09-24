@@ -7,16 +7,16 @@
   import Modal from "$lib/components/Modal.svelte";
   import WinetricksInstaller from "$lib/components/WinetricksInstaller.svelte";
   import WineToolsLauncher from "$lib/components/WineToolsLauncher.svelte";
-  import { t } from "$lib/i18n/index.svelte";
+  import { backendError, t } from "$lib/i18n/index.svelte";
 
   let path = $state("");
   let busy = $state(false);
-  let error = $state("");
+  let error = $state<unknown>(null);
   let winetricksFor = $state<string | null>(null);
   let wineToolsFor = $state<string | null>(null);
   let deleting = $state<string | null>(null);
   let deleteBusy = $state(false);
-  let deleteError = $state("");
+  let deleteError = $state<unknown>(null);
 
   // The games that use the prefix about to be deleted, so the dialog can
   // name them.
@@ -40,31 +40,31 @@
     event.preventDefault();
     if (!path) return;
     busy = true;
-    error = "";
+    error = null;
     try {
       await addPrefix(path);
       path = "";
     } catch (e) {
-      error = String(e);
+      error = e;
     } finally {
       busy = false;
     }
   }
 
   function askDelete(prefixPath: string) {
-    deleteError = "";
+    deleteError = null;
     deleting = prefixPath;
   }
 
   async function confirmDelete(deleteFiles: boolean) {
     if (!deleting) return;
     deleteBusy = true;
-    deleteError = "";
+    deleteError = null;
     try {
       await deletePrefix(deleting, deleteFiles);
       deleting = null;
     } catch (e) {
-      deleteError = String(e);
+      deleteError = e;
     } finally {
       deleteBusy = false;
     }
@@ -95,7 +95,7 @@
   </form>
 
   {#if error}
-    <p class="error">{error}</p>
+    <p class="error">{backendError(error)}</p>
   {/if}
 
   {#if $prefixes.length > 0}
@@ -145,7 +145,7 @@
     {/if}
     <p>{t("prefixManager.deleteExplain")}</p>
     {#if deleteError}
-      <p class="error">{deleteError}</p>
+      <p class="error">{backendError(deleteError)}</p>
     {/if}
     <div class="dialog-actions">
       <button type="button" class="ghost" onclick={() => (deleting = null)}

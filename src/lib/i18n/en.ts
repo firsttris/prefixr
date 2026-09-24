@@ -27,6 +27,7 @@ export const en: typeof de = {
     overlay: "Overlay",
     proton: "Proton",
     steamgriddb: "SteamGridDB",
+    languageSwitcher: "Language",
   },
   library: {
     heading: "Library",
@@ -452,5 +453,36 @@ export const en: typeof de = {
     updateToLatest: "Update to latest version",
     installNow: "Install now",
     installedHint: "umu {version} is installed.",
+  },
+  backendErrors: {
+    other: "{message}",
+    game_already_running: "The game is already starting or running",
+    prefix_in_use: "“{game_name}” is still running in this prefix. Close the game first.",
+    steam_command_not_found: "Steam is running. Please quit Steam and try again.",
+    steam_shutdown_timed_out: "Steam didn't quit within 30 seconds.",
+    steam_only_flatpak:
+      "Steam is only installed as a Flatpak. The Flatpak isn't allowed to launch programs outside its sandbox, so it can't launch Prefixr either.",
+    steam_not_found: "Steam wasn't found. Start Steam once and sign in.",
+    no_steam_account_found: "No Steam account found. Sign in to Steam once.",
+    shortcuts_vdf_unreadable:
+      "shortcuts.vdf could not be read ({error}). Prefixr is leaving the file unchanged.",
+    no_packages_selected: "No packages selected",
+    unclosed_quote_in_launch_args: "Launch arguments: a quotation mark is left unclosed",
+    pkexec_not_installed: "pkexec is not installed. Please run manually: {command}",
+    sysctl_change_failed: "sysctl change failed or was cancelled (status {status})",
+    runner_in_use: "{runner_name} is still used by {games}.",
+    with_log_details: "{message} — details in the log: {log_path}",
+    winetricks_failed: "winetricks exited with status {status} — details in the log: {log_path}",
+    prefix_already_exists: "Prefix at {path} already exists",
+    path_not_a_directory: "{path} is not a directory",
+    prefix_dir_not_empty:
+      "{path} already contains files but doesn't look like a Wine or Proton prefix",
+    runner_already_exists: "Runner '{tag}' already exists",
+    git_hub_rate_limited:
+      "GitHub's rate limit for unauthenticated requests is exhausted — add a GitHub token in the settings to raise it.",
+    git_hub_api_error: "GitHub API returned status {status}",
+    tool_launch_failed: "Could not start {tool}: {error}",
+    setup_launch_failed: "Setup could not be started: {error} — details in the log: {log_path}",
+    unknown_wine_tool: "Unknown Wine tool: {tool}",
   },
 };

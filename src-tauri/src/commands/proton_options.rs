@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use std::fs;
 
 use serde::Serialize;
@@ -93,7 +94,7 @@ fn parse_call_args(s: &str) -> Option<(&str, &str)> {
 pub fn list_proton_options(
     state: State<ConfigState>,
     runner_id: String,
-) -> Result<Vec<ProtonOption>, String> {
+) -> Result<Vec<ProtonOption>, AppError> {
     let runners_dir = {
         let config = state
             .lock()
@@ -111,7 +112,7 @@ pub fn list_proton_options(
 }
 
 #[tauri::command]
-pub fn get_proton_config(state: State<ConfigState>) -> Result<ProtonConfig, String> {
+pub fn get_proton_config(state: State<ConfigState>) -> Result<ProtonConfig, AppError> {
     let config = state
         .lock()
         .map_err(|_| "Configuration is locked".to_string())?;
@@ -123,7 +124,7 @@ pub fn save_proton_config(
     app: AppHandle,
     state: State<ConfigState>,
     config: ProtonConfig,
-) -> Result<ProtonConfig, String> {
+) -> Result<ProtonConfig, AppError> {
     let mut app_config = state
         .lock()
         .map_err(|_| "Configuration is locked".to_string())?;

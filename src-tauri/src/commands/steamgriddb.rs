@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -163,7 +164,7 @@ async fn sgdb_get<T: for<'de> Deserialize<'de> + Default>(
 }
 
 #[tauri::command]
-pub fn get_steamgriddb_config(state: State<ConfigState>) -> Result<SteamGridDbConfig, String> {
+pub fn get_steamgriddb_config(state: State<ConfigState>) -> Result<SteamGridDbConfig, AppError> {
     let config = state
         .lock()
         .map_err(|_| "Configuration is locked".to_string())?;
@@ -175,7 +176,7 @@ pub fn save_steamgriddb_config(
     app: AppHandle,
     state: State<ConfigState>,
     config: SteamGridDbConfig,
-) -> Result<SteamGridDbConfig, String> {
+) -> Result<SteamGridDbConfig, AppError> {
     let mut app_config = state
         .lock()
         .map_err(|_| "Configuration is locked".to_string())?;
@@ -190,7 +191,7 @@ pub fn save_steamgriddb_config(
 pub async fn search_steamgriddb_games(
     state: State<'_, ConfigState>,
     query: String,
-) -> Result<Vec<SteamGridDbGameMatch>, String> {
+) -> Result<Vec<SteamGridDbGameMatch>, AppError> {
     if query.trim().is_empty() {
         return Ok(Vec::new());
     }
@@ -262,7 +263,7 @@ pub(crate) async fn search_steam_apps(
 pub async fn list_steamgriddb_grids(
     state: State<'_, ConfigState>,
     steamgriddb_id: i64,
-) -> Result<Vec<SteamGridDbGrid>, String> {
+) -> Result<Vec<SteamGridDbGrid>, AppError> {
     let api_key = require_api_key(&state)?;
 
     let mut url = build_url(&["grids", "game", &steamgriddb_id.to_string()])?;
@@ -277,7 +278,7 @@ pub async fn list_steamgriddb_grids(
 pub async fn list_steamgriddb_icons(
     state: State<'_, ConfigState>,
     steamgriddb_id: i64,
-) -> Result<Vec<SteamGridDbGrid>, String> {
+) -> Result<Vec<SteamGridDbGrid>, AppError> {
     let api_key = require_api_key(&state)?;
 
     let url = build_url(&["icons", "game", &steamgriddb_id.to_string()])?;
@@ -294,7 +295,7 @@ pub async fn list_steamgriddb_artwork(
     state: State<'_, ConfigState>,
     steamgriddb_id: i64,
     kind: ArtworkKind,
-) -> Result<Vec<SteamGridDbGrid>, String> {
+) -> Result<Vec<SteamGridDbGrid>, AppError> {
     let api_key = require_api_key(&state)?;
 
     let (endpoint, dimensions) = match kind {
@@ -446,7 +447,7 @@ pub async fn set_game_cover(
     steamgriddb_id: i64,
     cover_grid_id: i64,
     image_url: String,
-) -> Result<Game, String> {
+) -> Result<Game, AppError> {
     let bytes = download_image(&image_url).await?;
 
     let dir = artwork_dir(&app)?;
@@ -475,7 +476,7 @@ pub async fn set_game_cover(
 /// cover set and when the cache file is unexpectedly missing, since either
 /// case just means the card should fall back to showing no cover.
 #[tauri::command(async)]
-pub fn get_game_cover(app: AppHandle, state: State<ConfigState>, game_id: String) -> Result<Option<String>, String> {
+pub fn get_game_cover(app: AppHandle, state: State<ConfigState>, game_id: String) -> Result<Option<String>, AppError> {
     let cover_url = {
         let mut config = state
             .lock()
@@ -506,7 +507,7 @@ pub fn get_game_cover(app: AppHandle, state: State<ConfigState>, game_id: String
 /// `steamgriddb_id` so the picker can jump straight back to that game's
 /// grid list rather than making the user search again.
 #[tauri::command]
-pub fn remove_game_cover(app: AppHandle, state: State<ConfigState>, game_id: String) -> Result<Game, String> {
+pub fn remove_game_cover(app: AppHandle, state: State<ConfigState>, game_id: String) -> Result<Game, AppError> {
     let mut config = state
         .lock()
         .map_err(|_| "Configuration is locked".to_string())?;
@@ -532,7 +533,7 @@ pub async fn set_game_icon(
     steamgriddb_id: i64,
     icon_grid_id: i64,
     image_url: String,
-) -> Result<Game, String> {
+) -> Result<Game, AppError> {
     let bytes = ico_to_png(download_image(&image_url).await?)?;
 
     let dir = artwork_dir(&app)?;
@@ -560,7 +561,7 @@ pub async fn set_game_icon(
 /// URI. Returns `Ok(None)` both when the game has no icon set and when the
 /// cache file is unexpectedly missing.
 #[tauri::command(async)]
-pub fn get_game_icon(app: AppHandle, state: State<ConfigState>, game_id: String) -> Result<Option<String>, String> {
+pub fn get_game_icon(app: AppHandle, state: State<ConfigState>, game_id: String) -> Result<Option<String>, AppError> {
     let icon_url = {
         let mut config = state
             .lock()
@@ -590,7 +591,7 @@ pub fn get_game_icon(app: AppHandle, state: State<ConfigState>, game_id: String)
 /// Clears a game's SteamGridDB icon and deletes its cached file. Keeps
 /// `steamgriddb_id` for the same reason `remove_game_cover` does.
 #[tauri::command]
-pub fn remove_game_icon(app: AppHandle, state: State<ConfigState>, game_id: String) -> Result<Game, String> {
+pub fn remove_game_icon(app: AppHandle, state: State<ConfigState>, game_id: String) -> Result<Game, AppError> {
     let mut config = state
         .lock()
         .map_err(|_| "Configuration is locked".to_string())?;
@@ -615,7 +616,7 @@ pub async fn set_game_artwork(
     kind: ArtworkKind,
     steamgriddb_id: i64,
     image_url: String,
-) -> Result<Game, String> {
+) -> Result<Game, AppError> {
     let bytes = download_image(&image_url).await?;
 
     let dir = artwork_dir(&app)?;
@@ -645,7 +646,7 @@ pub fn remove_game_artwork(
     state: State<ConfigState>,
     game_id: String,
     kind: ArtworkKind,
-) -> Result<Game, String> {
+) -> Result<Game, AppError> {
     let mut config = state
         .lock()
         .map_err(|_| "Configuration is locked".to_string())?;

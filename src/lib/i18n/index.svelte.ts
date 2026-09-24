@@ -63,3 +63,24 @@ export function t(key: TranslationKey, params?: Record<string, string | number>)
     value,
   );
 }
+
+// A Tauri command's Err value: either a plain string (a handful of internal
+// helpers that never got a structured code — see AppError::Other in
+// src-tauri/src/error.rs) or `{ code, ...params }` for anything with a
+// `backendErrors.<code>` entry below, translated the same way as any other
+// UI text. Every catch block that used to do `String(e)` on a command's
+// error should use this instead.
+export function backendError(e: unknown): string {
+  if (e === null || e === undefined || e === "") return "";
+  if (typeof e === "string") return e;
+  if (e && typeof e === "object" && "code" in e && typeof e.code === "string") {
+    const { code, ...params } = e as { code: string } & Record<string, string | number>;
+    const key = `backendErrors.${code}` as TranslationKey;
+    const translated = t(key, params);
+    // t() falls back to the raw key when a code has no dictionary entry
+    // (e.g. a newer backend than this frontend knows about) — better to
+    // show the error's own data than a dotted i18n key.
+    return translated === key ? JSON.stringify(e) : translated;
+  }
+  return String(e);
+}

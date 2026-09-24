@@ -16,7 +16,7 @@
     refreshSteamGames,
   } from "$lib/stores/games";
   import { showLog } from "$lib/logViewer";
-  import { t } from "$lib/i18n/index.svelte";
+  import { backendError, t } from "$lib/i18n/index.svelte";
   import GameCard from "./GameCard.svelte";
   import GameListRow from "./GameListRow.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
@@ -132,7 +132,7 @@
         );
       }
     } catch (e) {
-      notify(t("gameList.steam.errorPrefix", { error: String(e) }), "error");
+      notify(t("gameList.steam.errorPrefix", { error: backendError(e) }), "error");
     }
   }
 
@@ -141,7 +141,7 @@
       runSteamAction(game, "remove-game");
     } else {
       removeGame(game.id).catch((e) =>
-        notify(t("gameList.steam.removeFailed", { name: game.name, error: String(e) }), "error"),
+        notify(t("gameList.steam.removeFailed", { name: game.name, error: backendError(e) }), "error"),
       );
     }
   }

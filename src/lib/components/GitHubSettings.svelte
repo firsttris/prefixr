@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import { githubConfig, refreshGitHubConfig, saveGitHubConfig } from "$lib/stores/github";
   import type { GitHubConfig } from "$lib/types";
-  import { t } from "$lib/i18n/index.svelte";
+  import { backendError, t } from "$lib/i18n/index.svelte";
 
   let { open = false }: { open?: boolean } = $props();
 
@@ -11,7 +11,7 @@
   let config = $state<GitHubConfig>({ ...FALLBACK });
   let initialized = $state(false);
   let saving = $state(false);
-  let error = $state("");
+  let error = $state<unknown>(null);
   let saved = $state(false);
 
   onMount(() => {
@@ -27,13 +27,13 @@
 
   async function handleSave() {
     saving = true;
-    error = "";
+    error = null;
     saved = false;
     try {
       await saveGitHubConfig({ token: config.token?.trim() || null });
       saved = true;
     } catch (e) {
-      error = String(e);
+      error = e;
     } finally {
       saving = false;
     }
@@ -58,7 +58,7 @@
   </div>
 
   {#if error}
-    <p class="error">{error}</p>
+    <p class="error">{backendError(error)}</p>
   {:else if saved}
     <p class="saved-hint">{t("common.saved")}</p>
   {/if}

@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -186,14 +187,14 @@ pub async fn prefix_command(
 }
 
 #[tauri::command]
-pub fn list_runners(state: State<ConfigState>) -> Result<Vec<Runner>, String> {
+pub fn list_runners(state: State<ConfigState>) -> Result<Vec<Runner>, AppError> {
     let runners_dir = {
         let config = state
             .lock()
             .map_err(|_| "Configuration is locked".to_string())?;
         config.runners_dir.clone()
     };
-    scan_runners(&runners_dir)
+    scan_runners(&runners_dir).map_err(AppError::from)
 }
 
 /// Deletes a runner's folder — only one no game uses, so no game is left
@@ -201,7 +202,7 @@ pub fn list_runners(state: State<ConfigState>) -> Result<Vec<Runner>, String> {
 /// tool's folder (e.g. Steam's `compatibilitytools.d`) only loses the link.
 /// Async, since a runner is several hundred MB of files.
 #[tauri::command]
-pub async fn delete_runner(state: State<'_, ConfigState>, runner_id: String) -> Result<(), String> {
+pub async fn delete_runner(state: State<'_, ConfigState>, runner_id: String) -> Result<(), AppError> {
     let (runner, users) = {
         let config = state
             .lock()
@@ -216,16 +217,15 @@ pub async fn delete_runner(state: State<'_, ConfigState>, runner_id: String) -> 
         (runner, users)
     };
     if !users.is_empty() {
-        return Err(format!(
-            "{} wird noch verwendet von {}.",
-            runner.name,
-            users.join(", ")
-        ));
+        return Err(AppError::RunnerInUse {
+            runner_name: runner.name,
+            games: users.join(", "),
+        });
     }
     tauri::async_runtime::spawn_blocking(move || fs::remove_dir_all(&runner.path))
         .await
         .map_err(|e| format!("Could not delete runner: {e}"))?
-        .map_err(|e| format!("Could not delete runner: {e}"))
+        .map_err(|e| format!("Could not delete runner: {e}").into())
 }
 
 #[cfg(test)]
