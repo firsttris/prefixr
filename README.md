@@ -52,13 +52,13 @@ For a release binary/AppImage, see [Release build](#release-build).
 **Game library**
 - Add games via file dialog or the file manager's context menu; installers are detected automatically
 - Search, sort, per-game launch arguments and environment variables
-- Icons are extracted directly from the `.exe` (PNG, BMP, ICO)
+- Game icons are extracted from embedded `.exe` resources and stored/displayed as PNG
 - Create desktop and menu shortcuts
 
 **Prefixes & runners**
 - Create your own Wine/Proton prefixes or import existing ones (including from Steam)
-- Download Proton-GE and Wine runners directly from GitHub releases, with checksum verification
-- Launch via [umu-launcher](https://github.com/Open-Wine-Components/umu-launcher), including automatic GAMEID lookup from the umu database for [protonfixes](https://github.com/Open-Wine-Components/umu-protonfixes)
+- Download Proton-GE, Wine (Kron4ek) and Proton-CachyOS runners directly from GitHub releases, with checksum verification
+- Launch via [umu-launcher](https://github.com/Open-Wine-Components/umu-launcher) (managed by Prefixr and installable from the UI), including automatic GAMEID lookup from the umu database for [protonfixes](https://github.com/Open-Wine-Components/umu-protonfixes)
 - Proton environment toggles (HDR, Wayland, NVAPI, sync mode, shader cache, …) are read directly from the selected runner's `proton` script — only what that runner actually supports is offered
 - Winetricks integration for installing Windows dependencies
 - Launch Wine tools (winecfg, regedit & co.) directly from the UI
@@ -77,13 +77,14 @@ For a release binary/AppImage, see [Release build](#release-build).
 - System tray with an overview of running games and safe shutdown when games are open
 - Log viewer per game and per prefix (last 10 runs)
 - GitHub token management to avoid API rate limits on runner downloads
+- Bilingual UI (German/English) with instant language switching
 
 ## ✅ Requirements
 
 Prefixr is built for **Linux** (tested on Bazzite/Fedora, among others). It also requires:
 
 - [Wine](https://www.winehq.org/) or Steam's Proton prerequisites
-- [umu-launcher](https://github.com/Open-Wine-Components/umu-launcher) to launch games via Proton
+- Recommended: [umu-launcher](https://github.com/Open-Wine-Components/umu-launcher) for Proton launches (Prefixr can install/update it from the app)
 - Optional: Steam (for prefix import and export as a non-Steam game), [MangoHud](https://github.com/flightlessmango/MangoHud), [GameMode](https://github.com/FeralInteractive/gamemode), [Gamescope](https://github.com/ValveSoftware/gamescope), [vkBasalt](https://github.com/DadSchoolbus/vkBasalt)
 
 ## 📦 Installation
