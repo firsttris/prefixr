@@ -2373,19 +2373,23 @@ mod tests {
 
     #[test]
     fn pkill_pattern_matches_the_process_but_not_itself() {
+        if !command_on_path("sleep") || !command_on_path("pgrep") {
+            return;
+        }
+
         let _guard = env_lock().lock().unwrap();
         // GNU sleep sums its arguments; the random fraction makes this
         // command line unique on the system.
         let fraction = format!("0.{}", Uuid::new_v4().as_u128() % 1_000_000_000);
         let target = format!("sleep 30 {fraction}");
-        let mut child = std::process::Command::new("/bin/sleep")
+        let mut child = std::process::Command::new("sleep")
             .args(["30", &fraction])
             .spawn()
             .unwrap();
         let pattern = pkill_pattern(&target);
 
         // `pgrep -f` matches exactly like `pkill -f`, without killing.
-        let found = std::process::Command::new("/usr/bin/pgrep")
+        let found = std::process::Command::new("pgrep")
             .args(["-f", &pattern])
             .output()
             .unwrap();
@@ -2400,8 +2404,12 @@ mod tests {
     /// Whether `pattern` would match a command line containing `pattern`
     /// itself — checked with `grep -E`, which uses the same regex flavor.
     fn regex_self_match(pattern: &str) -> bool {
+        if !command_on_path("grep") {
+            return false;
+        }
+
         use std::io::Write;
-        let mut grep = std::process::Command::new("/bin/grep")
+        let mut grep = std::process::Command::new("grep")
             .args(["-qE", pattern])
             .stdin(Stdio::piped())
             .spawn()
@@ -2412,8 +2420,12 @@ mod tests {
 
     #[test]
     fn process_tree_helpers_see_real_processes() {
+        if !command_on_path("sh") {
+            return;
+        }
+
         let _guard = env_lock().lock().unwrap();
-        let mut child = std::process::Command::new("/bin/sh")
+        let mut child = std::process::Command::new("sh")
             .args(["-c", "sleep 30 & wait"])
             .spawn()
             .unwrap();
