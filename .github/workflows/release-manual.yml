@@ -174,14 +174,24 @@ jobs:
               export PATH="$HOME/.cargo/bin:$HOME/.bun/bin:$PATH"
               export APPIMAGE_EXTRACT_AND_RUN=1
 
-              for tool in \
-                glib-compile-schemas \
-                gdk-pixbuf-query-loaders \
-                gtk-update-icon-cache \
-                update-mime-database \
-                desktop-file-validate; do
-                command -v "$tool"
-              done
+              find_tool() {
+                local tool="$1"
+
+                for candidate in "$tool" "$tool-64" "$tool-32"; do
+                  if command -v "$candidate" >/dev/null 2>&1; then
+                    command -v "$candidate"
+                    return 0
+                  fi
+                done
+
+                return 1
+              }
+
+              command -v glib-compile-schemas
+              find_tool gdk-pixbuf-query-loaders
+              find_tool gtk-update-icon-cache
+              command -v update-mime-database
+              command -v desktop-file-validate
 
               bun install --frozen-lockfile
               bun run check
