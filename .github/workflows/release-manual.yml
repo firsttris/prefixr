@@ -167,6 +167,7 @@ jobs:
               curl -fsSL https://bun.sh/install | bash
 
               export PATH="$HOME/.cargo/bin:$HOME/.bun/bin:$PATH"
+              export APPIMAGE_EXTRACT_AND_RUN=1
 
               bun install --frozen-lockfile
               bun run check
