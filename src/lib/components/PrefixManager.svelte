@@ -56,12 +56,12 @@
     deleting = prefixPath;
   }
 
-  async function confirmDelete(deleteFiles: boolean) {
+  async function confirmDelete() {
     if (!deleting) return;
     deleteBusy = true;
     deleteError = null;
     try {
-      await deletePrefix(deleting, deleteFiles);
+      await deletePrefix(deleting);
       deleting = null;
     } catch (e) {
       deleteError = e;
@@ -151,16 +151,8 @@
       <button type="button" class="ghost" onclick={() => (deleting = null)}
         >{t("common.cancel")}</button
       >
-      <button type="button" disabled={deleteBusy} onclick={() => confirmDelete(false)}>
+      <button type="button" class="danger" disabled={deleteBusy} onclick={confirmDelete}>
         {t("prefixManager.removeFromAppOnly")}
-      </button>
-      <button
-        type="button"
-        class="danger"
-        disabled={deleteBusy}
-        onclick={() => confirmDelete(true)}
-      >
-        {t("prefixManager.deleteFolder")}
       </button>
     </div>
   {/if}

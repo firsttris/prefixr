@@ -206,9 +206,8 @@ export const de = {
     usedByBefore: "Verwendet von:",
     usedByAfter: "Diese Spiele behalten den Prefix, auch wenn er nur aus Prefixr entfernt wird.",
     deleteExplain:
-      "„Ordner löschen“ löscht den Prefix endgültig, mit allen installierten Programmen und Spielständen darin. Bei einem Prefix aus Lutris, Bottles oder PortProton reicht meist „Nur aus Prefixr entfernen“.",
+      "Der Prefix wird nur aus Prefixr entfernt. Der Ordner auf der Festplatte, installierte Programme und Spielstände darin bleiben unverändert.",
     removeFromAppOnly: "Nur aus Prefixr entfernen",
-    deleteFolder: "Ordner löschen",
     wineToolsTitle: "Wine-Werkzeuge",
   },
   runnerList: {

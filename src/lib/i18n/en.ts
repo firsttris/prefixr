@@ -208,9 +208,8 @@ export const en: typeof de = {
     usedByBefore: "Used by:",
     usedByAfter: "These games keep the prefix even if it's only removed from Prefixr.",
     deleteExplain:
-      "“Delete folder” permanently deletes the prefix, along with every installed program and save inside it. For a prefix from Lutris, Bottles, or PortProton, “Remove from Prefixr only” is usually enough.",
+      "The prefix is only removed from Prefixr. The directory on disk, installed programs, and saves inside it stay untouched.",
     removeFromAppOnly: "Remove from Prefixr only",
-    deleteFolder: "Delete folder",
     wineToolsTitle: "Wine tools",
   },
   runnerList: {

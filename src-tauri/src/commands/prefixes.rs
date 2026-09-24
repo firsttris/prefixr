@@ -76,17 +76,15 @@ pub fn add_prefix(
     Ok(prefix_path)
 }
 
-/// Removes a prefix from the app, and with `delete_files` also its folder.
-/// Refused while a game in it is running or being launched: deleting the
-/// folder would pull it out from under the game. Async, since deleting a
-/// prefix of several GB would otherwise freeze the window meanwhile.
+/// Removes a prefix from the app only; its folder on disk is left exactly as
+/// it is. Refused while a game in it is running or being launched, so the UI
+/// can't quietly hide a prefix a still-running game depends on.
 #[tauri::command]
 pub async fn delete_prefix(
     app: AppHandle,
     state: State<'_, ConfigState>,
     launching: State<'_, LaunchingGames>,
     path: String,
-    delete_files: bool,
 ) -> Result<(), AppError> {
     let prefix_path = PathBuf::from(&path);
 
@@ -109,14 +107,6 @@ pub async fn delete_prefix(
             };
             guards.push(guard);
         }
-    }
-
-    if delete_files && prefix_path.exists() {
-        let target = prefix_path.clone();
-        tauri::async_runtime::spawn_blocking(move || fs::remove_dir_all(target))
-            .await
-            .map_err(|e| format!("Could not delete prefix directory: {e}"))?
-            .map_err(|e| format!("Could not delete prefix directory: {e}"))?;
     }
 
     let mut config = state
