@@ -110,17 +110,20 @@ fn build_url(path_segments: &[&str]) -> Result<reqwest::Url, String> {
     Ok(url)
 }
 
+fn sanitized_api_key(api_key: Option<&str>) -> Option<String> {
+    api_key
+        .map(str::trim)
+        .filter(|key| !key.is_empty())
+        .map(str::to_string)
+}
+
 /// Reads the configured API key, without holding the config lock across an
 /// `.await` point (a `std::sync::MutexGuard` isn't `Send`).
 pub(crate) fn read_api_key(state: &State<ConfigState>) -> Result<Option<String>, String> {
     let config = state
         .lock()
         .map_err(|_| "Configuration is locked".to_string())?;
-    Ok(config
-        .steamgriddb
-        .api_key
-        .clone()
-        .filter(|key| !key.trim().is_empty()))
+    Ok(sanitized_api_key(config.steamgriddb.api_key.as_deref()))
 }
 
 fn require_api_key(state: &State<ConfigState>) -> Result<String, String> {
@@ -298,11 +301,7 @@ pub async fn list_steamgriddb_artwork(
 ) -> Result<Vec<SteamGridDbGrid>, AppError> {
     let api_key = require_api_key(&state)?;
 
-    let (endpoint, dimensions) = match kind {
-        ArtworkKind::Wide => ("grids", Some("920x430,460x215")),
-        ArtworkKind::Hero => ("heroes", None),
-        ArtworkKind::Logo => ("logos", None),
-    };
+    let (endpoint, dimensions) = artwork_endpoint(kind);
     let mut url = build_url(&[endpoint, "game", &steamgriddb_id.to_string()])?;
     {
         let mut query = url.query_pairs_mut();
@@ -314,6 +313,14 @@ pub async fn list_steamgriddb_artwork(
     let assets: Vec<SgdbAsset> = sgdb_get(url, &api_key).await?;
 
     Ok(assets.into_iter().map(SteamGridDbGrid::from).collect())
+}
+
+fn artwork_endpoint(kind: ArtworkKind) -> (&'static str, Option<&'static str>) {
+    match kind {
+        ArtworkKind::Wide => ("grids", Some("920x430,460x215")),
+        ArtworkKind::Hero => ("heroes", None),
+        ArtworkKind::Logo => ("logos", None),
+    }
 }
 
 pub(crate) fn artwork_dir(app: &AppHandle) -> Result<PathBuf, String> {
@@ -347,6 +354,10 @@ fn image_mime(ext: &str) -> &'static str {
         "webp" => "image/webp",
         _ => "image/png",
     }
+}
+
+fn image_data_url(bytes: &[u8], ext: &str) -> String {
+    format!("data:{};base64,{}", image_mime(ext), STANDARD.encode(bytes))
 }
 
 /// The cache path for a game's asset of a given `kind` ("" for the cover,
@@ -496,11 +507,7 @@ pub fn get_game_cover(app: AppHandle, state: State<ConfigState>, game_id: String
     }
 
     let bytes = fs::read(&path).map_err(|e| format!("Could not read cover file: {e}"))?;
-    Ok(Some(format!(
-        "data:{};base64,{}",
-        image_mime(ext),
-        STANDARD.encode(bytes)
-    )))
+    Ok(Some(image_data_url(&bytes, ext)))
 }
 
 /// Clears a game's cover and deletes its cached file. Deliberately keeps
@@ -581,11 +588,7 @@ pub fn get_game_icon(app: AppHandle, state: State<ConfigState>, game_id: String)
     }
 
     let bytes = fs::read(&path).map_err(|e| format!("Could not read icon file: {e}"))?;
-    Ok(Some(format!(
-        "data:{};base64,{}",
-        image_mime(ext),
-        STANDARD.encode(bytes)
-    )))
+    Ok(Some(image_data_url(&bytes, ext)))
 }
 
 /// Clears a game's SteamGridDB icon and deletes its cached file. Keeps
@@ -663,6 +666,178 @@ pub fn remove_game_artwork(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+
+    use crate::config::AppConfig;
+    use crate::models::{GameOverrides, GitHubConfig, GraphicsConfig, MangoHudConfig, PerformanceConfig, PrefixInfo, ProtonConfig};
+
+    fn temp_path(name: &str) -> PathBuf {
+        let path = std::env::temp_dir().join(format!("prefixr-{name}-{}", Uuid::new_v4()));
+        fs::create_dir_all(&path).unwrap();
+        path
+    }
+
+    fn sample_game(id: Uuid, name: &str) -> Game {
+        Game {
+            id,
+            name: name.to_string(),
+            exe_path: PathBuf::from("/games/game.exe"),
+            prefix_path: PathBuf::from("/prefix"),
+            runner_id: "runner".to_string(),
+            env_vars: Default::default(),
+            launch_args: String::new(),
+            icon: None,
+            steamgriddb_id: None,
+            cover_grid_id: None,
+            cover_url: None,
+            steamgriddb_icon_grid_id: None,
+            steamgriddb_icon_url: None,
+            artwork: Default::default(),
+            umu_id: None,
+            umu_store: None,
+            overrides: GameOverrides::default(),
+        }
+    }
+
+    fn sample_config(games: Vec<Game>) -> AppConfig {
+        AppConfig {
+            runners_dir: PathBuf::from("/runners"),
+            prefixes: Vec::<PrefixInfo>::new(),
+            games,
+            mangohud: MangoHudConfig::default(),
+            performance: PerformanceConfig::default(),
+            graphics: GraphicsConfig::default(),
+            proton: ProtonConfig::default(),
+            steamgriddb: SteamGridDbConfig::default(),
+            github: GitHubConfig::default(),
+        }
+    }
+
+    #[test]
+    fn builds_urls_with_percent_encoded_segments() {
+        let url = build_url(&["search", "autocomplete", "NieR: Automata / GOTY"]).unwrap();
+
+        assert_eq!(
+            url.as_str(),
+            "https://www.steamgriddb.com/api/v2/search/autocomplete/NieR:%20Automata%20%2F%20GOTY"
+        );
+    }
+
+    #[test]
+    fn trims_or_rejects_api_keys() {
+        assert_eq!(sanitized_api_key(Some("  secret-key  ")), Some("secret-key".to_string()));
+        assert_eq!(sanitized_api_key(Some("  \t\n  ")), None);
+        assert_eq!(sanitized_api_key(None), None);
+    }
+
+    #[test]
+    fn artwork_kinds_map_to_expected_endpoints() {
+        assert_eq!(artwork_endpoint(ArtworkKind::Wide), ("grids", Some("920x430,460x215")));
+        assert_eq!(artwork_endpoint(ArtworkKind::Hero), ("heroes", None));
+        assert_eq!(artwork_endpoint(ArtworkKind::Logo), ("logos", None));
+    }
+
+    #[test]
+    fn detects_image_extensions_and_mime_types() {
+        assert_eq!(image_extension("https://cdn/foo/bar.jpg?size=600"), "jpg");
+        assert_eq!(image_extension("https://cdn/foo/bar.JPEG"), "jpg");
+        assert_eq!(image_extension("https://cdn/foo/bar.webp"), "webp");
+        assert_eq!(image_extension("https://cdn/foo/bar.unknown"), "png");
+        assert_eq!(image_mime("jpg"), "image/jpeg");
+        assert_eq!(image_mime("webp"), "image/webp");
+        assert_eq!(image_mime("png"), "image/png");
+    }
+
+    #[test]
+    fn image_data_url_uses_matching_mime_and_base64() {
+        assert_eq!(image_data_url(b"\xff\xd8", "jpg"), "data:image/jpeg;base64,/9g=");
+        assert_eq!(image_data_url(b"RIFF", "webp"), "data:image/webp;base64,UklGRg==");
+        assert_eq!(image_data_url(b"PNG", "png"), "data:image/png;base64,UE5H");
+    }
+
+    #[test]
+    fn builds_cache_paths_by_kind_suffix_and_extension() {
+        let dir = Path::new("/tmp/artwork-cache");
+        let id = Uuid::nil();
+
+        assert_eq!(
+            asset_cache_path(dir, id, "", "png"),
+            PathBuf::from("/tmp/artwork-cache/00000000-0000-0000-0000-000000000000.png")
+        );
+        assert_eq!(
+            asset_cache_path(dir, id, "_icon", "webp"),
+            PathBuf::from("/tmp/artwork-cache/00000000-0000-0000-0000-000000000000_icon.webp")
+        );
+    }
+
+    #[test]
+    fn removes_only_stale_files_for_the_requested_kind() {
+        let dir = temp_path("steamgriddb-stale");
+        let id = Uuid::new_v4();
+        let cover = asset_cache_path(&dir, id, "", "png");
+        let icon = asset_cache_path(&dir, id, "_icon", "png");
+        let other_game = asset_cache_path(&dir, Uuid::new_v4(), "", "png");
+
+        fs::write(&cover, b"cover").unwrap();
+        fs::write(&icon, b"icon").unwrap();
+        fs::write(&other_game, b"other").unwrap();
+
+        remove_stale_asset_files(&dir, id, "").unwrap();
+
+        assert!(!cover.exists());
+        assert!(icon.exists());
+        assert!(other_game.exists());
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn remove_stale_asset_files_ignores_missing_directories() {
+        let dir = std::env::temp_dir().join(format!("prefixr-missing-artwork-{}", Uuid::new_v4()));
+
+        assert!(remove_stale_asset_files(&dir, Uuid::new_v4(), "_icon").is_ok());
+    }
+
+    #[test]
+    fn sgdb_asset_conversion_preserves_fields() {
+        let grid = SteamGridDbGrid::from(SgdbAsset {
+            id: 42,
+            url: "https://cdn.example/grid.png".to_string(),
+            thumb: "https://cdn.example/thumb.png".to_string(),
+            width: 600,
+            height: 900,
+        });
+
+        assert_eq!(grid.id, 42);
+        assert_eq!(grid.url, "https://cdn.example/grid.png");
+        assert_eq!(grid.thumb, "https://cdn.example/thumb.png");
+        assert_eq!(grid.width, 600);
+        assert_eq!(grid.height, 900);
+    }
+
+    #[test]
+    fn find_game_returns_the_matching_entry() {
+        let id = Uuid::new_v4();
+        let mut config = sample_config(vec![sample_game(id, "Cyberpunk 2077")]);
+
+        let game = find_game(&mut config, &id.to_string()).unwrap();
+
+        assert_eq!(game.name, "Cyberpunk 2077");
+        game.cover_url = Some("https://cdn.example/cover.png".to_string());
+        assert_eq!(config.games[0].cover_url.as_deref(), Some("https://cdn.example/cover.png"));
+    }
+
+    #[test]
+    fn find_game_rejects_invalid_or_unknown_ids() {
+        let mut config = sample_config(Vec::new());
+
+        assert!(find_game(&mut config, "not-a-uuid")
+            .unwrap_err()
+            .starts_with("Invalid game id:"));
+
+        let missing = Uuid::new_v4().to_string();
+        assert_eq!(find_game(&mut config, &missing).unwrap_err(), format!("No game with id {missing}"));
+    }
 
     #[test]
     fn ico_icons_become_png() {

@@ -10,6 +10,15 @@ use crate::commands::logs::{new_log_file, prefix_log_dir};
 use crate::commands::runners::{find_runner, runner_command};
 use crate::config::ConfigState;
 
+const BUILTIN_WINE_TOOLS: &[&str] = &[
+    "winecfg",
+    "regedit",
+    "cmd",
+    "winefile",
+    "uninstaller",
+    "taskmgr",
+];
+
 /// Wine's own built-in GUI utilities — the same set PortProton, Lutris and
 /// Bottles all expose straight from their prefix view (winecfg, regedit, a
 /// cmd shell, the wine-side file manager, its uninstaller and task manager).
@@ -22,15 +31,13 @@ use crate::config::ConfigState;
 /// rather than looking for a matching binary alongside it, the one path that
 /// works uniformly across both runner kinds.
 fn tool_arg(tool: &str) -> Result<&'static str, AppError> {
-    match tool {
-        "winecfg" => Ok("winecfg"),
-        "regedit" => Ok("regedit"),
-        "cmd" => Ok("cmd"),
-        "winefile" => Ok("winefile"),
-        "uninstaller" => Ok("uninstaller"),
-        "taskmgr" => Ok("taskmgr"),
-        _ => Err(AppError::UnknownWineTool { tool: tool.to_string() }),
-    }
+    BUILTIN_WINE_TOOLS
+        .iter()
+        .copied()
+        .find(|builtin| *builtin == tool)
+        .ok_or_else(|| AppError::UnknownWineTool {
+            tool: tool.to_string(),
+        })
 }
 
 /// Launches one of Wine's built-in GUI utilities against a prefix. Detached
@@ -78,4 +85,24 @@ pub async fn launch_wine_tool(
         })?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tool_arg_accepts_all_supported_builtin_tools() {
+        for tool in BUILTIN_WINE_TOOLS {
+            assert_eq!(tool_arg(tool).unwrap(), *tool);
+        }
+    }
+
+    #[test]
+    fn tool_arg_rejects_unknown_tools_with_the_original_name() {
+        match tool_arg("notepad") {
+            Err(AppError::UnknownWineTool { tool }) => assert_eq!(tool, "notepad"),
+            other => panic!("unexpected result: {other:?}"),
+        }
+    }
 }

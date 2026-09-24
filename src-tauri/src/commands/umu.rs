@@ -43,6 +43,14 @@ fn version_file(dir: &Path) -> PathBuf {
     dir.join("version")
 }
 
+fn release_zipapp_asset(assets: &[GitHubAsset]) -> Option<&GitHubAsset> {
+    assets.iter().find(|asset| asset.name.ends_with("-zipapp.tar"))
+}
+
+fn asset_sha256_hex(asset: &GitHubAsset) -> Option<&str> {
+    asset.digest.as_deref()?.strip_prefix("sha256:")
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct UmuStatus {
     pub installed: bool,
@@ -58,6 +66,29 @@ fn read_status(dir: &Path) -> UmuStatus {
         .map(|v| v.trim().to_string())
         .filter(|v| !v.is_empty());
     UmuStatus { installed, version }
+}
+
+fn required_runtime_name(manifest: &str) -> Option<&'static str> {
+    let app_id = manifest.lines().find_map(|line| {
+        let rest = line.trim().strip_prefix("\"require_tool_appid\"")?;
+        Some(rest.trim().trim_matches('"').to_string())
+    });
+    match app_id.as_deref() {
+        Some("4183110") => Some("steamrt4"),
+        Some("1628350") => Some("steamrt3"),
+        Some("1391110") => Some("steamrt2"),
+        _ => None,
+    }
+}
+
+fn runtime_dir_complete(dir: &Path) -> bool {
+    fs::read_dir(dir)
+        .map(|entries| {
+            entries
+                .flatten()
+                .any(|entry| entry.file_name().to_string_lossy().contains("_platform_"))
+        })
+        .unwrap_or(false)
 }
 
 #[derive(Deserialize)]
@@ -105,15 +136,9 @@ async fn latest_release(token: Option<&str>) -> Result<GitHubRelease, String> {
 async fn install_latest(app: &AppHandle, token: Option<&str>) -> Result<UmuStatus, String> {
     let release = latest_release(token).await?;
 
-    let asset = release
-        .assets
-        .into_iter()
-        .find(|a| a.name.ends_with("-zipapp.tar"))
+    let asset = release_zipapp_asset(&release.assets)
         .ok_or_else(|| format!("umu {} has no zipapp release asset", release.tag_name))?;
-    let expected = asset
-        .digest
-        .as_deref()
-        .and_then(|d| d.strip_prefix("sha256:"))
+    let expected = asset_sha256_hex(asset)
         .ok_or_else(|| format!("GitHub reported no SHA-256 digest for {}", asset.name))?
         .to_string();
 
@@ -206,28 +231,12 @@ pub fn runtime_present(runner_path: &Path) -> bool {
     let Ok(manifest) = fs::read_to_string(runner_path.join("toolmanifest.vdf")) else {
         return true;
     };
-    let app_id = manifest.lines().find_map(|line| {
-        let rest = line.trim().strip_prefix("\"require_tool_appid\"")?;
-        Some(rest.trim().trim_matches('"').to_string())
-    });
-    // Same table as umu's own `__runtime_versions__`.
-    let runtime = match app_id.as_deref() {
-        Some("4183110") => "steamrt4",
-        Some("1628350") => "steamrt3",
-        Some("1391110") => "steamrt2",
-        _ => return true,
+    let Some(runtime) = required_runtime_name(&manifest) else {
+        return true;
     };
     // umu's own completeness check: an interrupted download leaves the
     // runtime's directory behind, but no `<name>_platform_<version>` inside.
-    umu_local_dir().is_none_or(|dir| {
-        fs::read_dir(dir.join(runtime))
-            .map(|entries| {
-                entries
-                    .flatten()
-                    .any(|e| e.file_name().to_string_lossy().contains("_platform_"))
-            })
-            .unwrap_or(false)
-    })
+    umu_local_dir().is_none_or(|dir| runtime_dir_complete(&dir.join(runtime)))
 }
 
 #[tauri::command]
@@ -259,9 +268,135 @@ pub async fn install_umu(
 mod tests {
     use super::*;
 
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    fn temp_path() -> PathBuf {
+        std::env::temp_dir().join(format!("prefixr-test-{}", uuid::Uuid::new_v4()))
+    }
+
+    fn zipapp_asset(name: &str, digest: Option<&str>) -> GitHubAsset {
+        GitHubAsset {
+            name: name.to_string(),
+            browser_download_url: "https://example.invalid/umu.tar".to_string(),
+            digest: digest.map(str::to_string),
+        }
+    }
+
+    #[test]
+    fn release_helpers_pick_zipapp_and_digest() {
+        let assets = vec![
+            zipapp_asset("umu-runner.tar.gz", Some("sha256:ignored")),
+            zipapp_asset("umu-0.1.0-zipapp.tar", Some("sha256:abc123")),
+        ];
+
+        let asset = release_zipapp_asset(&assets).unwrap();
+
+        assert_eq!(asset.name, "umu-0.1.0-zipapp.tar");
+        assert_eq!(asset_sha256_hex(asset), Some("abc123"));
+    }
+
+    #[test]
+    fn release_helpers_reject_missing_or_malformed_digest() {
+        let missing = zipapp_asset("umu-0.1.0-zipapp.tar", None);
+        let malformed = zipapp_asset("umu-0.1.0-zipapp.tar", Some("md5:abc123"));
+
+        assert_eq!(asset_sha256_hex(&missing), None);
+        assert_eq!(asset_sha256_hex(&malformed), None);
+    }
+
+    #[test]
+    fn read_status_requires_umu_run_and_trims_versions() {
+        let dir = temp_path();
+        fs::create_dir_all(umu_run_path(&dir).parent().unwrap()).unwrap();
+        fs::write(umu_run_path(&dir), "#!/bin/sh\n").unwrap();
+        fs::write(version_file(&dir), "  v1.2.3 \n").unwrap();
+
+        let status = read_status(&dir);
+
+        assert!(status.installed);
+        assert_eq!(status.version.as_deref(), Some("v1.2.3"));
+
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn read_status_ignores_empty_versions_and_missing_install() {
+        let dir = temp_path();
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(version_file(&dir), "   \n").unwrap();
+
+        let status = read_status(&dir);
+
+        assert!(!status.installed);
+        assert_eq!(status.version, None);
+
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn required_runtime_name_maps_known_app_ids() {
+        assert_eq!(required_runtime_name("\"require_tool_appid\" \"4183110\""), Some("steamrt4"));
+        assert_eq!(required_runtime_name("\"require_tool_appid\" \"1628350\""), Some("steamrt3"));
+        assert_eq!(required_runtime_name("\"require_tool_appid\" \"1391110\""), Some("steamrt2"));
+        assert_eq!(required_runtime_name("\"require_tool_appid\" \"999\""), None);
+        assert_eq!(required_runtime_name("\"other\" \"4183110\""), None);
+    }
+
+    #[test]
+    fn runtime_dir_complete_needs_platform_marker() {
+        let dir = temp_path();
+        fs::create_dir_all(&dir).unwrap();
+        assert!(!runtime_dir_complete(&dir));
+        fs::create_dir_all(dir.join("steamrt4_payload")).unwrap();
+        assert!(!runtime_dir_complete(&dir));
+        fs::create_dir_all(dir.join("steamrt4_platform_4.0.20260914.260627")).unwrap();
+        assert!(runtime_dir_complete(&dir));
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn umu_local_dir_prefers_explicit_folders_path() {
+        let _lock = ENV_LOCK.lock().unwrap();
+        let base = temp_path();
+        std::env::set_var("UMU_FOLDERS_PATH", &base);
+        std::env::remove_var("XDG_DATA_HOME");
+        std::env::remove_var("HOME");
+
+        assert_eq!(umu_local_dir(), Some(base.join("umu")));
+
+        std::env::remove_var("UMU_FOLDERS_PATH");
+    }
+
+    #[test]
+    fn umu_local_dir_falls_back_to_xdg_data_home() {
+        let _lock = ENV_LOCK.lock().unwrap();
+        let base = temp_path();
+        std::env::remove_var("UMU_FOLDERS_PATH");
+        std::env::set_var("XDG_DATA_HOME", &base);
+        std::env::remove_var("HOME");
+
+        assert_eq!(umu_local_dir(), Some(base.join("umu")));
+
+        std::env::remove_var("XDG_DATA_HOME");
+    }
+
+    #[test]
+    fn umu_local_dir_uses_home_when_xdg_data_home_is_missing() {
+        let _lock = ENV_LOCK.lock().unwrap();
+        let home = temp_path();
+        std::env::remove_var("UMU_FOLDERS_PATH");
+        std::env::remove_var("XDG_DATA_HOME");
+        std::env::set_var("HOME", &home);
+
+        assert_eq!(umu_local_dir(), Some(home.join(".local/share/umu")));
+
+        std::env::remove_var("HOME");
+    }
+
     #[test]
     fn runtime_present_parses_real_manifest() {
-        let dir = std::env::temp_dir().join(format!("prefixr-test-{}", uuid::Uuid::new_v4()));
+        let _lock = ENV_LOCK.lock().unwrap();
+        let dir = temp_path();
         fs::create_dir_all(&dir).unwrap();
         // Verbatim from GE-Proton11-7.
         fs::write(

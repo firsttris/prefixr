@@ -47,6 +47,49 @@ const MAX_MAP_COUNT_PATH: &str = "/proc/sys/vm/max_map_count";
 /// is enough for it to take effect on the next `sysctl --system`/reboot too.
 const SYSCTL_DROPIN_PATH: &str = "/etc/sysctl.d/99-prefixr-max-map-count.conf";
 
+fn parse_max_map_count(raw: Option<&str>) -> u64 {
+    raw.and_then(|value| value.trim().parse::<u64>().ok())
+        .unwrap_or(0)
+}
+
+fn manual_fix_command() -> String {
+    format!(
+        "sudo sh -c 'echo \"vm.max_map_count = {RECOMMENDED_MAX_MAP_COUNT}\" > {SYSCTL_DROPIN_PATH} && sysctl --system'"
+    )
+}
+
+fn sysctl_fix_script() -> String {
+    format!(
+        "echo 'vm.max_map_count = {RECOMMENDED_MAX_MAP_COUNT}' > {SYSCTL_DROPIN_PATH} && sysctl --system"
+    )
+}
+
+fn build_max_map_count_status(current: u64, can_fix: bool) -> MaxMapCountStatus {
+    MaxMapCountStatus {
+        current,
+        recommended: RECOMMENDED_MAX_MAP_COUNT,
+        sufficient: current >= RECOMMENDED_MAX_MAP_COUNT,
+        can_fix,
+    }
+}
+
+fn finalize_max_map_count_fix(
+    pkexec_available: bool,
+    run_result: Result<(bool, String), String>,
+) -> Result<(), AppError> {
+    if !pkexec_available {
+        return Err(AppError::PkexecNotInstalled {
+            command: manual_fix_command(),
+        });
+    }
+
+    let (success, status) = run_result.map_err(AppError::from)?;
+    if !success {
+        return Err(AppError::SysctlChangeFailed { status });
+    }
+    Ok(())
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "snake_case")]
 pub struct MaxMapCountStatus {
@@ -63,16 +106,8 @@ pub struct MaxMapCountStatus {
 
 #[tauri::command]
 pub fn check_max_map_count() -> MaxMapCountStatus {
-    let current = fs::read_to_string(MAX_MAP_COUNT_PATH)
-        .ok()
-        .and_then(|s| s.trim().parse::<u64>().ok())
-        .unwrap_or(0);
-    MaxMapCountStatus {
-        current,
-        recommended: RECOMMENDED_MAX_MAP_COUNT,
-        sufficient: current >= RECOMMENDED_MAX_MAP_COUNT,
-        can_fix: command_on_path("pkexec"),
-    }
+    let current = parse_max_map_count(fs::read_to_string(MAX_MAP_COUNT_PATH).ok().as_deref());
+    build_max_map_count_status(current, command_on_path("pkexec"))
 }
 
 /// Writes the sysctl drop-in and applies it immediately via `pkexec` (a
@@ -81,25 +116,111 @@ pub fn check_max_map_count() -> MaxMapCountStatus {
 /// which would be more confusing than not offering a fix at all.
 #[tauri::command]
 pub async fn fix_max_map_count() -> Result<(), AppError> {
-    if !command_on_path("pkexec") {
-        return Err(AppError::PkexecNotInstalled {
-            command: format!(
+    let pkexec_available = command_on_path("pkexec");
+    let script = sysctl_fix_script();
+    let run_result = if pkexec_available {
+        tokio::process::Command::new("pkexec")
+            .args(["sh", "-c", &script])
+            .status()
+            .await
+            .map(|status| (status.success(), status.to_string()))
+            .map_err(|e| format!("Could not run pkexec: {e}"))
+    } else {
+        Ok((false, String::new()))
+    };
+    finalize_max_map_count_fix(pkexec_available, run_result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        build_max_map_count_status, finalize_max_map_count_fix, manual_fix_command,
+        parse_max_map_count, sysctl_fix_script, MaxMapCountStatus, RECOMMENDED_MAX_MAP_COUNT,
+        SYSCTL_DROPIN_PATH,
+    };
+    use crate::error::AppError;
+
+    fn assert_status(status: MaxMapCountStatus, current: u64, sufficient: bool, can_fix: bool) {
+        assert_eq!(status.current, current);
+        assert_eq!(status.recommended, RECOMMENDED_MAX_MAP_COUNT);
+        assert_eq!(status.sufficient, sufficient);
+        assert_eq!(status.can_fix, can_fix);
+    }
+
+    #[test]
+    fn parses_max_map_count_or_falls_back_to_zero() {
+        assert_eq!(parse_max_map_count(Some("2147483642\n")), RECOMMENDED_MAX_MAP_COUNT);
+        assert_eq!(parse_max_map_count(Some("not-a-number")), 0);
+        assert_eq!(parse_max_map_count(None), 0);
+    }
+
+    #[test]
+    fn builds_status_with_threshold_and_fix_availability() {
+        assert_status(
+            build_max_map_count_status(RECOMMENDED_MAX_MAP_COUNT - 1, false),
+            RECOMMENDED_MAX_MAP_COUNT - 1,
+            false,
+            false,
+        );
+        assert_status(
+            build_max_map_count_status(RECOMMENDED_MAX_MAP_COUNT, true),
+            RECOMMENDED_MAX_MAP_COUNT,
+            true,
+            true,
+        );
+    }
+
+    #[test]
+    fn exposes_manual_and_pkexec_fix_commands() {
+        assert_eq!(
+            manual_fix_command(),
+            format!(
                 "sudo sh -c 'echo \"vm.max_map_count = {RECOMMENDED_MAX_MAP_COUNT}\" > {SYSCTL_DROPIN_PATH} && sysctl --system'"
-            ),
-        });
+            )
+        );
+        assert_eq!(
+            sysctl_fix_script(),
+            format!(
+                "echo 'vm.max_map_count = {RECOMMENDED_MAX_MAP_COUNT}' > {SYSCTL_DROPIN_PATH} && sysctl --system"
+            )
+        );
     }
-    let script = format!(
-        "echo 'vm.max_map_count = {RECOMMENDED_MAX_MAP_COUNT}' > {SYSCTL_DROPIN_PATH} && sysctl --system"
-    );
-    let status = tokio::process::Command::new("pkexec")
-        .args(["sh", "-c", &script])
-        .status()
-        .await
-        .map_err(|e| format!("Could not run pkexec: {e}"))?;
-    if !status.success() {
-        return Err(AppError::SysctlChangeFailed {
-            status: status.to_string(),
-        });
+
+    #[test]
+    fn reports_missing_pkexec_with_manual_fallback() {
+        let error = finalize_max_map_count_fix(false, Ok((true, "0".to_string()))).unwrap_err();
+
+        match error {
+            AppError::PkexecNotInstalled { command } => {
+                assert_eq!(command, manual_fix_command());
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
     }
-    Ok(())
+
+    #[test]
+    fn reports_failed_or_unspawnable_pkexec_runs() {
+        let error = finalize_max_map_count_fix(true, Ok((false, "exit status: 126".to_string())))
+            .unwrap_err();
+        match error {
+            AppError::SysctlChangeFailed { status } => {
+                assert_eq!(status, "exit status: 126");
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+
+        let error = finalize_max_map_count_fix(true, Err("Could not run pkexec: boom".to_string()))
+            .unwrap_err();
+        match error {
+            AppError::Other { message } => {
+                assert_eq!(message, "Could not run pkexec: boom");
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn accepts_successful_pkexec_runs() {
+        assert!(finalize_max_map_count_fix(true, Ok((true, "exit status: 0".to_string()))).is_ok());
+    }
 }

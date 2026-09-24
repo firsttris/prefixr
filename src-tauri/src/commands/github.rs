@@ -4,6 +4,12 @@ use tauri::{AppHandle, State};
 use crate::config::{save_config, ConfigState};
 use crate::models::GitHubConfig;
 
+fn sanitized_token(token: Option<&str>) -> Option<String> {
+    token.map(str::trim)
+        .filter(|token| !token.is_empty())
+        .map(str::to_string)
+}
+
 /// Reads the configured GitHub token, if any, without holding the config
 /// lock across an `.await` point (a `std::sync::MutexGuard` isn't `Send`).
 /// `None` means "no token configured" — callers should fall back to an
@@ -13,12 +19,7 @@ pub(crate) fn read_token(state: &State<ConfigState>) -> Result<Option<String>, S
     let config = state
         .lock()
         .map_err(|_| "Configuration is locked".to_string())?;
-    Ok(config
-        .github
-        .token
-        .as_ref()
-        .map(|t| t.trim().to_string())
-        .filter(|t| !t.is_empty()))
+    Ok(sanitized_token(config.github.token.as_deref()))
 }
 
 #[tauri::command]
@@ -41,4 +42,20 @@ pub fn save_github_config(
     app_config.github = config;
     save_config(&app, &app_config)?;
     Ok(app_config.github.clone())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sanitized_token;
+
+    #[test]
+    fn trims_configured_tokens() {
+        assert_eq!(sanitized_token(Some("  secret-token  ")), Some("secret-token".to_string()));
+    }
+
+    #[test]
+    fn empty_or_missing_tokens_become_none() {
+        assert_eq!(sanitized_token(Some("   \t\n  ")), None);
+        assert_eq!(sanitized_token(None), None);
+    }
 }

@@ -1,20 +1,53 @@
 <div align="center">
-  <img src="src-tauri/icons/128x128@2x.png" width="96" height="96" alt="Prefixr Logo">
+  <h1>Prefixr</h1>
 
-  # Prefixr
+  <p>
+    A native Linux app for managing Wine and Proton prefixes to run Windows games
+  </p>
 
-  A native Linux app for managing Wine and Proton prefixes to run Windows games — a lightweight alternative to Lutris, Bottles, Heroic and PortProton.
+  <img src="docs/Banner.jpeg" alt="Prefixr Banner" width="100%">
 
-  Built with [Tauri 2](https://v2.tauri.app/), [SvelteKit](https://kit.svelte.dev/) and Rust.
+  <p>Built with <a href="https://v2.tauri.app/">Tauri 2</a>, <a href="https://kit.svelte.dev/">SvelteKit</a> and Rust.</p>
+
+  <p>
+    <a href="#requirements"><img alt="Platform Linux" src="https://img.shields.io/badge/platform-linux-0f766e?style=for-the-badge&logo=linux&logoColor=white"></a>
+    <a href="https://v2.tauri.app/"><img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24c8db?style=for-the-badge&logo=tauri&logoColor=white"></a>
+    <a href="https://kit.svelte.dev/"><img alt="SvelteKit" src="https://img.shields.io/badge/SvelteKit-ff3e00?style=for-the-badge&logo=svelte&logoColor=white"></a>
+    <a href="https://www.rust-lang.org/"><img alt="Rust" src="https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white"></a>
+    <a href="#license"><img alt="License MIT" src="https://img.shields.io/badge/license-MIT-1f2937?style=for-the-badge"></a>
+  </p>
 </div>
 
 ---
+
+## Table of Contents
+
+- [What is Prefixr?](#what-is-prefixr)
+- [✨ Features](#features)
+- [✅ Requirements](#requirements)
+- [📦 Installation](#installation)
+- [🛠️ Development](#development)
+- [🧰 Troubleshooting](#troubleshooting)
+- [License](#license)
 
 ## What is Prefixr?
 
 Prefixr is a library for Windows games on Linux: add games, create or reuse Wine/Proton prefixes for them, download matching runners, and configure per game how it's launched — including graphics overlays, performance tweaks and Steam artwork. Everything runs in a native desktop UI instead of the terminal.
 
-## Features
+## 🚀 Quick Start
+
+1. Install dependencies from [Requirements](#requirements).
+2. Install frontend packages with Bun.
+3. Start the app in development mode:
+
+```bash
+bun install
+bun run tauri dev
+```
+
+For a release binary/AppImage, see [Release build](#release-build).
+
+## ✨ Features
 
 **Game library**
 - Add games via file dialog or the file manager's context menu; installers are detected automatically
@@ -45,7 +78,7 @@ Prefixr is a library for Windows games on Linux: add games, create or reuse Wine
 - Log viewer per game and per prefix (last 10 runs)
 - GitHub token management to avoid API rate limits on runner downloads
 
-## Requirements
+## ✅ Requirements
 
 Prefixr is built for **Linux** (tested on Bazzite/Fedora, among others). It also requires:
 
@@ -53,17 +86,30 @@ Prefixr is built for **Linux** (tested on Bazzite/Fedora, among others). It also
 - [umu-launcher](https://github.com/Open-Wine-Components/umu-launcher) to launch games via Proton
 - Optional: Steam (for prefix import and export as a non-Steam game), [MangoHud](https://github.com/flightlessmango/MangoHud), [GameMode](https://github.com/FeralInteractive/gamemode), [Gamescope](https://github.com/ValveSoftware/gamescope), [vkBasalt](https://github.com/DadSchoolbus/vkBasalt)
 
-## Installation
+## 📦 Installation
 
 There are no prebuilt releases yet — Prefixr currently has to be built from source (see below). Once the AppImage is built, make it executable and run it as usual.
 
-## Development
+### 🏗️ Build from source
 
-### Recommended setup
+```bash
+bun install
+bun run tauri build
+```
+
+Artifacts (including AppImage) are written to:
+
+```text
+src-tauri/target/release/
+```
+
+## 🛠️ Development
+
+### 🧩 Recommended setup
 
 [VS Code](https://code.visualstudio.com/) + [Svelte](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
 
-### Rust/Tauri setup
+### 🦀 Rust/Tauri setup
 
 Tauri requires Rust. Install it via rustup (Linux/macOS):
 
@@ -89,7 +135,7 @@ cargo --version
 
 For other platforms (Windows, macOS) see [Tauri Prerequisites](https://v2.tauri.app/start/prerequisites/).
 
-### Install frontend dependencies
+### 📚 Install frontend dependencies
 
 Prefixr uses [Bun](https://bun.sh/) as its package manager:
 
@@ -97,7 +143,7 @@ Prefixr uses [Bun](https://bun.sh/) as its package manager:
 bun install
 ```
 
-### Run in dev mode
+### ▶️ Run in dev mode
 
 ```bash
 bun run tauri dev
@@ -105,7 +151,7 @@ bun run tauri dev
 
 Starts the SvelteKit dev server and opens the Tauri window alongside it with hot reload.
 
-### Release build
+### 📦 Release build
 
 ```bash
 bun run tauri build
@@ -113,15 +159,15 @@ bun run tauri build
 
 Builds the frontend and produces the native binary as well as the configured bundles (including an AppImage) under `src-tauri/target/release/`.
 
-### Type checking
+### ✅ Type checking
 
 ```bash
 bun run check
 ```
 
-## Troubleshooting
+## 🧰 Troubleshooting
 
-### AppImage crashes ("EGL_BAD_PARAMETER") or shows only a blank white window
+### ⚠️ AppImage crashes ("EGL_BAD_PARAMETER") or shows only a blank white window
 
 **Symptom:** Launching the AppImage immediately produces
 
@@ -149,7 +195,7 @@ bun run tauri build   # NOT "cargo build --release" -- that doesn't embed
 
 **Side observation:** On crashing ("Aborting..."), the process sometimes lingers as a zombie and has to be killed manually (`kill -9`) instead of terminating cleanly.
 
-### Clearing the WebKit cache
+### 🧹 Clearing the WebKit cache
 
 On Linux, Tauri uses WebKitGTK as its webview. Its cache lives here:
 

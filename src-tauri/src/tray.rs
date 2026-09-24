@@ -36,6 +36,19 @@ impl WindowVisible {
 /// starting Prefixr again. See `lib.rs`'s close handling.
 pub struct TrayAvailable(pub bool);
 
+fn tray_host_available_from_gdbus(success: bool, stdout: &[u8]) -> bool {
+    if success {
+        String::from_utf8_lossy(stdout).contains("true")
+    } else {
+        true
+    }
+}
+
+fn sorted_running_games(mut games: Vec<(Uuid, String)>) -> Vec<(Uuid, String)> {
+    games.sort_by(|a, b| a.1.cmp(&b.1));
+    games
+}
+
 /// Asks the session bus whether a StatusNotifier host (what Tauri's tray
 /// icon registers with) is running. `gdbus` ships with GLib, which Prefixr
 /// needs anyway; if it can't answer, a tray is assumed as before.
@@ -56,8 +69,8 @@ pub fn tray_host_available() -> bool {
         ])
         .output();
     match output {
-        Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout).contains("true"),
-        _ => true,
+        Ok(out) => tray_host_available_from_gdbus(out.status.success(), &out.stdout),
+        Err(_) => true,
     }
 }
 
@@ -125,17 +138,73 @@ fn tray_locale(app: &AppHandle) -> Locale {
     app.try_state::<LocaleState>().map(|s| s.get()).unwrap_or(Locale::De)
 }
 
+fn toggle_label(visible: bool, locale: Locale) -> &'static str {
+    match (visible, locale) {
+        (true, Locale::De) => "Fenster verstecken",
+        (true, Locale::En) => "Hide window",
+        (false, Locale::De) => "Fenster anzeigen",
+        (false, Locale::En) => "Show window",
+    }
+}
+
+fn kill_game_label(name: &str, locale: Locale) -> String {
+    match locale {
+        Locale::De => format!("„{name}“ beenden (erzwingen)"),
+        Locale::En => format!("Quit “{name}” (force)"),
+    }
+}
+
+fn quit_label(locale: Locale) -> &'static str {
+    match locale {
+        Locale::De => "Beenden",
+        Locale::En => "Quit",
+    }
+}
+
+fn parse_kill_game_id(id: &str) -> Option<Uuid> {
+    id.strip_prefix(KILL_PREFIX)
+        .and_then(|game_id| Uuid::parse_str(game_id).ok())
+}
+
+fn quit_dialog_copy(active: usize, locale: Locale) -> (String, &'static str, String, String) {
+    let text = match (active, locale) {
+        (1, Locale::De) => "Ein Spiel läuft noch oder wird gerade gestartet.".to_string(),
+        (1, Locale::En) => "A game is still running or starting.".to_string(),
+        (n, Locale::De) => format!("{n} Spiele laufen noch oder werden gerade gestartet."),
+        (n, Locale::En) => format!("{n} games are still running or starting."),
+    };
+    let message = match locale {
+        Locale::De => format!(
+            "{text} Beim Beenden von Prefixr werden sie ebenfalls beendet — ungespeicherter \
+             Fortschritt geht dabei verloren."
+        ),
+        Locale::En => format!(
+            "{text} Quitting Prefixr will end them too — unsaved progress will be lost."
+        ),
+    };
+    let title = match locale {
+        Locale::De => "Prefixr beenden?",
+        Locale::En => "Quit Prefixr?",
+    };
+    let confirm_label = match locale {
+        Locale::De => "Spiele und Prefixr beenden",
+        Locale::En => "Quit games and Prefixr",
+    }
+    .to_string();
+    let cancel_label = match locale {
+        Locale::De => "Abbrechen",
+        Locale::En => "Cancel",
+    }
+    .to_string();
+    (message, title, confirm_label, cancel_label)
+}
+
 /// Builds the tray's menu from scratch: a show/hide toggle, one "quit this
 /// game" entry per currently running game (so a hung Proton process can be
 /// killed without needing the main window), and quit.
 fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let locale = tray_locale(app);
-    let toggle_text = match (is_main_window_visible(app), locale) {
-        (true, Locale::De) => "Fenster verstecken",
-        (true, Locale::En) => "Hide window",
-        (false, Locale::De) => "Fenster anzeigen",
-        (false, Locale::En) => "Show window",
-    };
+    let toggle_text = toggle_label(is_main_window_visible(app), locale);
 
     let builder =
         MenuBuilder::new(app).item(&MenuItemBuilder::with_id(TOGGLE_ID, toggle_text).build(app)?);
@@ -144,11 +213,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         .state::<RunningGames>()
         .0
         .lock()
-        .map(|games| {
-            let mut games: Vec<_> = games.iter().map(|(id, g)| (*id, g.name.clone())).collect();
-            games.sort_by(|a, b| a.1.cmp(&b.1));
-            games
-        })
+        .map(|games| sorted_running_games(games.iter().map(|(id, g)| (*id, g.name.clone())).collect()))
         .unwrap_or_default();
 
     let builder = if running_games.is_empty() {
@@ -156,23 +221,16 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     } else {
         let mut builder = builder.separator();
         for (id, name) in running_games {
-            let label = match locale {
-                Locale::De => format!("„{name}“ beenden (erzwingen)"),
-                Locale::En => format!("Quit “{name}” (force)"),
-            };
+            let label = kill_game_label(&name, locale);
             let item = MenuItemBuilder::with_id(format!("{KILL_PREFIX}{id}"), label).build(app)?;
             builder = builder.item(&item);
         }
         builder
     };
 
-    let quit_label = match locale {
-        Locale::De => "Beenden",
-        Locale::En => "Quit",
-    };
     builder
         .separator()
-        .item(&MenuItemBuilder::with_id(QUIT_ID, quit_label).build(app)?)
+        .item(&MenuItemBuilder::with_id(QUIT_ID, quit_label(locale)).build(app)?)
         .build()
 }
 
@@ -197,14 +255,12 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
         quit(app);
         return;
     }
-    if let Some(game_id) = id.strip_prefix(KILL_PREFIX) {
-        if let Ok(game_id) = Uuid::parse_str(game_id) {
-            let app = app.clone();
-            tauri::async_runtime::spawn(async move {
-                let running = app.state::<RunningGames>();
-                let _ = kill_running_game(&running, game_id).await;
-            });
-        }
+    if let Some(game_id) = parse_kill_game_id(id) {
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move {
+            let running = app.state::<RunningGames>();
+            let _ = kill_running_game(&running, game_id).await;
+        });
     }
 }
 
@@ -219,29 +275,7 @@ fn quit(app: &AppHandle) {
         return;
     }
     let locale = tray_locale(app);
-    let text = match (active, locale) {
-        (1, Locale::De) => "Ein Spiel läuft noch oder wird gerade gestartet.".to_string(),
-        (1, Locale::En) => "A game is still running or starting.".to_string(),
-        (n, Locale::De) => format!("{n} Spiele laufen noch oder werden gerade gestartet."),
-        (n, Locale::En) => format!("{n} games are still running or starting."),
-    };
-    let message = match locale {
-        Locale::De => format!(
-            "{text} Beim Beenden von Prefixr werden sie ebenfalls beendet — ungespeicherter \
-             Fortschritt geht dabei verloren."
-        ),
-        Locale::En => format!(
-            "{text} Quitting Prefixr will end them too — unsaved progress will be lost."
-        ),
-    };
-    let title = match locale {
-        Locale::De => "Prefixr beenden?",
-        Locale::En => "Quit Prefixr?",
-    };
-    let (confirm_label, cancel_label) = match locale {
-        Locale::De => ("Spiele und Prefixr beenden".to_string(), "Abbrechen".to_string()),
-        Locale::En => ("Quit games and Prefixr".to_string(), "Cancel".to_string()),
-    };
+    let (message, title, confirm_label, cancel_label) = quit_dialog_copy(active, locale);
     let app = app.clone();
     app.dialog()
         .message(message)
@@ -293,4 +327,73 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     }
     builder.build(app)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn toggle_labels_follow_visibility_and_locale() {
+        assert_eq!(toggle_label(true, Locale::De), "Fenster verstecken");
+        assert_eq!(toggle_label(false, Locale::De), "Fenster anzeigen");
+        assert_eq!(toggle_label(true, Locale::En), "Hide window");
+        assert_eq!(toggle_label(false, Locale::En), "Show window");
+    }
+
+    #[test]
+    fn tray_labels_are_localized() {
+        assert_eq!(kill_game_label("Cyberpunk 2077", Locale::De), "„Cyberpunk 2077“ beenden (erzwingen)");
+        assert_eq!(kill_game_label("Cyberpunk 2077", Locale::En), "Quit “Cyberpunk 2077” (force)");
+        assert_eq!(quit_label(Locale::De), "Beenden");
+        assert_eq!(quit_label(Locale::En), "Quit");
+    }
+
+    #[test]
+    fn kill_menu_ids_parse_only_valid_uuid_entries() {
+        let id = Uuid::new_v4();
+        assert_eq!(parse_kill_game_id(&format!("{KILL_PREFIX}{id}")), Some(id));
+        assert_eq!(parse_kill_game_id("quit"), None);
+        assert_eq!(parse_kill_game_id("kill-game:not-a-uuid"), None);
+    }
+
+    #[test]
+    fn quit_dialog_copy_varies_by_count_and_locale() {
+        let (message_de, title_de, confirm_de, cancel_de) = quit_dialog_copy(1, Locale::De);
+        assert!(message_de.contains("Ein Spiel läuft noch oder wird gerade gestartet."));
+        assert_eq!(title_de, "Prefixr beenden?");
+        assert_eq!(confirm_de, "Spiele und Prefixr beenden");
+        assert_eq!(cancel_de, "Abbrechen");
+
+        let (message_en, title_en, confirm_en, cancel_en) = quit_dialog_copy(3, Locale::En);
+        assert!(message_en.contains("3 games are still running or starting."));
+        assert_eq!(title_en, "Quit Prefixr?");
+        assert_eq!(confirm_en, "Quit games and Prefixr");
+        assert_eq!(cancel_en, "Cancel");
+    }
+
+    #[test]
+    fn gdbus_host_detection_parses_output_and_falls_back_open() {
+        assert!(tray_host_available_from_gdbus(true, b"(true,)\n"));
+        assert!(!tray_host_available_from_gdbus(true, b"(false,)\n"));
+        assert!(tray_host_available_from_gdbus(false, b""));
+    }
+
+    #[test]
+    fn running_games_are_sorted_by_name() {
+        let a = Uuid::new_v4();
+        let b = Uuid::new_v4();
+        let c = Uuid::new_v4();
+
+        let sorted = sorted_running_games(vec![
+            (a, "Zelda".to_string()),
+            (b, "Anno 1800".to_string()),
+            (c, "Baldur's Gate 3".to_string()),
+        ]);
+
+        assert_eq!(
+            sorted.into_iter().map(|(_, name)| name).collect::<Vec<_>>(),
+            vec!["Anno 1800", "Baldur's Gate 3", "Zelda"]
+        );
+    }
 }
