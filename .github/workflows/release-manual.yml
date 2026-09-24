@@ -173,6 +173,7 @@ jobs:
 
               export PATH="$HOME/.cargo/bin:$HOME/.bun/bin:$PATH"
               export APPIMAGE_EXTRACT_AND_RUN=1
+              export NO_STRIP=1
 
               find_tool() {
                 local tool="$1"
