@@ -203,13 +203,16 @@ export const en: typeof de = {
     addPrefix: "Add prefix",
     installDeps: "Install dependencies",
     openWineTools: "Open Wine tools",
-    delete: "Delete",
+    remove: "Remove",
     removeTitle: "Remove prefix",
+    unused: "Unused",
+    usedByOne: "Used by 1 game",
+    usedByMany: "Used by {count} games",
     usedByBefore: "Used by:",
     usedByAfter: "These games keep the prefix even if it's only removed from Prefixr.",
     deleteExplain:
       "The prefix is only removed from Prefixr. The directory on disk, installed programs, and saves inside it stay untouched.",
-    removeFromAppOnly: "Remove from Prefixr only",
+    removeFromAppOnly: "Remove from Prefixr",
     wineToolsTitle: "Wine tools",
   },
   runnerList: {

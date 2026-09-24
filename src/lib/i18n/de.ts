@@ -201,13 +201,16 @@ export const de = {
     addPrefix: "Prefix hinzufügen",
     installDeps: "Abhängigkeiten installieren",
     openWineTools: "Wine-Werkzeuge öffnen",
-    delete: "Löschen",
+    remove: "Entfernen",
     removeTitle: "Prefix entfernen",
+    unused: "Nicht verwendet",
+    usedByOne: "Von 1 Spiel verwendet",
+    usedByMany: "Von {count} Spielen verwendet",
     usedByBefore: "Verwendet von:",
     usedByAfter: "Diese Spiele behalten den Prefix, auch wenn er nur aus Prefixr entfernt wird.",
     deleteExplain:
       "Der Prefix wird nur aus Prefixr entfernt. Der Ordner auf der Festplatte, installierte Programme und Spielstände darin bleiben unverändert.",
-    removeFromAppOnly: "Nur aus Prefixr entfernen",
+    removeFromAppOnly: "Aus Prefixr entfernen",
     wineToolsTitle: "Wine-Werkzeuge",
   },
   runnerList: {

@@ -18,6 +18,23 @@
   let deleteBusy = $state(false);
   let deleteError = $state<unknown>(null);
 
+  // How many games use each prefix. Unlike runners, a used prefix may still
+  // be removed from Prefixr, since this only unregisters it and leaves the
+  // directory on disk untouched.
+  let usage = $derived(
+    $games.reduce<Record<string, number>>((counts, game) => {
+      counts[game.prefix_path] = (counts[game.prefix_path] ?? 0) + 1;
+      return counts;
+    }, {}),
+  );
+
+  function usageLabel(count: number): string {
+    if (count === 0) return t("prefixManager.unused");
+    return count === 1
+      ? t("prefixManager.usedByOne")
+      : t("prefixManager.usedByMany", { count });
+  }
+
   // The games that use the prefix about to be deleted, so the dialog can
   // name them.
   let affectedGames = $derived(
@@ -101,8 +118,12 @@
   {#if $prefixes.length > 0}
     <ul>
       {#each $prefixes as prefix (prefix.path)}
+        {@const count = usage[prefix.path] ?? 0}
         <li>
-          <span>{prefix.path}</span>
+          <div class="prefix-info">
+            <span>{prefix.path}</span>
+            <span class="usage" class:unused={count === 0}>{usageLabel(count)}</span>
+          </div>
           <div class="actions">
             <button
               type="button"
@@ -121,7 +142,7 @@
               🛠️
             </button>
             <button type="button" class="ghost" onclick={() => askDelete(prefix.path)}>
-              {t("prefixManager.delete")}
+              {t("prefixManager.remove")}
             </button>
           </div>
         </li>
@@ -246,6 +267,22 @@
 
   li span {
     word-break: break-all;
+  }
+
+  .prefix-info {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2em;
+  }
+
+  .usage {
+    color: var(--text-muted);
+    font-size: 0.82em;
+  }
+
+  .usage.unused {
+    font-style: italic;
   }
 
   .actions {
