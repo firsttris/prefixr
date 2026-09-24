@@ -170,7 +170,7 @@ jobs:
               bun install --frozen-lockfile
               bun run check
               cargo test --manifest-path src-tauri/Cargo.toml --locked
-              bun run tauri build -- --bundles appimage
+              bun run tauri build --bundles appimage
 
               shopt -s nullglob
               for app in src-tauri/target/release/bundle/appimage/*.AppImage; do
