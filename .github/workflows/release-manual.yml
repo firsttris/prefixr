@@ -158,9 +158,14 @@ jobs:
                 gcc gcc-c++ make \
                 curl wget file git which \
                 xdg-utils \
+                desktop-file-utils \
+                gdk-pixbuf2 gdk-pixbuf2-devel \
+                glib2 glib2-devel \
+                gobject-introspection-devel \
+                gtk3 gtk3-devel \
                 openssl-devel libxdo-devel \
                 libayatana-appindicator-gtk3-devel \
-                librsvg2-devel webkit2gtk4.1-devel \
+                librsvg2-devel shared-mime-info webkit2gtk4.1-devel \
                 patchelf pkgconf
 
               curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -169,10 +174,19 @@ jobs:
               export PATH="$HOME/.cargo/bin:$HOME/.bun/bin:$PATH"
               export APPIMAGE_EXTRACT_AND_RUN=1
 
+              for tool in \
+                glib-compile-schemas \
+                gdk-pixbuf-query-loaders \
+                gtk-update-icon-cache \
+                update-mime-database \
+                desktop-file-validate; do
+                command -v "$tool"
+              done
+
               bun install --frozen-lockfile
               bun run check
               cargo test --manifest-path src-tauri/Cargo.toml --locked
-              bun run tauri build --bundles appimage
+              bun run tauri build -v --bundles appimage
 
               shopt -s nullglob
               for app in src-tauri/target/release/bundle/appimage/*.AppImage; do
