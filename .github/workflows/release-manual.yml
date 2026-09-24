@@ -26,37 +26,17 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
-    name: Build, tag and publish
+  prepare:
+    name: Prepare release tag
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Rust build
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-
-      - name: Install Linux system dependencies for Tauri
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libxdo-dev \
-            libssl-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            patchelf
 
       - name: Normalize and validate tag
         id: tag
@@ -82,6 +62,37 @@ jobs:
             exit 1
           fi
 
+  build-ubuntu-compat:
+    name: Build Ubuntu compatibility bundles
+    needs: prepare
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Linux system dependencies for Tauri
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
       - name: Install frontend dependencies
         run: bun install --frozen-lockfile
 
@@ -94,9 +105,126 @@ jobs:
       - name: Build Tauri release bundles
         run: bun run tauri build
 
+      - name: Mark AppImage as Ubuntu compatibility build
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          for app in src-tauri/target/release/bundle/appimage/*.AppImage; do
+            base="${app%.AppImage}"
+            new="${base}-ubuntu-compat.AppImage"
+            mv "$app" "$new"
+
+            if [ -f "${app}.sig" ]; then
+              mv "${app}.sig" "${new}.sig"
+            fi
+            if [ -f "${app}.tar.gz" ]; then
+              mv "${app}.tar.gz" "${new}.tar.gz"
+            fi
+          done
+
+      - name: Upload Ubuntu compatibility artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets-ubuntu-compat
+          path: |
+            src-tauri/target/release/bundle/**/*.AppImage
+            src-tauri/target/release/bundle/**/*.AppImage.tar.gz
+            src-tauri/target/release/bundle/**/*.deb
+            src-tauri/target/release/bundle/**/*.rpm
+            src-tauri/target/release/bundle/**/*.tar.gz
+            src-tauri/target/release/bundle/**/*.zip
+            src-tauri/target/release/bundle/**/*.sig
+
+  build-fedora-latest-appimage:
+    name: Build Fedora latest AppImage
+    needs: prepare
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build AppImage inside Fedora container
+        run: |
+          docker run --rm \
+            -v "$PWD":/work \
+            -w /work \
+            fedora:latest \
+            bash -lc '
+              set -euo pipefail
+              dnf -y update
+              dnf -y install \
+                gcc gcc-c++ make \
+                curl wget file git which \
+                openssl-devel libxdo-devel \
+                libayatana-appindicator-gtk3-devel \
+                librsvg2-devel webkit2gtk4.1-devel \
+                patchelf pkgconf
+
+              curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+              curl -fsSL https://bun.sh/install | bash
+
+              export PATH="$HOME/.cargo/bin:$HOME/.bun/bin:$PATH"
+
+              bun install --frozen-lockfile
+              bun run check
+              cargo test --manifest-path src-tauri/Cargo.toml --locked
+              bun run tauri build -- --bundles appimage
+
+              shopt -s nullglob
+              for app in src-tauri/target/release/bundle/appimage/*.AppImage; do
+                base="${app%.AppImage}"
+                new="${base}-fedora-latest.AppImage"
+                mv "$app" "$new"
+
+                if [ -f "${app}.sig" ]; then
+                  mv "${app}.sig" "${new}.sig"
+                fi
+                if [ -f "${app}.tar.gz" ]; then
+                  mv "${app}.tar.gz" "${new}.tar.gz"
+                fi
+              done
+            '
+
+      - name: Upload Fedora latest AppImage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets-fedora-latest-appimage
+          path: |
+            src-tauri/target/release/bundle/**/*.AppImage
+            src-tauri/target/release/bundle/**/*.AppImage.tar.gz
+            src-tauri/target/release/bundle/**/*.sig
+
+  release:
+    name: Tag and publish release
+    needs:
+      - prepare
+      - build-ubuntu-compat
+      - build-fedora-latest-appimage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download Ubuntu compatibility artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-assets-ubuntu-compat
+          path: dist
+
+      - name: Download Fedora latest AppImage artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-assets-fedora-latest-appimage
+          path: dist
+
       - name: Create and push git tag
         env:
-          TAG: ${{ steps.tag.outputs.tag }}
+          TAG: ${{ needs.prepare.outputs.tag }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -107,16 +235,16 @@ jobs:
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.tag.outputs.tag }}
-          name: Release ${{ steps.tag.outputs.tag }}
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          name: Release ${{ needs.prepare.outputs.tag }}
           draft: ${{ inputs.draft }}
           prerelease: ${{ inputs.prerelease }}
           generate_release_notes: true
           files: |
-            src-tauri/target/release/bundle/**/*.AppImage
-            src-tauri/target/release/bundle/**/*.AppImage.tar.gz
-            src-tauri/target/release/bundle/**/*.deb
-            src-tauri/target/release/bundle/**/*.rpm
-            src-tauri/target/release/bundle/**/*.tar.gz
-            src-tauri/target/release/bundle/**/*.zip
-            src-tauri/target/release/bundle/**/*.sig
+            dist/**/*.AppImage
+            dist/**/*.AppImage.tar.gz
+            dist/**/*.deb
+            dist/**/*.rpm
+            dist/**/*.tar.gz
+            dist/**/*.zip
+            dist/**/*.sig

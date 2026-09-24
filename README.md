@@ -160,6 +160,13 @@ bun run tauri build
 
 Builds the frontend and produces the native binary as well as the configured bundles (including an AppImage) under `src-tauri/target/release/`.
 
+When downloading release assets, you may see two AppImage variants:
+
+- `*-ubuntu-compat.AppImage`: built on Ubuntu (compatibility-focused baseline). Prefer this on most distros.
+- `*-fedora-latest.AppImage`: built in a Fedora latest environment (newer userspace stack). Try this if the compatibility build crashes on very new Mesa/driver stacks.
+
+Why both exist: AppImage bundles a large part of its own userspace libraries, so the build environment influences runtime behavior. Shipping both variants makes this tradeoff explicit: broad compatibility vs. newer graphics stack alignment.
+
 ### ✅ Type checking
 
 ```bash
