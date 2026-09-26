@@ -62,8 +62,8 @@ jobs:
             exit 1
           fi
 
-  build-ubuntu-compat:
-    name: Build Ubuntu compatibility bundles
+  build:
+    name: Build release bundles
     needs: prepare
     runs-on: ubuntu-22.04
 
@@ -123,10 +123,10 @@ jobs:
             fi
           done
 
-      - name: Upload Ubuntu compatibility artifacts
+      - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: release-assets-ubuntu-compat
+          name: release-assets
           path: |
             src-tauri/target/release/bundle/**/*.AppImage
             src-tauri/target/release/bundle/**/*.AppImage.tar.gz
@@ -136,99 +136,11 @@ jobs:
             src-tauri/target/release/bundle/**/*.zip
             src-tauri/target/release/bundle/**/*.sig
 
-  build-fedora-latest-appimage:
-    name: Build Fedora latest AppImage
-    needs: prepare
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Build AppImage inside Fedora container
-        run: |
-          docker run --rm \
-            -v "$PWD":/work \
-            -w /work \
-            fedora:latest \
-            bash -lc '
-              set -euo pipefail
-              dnf -y update
-              dnf -y install \
-                gcc gcc-c++ make \
-                curl wget file git which \
-                xdg-utils \
-                desktop-file-utils \
-                gdk-pixbuf2 gdk-pixbuf2-devel \
-                glib2 glib2-devel \
-                gobject-introspection-devel \
-                gtk3 gtk3-devel \
-                openssl-devel libxdo-devel \
-                libayatana-appindicator-gtk3-devel \
-                librsvg2-devel shared-mime-info webkit2gtk4.1-devel \
-                patchelf pkgconf
-
-              curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-              curl -fsSL https://bun.sh/install | bash
-
-              export PATH="$HOME/.cargo/bin:$HOME/.bun/bin:$PATH"
-              export APPIMAGE_EXTRACT_AND_RUN=1
-              export NO_STRIP=1
-
-              find_tool() {
-                local tool="$1"
-
-                for candidate in "$tool" "$tool-64" "$tool-32"; do
-                  if command -v "$candidate" >/dev/null 2>&1; then
-                    command -v "$candidate"
-                    return 0
-                  fi
-                done
-
-                return 1
-              }
-
-              command -v glib-compile-schemas
-              find_tool gdk-pixbuf-query-loaders
-              find_tool gtk-update-icon-cache
-              command -v update-mime-database
-              command -v desktop-file-validate
-
-              bun install --frozen-lockfile
-              bun run check
-              cargo test --manifest-path src-tauri/Cargo.toml --locked
-              bun run tauri build -v --bundles appimage
-
-              shopt -s nullglob
-              for app in src-tauri/target/release/bundle/appimage/*.AppImage; do
-                base="${app%.AppImage}"
-                new="${base}-fedora-latest.AppImage"
-                mv "$app" "$new"
-
-                if [ -f "${app}.sig" ]; then
-                  mv "${app}.sig" "${new}.sig"
-                fi
-                if [ -f "${app}.tar.gz" ]; then
-                  mv "${app}.tar.gz" "${new}.tar.gz"
-                fi
-              done
-            '
-
-      - name: Upload Fedora latest AppImage artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-assets-fedora-latest-appimage
-          path: |
-            src-tauri/target/release/bundle/**/*.AppImage
-            src-tauri/target/release/bundle/**/*.AppImage.tar.gz
-            src-tauri/target/release/bundle/**/*.sig
-
   release:
-    name: Tag and publish release
+    name: Publish release
     needs:
       - prepare
-      - build-ubuntu-compat
-      - build-fedora-latest-appimage
+      - build
     runs-on: ubuntu-latest
 
     steps:
@@ -237,16 +149,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Download Ubuntu compatibility artifacts
+      - name: Download release artifacts
         uses: actions/download-artifact@v4
         with:
-          name: release-assets-ubuntu-compat
-          path: dist
-
-      - name: Download Fedora latest AppImage artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: release-assets-fedora-latest-appimage
+          name: release-assets
           path: dist
 
       - name: Create and push git tag
