@@ -1,8 +1,10 @@
 <script lang="ts">
+  import * as m from "$lib/paraglide/messages";
+  import { msgGroup } from "$lib/i18n/msg-groups";
   import { onMount } from "svelte";
   import { runners, refreshRunners } from "$lib/stores/runners";
   import { WINE_TOOLS, launchWineTool } from "$lib/stores/wineTools";
-  import { backendError, t, type TranslationKey } from "$lib/i18n/index.svelte";
+  import { backendError, pickMsg } from "$lib/i18n/index.svelte";
 
   let { prefixPath }: { prefixPath: string } = $props();
 
@@ -30,13 +32,13 @@
 
 <div class="wine-tools">
   <p class="hint">
-    {t("wineToolsLauncher.hintBefore")}<code>{prefixPath}</code>{t("wineToolsLauncher.hintAfter")}
+    {m.wineToolsLauncher_hintBefore()}<code>{prefixPath}</code>{m.wineToolsLauncher_hintAfter()}
   </p>
 
   <label>
-    {t("wineToolsLauncher.runnerLabel")}
+    {m.wineToolsLauncher_runnerLabel()}
     <select bind:value={runnerId}>
-      <option value="" disabled selected>{t("gameForm.runnerChoose")}</option>
+      <option value="" disabled selected>{m.gameForm_runnerChoose()}</option>
       {#each $runners as runner (runner.id)}
         <option value={runner.id}>{runner.name} ({runner.kind})</option>
       {/each}
@@ -47,8 +49,8 @@
     {#each WINE_TOOLS as tool (tool.id)}
       <div class="tool-row">
         <div>
-          <span class="tool-label">{t(`wineTools.${tool.id}.label` as TranslationKey)}</span>
-          <p class="tool-desc">{t(`wineTools.${tool.id}.description` as TranslationKey)}</p>
+          <span class="tool-label">{pickMsg(msgGroup.wineTools_label, tool.id)}</span>
+          <p class="tool-desc">{pickMsg(msgGroup.wineTools_description, tool.id)}</p>
         </div>
         <button
           type="button"
@@ -56,7 +58,7 @@
           disabled={!runnerId || launching !== ""}
           onclick={() => handleLaunch(tool.id)}
         >
-          {launching === tool.id ? t("wineToolsLauncher.opening") : t("wineToolsLauncher.open")}
+          {launching === tool.id ? m.wineToolsLauncher_opening() : m.wineToolsLauncher_open()}
         </button>
       </div>
     {/each}

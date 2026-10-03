@@ -1,9 +1,10 @@
 <script lang="ts">
+  import * as m from "$lib/paraglide/messages";
   import { onMount, untrack } from "svelte";
   import { searchUmuIds } from "$lib/stores/umu";
   import { prettifyExeName } from "$lib/gameName";
   import type { UmuMatch } from "$lib/types";
-  import { backendError, t } from "$lib/i18n/index.svelte";
+  import { backendError } from "$lib/i18n/index.svelte";
 
   // The game's UMU id, which umu gets as `GAMEID` so umu-protonfixes
   // applies this game's own fixes — see `Game::umu_id` in models.rs.
@@ -40,7 +41,7 @@
 
   function storeLabel(match: UmuMatch): string {
     if (match.store) return STORE_LABELS[match.store] ?? match.store;
-    return match.source === "steam" ? t("umuPicker.steam") : t("umuPicker.noStore");
+    return match.source === "steam" ? m.umuPicker_steam() : m.umuPicker_noStore();
   }
 
   // Mounted fresh each time the Proton tab opens, so reading the name once
@@ -81,8 +82,8 @@
 
 <section class="umu-picker">
   <div>
-    <span class="label">{t("umuPicker.label")}</span>
-    <p class="hint">{t("umuPicker.intro")}</p>
+    <span class="label">{m.umuPicker_label()}</span>
+    <p class="hint">{m.umuPicker_intro()}</p>
   </div>
 
   <div class="current" class:set={!!umuId}>
@@ -92,12 +93,11 @@
         {#if umuStore}<code>STORE={umuStore}</code>{/if}
       </span>
       <button type="button" class="reset" onclick={() => onchange(null, null)}
-        >{t("common.remove")}</button
+        >{m.common_remove()}</button
       >
     {:else}
       <span class="hint"
-        >{t("umuPicker.noneSetHintBefore")} <code>umu-default</code>{t(
-          "umuPicker.noneSetHintAfter",
+        >{m.umuPicker_noneSetHintBefore()} <code>umu-default</code>{m.umuPicker_noneSetHintAfter(
         )}</span
       >
     {/if}
@@ -106,7 +106,7 @@
   <div class="search-row">
     <input
       type="text"
-      placeholder={t("umuPicker.searchPlaceholder")}
+      placeholder={m.umuPicker_searchPlaceholder()}
       bind:value={query}
       onkeydown={(e) => {
         if (e.key === "Enter") {
@@ -117,16 +117,16 @@
       }}
     />
     <button type="button" onclick={handleSearch} disabled={loading}
-      >{t("umuPicker.searchButton")}</button
+      >{m.umuPicker_searchButton()}</button
     >
   </div>
 
   {#if loading}
-    <p class="hint">{t("umuPicker.searching")}</p>
+    <p class="hint">{m.umuPicker_searching()}</p>
   {:else if error}
     <p class="error">{backendError(error)}</p>
   {:else if searched && matches.length === 0}
-    <p class="hint">{t("umuPicker.noMatches", { query })}</p>
+    <p class="hint">{m.umuPicker_noMatches( { query })}</p>
   {:else if matches.length > 0}
     <ul class="matches">
       {#each matches as match (`${match.umu_id}:${match.store}`)}
@@ -145,20 +145,20 @@
         </li>
       {/each}
     </ul>
-    <p class="hint">{t("umuPicker.matchesHint")}</p>
+    <p class="hint">{m.umuPicker_matchesHint()}</p>
   {/if}
 
   <details class="manual">
-    <summary>{t("umuPicker.manualSummary")}</summary>
+    <summary>{m.umuPicker_manualSummary()}</summary>
     <input
       type="text"
-      placeholder={t("umuPicker.manualPlaceholder")}
+      placeholder={m.umuPicker_manualPlaceholder()}
       value={umuId ?? ""}
       oninput={(e) => onchange(e.currentTarget.value || null, null)}
     />
     <p class="hint">
-      {t("umuPicker.manualHintBefore")} <code>umu-&lt;ID&gt;</code>
-      {t("umuPicker.manualHintAfter")}
+      {m.umuPicker_manualHintBefore()} <code>umu-&lt;ID&gt;</code>
+      {m.umuPicker_manualHintAfter()}
     </p>
   </details>
 </section>

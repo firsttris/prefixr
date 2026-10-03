@@ -1,4 +1,5 @@
 <script lang="ts">
+  import * as m from "$lib/paraglide/messages";
   import { onMount } from "svelte";
   import { open } from "@tauri-apps/plugin-dialog";
   import { prefixes, refreshPrefixes, addPrefix, deletePrefix } from "$lib/stores/prefixes";
@@ -7,7 +8,7 @@
   import Modal from "$lib/components/Modal.svelte";
   import WinetricksInstaller from "$lib/components/WinetricksInstaller.svelte";
   import WineToolsLauncher from "$lib/components/WineToolsLauncher.svelte";
-  import { backendError, t } from "$lib/i18n/index.svelte";
+  import { backendError } from "$lib/i18n/index.svelte";
 
   let path = $state("");
   let busy = $state(false);
@@ -29,10 +30,10 @@
   );
 
   function usageLabel(count: number): string {
-    if (count === 0) return t("prefixManager.unused");
+    if (count === 0) return m.prefixManager_unused();
     return count === 1
-      ? t("prefixManager.usedByOne")
-      : t("prefixManager.usedByMany", { count });
+      ? m.prefixManager_usedByOne()
+      : m.prefixManager_usedByMany( { count });
   }
 
   // The games that use the prefix about to be deleted, so the dialog can
@@ -90,24 +91,24 @@
 
 <section class="panel">
   <p class="explainer">
-    {t("prefixManager.explainerBefore")}
-    <strong>{t("prefixManager.explainerDrive")}</strong>
-    {t("prefixManager.explainerAfter")}
+    {m.prefixManager_explainerBefore()}
+    <strong>{m.prefixManager_explainerDrive()}</strong>
+    {m.prefixManager_explainerAfter()}
   </p>
 
-  <p class="hint">{t("prefixManager.hint")}</p>
+  <p class="hint">{m.prefixManager_hint()}</p>
 
   <form onsubmit={handleSubmit}>
     <label>
-      {t("prefixManager.pathLabel")}
+      {m.prefixManager_pathLabel()}
       <div class="row">
-        <input placeholder={t("prefixManager.pathPlaceholder")} bind:value={path} />
-        <button type="button" onclick={pickFolder}>{t("prefixManager.chooseFolder")}</button>
+        <input placeholder={m.prefixManager_pathPlaceholder()} bind:value={path} />
+        <button type="button" onclick={pickFolder}>{m.prefixManager_chooseFolder()}</button>
       </div>
     </label>
 
     <button type="submit" class="primary" disabled={busy || !path}>
-      {busy ? t("prefixManager.adding") : t("prefixManager.addPrefix")}
+      {busy ? m.prefixManager_adding() : m.prefixManager_addPrefix()}
     </button>
   </form>
 
@@ -129,7 +130,7 @@
               type="button"
               class="ghost"
               onclick={() => (winetricksFor = prefix.path)}
-              aria-label={t("prefixManager.installDeps")}
+              aria-label={m.prefixManager_installDeps()}
             >
               📦
             </button>
@@ -137,12 +138,12 @@
               type="button"
               class="ghost"
               onclick={() => (wineToolsFor = prefix.path)}
-              aria-label={t("prefixManager.openWineTools")}
+              aria-label={m.prefixManager_openWineTools()}
             >
               🛠️
             </button>
             <button type="button" class="ghost" onclick={() => askDelete(prefix.path)}>
-              {t("prefixManager.remove")}
+              {m.prefixManager_remove()}
             </button>
           </div>
         </li>
@@ -153,27 +154,27 @@
 
 <Modal
   open={deleting !== null}
-  title={t("prefixManager.removeTitle")}
+  title={m.prefixManager_removeTitle()}
   onClose={() => (deleting = null)}
 >
   {#if deleting}
     <p class="path">{deleting}</p>
     {#if affectedGames.length > 0}
       <p>
-        {t("prefixManager.usedByBefore")}
-        <strong>{affectedGames.join(", ")}</strong>. {t("prefixManager.usedByAfter")}
+        {m.prefixManager_usedByBefore()}
+        <strong>{affectedGames.join(", ")}</strong>. {m.prefixManager_usedByAfter()}
       </p>
     {/if}
-    <p>{t("prefixManager.deleteExplain")}</p>
+    <p>{m.prefixManager_deleteExplain()}</p>
     {#if deleteError}
       <p class="error">{backendError(deleteError)}</p>
     {/if}
     <div class="dialog-actions">
       <button type="button" class="ghost" onclick={() => (deleting = null)}
-        >{t("common.cancel")}</button
+        >{m.common_cancel()}</button
       >
       <button type="button" class="danger" disabled={deleteBusy} onclick={confirmDelete}>
-        {t("prefixManager.removeFromAppOnly")}
+        {m.prefixManager_removeFromAppOnly()}
       </button>
     </div>
   {/if}
@@ -181,7 +182,7 @@
 
 <Modal
   open={winetricksFor !== null}
-  title={t("prefixManager.installDeps")}
+  title={m.prefixManager_installDeps()}
   onClose={() => (winetricksFor = null)}
 >
   {#if winetricksFor}
@@ -191,7 +192,7 @@
 
 <Modal
   open={wineToolsFor !== null}
-  title={t("prefixManager.wineToolsTitle")}
+  title={m.prefixManager_wineToolsTitle()}
   onClose={() => (wineToolsFor = null)}
 >
   {#if wineToolsFor}

@@ -1,9 +1,10 @@
 <script lang="ts">
+  import * as m from "$lib/paraglide/messages";
   import type { Game } from "$lib/types";
   import type { GameRunState } from "$lib/stores/games";
   import { getGameCover } from "$lib/stores/steamgriddb";
   import ConfirmDialog from "./ConfirmDialog.svelte";
-  import { backendError, t } from "$lib/i18n/index.svelte";
+  import { backendError } from "$lib/i18n/index.svelte";
 
   let {
     game,
@@ -103,9 +104,9 @@
     {/if}
 
     {#if runState?.running}
-      <span class="status-badge running"><span class="dot"></span>{t("gameCard.running")}</span>
+      <span class="status-badge running"><span class="dot"></span>{m.gameCard_running()}</span>
     {:else if runState?.initializing}
-      <span class="status-badge init"><span class="dot"></span>{t("gameCard.initializing")}</span>
+      <span class="status-badge init"><span class="dot"></span>{m.gameCard_initializing()}</span>
     {/if}
 
     <div class="menu-anchor">
@@ -116,8 +117,8 @@
         onclick={toggleMenu}
         aria-haspopup="true"
         aria-expanded={menuOpen}
-        aria-label={t("gameCard.moreOptions")}
-        title={t("gameCard.moreOptions")}
+        aria-label={m.gameCard_moreOptions()}
+        title={m.gameCard_moreOptions()}
       >
         ⋮
       </button>
@@ -143,7 +144,7 @@
                 stroke-linejoin="round"
               />
             </svg>
-            {t("library.selectArtworkTitle")}
+            {m.library_selectArtworkTitle()}
           </button>
           <button
             type="button"
@@ -161,7 +162,7 @@
                 stroke-linejoin="round"
               />
             </svg>
-            {t("library.editGameTitle")}
+            {m.library_editGameTitle()}
           </button>
           <span class="menu-divider"></span>
           <button
@@ -185,7 +186,7 @@
                 stroke-linecap="round"
               />
             </svg>
-            {t("gameCard.menuDesktopShortcut")}
+            {m.gameCard_menuDesktopShortcut()}
           </button>
           <button
             type="button"
@@ -208,7 +209,7 @@
                 stroke-linecap="round"
               />
             </svg>
-            {t("gameCard.menuMenuShortcut")}
+            {m.gameCard_menuMenuShortcut()}
           </button>
           <button
             type="button"
@@ -222,7 +223,7 @@
               <rect x="3" y="3" width="14" height="14" rx="3" stroke="currentColor" stroke-width="1.5" />
               <path d="M10 6.5v7M6.5 10h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
             </svg>
-            {inSteam ? t("gameCard.menuUpdateInSteam") : t("gameCard.menuAddToSteam")}
+            {inSteam ? m.gameCard_menuUpdateInSteam() : m.gameCard_menuAddToSteam()}
           </button>
           {#if inSteam}
             <button
@@ -237,7 +238,7 @@
                 <rect x="3" y="3" width="14" height="14" rx="3" stroke="currentColor" stroke-width="1.5" />
                 <path d="M6.5 10h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
               </svg>
-              {t("gameCard.menuRemoveFromSteam")}
+              {m.gameCard_menuRemoveFromSteam()}
             </button>
           {/if}
           <span class="menu-divider"></span>
@@ -259,7 +260,7 @@
                 stroke-linejoin="round"
               />
             </svg>
-            {t("common.remove")}
+            {m.common_remove()}
           </button>
         </div>
       {/if}
@@ -279,15 +280,15 @@
           onclick={runState?.running ? onKill : onLaunch}
           disabled={runState?.initializing}
           aria-label={runState?.running
-            ? t("gameCard.playKill")
+            ? m.gameCard_playKill()
             : runState?.initializing
-              ? t("gameCard.playInitializing")
-              : t("gameCard.playStart")}
+              ? m.gameCard_playInitializing()
+              : m.gameCard_playStart()}
           title={runState?.running
-            ? t("gameCard.playKill")
+            ? m.gameCard_playKill()
             : runState?.initializing
-              ? t("gameCard.playInitializing")
-              : t("gameCard.playStart")}
+              ? m.gameCard_playInitializing()
+              : m.gameCard_playStart()}
         >
           {#if runState?.initializing}
             <svg class="play-icon spin" viewBox="0 0 20 20" fill="none" aria-hidden="true">
@@ -320,7 +321,7 @@
       <span>{backendError(runState.error)}</span>
       {#if runState.logPath}
         <button type="button" class="ghost" onclick={() => onShowLog(runState.logPath!)}>
-          {t("gameCard.showLog")}
+          {m.gameCard_showLog()}
         </button>
       {/if}
     </div>
@@ -328,17 +329,17 @@
 
   {#if typeof shortcutState === "object"}
     <div class="toast">
-      <span>{t("gameCard.shortcutFailed", { error: backendError(shortcutState.error) })}</span>
+      <span>{m.gameCard_shortcutFailed( { error: backendError(shortcutState.error) })}</span>
     </div>
   {/if}
 </article>
 
 <ConfirmDialog
   open={confirmingRemove}
-  title={t("gameCard.removeConfirmTitle")}
-  message={t("gameCard.removeConfirmMessage", {
+  title={m.gameCard_removeConfirmTitle()}
+  message={m.gameCard_removeConfirmMessage( {
     name: game.name,
-    steamPart: inSteam ? t("gameCard.removeConfirmSteamPart") : "",
+    steamPart: inSteam ? m.gameCard_removeConfirmSteamPart() : "",
   })}
   onConfirm={() => {
     confirmingRemove = false;

@@ -1,6 +1,7 @@
 <script lang="ts">
+  import * as m from "$lib/paraglide/messages";
   import type { Snippet } from "svelte";
-  import { t } from "$lib/i18n/index.svelte";
+  
 
   let {
     open,
@@ -38,7 +39,7 @@
     >
       <header>
         <h2>{title}</h2>
-        <button type="button" class="ghost" onclick={onClose} aria-label={t("common.close")}
+        <button type="button" class="ghost" onclick={onClose} aria-label={m.common_close()}
           >✕</button
         >
       </header>

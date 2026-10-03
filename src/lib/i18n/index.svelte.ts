@@ -1,20 +1,14 @@
-import { de } from "./de";
-import { en } from "./en";
+/**
+ * The interface language. The texts live in messages/{de,en}.json and are compiled by Paraglide
+ * to src/lib/paraglide: components call them directly, with named inputs where a text has them.
+ * The language is a reactive $state: Paraglide asks for it on every call, so switching re-renders
+ * every text without a reload. It is also handed to Rust (set_ui_locale, see +layout.svelte) for
+ * the few texts Rust renders itself from the same files (src-tauri/src/locale.rs).
+ */
+import * as m from "$lib/paraglide/messages";
+import { overwriteGetLocale } from "$lib/paraglide/runtime";
 
 export type Locale = "de" | "en";
-
-const dictionaries = { de, en };
-
-// Builds a union of dotted paths through a nested string dictionary, e.g.
-// "nav.library" | "gameForm.title" | ... — gives t() autocomplete and
-// catches typo'd/renamed keys at compile time.
-type Paths<T> = T extends string
-  ? never
-  : {
-      [K in keyof T & string]: T[K] extends string ? K : `${K}.${Paths<T[K]>}`;
-    }[keyof T & string];
-
-export type TranslationKey = Paths<typeof de>;
 
 const STORAGE_KEY = "prefixr:locale";
 
@@ -33,6 +27,9 @@ function detectLocale(): Locale {
 
 let locale = $state<Locale>(detectLocale());
 
+// Paraglide's m.*() ask getLocale(): reading the $state here makes every text reactive.
+overwriteGetLocale(() => locale);
+
 export function getLocale(): Locale {
   return locale;
 }
@@ -46,41 +43,28 @@ export function setLocale(next: Locale): void {
   }
 }
 
-function resolve(dict: typeof de, key: string): string | undefined {
-  let node: unknown = dict;
-  for (const part of key.split(".")) {
-    if (typeof node !== "object" || node === null) return undefined;
-    node = (node as Record<string, unknown>)[part];
-  }
-  return typeof node === "string" ? node : undefined;
-}
+type Inputs = Record<string, string | number>;
+const messages = m as unknown as Record<string, ((inputs?: Inputs) => string) | undefined>;
 
-export function t(key: TranslationKey, params?: Record<string, string | number>): string {
-  const value = resolve(dictionaries[locale], key) ?? resolve(de, key) ?? key;
-  if (!params) return value;
-  return Object.entries(params).reduce(
-    (text, [name, val]) => text.replaceAll(`{${name}}`, String(val)),
-    value,
-  );
+/** A message picked by a runtime id (tool, option, preset …); unknown ids come back as they are. */
+export function pickMsg(map: Record<string, () => string>, id: string): string {
+  return map[id]?.() ?? id;
 }
 
 // A Tauri command's Err value: either a plain string (a handful of internal
 // helpers that never got a structured code — see AppError::Other in
 // src-tauri/src/error.rs) or `{ code, ...params }` for anything with a
-// `backendErrors.<code>` entry below, translated the same way as any other
-// UI text. Every catch block that used to do `String(e)` on a command's
-// error should use this instead.
+// `backendErrors_<code>` message, translated the same way as any other UI
+// text. Every catch block that shows a command's error uses this.
 export function backendError(e: unknown): string {
   if (e === null || e === undefined || e === "") return "";
   if (typeof e === "string") return e;
   if (e && typeof e === "object" && "code" in e && typeof e.code === "string") {
-    const { code, ...params } = e as { code: string } & Record<string, string | number>;
-    const key = `backendErrors.${code}` as TranslationKey;
-    const translated = t(key, params);
-    // t() falls back to the raw key when a code has no dictionary entry
-    // (e.g. a newer backend than this frontend knows about) — better to
-    // show the error's own data than a dotted i18n key.
-    return translated === key ? JSON.stringify(e) : translated;
+    const { code, ...params } = e as { code: string } & Inputs;
+    const message = messages[`backendErrors_${code}`];
+    // A code without a message (e.g. a newer backend than this frontend knows
+    // about): better to show the error's own data than nothing.
+    return message ? message(params) : JSON.stringify(e);
   }
   return String(e);
 }

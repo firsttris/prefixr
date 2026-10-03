@@ -173,6 +173,21 @@ Why both exist: AppImage bundles a large part of its own userspace libraries, so
 bun run check
 ```
 
+### 🌍 Texts and languages
+
+All texts live in `messages/de.json` and `messages/en.json`
+([Paraglide JS](https://inlang.com/m/gerre34r/library-inlang-paraglideJs)); `bun run i18n` compiles them to
+`src/lib/paraglide` (dev, build, check and test do that on their own). Components call them directly,
+`m.gameForm_tabCount({ count })`; an id chosen at runtime goes through `pickMsg(msgGroup.wineTools_label, id)`.
+
+The backend does not translate: a command's error is a structured `AppError` (`{ code, ...fields }`), which the
+frontend shows as the message `backendErrors_<code>` with the fields as placeholders. The few texts Rust shows
+itself — the tray menu and native dialogs — come from the same two files, built into the binary
+(`locale::text`).
+
+`bun run test` checks that both languages have the same keys and placeholders, that every message is used and
+every used key exists; `cargo test` checks that every `AppError` variant has its message.
+
 ## 🧰 Troubleshooting
 
 ### ⚠️ AppImage crashes ("EGL_BAD_PARAMETER") or shows only a blank white window

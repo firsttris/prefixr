@@ -1,4 +1,5 @@
 <script lang="ts">
+  import * as m from "$lib/paraglide/messages";
   import { onMount } from "svelte";
   import {
     umuStatus,
@@ -7,7 +8,7 @@
     installUmu,
     checkUmuUpdate,
   } from "$lib/stores/umu";
-  import { backendError, t } from "$lib/i18n/index.svelte";
+  import { backendError } from "$lib/i18n/index.svelte";
 
   let installing = $state(false);
   let error = $state<unknown>(null);
@@ -46,32 +47,32 @@
   <summary>
     umu-launcher
     {#if $umuStatus?.installed}
-      <span class="status">{$umuStatus.version ?? t("umuSettings.installed")}</span>
+      <span class="status">{$umuStatus.version ?? m.umuSettings_installed()}</span>
       {#if updateAvailable}
         <span class="update"
-          >{t("umuSettings.updateAvailable", { version: $latestUmuVersion ?? "" })}</span
+          >{m.umuSettings_updateAvailable( { version: $latestUmuVersion ?? "" })}</span
         >
       {/if}
     {:else if $umuStatus}
-      <span class="status">{t("umuSettings.notInstalled")}</span>
+      <span class="status">{m.umuSettings_notInstalled()}</span>
     {/if}
   </summary>
   <p class="hint">
-    {t("umuSettings.hintBefore")} <code>PROTON_*</code>{t("umuSettings.hintAfter")}
+    {m.umuSettings_hintBefore()} <code>PROTON_*</code>{m.umuSettings_hintAfter()}
   </p>
 
   <div class="row">
     <button type="button" class="ghost" disabled={installing} onclick={handleInstall}>
       {#if installing}
-        {t("umuSettings.loading")}
+        {m.umuSettings_loading()}
       {:else if updateAvailable}
-        {t("umuSettings.updateTo", { version: $latestUmuVersion ?? "" })}
+        {m.umuSettings_updateTo( { version: $latestUmuVersion ?? "" })}
       {:else if $umuStatus?.installed && $latestUmuVersion === $umuStatus.version}
-        {t("umuSettings.reinstall")}
+        {m.umuSettings_reinstall()}
       {:else if $umuStatus?.installed}
-        {t("umuSettings.updateToLatest")}
+        {m.umuSettings_updateToLatest()}
       {:else}
-        {t("umuSettings.installNow")}
+        {m.umuSettings_installNow()}
       {/if}
     </button>
   </div>
@@ -80,7 +81,7 @@
     <p class="error">{backendError(error)}</p>
   {:else if updated}
     <p class="saved-hint">
-      {t("umuSettings.installedHint", { version: $umuStatus?.version ?? "" })}
+      {m.umuSettings_installedHint( { version: $umuStatus?.version ?? "" })}
     </p>
   {/if}
 </details>

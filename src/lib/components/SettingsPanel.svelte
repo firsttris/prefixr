@@ -1,6 +1,7 @@
 <script lang="ts">
+  import * as m from "$lib/paraglide/messages";
   import type { Snippet } from "svelte";
-  import { t } from "$lib/i18n/index.svelte";
+  
 
   // Frame for a global settings page: heading, intro, the category's
   // editor, and a save button for the page's draft.
@@ -37,10 +38,10 @@
 
   <div class="save-row">
     <button type="button" class="primary" disabled={saving} onclick={onSave}>
-      {saving ? t("common.saving") : t("settingsPanel.saveChanges")}
+      {saving ? m.common_saving() : m.settingsPanel_saveChanges()}
     </button>
     {#if saved}
-      <span class="saved-hint">{t("common.saved")}</span>
+      <span class="saved-hint">{m.common_saved()}</span>
     {/if}
   </div>
 </section>

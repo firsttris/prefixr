@@ -1,4 +1,6 @@
 <script lang="ts">
+  import * as m from "$lib/paraglide/messages";
+  import { msgGroup } from "$lib/i18n/msg-groups";
   import { onMount } from "svelte";
   import { runners, refreshRunners } from "$lib/stores/runners";
   import {
@@ -8,7 +10,7 @@
     listInstalledWinetricksVerbs,
     type WinetricksVerbMeta,
   } from "$lib/stores/winetricks";
-  import { backendError, t, type TranslationKey } from "$lib/i18n/index.svelte";
+  import { backendError, pickMsg } from "$lib/i18n/index.svelte";
 
   let { prefixPath, onShowLog }: { prefixPath: string; onShowLog: (path: string) => void } =
     $props();
@@ -91,14 +93,14 @@
 
 <div class="winetricks">
   <p class="hint">
-    {t("winetricksInstaller.hintBefore")}<code>{prefixPath}</code
-    >{t("winetricksInstaller.hintAfter")}
+    {m.winetricksInstaller_hintBefore()}<code>{prefixPath}</code
+    >{m.winetricksInstaller_hintAfter()}
   </p>
 
   <label>
-    {t("winetricksInstaller.runnerLabel")}
+    {m.winetricksInstaller_runnerLabel()}
     <select bind:value={runnerId}>
-      <option value="" disabled selected>{t("gameForm.runnerChoose")}</option>
+      <option value="" disabled selected>{m.gameForm_runnerChoose()}</option>
       {#each $runners as runner (runner.id)}
         <option value={runner.id}>{runner.name} ({runner.kind})</option>
       {/each}
@@ -115,12 +117,12 @@
         />
         <div>
           <span class="verb-label">
-            {t(`winetricksVerbs.${verb.id}.label` as TranslationKey)}
+            {pickMsg(msgGroup.winetricksVerbs_label, verb.id)}
             {#if installed.has(verb.id)}
-              <span class="badge">{t("winetricksInstaller.installedBadge")}</span>
+              <span class="badge">{m.winetricksInstaller_installedBadge()}</span>
             {/if}
           </span>
-          <p class="verb-desc">{t(`winetricksVerbs.${verb.id}.description` as TranslationKey)}</p>
+          <p class="verb-desc">{pickMsg(msgGroup.winetricksVerbs_description, verb.id)}</p>
         </div>
       </label>
     {/each}
@@ -129,20 +131,20 @@
   <div class="catalogue">
     <button type="button" class="ghost disclosure" onclick={toggleCatalogue}>
       {catalogueOpen ? "▾" : "▸"}
-      {t("winetricksInstaller.browseMore")}
+      {m.winetricksInstaller_browseMore()}
     </button>
 
     {#if catalogueOpen}
       <div class="catalogue-body">
         {#if catalogueLoading}
-          <p class="hint">{t("winetricksInstaller.loadingCatalogue")}</p>
+          <p class="hint">{m.winetricksInstaller_loadingCatalogue()}</p>
         {:else if catalogueError}
           <p class="error">{backendError(catalogueError)}</p>
         {:else}
           <input
             class="search"
             type="search"
-            placeholder={t("winetricksInstaller.searchPlaceholder")}
+            placeholder={m.winetricksInstaller_searchPlaceholder()}
             bind:value={search}
           />
           <div class="catalogue-list">
@@ -160,7 +162,7 @@
                 <span class="catalogue-id">{verb.id}</span>
               </label>
             {:else}
-              <p class="hint">{t("winetricksInstaller.noMatches")}</p>
+              <p class="hint">{m.winetricksInstaller_noMatches()}</p>
             {/each}
           </div>
         {/if}
@@ -176,9 +178,9 @@
 
   {#if successLogPath}
     <div class="success">
-      <span>{t("winetricksInstaller.installSuccess")}</span>
+      <span>{m.winetricksInstaller_installSuccess()}</span>
       <button type="button" class="ghost" onclick={() => onShowLog(successLogPath)}>
-        {t("winetricksInstaller.showLog")}
+        {m.winetricksInstaller_showLog()}
       </button>
     </div>
   {/if}
@@ -190,8 +192,8 @@
     onclick={handleInstall}
   >
     {installing
-      ? t("winetricksInstaller.installing")
-      : t("winetricksInstaller.installButton", { count: selected.size })}
+      ? m.winetricksInstaller_installing()
+      : m.winetricksInstaller_installButton( { count: selected.size })}
   </button>
 </div>
 

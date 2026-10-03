@@ -1,4 +1,5 @@
 <script lang="ts">
+  import * as m from "$lib/paraglide/messages";
   import { onMount } from "svelte";
   import { open } from "@tauri-apps/plugin-dialog";
   import { prefixes, refreshPrefixes, addPrefix } from "$lib/stores/prefixes";
@@ -8,7 +9,7 @@
   import { showLog } from "$lib/logViewer";
   import GameForm from "./GameForm.svelte";
   import type { DetectedShortcut } from "$lib/types";
-  import { backendError, t } from "$lib/i18n/index.svelte";
+  import { backendError } from "$lib/i18n/index.svelte";
 
   let { exePath, onClose }: { exePath: string; onClose: () => void } = $props();
 
@@ -80,7 +81,7 @@
 
   async function pickExeManually() {
     const selected = await open({
-      filters: [{ name: t("gameForm.exeFilterName"), extensions: ["exe"] }],
+      filters: [{ name: m.gameForm_exeFilterName(), extensions: ["exe"] }],
     });
     if (typeof selected === "string") {
       chosenExePath = selected;
@@ -94,15 +95,15 @@
   {#if phase === "setup"}
     <p class="hint">
       <strong>{exeName}</strong>
-      {t("installDialog.introRest")}
+      {m.installDialog_introRest()}
     </p>
 
     <form onsubmit={handleStart}>
       <label>
-        {t("gameForm.prefixLabel")}
+        {m.gameForm_prefixLabel()}
         <div class="row">
           <select bind:value={prefixPath} disabled={creatingPrefix || busy}>
-            <option value="" disabled selected>{t("gameForm.prefixChoose")}</option>
+            <option value="" disabled selected>{m.gameForm_prefixChoose()}</option>
             {#each $prefixes as prefix (prefix.path)}
               <option value={prefix.path}>{prefix.path}</option>
             {/each}
@@ -110,7 +111,7 @@
           <button
             type="button"
             class="icon-button"
-            title={t("installDialog.newPrefixTitle")}
+            title={m.installDialog_newPrefixTitle()}
             disabled={creatingPrefix || busy}
             onclick={createNewPrefix}
           >
@@ -120,9 +121,9 @@
       </label>
 
       <label>
-        {t("gameForm.runnerLabel")}
+        {m.gameForm_runnerLabel()}
         <select bind:value={runnerId} disabled={busy}>
-          <option value="" disabled selected>{t("gameForm.runnerChoose")}</option>
+          <option value="" disabled selected>{m.gameForm_runnerChoose()}</option>
           {#each $runners as runner (runner.id)}
             <option value={runner.id}>{runner.name} ({runner.kind})</option>
           {/each}
@@ -130,16 +131,16 @@
       </label>
 
       <button type="submit" class="primary" disabled={busy || !runnerId || !prefixPath}>
-        {busy ? t("installDialog.runBusy") : t("installDialog.runStart")}
+        {busy ? m.installDialog_runBusy() : m.installDialog_runStart()}
       </button>
     </form>
 
     {#if busy}
-      <p class="hint">{t("installDialog.closeHint")}</p>
+      <p class="hint">{m.installDialog_closeHint()}</p>
     {/if}
   {:else if phase === "review"}
     {#if candidates.length > 0}
-      <p class="hint">{t("installDialog.candidatesHint")}</p>
+      <p class="hint">{m.installDialog_candidatesHint()}</p>
       <div class="candidates">
         {#each candidates as candidate (candidate.exe_path)}
           <label class="candidate">
@@ -161,26 +162,26 @@
           disabled={!chosenExePath}
           onclick={() => (phase = "add")}
         >
-          {t("installDialog.continueButton")}
+          {m.installDialog_continueButton()}
         </button>
-        <button type="button" onclick={pickExeManually}>{t("installDialog.pickOtherFile")}</button
+        <button type="button" onclick={pickExeManually}>{m.installDialog_pickOtherFile()}</button
         >
       </div>
     {:else}
-      <p class="hint">{t("installDialog.noCandidatesHint")}</p>
+      <p class="hint">{m.installDialog_noCandidatesHint()}</p>
       <div class="row">
         <button type="button" class="primary" onclick={pickExeManually}
-          >{t("installDialog.pickFile")}</button
+          >{m.installDialog_pickFile()}</button
         >
         {#if logPath}
           <button type="button" onclick={() => showLog(logPath)}
-            >{t("installDialog.showSetupLog")}</button
+            >{m.installDialog_showSetupLog()}</button
           >
         {/if}
       </div>
     {/if}
   {:else if phase === "add"}
-    <p class="hint">{t("installDialog.addToLibraryHint")}</p>
+    <p class="hint">{m.installDialog_addToLibraryHint()}</p>
     <GameForm
       initialName={chosenName}
       initialExePath={chosenExePath}

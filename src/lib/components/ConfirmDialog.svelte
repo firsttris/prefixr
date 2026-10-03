@@ -1,12 +1,13 @@
 <script lang="ts">
+  import * as m from "$lib/paraglide/messages";
   import Modal from "./Modal.svelte";
-  import { t } from "$lib/i18n/index.svelte";
+  
 
   let {
     open,
     title,
     message,
-    confirmLabel = t("common.remove"),
+    confirmLabel = m.common_remove(),
     onConfirm,
     onCancel,
   }: {
@@ -22,7 +23,7 @@
 <Modal {open} {title} onClose={onCancel}>
   <p>{message}</p>
   <div class="actions">
-    <button type="button" class="ghost" onclick={onCancel}>{t("common.cancel")}</button>
+    <button type="button" class="ghost" onclick={onCancel}>{m.common_cancel()}</button>
     <button type="button" class="danger" onclick={onConfirm}>{confirmLabel}</button>
   </div>
 </Modal>

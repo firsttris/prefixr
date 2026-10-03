@@ -1,4 +1,5 @@
 <script lang="ts">
+  import * as m from "$lib/paraglide/messages";
   import { onMount } from "svelte";
   import {
     steamGridDbConfig,
@@ -6,7 +7,7 @@
     saveSteamGridDbConfig,
   } from "$lib/stores/steamgriddb";
   import type { SteamGridDbConfig } from "$lib/types";
-  import { backendError, t } from "$lib/i18n/index.svelte";
+  import { backendError } from "$lib/i18n/index.svelte";
 
   const FALLBACK: SteamGridDbConfig = { api_key: "" };
 
@@ -46,16 +47,16 @@
   <div class="header-row">
     <div>
       <h2>SteamGridDB</h2>
-      <p class="hint">{t("steamGridDbSettings.hint")}</p>
+      <p class="hint">{m.steamGridDbSettings_hint()}</p>
     </div>
   </div>
 
   <label class="control-group">
-    <span class="tune-title">{t("steamGridDbSettings.apiKeyLabel")}</span>
+    <span class="tune-title">{m.steamGridDbSettings_apiKeyLabel()}</span>
     <input
       type="password"
       class="text-input"
-      placeholder={t("steamGridDbSettings.apiKeyPlaceholder")}
+      placeholder={m.steamGridDbSettings_apiKeyPlaceholder()}
       bind:value={config.api_key}
       oninput={() => (saved = false)}
     />
@@ -67,10 +68,10 @@
 
   <div class="save-row">
     <button type="button" class="primary" disabled={saving} onclick={handleSave}>
-      {saving ? t("common.saving") : t("settingsPanel.saveChanges")}
+      {saving ? m.common_saving() : m.settingsPanel_saveChanges()}
     </button>
     {#if saved}
-      <span class="saved-hint">{t("common.saved")}</span>
+      <span class="saved-hint">{m.common_saved()}</span>
     {/if}
   </div>
 </section>

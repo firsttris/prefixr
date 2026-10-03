@@ -1,4 +1,5 @@
 <script lang="ts">
+  import * as m from "$lib/paraglide/messages";
   import { onMount } from "svelte";
   import {
     runners,
@@ -10,7 +11,7 @@
     downloadRunner,
     initRunnerDownloadEvents,
   } from "$lib/stores/runners";
-  import { backendError, t, getLocale } from "$lib/i18n/index.svelte";
+  import { backendError, getLocale } from "$lib/i18n/index.svelte";
 
   let loading = $state(true);
   let loadError = $state<unknown>(null);
@@ -76,11 +77,11 @@
 </div>
 
 {#if loading}
-  <p class="hint">{t("runnerDownloads.loading")}</p>
+  <p class="hint">{m.runnerDownloads_loading()}</p>
 {:else if loadError}
   <p class="error">{backendError(loadError)}</p>
 {:else if $runnerReleases.length === 0}
-  <p class="hint">{t("runnerDownloads.noReleases")}</p>
+  <p class="hint">{m.runnerDownloads_noReleases()}</p>
 {:else}
   <ul>
     {#each $runnerReleases as release (release.tag)}
@@ -94,7 +95,7 @@
           </div>
 
           {#if installed || state?.done}
-            <span class="badge">{t("runnerDownloads.installed")}</span>
+            <span class="badge">{m.runnerDownloads_installed()}</span>
           {:else if state && !state.error}
             <div class="progress">
               <div
@@ -109,7 +110,7 @@
               type="button"
               onclick={() => downloadRunner(release.source, release.tag, release.download_url)}
             >
-              {t("runnerDownloads.download")}
+              {m.runnerDownloads_download()}
             </button>
           {/if}
         </div>

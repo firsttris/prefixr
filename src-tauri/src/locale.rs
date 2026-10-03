@@ -1,4 +1,4 @@
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 
 /// The UI language for the handful of things Rust itself renders directly
 /// (the tray menu, and a few native dialogs shown before the frontend has
@@ -55,6 +55,37 @@ impl LocaleState {
             *guard = locale;
         }
     }
+}
+
+/// The UI's own texts (`messages/*.json`, the same files the frontend compiles with Paraglide),
+/// built into the binary so the tray and the native dialogs need no copy of their own.
+const MESSAGES_DE: &str = include_str!("../../messages/de.json");
+const MESSAGES_EN: &str = include_str!("../../messages/en.json");
+
+type Messages = serde_json::Map<String, serde_json::Value>;
+
+fn messages(locale: Locale) -> &'static Messages {
+    static DE: OnceLock<Messages> = OnceLock::new();
+    static EN: OnceLock<Messages> = OnceLock::new();
+    let (cell, source) = match locale {
+        Locale::De => (&DE, MESSAGES_DE),
+        Locale::En => (&EN, MESSAGES_EN),
+    };
+    cell.get_or_init(|| serde_json::from_str(source).expect("messages/*.json is valid JSON"))
+}
+
+/// A text by key with its `{placeholders}` filled in, e.g.
+/// `text(locale, "native_tray_killGame", &[("name", "Doom")])`. Only plain messages (no plurals
+/// or variants); an unknown key comes back as the key itself.
+pub fn text(locale: Locale, key: &str, params: &[(&str, &str)]) -> String {
+    let Some(template) = messages(locale).get(key).and_then(|v| v.as_str()) else {
+        return key.to_string();
+    };
+    let mut out = template.to_string();
+    for (name, value) in params {
+        out = out.replace(&format!("{{{name}}}"), value);
+    }
+    out.replace("\\{", "{").replace("\\}", "}")
 }
 
 #[cfg(test)]

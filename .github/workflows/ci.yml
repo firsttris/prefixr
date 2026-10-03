@@ -52,6 +52,9 @@ jobs:
       - name: Frontend type and Svelte checks
         run: bun run check
 
+      - name: Frontend tests (texts)
+        run: bun run test
+
       - name: Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --locked
 

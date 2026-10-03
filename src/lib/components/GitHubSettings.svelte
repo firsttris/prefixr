@@ -1,8 +1,9 @@
 <script lang="ts">
+  import * as m from "$lib/paraglide/messages";
   import { onMount } from "svelte";
   import { githubConfig, refreshGitHubConfig, saveGitHubConfig } from "$lib/stores/github";
   import type { GitHubConfig } from "$lib/types";
-  import { backendError, t } from "$lib/i18n/index.svelte";
+  import { backendError } from "$lib/i18n/index.svelte";
 
   let { open = false }: { open?: boolean } = $props();
 
@@ -41,26 +42,26 @@
 </script>
 
 <details class="github-token" {open}>
-  <summary>{t("githubSettings.summary")}</summary>
-  <p class="hint">{t("githubSettings.hint")}</p>
+  <summary>{m.githubSettings_summary()}</summary>
+  <p class="hint">{m.githubSettings_hint()}</p>
 
   <div class="row">
     <input
       type="password"
       class="text-input"
-      placeholder={t("githubSettings.tokenPlaceholder")}
+      placeholder={m.githubSettings_tokenPlaceholder()}
       bind:value={config.token}
       oninput={() => (saved = false)}
     />
     <button type="button" class="ghost" disabled={saving} onclick={handleSave}>
-      {saving ? t("githubSettings.saving") : t("common.save")}
+      {saving ? m.githubSettings_saving() : m.common_save()}
     </button>
   </div>
 
   {#if error}
     <p class="error">{backendError(error)}</p>
   {:else if saved}
-    <p class="saved-hint">{t("common.saved")}</p>
+    <p class="saved-hint">{m.common_saved()}</p>
   {/if}
 </details>
 

@@ -6,12 +6,13 @@ use crate::locale::Locale;
 /// as before (mostly technical/OS errors, e.g. "Could not read X: <os
 /// err>") — the frontend shows those as-is, unlocalized, same as today.
 /// The other variants carry just the data the situation needs, so the
-/// frontend can render the sentence in the UI's current language from its
-/// own i18n dictionaries (see `backendErrors` in `src/lib/i18n`). Add a
-/// variant here — and a matching `backendErrors.<code>` entry in `de.ts`/
-/// `en.ts`, and an arm in `localized()` below — for any error a user can
+/// frontend can render the sentence in the UI's current language (see
+/// `backendError()` in `src/lib/i18n`). Add a variant here — and a matching
+/// `backendErrors_<code>` message in `messages/{de,en}.json` whose
+/// placeholders are the variant's fields — for any error a user can
 /// plausibly hit and should read in their chosen language, rather than
-/// leaving it to fall through to `Other`.
+/// leaving it to fall through to `Other`. `every_app_error_has_a_text`
+/// checks that the message exists.
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "code", rename_all = "snake_case")]
 pub enum AppError {
@@ -100,148 +101,19 @@ impl AppError {
     /// runs in at all. Everywhere else, translate `code` (see `t()` /
     /// `backendError()` in `src/lib/i18n`) instead of calling this.
     pub fn localized(&self, locale: Locale) -> String {
-        use Locale::{De, En};
-        match (self, locale) {
-            (AppError::Other { message }, _) => message.clone(),
-            (AppError::GameAlreadyRunning, De) => {
-                "Das Spiel wird bereits gestartet oder läuft schon".into()
-            }
-            (AppError::GameAlreadyRunning, En) => {
-                "The game is already starting or running".into()
-            }
-            (AppError::PrefixInUse { game_name }, De) => format!(
-                "„{game_name}“ läuft noch in diesem Prefix. Beende das Spiel zuerst."
-            ),
-            (AppError::PrefixInUse { game_name }, En) => format!(
-                "“{game_name}” is still running in this prefix. Close the game first."
-            ),
-            (AppError::SteamCommandNotFound, De) => {
-                "Steam läuft. Bitte beende Steam und versuche es erneut.".into()
-            }
-            (AppError::SteamCommandNotFound, En) => {
-                "Steam is running. Please quit Steam and try again.".into()
-            }
-            (AppError::SteamShutdownTimedOut, De) => {
-                "Steam hat sich nicht innerhalb von 30 Sekunden beendet.".into()
-            }
-            (AppError::SteamShutdownTimedOut, En) => "Steam didn't quit within 30 seconds.".into(),
-            (AppError::SteamOnlyFlatpak, De) => "Steam ist nur als Flatpak installiert. Das \
-                 Flatpak darf keine Programme außerhalb seiner Sandbox starten, also auch \
-                 Prefixr nicht."
-                .into(),
-            (AppError::SteamOnlyFlatpak, En) => "Steam is only installed as a Flatpak. The \
-                 Flatpak isn't allowed to launch programs outside its sandbox, so it can't \
-                 launch Prefixr either."
-                .into(),
-            (AppError::SteamNotFound, De) => {
-                "Steam wurde nicht gefunden. Starte Steam einmal und melde dich an.".into()
-            }
-            (AppError::SteamNotFound, En) => {
-                "Steam wasn't found. Start Steam once and sign in.".into()
-            }
-            (AppError::NoSteamAccountFound, De) => {
-                "Kein Steam-Konto gefunden. Melde dich einmal in Steam an.".into()
-            }
-            (AppError::NoSteamAccountFound, En) => {
-                "No Steam account found. Sign in to Steam once.".into()
-            }
-            (AppError::ShortcutsVdfUnreadable { error }, De) => format!(
-                "shortcuts.vdf konnte nicht gelesen werden ({error}). Prefixr lässt die Datei \
-                 deshalb unverändert."
-            ),
-            (AppError::ShortcutsVdfUnreadable { error }, En) => format!(
-                "shortcuts.vdf could not be read ({error}). Prefixr is leaving the file \
-                 unchanged."
-            ),
-            (AppError::NoPackagesSelected, De) => "Keine Pakete ausgewählt".into(),
-            (AppError::NoPackagesSelected, En) => "No packages selected".into(),
-            (AppError::UnclosedQuoteInLaunchArgs, De) => {
-                "Startargumente: ein Anführungszeichen wird nicht geschlossen".into()
-            }
-            (AppError::UnclosedQuoteInLaunchArgs, En) => {
-                "Launch arguments: a quotation mark is left unclosed".into()
-            }
-            (AppError::PkexecNotInstalled { command }, De) => {
-                format!("pkexec ist nicht installiert. Bitte manuell ausführen: {command}")
-            }
-            (AppError::PkexecNotInstalled { command }, En) => {
-                format!("pkexec is not installed. Please run manually: {command}")
-            }
-            (AppError::SysctlChangeFailed { status }, De) => {
-                format!("sysctl-Anpassung fehlgeschlagen oder abgebrochen (Status {status})")
-            }
-            (AppError::SysctlChangeFailed { status }, En) => {
-                format!("sysctl change failed or was cancelled (status {status})")
-            }
-            (AppError::RunnerInUse { runner_name, games }, De) => {
-                format!("{runner_name} wird noch verwendet von {games}.")
-            }
-            (AppError::RunnerInUse { runner_name, games }, En) => {
-                format!("{runner_name} is still used by {games}.")
-            }
-            (AppError::WithLogDetails { message, log_path }, De) => {
-                format!("{message} — Details im Log: {log_path}")
-            }
-            (AppError::WithLogDetails { message, log_path }, En) => {
-                format!("{message} — details in the log: {log_path}")
-            }
-            (AppError::WinetricksFailed { status, log_path }, De) => format!(
-                "winetricks beendete sich mit Status {status} — Details im Log: {log_path}"
-            ),
-            (AppError::WinetricksFailed { status, log_path }, En) => format!(
-                "winetricks exited with status {status} — details in the log: {log_path}"
-            ),
-            (AppError::PrefixAlreadyExists { path }, De) => {
-                format!("Prefix unter {path} existiert bereits")
-            }
-            (AppError::PrefixAlreadyExists { path }, En) => {
-                format!("Prefix at {path} already exists")
-            }
-            (AppError::PathNotADirectory { path }, De) => {
-                format!("{path} ist kein Ordner")
-            }
-            (AppError::PathNotADirectory { path }, En) => {
-                format!("{path} is not a directory")
-            }
-            (AppError::PrefixDirNotEmpty { path }, De) => format!(
-                "{path} enthält bereits Dateien, sieht aber nicht wie ein Wine- oder \
-                 Proton-Prefix aus"
-            ),
-            (AppError::PrefixDirNotEmpty { path }, En) => format!(
-                "{path} already contains files but doesn't look like a Wine or Proton prefix"
-            ),
-            (AppError::RunnerAlreadyExists { tag }, De) => {
-                format!("Runner „{tag}“ existiert bereits")
-            }
-            (AppError::RunnerAlreadyExists { tag }, En) => {
-                format!("Runner '{tag}' already exists")
-            }
-            (AppError::GitHubRateLimited, De) => "GitHubs Limit für nicht angemeldete Anfragen \
-                 ist ausgeschöpft — ein GitHub-Token in den Einstellungen hebt es an."
-                .into(),
-            (AppError::GitHubRateLimited, En) => "GitHub's rate limit for unauthenticated \
-                 requests is exhausted — add a GitHub token in the settings to raise it."
-                .into(),
-            (AppError::GitHubApiError { status }, De) => {
-                format!("GitHub-API antwortete mit Status {status}")
-            }
-            (AppError::GitHubApiError { status }, En) => {
-                format!("GitHub API returned status {status}")
-            }
-            (AppError::ToolLaunchFailed { tool, error }, De) => {
-                format!("Konnte {tool} nicht starten: {error}")
-            }
-            (AppError::ToolLaunchFailed { tool, error }, En) => {
-                format!("Could not start {tool}: {error}")
-            }
-            (AppError::SetupLaunchFailed { error, log_path }, De) => format!(
-                "Setup konnte nicht gestartet werden: {error} — Details im Log: {log_path}"
-            ),
-            (AppError::SetupLaunchFailed { error, log_path }, En) => format!(
-                "Setup could not be started: {error} — details in the log: {log_path}"
-            ),
-            (AppError::UnknownWineTool { tool }, De) => format!("Unbekanntes Wine-Werkzeug: {tool}"),
-            (AppError::UnknownWineTool { tool }, En) => format!("Unknown Wine tool: {tool}"),
+        if let AppError::Other { message } = self {
+            return message.clone();
         }
+        // The same text the frontend shows: `backendErrors_<code>` with the
+        // variant's fields as placeholders (see `serde(tag = "code")` above).
+        let value = serde_json::to_value(self).expect("AppError serializes");
+        let fields = value.as_object().expect("AppError is an object");
+        let code = fields["code"].as_str().unwrap_or_default();
+        let params: Vec<(&str, &str)> = fields
+            .iter()
+            .filter(|(k, _)| k.as_str() != "code")
+            .map(|(k, v)| (k.as_str(), v.as_str().unwrap_or_default()))
+            .collect();
+        crate::locale::text(locale, &format!("backendErrors_{code}"), &params)
     }
 }

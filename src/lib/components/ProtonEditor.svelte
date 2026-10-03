@@ -1,7 +1,9 @@
 <script lang="ts">
+  import * as m from "$lib/paraglide/messages";
+  import { msgGroup } from "$lib/i18n/msg-groups";
   import { PROTON_OPTION_ORDER } from "$lib/protonOptions";
   import type { ProtonOption } from "$lib/types";
-  import { t, type TranslationKey } from "$lib/i18n/index.svelte";
+  import { pickMsg } from "$lib/i18n/index.svelte";
 
   // Proton — see settings.ts for how the editors are shared between the
   // global page and the game dialog. Unlike the other categories every
@@ -67,11 +69,11 @@
   }
 
   function neutralLabel(option: ProtonOption): string {
-    if (!inherited) return t("protonEditor.neutralDefault");
+    if (!inherited) return m.protonEditor_neutralDefault();
     const global = lookup(inherited, option);
     return global === null
-      ? t("protonEditor.neutralGlobal")
-      : t("protonEditor.neutralGlobalState", { state: global ? t("common.on") : t("common.off") });
+      ? m.protonEditor_neutralGlobal()
+      : m.protonEditor_neutralGlobalState( { state: global ? m.common_on() : m.common_off() });
   }
 </script>
 
@@ -82,10 +84,10 @@
       {neutralLabel(option)}
     </button>
     <button type="button" aria-pressed={value === true} onclick={() => set(option, true)}>
-      {t("protonEditor.on")}
+      {m.protonEditor_on()}
     </button>
     <button type="button" aria-pressed={value === false} onclick={() => set(option, false)}>
-      {t("protonEditor.off")}
+      {m.protonEditor_off()}
     </button>
   </div>
 {/snippet}
@@ -99,8 +101,8 @@
     {#each curated as option (option.config)}
       <div class="row" class:overridden={lookup(values, option) !== null}>
         <div>
-          <span class="label">{t(`protonOptions.${option.config}.label` as TranslationKey)}</span>
-          <p class="desc">{t(`protonOptions.${option.config}.description` as TranslationKey)}</p>
+          <span class="label">{pickMsg(msgGroup.protonOptions_label, option.config)}</span>
+          <p class="desc">{pickMsg(msgGroup.protonOptions_description, option.config)}</p>
           <code class="env-name">{option.env}</code>
         </div>
         {@render tristate(option)}
@@ -110,14 +112,14 @@
 
   {#if others.length > 0}
     <details class="advanced">
-      <summary>{t("protonEditor.advanced", { count: others.length })}</summary>
-      <p class="hint">{t("protonEditor.advancedHint")}</p>
+      <summary>{m.protonEditor_advanced( { count: others.length })}</summary>
+      <p class="hint">{m.protonEditor_advancedHint()}</p>
       <div class="compact-list">
         {#each others as option (option.config)}
           <div class="compact-row" class:overridden={lookup(values, option) !== null}>
             <code
               title={option.aliases.length
-                ? t("protonEditor.alsoAliases", { aliases: option.aliases.join(", ") })
+                ? m.protonEditor_alsoAliases( { aliases: option.aliases.join(", ") })
                 : ""}
             >
               {option.env}
@@ -131,12 +133,12 @@
 
   {#if options.length > 0 && unknown.length > 0}
     <div class="compact-list">
-      <p class="hint">{t("protonEditor.unsetKnownHint")}</p>
+      <p class="hint">{m.protonEditor_unsetKnownHint()}</p>
       {#each unknown as name (name)}
         <div class="compact-row overridden">
           <code>{name}={values[name] ? "1" : "0"}</code>
           <button type="button" class="reset" onclick={() => remove(name)}
-            >{t("common.remove")}</button
+            >{m.common_remove()}</button
           >
         </div>
       {/each}

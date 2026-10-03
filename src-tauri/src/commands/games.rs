@@ -16,7 +16,7 @@ use crate::commands::github::read_token;
 use crate::commands::graphics_layers::{ensure_directx_layer_cache, ensure_wine_mono_msi};
 use crate::commands::icons::{exe_icon_path, extract_icon_png, png_data_url, store_exe_icon};
 use crate::commands::logs::{game_log_dir, new_log_file, prefix_log_dir};
-use crate::locale::{Locale, LocaleState};
+use crate::locale::LocaleState;
 use crate::commands::graphics::{ensure_vkbasalt_conf, vkbasalt_conf_path};
 use crate::commands::mangohud::{ensure_mangohud_conf, mangohud_conf_path};
 use crate::commands::runners::{
@@ -1161,10 +1161,7 @@ pub fn launch_game_headless(app: &AppHandle, id: String) {
                     if let Some(dir) = logs_dir {
                         text.push_str(&format!("\n\nLogs: {}", dir.display()));
                     }
-                    let title = match locale {
-                        Locale::De => "Spiel konnte nicht gestartet werden",
-                        Locale::En => "Game could not be started",
-                    };
+                    let title = crate::locale::text(locale, "native_launch_title", &[]);
                     let dialog = app
                         .dialog()
                         .message(text)
