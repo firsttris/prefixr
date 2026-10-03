@@ -42,7 +42,7 @@ use commands::winetricks::{
     install_winetricks_verbs, list_all_winetricks_verbs, list_installed_winetricks_verbs,
 };
 use config::load_config;
-use locale::{Locale, LocaleState};
+use locale::LocaleState;
 use tray::{
     hide_main_window, rebuild_tray_menu, setup_tray, show_and_focus, tray_host_available,
     TrayAvailable, WindowVisible,
@@ -142,21 +142,8 @@ pub fn run() {
             let startup_locale = app.state::<LocaleState>().get();
 
             if running_as_root() {
-                let (message, title) = match startup_locale {
-                    Locale::De => (
-                        "Ein als root angelegter oder gestarteter Wine-Prefix gehört danach \
-                         root statt dir — deine normale Sitzung kann ihn dann oft nicht mehr \
-                         verwenden oder ohne sudo löschen. Bitte Prefixr als normaler Benutzer \
-                         starten.",
-                        "Prefixr nicht als root ausführen",
-                    ),
-                    Locale::En => (
-                        "A Wine prefix created or run as root ends up owned by root instead of \
-                         you — your normal session then often can't use it anymore, or delete \
-                         it without sudo. Please start Prefixr as a normal user.",
-                        "Don't run Prefixr as root",
-                    ),
-                };
+                let message = locale::text(startup_locale, "native_root_message", &[]);
+                let title = locale::text(startup_locale, "native_root_title", &[]);
                 app.dialog()
                     .message(message)
                     .title(title)
@@ -171,22 +158,12 @@ pub fn run() {
             let config = match load_config(app.handle()) {
                 Ok(config) => config,
                 Err(message) => {
-                    let (body, title) = match startup_locale {
-                        Locale::De => (
-                            format!(
-                                "{message}\n\nPrefixr lässt die Datei unverändert. Repariere \
-                                 oder entferne sie und starte Prefixr dann neu."
-                            ),
-                            "Konfiguration konnte nicht gelesen werden",
-                        ),
-                        Locale::En => (
-                            format!(
-                                "{message}\n\nPrefixr is leaving the file unchanged. Fix or \
-                                 remove it and restart Prefixr."
-                            ),
-                            "Could not read the configuration",
-                        ),
-                    };
+                    let body = locale::text(
+                        startup_locale,
+                        "native_config_message",
+                        &[("error", &message)],
+                    );
+                    let title = locale::text(startup_locale, "native_config_title", &[]);
                     app.dialog()
                         .message(body)
                         .title(title)

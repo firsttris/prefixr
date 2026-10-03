@@ -1,9 +1,10 @@
 <script lang="ts">
+  import * as m from "$lib/paraglide/messages";
   import InfoIcon from "$lib/components/InfoIcon.svelte";
   import SettingToggle from "$lib/components/SettingToggle.svelte";
   import type { OverrideHooks } from "$lib/settings";
   import type { GamescopeSettings, GraphicsConfig, VkBasaltSettings } from "$lib/types";
-  import { t } from "$lib/i18n/index.svelte";
+  
 
   // Bild — see settings.ts for how the editors are shared between the global
   // page and the game dialog. gamescope and vkBasalt are each overridden as
@@ -43,9 +44,9 @@
 
 <div class="list">
   <SettingToggle
-    label={t("graphicsEditor.gamescopeLabel")}
-    description={t("graphicsEditor.gamescopeDescription")}
-    info={t("graphicsEditor.gamescopeInfo")}
+    label={m.graphicsEditor_gamescopeLabel()}
+    description={m.graphicsEditor_gamescopeDescription()}
+    info={m.graphicsEditor_gamescopeInfo()}
     checked={value.gamescope.enabled}
     onToggle={(enabled) => onchange({ gamescope: { enabled } })}
     overridden={overrides?.isOverridden("gamescope")}
@@ -56,31 +57,31 @@
       {#if value.gamescope.enabled}
         <div class="field-grid">
           <label>
-            {t("graphicsEditor.widthLabel")}
+            {m.graphicsEditor_widthLabel()}
             <input
               type="number"
               min="0"
-              placeholder={t("graphicsEditor.widthPlaceholder")}
+              placeholder={m.graphicsEditor_widthPlaceholder()}
               value={value.gamescope.width ?? ""}
               oninput={(e) => onchange({ gamescope: { width: numberOrNull(e.currentTarget) } })}
             />
           </label>
           <label>
-            {t("graphicsEditor.heightLabel")}
+            {m.graphicsEditor_heightLabel()}
             <input
               type="number"
               min="0"
-              placeholder={t("graphicsEditor.heightPlaceholder")}
+              placeholder={m.graphicsEditor_heightPlaceholder()}
               value={value.gamescope.height ?? ""}
               oninput={(e) => onchange({ gamescope: { height: numberOrNull(e.currentTarget) } })}
             />
           </label>
           <label>
-            {t("graphicsEditor.fpsLimitLabel")}
+            {m.graphicsEditor_fpsLimitLabel()}
             <input
               type="number"
               min="0"
-              placeholder={t("graphicsEditor.fpsLimitPlaceholder")}
+              placeholder={m.graphicsEditor_fpsLimitPlaceholder()}
               value={value.gamescope.fps_limit ?? ""}
               oninput={(e) =>
                 onchange({ gamescope: { fps_limit: numberOrNull(e.currentTarget) } })}
@@ -93,16 +94,16 @@
             checked={value.gamescope.fullscreen}
             onchange={(e) => onchange({ gamescope: { fullscreen: e.currentTarget.checked } })}
           />
-          {t("graphicsEditor.forceFullscreen")}
+          {m.graphicsEditor_forceFullscreen()}
         </label>
       {/if}
     {/snippet}
   </SettingToggle>
 
   <SettingToggle
-    label={t("graphicsEditor.vkbasaltLabel")}
-    description={t("graphicsEditor.vkbasaltDescription")}
-    info={t("graphicsEditor.vkbasaltInfo")}
+    label={m.graphicsEditor_vkbasaltLabel()}
+    description={m.graphicsEditor_vkbasaltDescription()}
+    info={m.graphicsEditor_vkbasaltInfo()}
     checked={value.vkbasalt.enabled}
     onToggle={(enabled) => onchange({ vkbasalt: { enabled } })}
     overridden={overrides?.isOverridden("vkbasalt")}
@@ -114,7 +115,7 @@
         <div class="vkbasalt" class:compact>
           {#if !compact}
             <div class="preview">
-              <span class="title">{t("graphicsEditor.previewTitle")}</span>
+              <span class="title">{m.graphicsEditor_previewTitle()}</span>
               <div class="preview-screen">
                 <div class="preview-image" style={`filter:${previewFilter}`}></div>
               </div>
@@ -128,13 +129,13 @@
                   checked={value.vkbasalt.sharpen}
                   onchange={(e) => onchange({ vkbasalt: { sharpen: e.currentTarget.checked } })}
                 />
-                {t("graphicsEditor.sharpenLabel")}
+                {m.graphicsEditor_sharpenLabel()}
               </label>
-              <InfoIcon text={t("graphicsEditor.sharpenInfo")} />
+              <InfoIcon text={m.graphicsEditor_sharpenInfo()} />
             </div>
             {#if value.vkbasalt.sharpen}
               <label class="sharpness">
-                {t("graphicsEditor.sharpnessLabel", { value: value.vkbasalt.sharpness.toFixed(2) })}
+                {m.graphicsEditor_sharpnessLabel( { value: value.vkbasalt.sharpness.toFixed(2) })}
                 <input
                   type="range"
                   min="0"
@@ -153,9 +154,9 @@
                   checked={value.vkbasalt.smaa}
                   onchange={(e) => onchange({ vkbasalt: { smaa: e.currentTarget.checked } })}
                 />
-                {t("graphicsEditor.smaaLabel")}
+                {m.graphicsEditor_smaaLabel()}
               </label>
-              <InfoIcon text={t("graphicsEditor.smaaInfo")} />
+              <InfoIcon text={m.graphicsEditor_smaaInfo()} />
             </div>
           </div>
         </div>

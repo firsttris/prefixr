@@ -1,9 +1,11 @@
 <script lang="ts">
+  import * as m from "$lib/paraglide/messages";
+  import { msgGroup } from "$lib/i18n/msg-groups";
   import SettingToggle from "$lib/components/SettingToggle.svelte";
   import { COLORS, POSITIONS, PRESETS, type MangoHudPreset } from "$lib/mangohudPresets";
   import type { OverrideHooks } from "$lib/settings";
   import type { MangoHudConfig, MangoHudLayout } from "$lib/types";
-  import { t, type TranslationKey } from "$lib/i18n/index.svelte";
+  import { pickMsg } from "$lib/i18n/index.svelte";
 
   // Overlay — see settings.ts for how the editors are shared between the
   // global page and the game dialog. On/off and the look (`layout`) are
@@ -30,8 +32,8 @@
 
 <div class="overlay-editor">
   <SettingToggle
-    label={t("overlayEditor.mangohudLabel")}
-    description={t("overlayEditor.mangohudDescription")}
+    label={m.overlayEditor_mangohudLabel()}
+    description={m.overlayEditor_mangohudDescription()}
     checked={value.enabled}
     onToggle={(enabled) => onchange({ enabled })}
     overridden={overrides?.isOverridden("enabled")}
@@ -41,7 +43,7 @@
 
   <div class="look" class:overridden={overrides?.isOverridden("layout")}>
     <div class="look-header">
-      <span class="look-title">{t("overlayEditor.lookTitle")}</span>
+      <span class="look-title">{m.overlayEditor_lookTitle()}</span>
       {#if overrides?.isOverridden("layout")}
         <button
           type="button"
@@ -49,7 +51,7 @@
           title={overrides.resetTitle("layout")}
           onclick={() => overrides.reset("layout")}
         >
-          {t("common.reset")}
+          {m.common_reset()}
         </button>
       {/if}
     </div>
@@ -62,10 +64,10 @@
           onclick={() => applyPreset(preset)}
         >
           <span class="preset-label"
-            >{t(`mangohud.presets.${preset.key}.label` as TranslationKey)}</span
+            >{pickMsg(msgGroup.mangohud_presets_label, preset.key)}</span
           >
           <span class="preset-description"
-            >{t(`mangohud.presets.${preset.key}.description` as TranslationKey)}</span
+            >{pickMsg(msgGroup.mangohud_presets_description, preset.key)}</span
           >
         </button>
       {/each}
@@ -73,7 +75,7 @@
 
     <div class="tune-grid">
       <div class="preview-wrap">
-        <span class="tune-title">{t("overlayEditor.previewTitle")}</span>
+        <span class="tune-title">{m.overlayEditor_previewTitle()}</span>
         <div class="preview-screen">
           <div
             class="overlay-box pos-{value.position}"
@@ -131,14 +133,14 @@
 
       <div class="controls">
         <div class="control-group">
-          <span class="tune-title">{t("overlayEditor.positionTitle")}</span>
+          <span class="tune-title">{m.overlayEditor_positionTitle()}</span>
           <div class="position-grid">
             {#each POSITIONS as pos (pos.value)}
               <button
                 type="button"
                 class="position-btn pos-{pos.value}"
                 class:active={value.position === pos.value}
-                title={t(`mangohud.positions.${pos.value}` as TranslationKey)}
+                title={pickMsg(msgGroup.mangohud_positions, pos.value)}
                 onclick={() => setLayout({ position: pos.value })}
               ></button>
             {/each}
@@ -146,14 +148,14 @@
         </div>
 
         <div class="control-group">
-          <span class="tune-title">{t("overlayEditor.colorTitle")}</span>
+          <span class="tune-title">{m.overlayEditor_colorTitle()}</span>
           <div class="colors">
             {#each COLORS as color (color.hex)}
               <button
                 type="button"
                 class="color-swatch"
                 class:active={value.theme_color === color.hex}
-                title={t(`mangohud.colors.${color.hex}` as TranslationKey)}
+                title={pickMsg(msgGroup.mangohud_colors, color.hex)}
                 style={`--swatch-color:#${color.hex}`}
                 onclick={() => setLayout({ theme_color: color.hex })}
               ></button>
@@ -162,7 +164,7 @@
         </div>
 
         <label class="control-group">
-          <span class="tune-title">{t("overlayEditor.backgroundOpacity")}</span>
+          <span class="tune-title">{m.overlayEditor_backgroundOpacity()}</span>
           <input
             type="range"
             min="0"
@@ -176,104 +178,104 @@
         <label class="checkbox-row">
           <input type="checkbox" checked={value.round_corners}
                 onchange={(e) => setLayout({ round_corners: e.currentTarget.checked })} />
-          {t("overlayEditor.roundedCorners")}
+          {m.overlayEditor_roundedCorners()}
         </label>
 
         <label class="checkbox-row">
           <input type="checkbox" checked={value.horizontal}
                 onchange={(e) => setLayout({ horizontal: e.currentTarget.checked })} />
-          {t("overlayEditor.horizontalLayout")}
+          {m.overlayEditor_horizontalLayout()}
         </label>
 
         <div class="control-group">
-          <span class="tune-title">{t("overlayEditor.perfValuesTitle")}</span>
+          <span class="tune-title">{m.overlayEditor_perfValuesTitle()}</span>
           <div class="checkbox-list">
             <label class="checkbox-row">
               <input type="checkbox" checked={value.show_fps}
                 onchange={(e) => setLayout({ show_fps: e.currentTarget.checked })} />
-              {t("overlayEditor.fpsCounter")}
+              {m.overlayEditor_fpsCounter()}
             </label>
             <label class="checkbox-row">
               <input type="checkbox" checked={value.show_frametime}
                 onchange={(e) => setLayout({ show_frametime: e.currentTarget.checked })} />
-              {t("overlayEditor.frametimeGraph")}
+              {m.overlayEditor_frametimeGraph()}
             </label>
             <label class="checkbox-row">
               <input type="checkbox" checked={value.show_cpu}
                 onchange={(e) => setLayout({ show_cpu: e.currentTarget.checked })} />
-              {t("overlayEditor.cpu")}
+              {m.overlayEditor_cpu()}
             </label>
             <label class="checkbox-row">
               <input type="checkbox" checked={value.show_gpu}
                 onchange={(e) => setLayout({ show_gpu: e.currentTarget.checked })} />
-              {t("overlayEditor.gpu")}
+              {m.overlayEditor_gpu()}
             </label>
             <label class="checkbox-row">
               <input type="checkbox" checked={value.show_ram}
                 onchange={(e) => setLayout({ show_ram: e.currentTarget.checked })} />
-              {t("overlayEditor.ram")}
+              {m.overlayEditor_ram()}
             </label>
             <label class="checkbox-row">
               <input type="checkbox" checked={value.show_vram}
                 onchange={(e) => setLayout({ show_vram: e.currentTarget.checked })} />
-              {t("overlayEditor.vram")}
+              {m.overlayEditor_vram()}
             </label>
             <label class="checkbox-row">
               <input type="checkbox" checked={value.show_temps}
                 onchange={(e) => setLayout({ show_temps: e.currentTarget.checked })} />
-              {t("overlayEditor.temps")}
+              {m.overlayEditor_temps()}
             </label>
           </div>
         </div>
 
         <div class="control-group">
-          <span class="tune-title">{t("overlayEditor.statusIconsTitle")}</span>
+          <span class="tune-title">{m.overlayEditor_statusIconsTitle()}</span>
           <div class="checkbox-list">
             <label class="checkbox-row">
               <input type="checkbox" checked={value.show_gamemode}
                 onchange={(e) => setLayout({ show_gamemode: e.currentTarget.checked })} />
-              {t("overlayEditor.gamemodeActive")}
+              {m.overlayEditor_gamemodeActive()}
             </label>
             <label class="checkbox-row">
               <input type="checkbox" checked={value.show_vkbasalt}
                 onchange={(e) => setLayout({ show_vkbasalt: e.currentTarget.checked })} />
-              {t("overlayEditor.vkbasaltActive")}
+              {m.overlayEditor_vkbasaltActive()}
             </label>
             <label class="checkbox-row">
               <input type="checkbox" checked={value.show_hdr}
                 onchange={(e) => setLayout({ show_hdr: e.currentTarget.checked })} />
-              {t("overlayEditor.hdrActive")}
+              {m.overlayEditor_hdrActive()}
             </label>
           </div>
         </div>
 
         <div class="control-group">
-          <span class="tune-title">{t("overlayEditor.techInfoTitle")}</span>
+          <span class="tune-title">{m.overlayEditor_techInfoTitle()}</span>
           <div class="checkbox-list">
             <label class="checkbox-row">
               <input type="checkbox" checked={value.show_driver}
                 onchange={(e) => setLayout({ show_driver: e.currentTarget.checked })} />
-              {t("overlayEditor.driver")}
+              {m.overlayEditor_driver()}
             </label>
             <label class="checkbox-row">
               <input type="checkbox" checked={value.show_engine_version}
                 onchange={(e) => setLayout({ show_engine_version: e.currentTarget.checked })} />
-              {t("overlayEditor.engineVersion")}
+              {m.overlayEditor_engineVersion()}
             </label>
             <label class="checkbox-row">
               <input type="checkbox" checked={value.show_wine}
                 onchange={(e) => setLayout({ show_wine: e.currentTarget.checked })} />
-              {t("overlayEditor.wineVersion")}
+              {m.overlayEditor_wineVersion()}
             </label>
             <label class="checkbox-row">
               <input type="checkbox" checked={value.show_gpu_name}
                 onchange={(e) => setLayout({ show_gpu_name: e.currentTarget.checked })} />
-              {t("overlayEditor.gpuName")}
+              {m.overlayEditor_gpuName()}
             </label>
             <label class="checkbox-row">
               <input type="checkbox" checked={value.show_resolution}
                 onchange={(e) => setLayout({ show_resolution: e.currentTarget.checked })} />
-              {t("overlayEditor.resolution")}
+              {m.overlayEditor_resolution()}
             </label>
           </div>
         </div>

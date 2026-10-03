@@ -1,7 +1,8 @@
 <script lang="ts">
+  import * as m from "$lib/paraglide/messages";
   import type { Snippet } from "svelte";
   import InfoIcon from "$lib/components/InfoIcon.svelte";
-  import { t } from "$lib/i18n/index.svelte";
+  
 
   // One on/off setting with a label and description, plus optional details
   // shown below it (e.g. gamescope's resolution). `overridden`/`onReset` are
@@ -41,7 +42,7 @@
     <div class="controls">
       {#if overridden && onReset}
         <button type="button" class="reset" title={resetTitle} onclick={onReset}>
-          {t("common.reset")}
+          {m.common_reset()}
         </button>
       {/if}
       <label class="switch">

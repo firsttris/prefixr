@@ -1,4 +1,5 @@
 <script lang="ts">
+  import * as m from "$lib/paraglide/messages";
   import { onMount } from "svelte";
   import GameList from "$lib/components/GameList.svelte";
   import GameForm from "$lib/components/GameForm.svelte";
@@ -12,7 +13,7 @@
   import ArtworkPicker from "$lib/components/ArtworkPicker.svelte";
   import InstallDialog from "$lib/components/InstallDialog.svelte";
   import Modal from "$lib/components/Modal.svelte";
-  import { t, getLocale, setLocale, type Locale } from "$lib/i18n/index.svelte";
+  import { getLocale, setLocale, type Locale } from "$lib/i18n/index.svelte";
   import {
     games,
     initGameEvents,
@@ -38,10 +39,10 @@
   // The game settings categories: set globally here, overridable per game
   // in the game dialog's tabs of the same names.
   const SETTINGS_VIEWS: { view: View; label: () => string }[] = [
-    { view: "performance", label: () => t("nav.performance") },
-    { view: "graphics", label: () => t("nav.graphics") },
-    { view: "overlay", label: () => t("nav.overlay") },
-    { view: "proton", label: () => t("nav.proton") },
+    { view: "performance", label: () => m.nav_performance() },
+    { view: "graphics", label: () => m.nav_graphics() },
+    { view: "overlay", label: () => m.nav_overlay() },
+    { view: "proton", label: () => m.nav_proton() },
   ];
   let editing = $state<Game | "new" | null>(null);
   let pickingArtworkFor = $state<Game | null>(null);
@@ -49,7 +50,7 @@
 
   let modalGame = $derived(editing && editing !== "new" ? editing : undefined);
   let modalTitle = $derived(
-    editing === "new" ? t("library.addGameTitle") : t("library.editGameTitle"),
+    editing === "new" ? m.library_addGameTitle() : m.library_editGameTitle(),
   );
 
   // If the app was started via a desktop shortcut (--launch <id>), jump
@@ -91,7 +92,7 @@
       class:active={view === "library"}
       onclick={() => (view = "library")}
     >
-      {t("nav.library")}
+      {m.nav_library()}
     </button>
     <button
       type="button"
@@ -99,7 +100,7 @@
       class:active={view === "prefixes"}
       onclick={() => (view = "prefixes")}
     >
-      {t("nav.prefixes")}
+      {m.nav_prefixes()}
     </button>
     <button
       type="button"
@@ -107,10 +108,10 @@
       class:active={view === "runners"}
       onclick={() => (view = "runners")}
     >
-      {t("nav.runners")}
+      {m.nav_runners()}
     </button>
-    <div class="nav-group" title={t("nav.perGameGroupTitle")}>
-      {t("nav.perGameGroupLabel")}
+    <div class="nav-group" title={m.nav_perGameGroupTitle()}>
+      {m.nav_perGameGroupLabel()}
     </div>
     {#each SETTINGS_VIEWS as item (item.view)}
       <button
@@ -129,10 +130,10 @@
       class:active={view === "steamgriddb"}
       onclick={() => (view = "steamgriddb")}
     >
-      {t("nav.steamgriddb")}
+      {m.nav_steamgriddb()}
     </button>
     <div class="nav-spacer"></div>
-    <div class="lang-switch" role="group" aria-label={t("nav.languageSwitcher")}>
+    <div class="lang-switch" role="group" aria-label={m.nav_languageSwitcher()}>
       {#each ["de", "en"] as const as lng (lng)}
         <button
           type="button"
@@ -150,16 +151,16 @@
     {#if view === "library"}
       <div class="page-header">
         <div>
-          <h1>{t("library.heading")}</h1>
+          <h1>{m.library_heading()}</h1>
           {#if $games.length > 0}
             <p class="subtitle">
               {$games.length}
-              {$games.length === 1 ? t("library.gameSingular") : t("library.gamePlural")}
+              {$games.length === 1 ? m.library_gameSingular() : m.library_gamePlural()}
             </p>
           {/if}
         </div>
         <button type="button" class="primary" onclick={() => (editing = "new")}>
-          {t("library.addGame")}
+          {m.library_addGame()}
         </button>
       </div>
       <GameList
@@ -169,12 +170,12 @@
       />
     {:else if view === "prefixes"}
       <div class="page-header">
-        <h1>{t("library.prefixesHeading")}</h1>
+        <h1>{m.library_prefixesHeading()}</h1>
       </div>
       <PrefixManager />
     {:else if view === "runners"}
       <div class="page-header">
-        <h1>{t("library.runnersHeading")}</h1>
+        <h1>{m.library_runnersHeading()}</h1>
       </div>
       <RunnerList />
     {:else if view === "performance"}
@@ -187,7 +188,7 @@
       <ProtonSettings />
     {:else}
       <div class="page-header">
-        <h1>{t("library.steamgriddbHeading")}</h1>
+        <h1>{m.library_steamgriddbHeading()}</h1>
       </div>
       <SteamGridDbSettings />
     {/if}
@@ -200,7 +201,7 @@
 
 <Modal
   open={pickingArtworkFor !== null}
-  title={t("library.selectArtworkTitle")}
+  title={m.library_selectArtworkTitle()}
   onClose={() => (pickingArtworkFor = null)}
 >
   {#if pickingArtworkFor}
@@ -210,7 +211,7 @@
 
 <Modal
   open={installingExePath !== null}
-  title={t("library.installTitle")}
+  title={m.library_installTitle()}
   onClose={() => (installingExePath = null)}
 >
   {#if installingExePath}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import * as m from "$lib/paraglide/messages";
   import { onMount } from "svelte";
   import ProtonEditor from "$lib/components/ProtonEditor.svelte";
   import SettingsPanel from "$lib/components/SettingsPanel.svelte";
@@ -10,7 +11,7 @@
   } from "$lib/stores/proton";
   import { refreshRunners, runners } from "$lib/stores/runners";
   import type { ProtonOption } from "$lib/types";
-  import { backendError, t } from "$lib/i18n/index.svelte";
+  import { backendError } from "$lib/i18n/index.svelte";
 
   let draft = $state<Record<string, boolean> | null>(null);
   let saving = $state(false);
@@ -78,18 +79,18 @@
 </script>
 
 <SettingsPanel
-  title={t("protonSettings.title")}
-  hint={t("protonSettings.hint")}
+  title={m.protonSettings_title()}
+  hint={m.protonSettings_hint()}
   {saving}
   {saved}
   error={backendError(error)}
   onSave={handleSave}
 >
   {#if protonRunners.length === 0}
-    <p class="hint">{t("protonSettings.noRunner")}</p>
+    <p class="hint">{m.protonSettings_noRunner()}</p>
   {:else}
     <label class="runner">
-      {t("protonSettings.availableSwitches")}
+      {m.protonSettings_availableSwitches()}
       <select
         value={runnerId}
         onchange={(e) => (pickedRunnerId = e.currentTarget.value)}

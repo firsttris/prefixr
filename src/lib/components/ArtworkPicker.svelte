@@ -1,4 +1,5 @@
 <script lang="ts">
+  import * as m from "$lib/paraglide/messages";
   import { onMount, untrack } from "svelte";
   import type { ArtworkKind, Game, SteamGridDbGameMatch, SteamGridDbGrid } from "$lib/types";
   import {
@@ -14,25 +15,25 @@
     removeGameArtwork,
   } from "$lib/stores/steamgriddb";
   import { prettifyExeName } from "$lib/gameName";
-  import { backendError, t } from "$lib/i18n/index.svelte";
+  import { backendError } from "$lib/i18n/index.svelte";
 
   let { game, onDone }: { game: Game; onDone: () => void } = $props();
 
   type Kind = "cover" | "icon" | ArtworkKind;
 
   const kindLabels: Record<Kind, string> = $derived({
-    cover: t("artworkPicker.kindCover"),
-    icon: t("artworkPicker.kindIcon"),
-    wide: t("artworkPicker.kindWide"),
-    hero: t("artworkPicker.kindHero"),
-    logo: t("artworkPicker.kindLogo"),
+    cover: m.artworkPicker_kindCover(),
+    icon: m.artworkPicker_kindIcon(),
+    wide: m.artworkPicker_kindWide(),
+    hero: m.artworkPicker_kindHero(),
+    logo: m.artworkPicker_kindLogo(),
   });
 
   // Only Steam shows these; Prefixr itself uses the cover and icon.
   const steamOnlyHints: Partial<Record<Kind, string>> = $derived({
-    wide: t("artworkPicker.hintWide"),
-    hero: t("artworkPicker.hintHero"),
-    logo: t("artworkPicker.hintLogo"),
+    wide: m.artworkPicker_hintWide(),
+    hero: m.artworkPicker_hintHero(),
+    logo: m.artworkPicker_hintLogo(),
   });
 
   // `game` is only read here to seed this picker's initial state — a fresh
@@ -186,11 +187,11 @@
 
   {#if currentUrl}
     <div class="current">
-      <span class="tune-title">{t("artworkPicker.currentSelection")}</span>
+      <span class="tune-title">{m.artworkPicker_currentSelection()}</span>
       <div class="current-row">
         <img class="current-asset shape-{kind}" src={currentUrl} alt="" />
         <button type="button" class="ghost" disabled={removing} onclick={handleRemove}>
-          {removing ? t("artworkPicker.removing") : t("common.remove")}
+          {removing ? m.artworkPicker_removing() : m.common_remove()}
         </button>
       </div>
     </div>
@@ -201,28 +202,28 @@
       <input
         type="text"
         class="text-input"
-        placeholder={t("artworkPicker.searchPlaceholder")}
+        placeholder={m.artworkPicker_searchPlaceholder()}
         bind:value={query}
         onkeydown={(e) => e.key === "Enter" && handleSearch()}
       />
       <button type="button" onclick={handleSearch} disabled={loading}
-        >{t("artworkPicker.searchButton")}</button
+        >{m.artworkPicker_searchButton()}</button
       >
     </div>
 
     {#if loading}
-      <p class="hint">{t("artworkPicker.searching")}</p>
+      <p class="hint">{m.artworkPicker_searching()}</p>
     {:else if error}
       <p class="error">{backendError(error)}</p>
     {:else if matches.length === 0}
-      <p class="hint">{t("artworkPicker.noMatches", { query })}</p>
+      <p class="hint">{m.artworkPicker_noMatches( { query })}</p>
     {:else}
       <ul class="matches">
         {#each matches as match (match.id)}
           <li>
             <button type="button" class="match" onclick={() => selectMatch(match)}>
               <span>{match.name}</span>
-              {#if match.verified}<span class="badge">{t("artworkPicker.verified")}</span>{/if}
+              {#if match.verified}<span class="badge">{m.artworkPicker_verified()}</span>{/if}
             </button>
           </li>
         {/each}
@@ -230,15 +231,15 @@
     {/if}
   {:else}
     <button type="button" class="ghost back" onclick={backToSearch}
-      >{t("artworkPicker.backToSearch")}</button
+      >{m.artworkPicker_backToSearch()}</button
     >
 
     {#if loading}
-      <p class="hint">{t("artworkPicker.loadingKind", { kind: kindLabels[kind] })}</p>
+      <p class="hint">{m.artworkPicker_loadingKind( { kind: kindLabels[kind] })}</p>
     {:else if error}
       <p class="error">{backendError(error)}</p>
     {:else if assetOptions.length === 0}
-      <p class="hint">{t("artworkPicker.noKindOptions", { kind: kindLabels[kind] })}</p>
+      <p class="hint">{m.artworkPicker_noKindOptions( { kind: kindLabels[kind] })}</p>
     {:else}
       <div class="grid-options" class:landscape={kind === "wide" || kind === "hero" || kind === "logo"}>
         {#each assetOptions as asset (asset.id)}

@@ -8,7 +8,7 @@ use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use uuid::Uuid;
 
 use crate::commands::games::{kill_running_game, LaunchingGames, RunningGames};
-use crate::locale::{Locale, LocaleState};
+use crate::locale::{text, Locale, LocaleState};
 
 pub const TRAY_ID: &str = "main-tray";
 const MAIN_WINDOW: &str = "main";
@@ -138,27 +138,21 @@ fn tray_locale(app: &AppHandle) -> Locale {
     app.try_state::<LocaleState>().map(|s| s.get()).unwrap_or(Locale::De)
 }
 
-fn toggle_label(visible: bool, locale: Locale) -> &'static str {
-    match (visible, locale) {
-        (true, Locale::De) => "Fenster verstecken",
-        (true, Locale::En) => "Hide window",
-        (false, Locale::De) => "Fenster anzeigen",
-        (false, Locale::En) => "Show window",
-    }
+fn toggle_label(visible: bool, locale: Locale) -> String {
+    let key = if visible {
+        "native_tray_hideWindow"
+    } else {
+        "native_tray_showWindow"
+    };
+    text(locale, key, &[])
 }
 
 fn kill_game_label(name: &str, locale: Locale) -> String {
-    match locale {
-        Locale::De => format!("„{name}“ beenden (erzwingen)"),
-        Locale::En => format!("Quit “{name}” (force)"),
-    }
+    text(locale, "native_tray_killGame", &[("name", name)])
 }
 
-fn quit_label(locale: Locale) -> &'static str {
-    match locale {
-        Locale::De => "Beenden",
-        Locale::En => "Quit",
-    }
+fn quit_label(locale: Locale) -> String {
+    text(locale, "native_tray_quit", &[])
 }
 
 fn parse_kill_game_id(id: &str) -> Option<Uuid> {
@@ -166,37 +160,18 @@ fn parse_kill_game_id(id: &str) -> Option<Uuid> {
         .and_then(|game_id| Uuid::parse_str(game_id).ok())
 }
 
-fn quit_dialog_copy(active: usize, locale: Locale) -> (String, &'static str, String, String) {
-    let text = match (active, locale) {
-        (1, Locale::De) => "Ein Spiel läuft noch oder wird gerade gestartet.".to_string(),
-        (1, Locale::En) => "A game is still running or starting.".to_string(),
-        (n, Locale::De) => format!("{n} Spiele laufen noch oder werden gerade gestartet."),
-        (n, Locale::En) => format!("{n} games are still running or starting."),
+fn quit_dialog_copy(active: usize, locale: Locale) -> (String, String, String, String) {
+    let count = active.to_string();
+    let running = match active {
+        1 => text(locale, "native_quitDialog_oneRunning", &[]),
+        _ => text(locale, "native_quitDialog_manyRunning", &[("count", &count)]),
     };
-    let message = match locale {
-        Locale::De => format!(
-            "{text} Beim Beenden von Prefixr werden sie ebenfalls beendet — ungespeicherter \
-             Fortschritt geht dabei verloren."
-        ),
-        Locale::En => format!(
-            "{text} Quitting Prefixr will end them too — unsaved progress will be lost."
-        ),
-    };
-    let title = match locale {
-        Locale::De => "Prefixr beenden?",
-        Locale::En => "Quit Prefixr?",
-    };
-    let confirm_label = match locale {
-        Locale::De => "Spiele und Prefixr beenden",
-        Locale::En => "Quit games and Prefixr",
-    }
-    .to_string();
-    let cancel_label = match locale {
-        Locale::De => "Abbrechen",
-        Locale::En => "Cancel",
-    }
-    .to_string();
-    (message, title, confirm_label, cancel_label)
+    (
+        text(locale, "native_quitDialog_message", &[("running", &running)]),
+        text(locale, "native_quitDialog_title", &[]),
+        text(locale, "native_quitDialog_confirm", &[]),
+        text(locale, "common_cancel", &[]),
+    )
 }
 
 /// Builds the tray's menu from scratch: a show/hide toggle, one "quit this

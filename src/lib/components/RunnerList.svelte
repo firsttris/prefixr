@@ -1,4 +1,5 @@
 <script lang="ts">
+  import * as m from "$lib/paraglide/messages";
   import { onMount } from "svelte";
   import { runners, refreshRunners, deleteRunner } from "$lib/stores/runners";
   import { games, refreshGames } from "$lib/stores/games";
@@ -8,7 +9,7 @@
   import RunnerDownloads from "./RunnerDownloads.svelte";
   import GitHubSettings from "./GitHubSettings.svelte";
   import UmuSettings from "./UmuSettings.svelte";
-  import { backendError, t } from "$lib/i18n/index.svelte";
+  import { backendError } from "$lib/i18n/index.svelte";
 
   let showDownloads = $state(false);
   let deleting = $state<Runner | null>(null);
@@ -24,8 +25,8 @@
   );
 
   function usageLabel(count: number): string {
-    if (count === 0) return t("runnerList.unused");
-    return count === 1 ? t("runnerList.usedByOne") : t("runnerList.usedByMany", { count });
+    if (count === 0) return m.runnerList_unused();
+    return count === 1 ? m.runnerList_usedByOne() : m.runnerList_usedByMany( { count });
   }
 
   async function confirmDelete() {
@@ -48,17 +49,17 @@
 
 <section class="panel">
   <p class="explainer">
-    {t("runnerList.explainerBefore")} <strong>{t("runnerList.explainerProton")}</strong>
-    {t("runnerList.explainerOr")} <strong>{t("runnerList.explainerWine")}</strong>.
-    {t("runnerList.explainerAfter")}
+    {m.runnerList_explainerBefore()} <strong>{m.runnerList_explainerProton()}</strong>
+    {m.runnerList_explainerOr()} <strong>{m.runnerList_explainerWine()}</strong>.
+    {m.runnerList_explainerAfter()}
   </p>
 
   <div class="panel-header">
-    <h2>{t("runnerList.heading")}</h2>
+    <h2>{m.runnerList_heading()}</h2>
     <div class="actions">
-      <button type="button" class="ghost" onclick={refreshRunners}>{t("runnerList.refresh")}</button>
+      <button type="button" class="ghost" onclick={refreshRunners}>{m.runnerList_refresh()}</button>
       <button type="button" class="primary" onclick={() => (showDownloads = true)}>
-        {t("runnerList.downloadRunner")}
+        {m.runnerList_downloadRunner()}
       </button>
     </div>
   </div>
@@ -67,7 +68,7 @@
   <UmuSettings />
 
   {#if $runners.length === 0}
-    <p class="hint">{t("runnerList.empty")}</p>
+    <p class="hint">{m.runnerList_empty()}</p>
   {:else}
     <ul>
       {#each $runners as runner (runner.id)}
@@ -79,7 +80,7 @@
             <span class="kind">{runner.kind}</span>
             {#if count === 0}
               <button type="button" class="ghost small" onclick={() => (deleting = runner)}>
-                {t("runnerList.delete")}
+                {m.runnerList_delete()}
               </button>
             {/if}
           </span>
@@ -94,16 +95,16 @@
 
 <ConfirmDialog
   open={deleting !== null}
-  title={t("runnerList.deleteConfirmTitle")}
-  message={t("runnerList.deleteConfirmMessage", { name: deleting?.name ?? "" })}
-  confirmLabel={t("runnerList.delete")}
+  title={m.runnerList_deleteConfirmTitle()}
+  message={m.runnerList_deleteConfirmMessage( { name: deleting?.name ?? "" })}
+  confirmLabel={m.runnerList_delete()}
   onConfirm={confirmDelete}
   onCancel={() => (deleting = null)}
 />
 
 <Modal
   open={showDownloads}
-  title={t("runnerList.downloadRunner")}
+  title={m.runnerList_downloadRunner()}
   onClose={() => (showDownloads = false)}
 >
   <RunnerDownloads />

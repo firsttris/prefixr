@@ -1,4 +1,5 @@
 <script lang="ts">
+  import * as m from "$lib/paraglide/messages";
   import { onMount } from "svelte";
   import {
     games,
@@ -16,7 +17,7 @@
     refreshSteamGames,
   } from "$lib/stores/games";
   import { showLog } from "$lib/logViewer";
-  import { backendError, t } from "$lib/i18n/index.svelte";
+  import { backendError } from "$lib/i18n/index.svelte";
   import GameCard from "./GameCard.svelte";
   import GameListRow from "./GameListRow.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
@@ -99,10 +100,10 @@
     steamConfirm = null;
     notify(
       shutdownSteam
-        ? t("gameList.steam.busyQuitting")
+        ? m.gameList_steam_busyQuitting()
         : action === "export"
-          ? t("gameList.steam.busyExporting", { name: game.name })
-          : t("gameList.steam.busyRemoving", { name: game.name }),
+          ? m.gameList_steam_busyExporting( { name: game.name })
+          : m.gameList_steam_busyRemoving( { name: game.name }),
       "busy",
     );
     try {
@@ -116,23 +117,23 @@
         return;
       }
       await refreshSteamGames();
-      const restarted = result.restarted_steam ? t("gameList.steam.restartedSuffix") : "";
+      const restarted = result.restarted_steam ? m.gameList_steam_restartedSuffix() : "";
       if (action === "remove-game") {
         await removeGame(game.id);
-        notify(t("gameList.steam.doneRemovedBoth", { name: game.name, restarted }), "done");
+        notify(m.gameList_steam_doneRemovedBoth( { name: game.name, restarted }), "done");
       } else if (action === "remove") {
-        notify(t("gameList.steam.doneRemoved", { name: game.name, restarted }), "done");
+        notify(m.gameList_steam_doneRemoved( { name: game.name, restarted }), "done");
       } else {
         notify(
-          t("gameList.steam.doneAdded", {
+          m.gameList_steam_doneAdded( {
             name: game.name,
-            restarted: restarted || t("gameList.steam.doneAddedNextStartSuffix"),
+            restarted: restarted || m.gameList_steam_doneAddedNextStartSuffix(),
           }),
           "done",
         );
       }
     } catch (e) {
-      notify(t("gameList.steam.errorPrefix", { error: backendError(e) }), "error");
+      notify(m.gameList_steam_errorPrefix( { error: backendError(e) }), "error");
     }
   }
 
@@ -141,7 +142,7 @@
       runSteamAction(game, "remove-game");
     } else {
       removeGame(game.id).catch((e) =>
-        notify(t("gameList.steam.removeFailed", { name: game.name, error: backendError(e) }), "error"),
+        notify(m.gameList_steam_removeFailed( { name: game.name, error: backendError(e) }), "error"),
       );
     }
   }
@@ -151,24 +152,24 @@
   <div class="toolbar">
     <input
       type="search"
-      placeholder={t("gameList.toolbar.searchPlaceholder")}
+      placeholder={m.gameList_toolbar_searchPlaceholder()}
       bind:value={query}
-      aria-label={t("gameList.toolbar.searchLabel")}
+      aria-label={m.gameList_toolbar_searchLabel()}
     />
 
-    <select bind:value={sortBy} aria-label={t("gameList.toolbar.sortLabel")}>
-      <option value="name-asc">{t("gameList.toolbar.sortNameAsc")}</option>
-      <option value="name-desc">{t("gameList.toolbar.sortNameDesc")}</option>
-      <option value="runner">{t("gameList.toolbar.sortRunner")}</option>
+    <select bind:value={sortBy} aria-label={m.gameList_toolbar_sortLabel()}>
+      <option value="name-asc">{m.gameList_toolbar_sortNameAsc()}</option>
+      <option value="name-desc">{m.gameList_toolbar_sortNameDesc()}</option>
+      <option value="runner">{m.gameList_toolbar_sortRunner()}</option>
     </select>
 
-    <div class="view-toggle" role="group" aria-label={t("gameList.toolbar.viewToggleLabel")}>
+    <div class="view-toggle" role="group" aria-label={m.gameList_toolbar_viewToggleLabel()}>
       <button
         type="button"
         class:active={viewMode === "grid"}
         onclick={() => (viewMode = "grid")}
-        aria-label={t("gameList.toolbar.gridView")}
-        title={t("gameList.toolbar.gridView")}
+        aria-label={m.gameList_toolbar_gridView()}
+        title={m.gameList_toolbar_gridView()}
       >
         ▦
       </button>
@@ -176,8 +177,8 @@
         type="button"
         class:active={viewMode === "list"}
         onclick={() => (viewMode = "list")}
-        aria-label={t("gameList.toolbar.listView")}
-        title={t("gameList.toolbar.listView")}
+        aria-label={m.gameList_toolbar_listView()}
+        title={m.gameList_toolbar_listView()}
       >
         ☰
       </button>
@@ -188,17 +189,17 @@
 {#if $games.length === 0}
   <div class="empty">
     <span class="empty-icon">🎮</span>
-    <h3>{t("gameList.emptyLibrary.title")}</h3>
-    <p>{t("gameList.emptyLibrary.hint")}</p>
+    <h3>{m.gameList_emptyLibrary_title()}</h3>
+    <p>{m.gameList_emptyLibrary_hint()}</p>
     {#if onAddNew}
-      <button type="button" class="primary" onclick={onAddNew}>{t("library.addGame")}</button>
+      <button type="button" class="primary" onclick={onAddNew}>{m.library_addGame()}</button>
     {/if}
   </div>
 {:else if visibleGames.length === 0}
   <div class="empty">
     <span class="empty-icon">🔍</span>
-    <h3>{t("gameList.emptySearch.title")}</h3>
-    <p>{t("gameList.emptySearch.hint", { query })}</p>
+    <h3>{m.gameList_emptySearch_title()}</h3>
+    <p>{m.gameList_emptySearch_hint( { query })}</p>
   </div>
 {:else if viewMode === "grid"}
   <div class="grid">
@@ -248,16 +249,16 @@
 
 <ConfirmDialog
   open={steamConfirm !== null}
-  title={t("gameList.steam.confirmTitle")}
+  title={m.gameList_steam_confirmTitle()}
   message={steamConfirm
-    ? t("gameList.steam.confirmMessage", {
+    ? m.gameList_steam_confirmMessage( {
         action:
           steamConfirm.action === "export"
-            ? t("gameList.steam.confirmActionExport", { name: steamConfirm.game.name })
-            : t("gameList.steam.confirmActionRemove", { name: steamConfirm.game.name }),
+            ? m.gameList_steam_confirmActionExport( { name: steamConfirm.game.name })
+            : m.gameList_steam_confirmActionRemove( { name: steamConfirm.game.name }),
       })
     : ""}
-  confirmLabel={t("gameList.steam.confirmButton")}
+  confirmLabel={m.gameList_steam_confirmButton()}
   onConfirm={() => steamConfirm && runSteamAction(steamConfirm.game, steamConfirm.action, true)}
   onCancel={() => (steamConfirm = null)}
 />

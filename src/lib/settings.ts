@@ -1,3 +1,4 @@
+import * as m from "$lib/paraglide/messages";
 // Shared plumbing for the four settings categories (Leistung, Bild, Overlay,
 // Proton). Each has one editor component used in two places: the global
 // settings page, and the game dialog, where every value starts out
@@ -5,7 +6,7 @@
 // values; in the game dialog they additionally get `OverrideHooks` to show
 // which rows deviate from the global setting and to reset them.
 
-import { t } from "$lib/i18n/index.svelte";
+
 
 export interface OverrideHooks<K extends string> {
   isOverridden: (key: K) => boolean;
@@ -15,7 +16,7 @@ export interface OverrideHooks<K extends string> {
 }
 
 export function onOff(value: boolean | undefined): string {
-  return value ? t("common.on") : t("common.off");
+  return value ? m.common_on() : m.common_off();
 }
 
 // Field-by-field equality of two flat settings objects.

@@ -1,10 +1,11 @@
 <script lang="ts">
+  import * as m from "$lib/paraglide/messages";
   import { onMount } from "svelte";
   import OverlayEditor from "$lib/components/OverlayEditor.svelte";
   import SettingsPanel from "$lib/components/SettingsPanel.svelte";
   import { mangoHudConfig, refreshMangoHudConfig, saveMangoHudConfig } from "$lib/stores/mangohud";
   import type { MangoHudConfig } from "$lib/types";
-  import { backendError, t } from "$lib/i18n/index.svelte";
+  import { backendError } from "$lib/i18n/index.svelte";
 
   let draft = $state<MangoHudConfig | null>(null);
   let saving = $state(false);
@@ -36,8 +37,8 @@
 </script>
 
 <SettingsPanel
-  title={t("overlaySettings.title")}
-  hint={t("overlaySettings.hint")}
+  title={m.overlaySettings_title()}
+  hint={m.overlaySettings_hint()}
   {saving}
   {saved}
   error={backendError(error)}

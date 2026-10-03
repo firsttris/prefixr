@@ -1,4 +1,5 @@
 <script lang="ts">
+  import * as m from "$lib/paraglide/messages";
   import { onMount, untrack } from "svelte";
   import { open } from "@tauri-apps/plugin-dialog";
   import { runners, refreshRunners } from "$lib/stores/runners";
@@ -11,7 +12,7 @@
   import { prettifyExeName } from "$lib/gameName";
   import { PRESETS } from "$lib/mangohudPresets";
   import { onOff, sameBlock, sameFields, type OverrideHooks } from "$lib/settings";
-  import { backendError, t } from "$lib/i18n/index.svelte";
+  import { backendError } from "$lib/i18n/index.svelte";
   import PerformanceEditor from "$lib/components/PerformanceEditor.svelte";
   import GraphicsEditor from "$lib/components/GraphicsEditor.svelte";
   import OverlayEditor from "$lib/components/OverlayEditor.svelte";
@@ -139,7 +140,7 @@
   const perfHooks: OverrideHooks<keyof PerformanceConfig> = {
     isOverridden: (key) => perf[key] !== null,
     reset: (key) => (perf[key] = null),
-    resetTitle: (key) => t("gameForm.resetToGlobal", { state: onOff(globalPerf[key]) }),
+    resetTitle: (key) => m.gameForm_resetToGlobal( { state: onOff(globalPerf[key]) }),
   };
 
   // --- Bild ---
@@ -173,7 +174,7 @@
   const gfxHooks: OverrideHooks<keyof GraphicsConfig> = {
     isOverridden: (key) => gfx[key] !== null,
     reset: (key) => (gfx[key] = null),
-    resetTitle: (key) => t("gameForm.resetToGlobal", { state: onOff(globalGfx[key].enabled) }),
+    resetTitle: (key) => m.gameForm_resetToGlobal( { state: onOff(globalGfx[key].enabled) }),
   };
 
   // --- Overlay ---
@@ -218,8 +219,8 @@
     reset: (key) => (overlay[key] = null),
     resetTitle: (key) =>
       key === "enabled"
-        ? t("gameForm.resetToGlobal", { state: onOff(globalOverlay.enabled) })
-        : t("gameForm.resetOverlayLook"),
+        ? m.gameForm_resetToGlobal( { state: onOff(globalOverlay.enabled) })
+        : m.gameForm_resetOverlayLook(),
   };
 
   // --- Proton ---
@@ -259,18 +260,18 @@
   let tab = $state<Tab>("general");
   const tabs = $derived(
     [
-      { id: "general" as Tab, label: t("gameForm.tabGeneral"), count: 0 },
-      { id: "performance" as Tab, label: t("nav.performance"), count: perfCount },
-      { id: "graphics" as Tab, label: t("nav.graphics"), count: gfxCount },
-      { id: "overlay" as Tab, label: t("nav.overlay"), count: overlayCount },
-      { id: "proton" as Tab, label: t("nav.proton"), count: protonCount },
+      { id: "general" as Tab, label: m.gameForm_tabGeneral(), count: 0 },
+      { id: "performance" as Tab, label: m.nav_performance(), count: perfCount },
+      { id: "graphics" as Tab, label: m.nav_graphics(), count: gfxCount },
+      { id: "overlay" as Tab, label: m.nav_overlay(), count: overlayCount },
+      { id: "proton" as Tab, label: m.nav_proton(), count: protonCount },
     ].filter((tabItem) => tabItem.id !== "proton" || isProton),
   );
   const activeTab = $derived(tabs.some((t) => t.id === tab) ? tab : "general");
 
   async function pickExe() {
     const selected = await open({
-      filters: [{ name: t("gameForm.exeFilterName"), extensions: ["exe"] }],
+      filters: [{ name: m.gameForm_exeFilterName(), extensions: ["exe"] }],
     });
     if (typeof selected === "string") {
       exePath = selected;
@@ -329,7 +330,7 @@
 </script>
 
 {#snippet inheritHint(page: string)}
-  <p class="hint">{t("gameForm.inheritHint", { page })}</p>
+  <p class="hint">{m.gameForm_inheritHint( { page })}</p>
 {/snippet}
 
 <form onsubmit={handleSubmit}>
@@ -344,7 +345,7 @@
       >
         {tabItem.label}
         {#if tabItem.count > 0}
-          <span class="count" title={t("gameForm.tabCount", { count: tabItem.count })}
+          <span class="count" title={m.gameForm_tabCount( { count: tabItem.count })}
             >{tabItem.count}</span
           >
         {/if}
@@ -354,22 +355,22 @@
 
   {#if activeTab === "general"}
     <label>
-      {t("gameForm.nameLabel")}
-      <input bind:value={name} placeholder={t("gameForm.namePlaceholder")} />
+      {m.gameForm_nameLabel()}
+      <input bind:value={name} placeholder={m.gameForm_namePlaceholder()} />
     </label>
 
     <label>
-      {t("gameForm.exeLabel")}
+      {m.gameForm_exeLabel()}
       <div class="row">
-        <input bind:value={exePath} readonly placeholder={t("gameForm.exePlaceholder")} />
-        <button type="button" onclick={pickExe}>{t("gameForm.exeChoose")}</button>
+        <input bind:value={exePath} readonly placeholder={m.gameForm_exePlaceholder()} />
+        <button type="button" onclick={pickExe}>{m.gameForm_exeChoose()}</button>
       </div>
     </label>
 
     <label>
-      {t("gameForm.prefixLabel")}
+      {m.gameForm_prefixLabel()}
       <select bind:value={prefixPath}>
-        <option value="" disabled selected>{t("gameForm.prefixChoose")}</option>
+        <option value="" disabled selected>{m.gameForm_prefixChoose()}</option>
         {#each $prefixes as prefix (prefix.path)}
           <option value={prefix.path}>{prefix.path}</option>
         {/each}
@@ -379,48 +380,48 @@
         {/if}
       </select>
       {#if $prefixes.length === 0}
-        <span class="hint">{t("gameForm.prefixEmptyHint")}</span>
+        <span class="hint">{m.gameForm_prefixEmptyHint()}</span>
       {/if}
     </label>
 
     <label>
-      {t("gameForm.runnerLabel")}
+      {m.gameForm_runnerLabel()}
       <select bind:value={runnerId}>
-        <option value="" disabled selected>{t("gameForm.runnerChoose")}</option>
+        <option value="" disabled selected>{m.gameForm_runnerChoose()}</option>
         {#each $runners as runner (runner.id)}
           <option value={runner.id}>{runner.name} ({runner.kind})</option>
         {/each}
       </select>
       {#if isProton && !umuId}
         <span class="hint">
-          {t("gameForm.runnerNoProtonfixesHint")}
+          {m.gameForm_runnerNoProtonfixesHint()}
           <button type="button" class="link" onclick={() => (tab = "proton")}
-            >{t("nav.proton")}</button
+            >{m.nav_proton()}</button
           >
-          {t("gameForm.runnerNoProtonfixesHintSuffix")}
+          {m.gameForm_runnerNoProtonfixesHintSuffix()}
         </span>
       {/if}
     </label>
 
     <label>
-      {t("gameForm.envVarsLabel")}
-      <textarea placeholder={t("gameForm.envVarsPlaceholder")} bind:value={envVarsText}
+      {m.gameForm_envVarsLabel()}
+      <textarea placeholder={m.gameForm_envVarsPlaceholder()} bind:value={envVarsText}
       ></textarea>
-      <span class="hint">{t("gameForm.envVarsHint")}</span>
+      <span class="hint">{m.gameForm_envVarsHint()}</span>
     </label>
 
     <label>
-      {t("gameForm.launchArgsLabel")}
-      <input placeholder={t("gameForm.launchArgsPlaceholder")} bind:value={launchArgs} />
+      {m.gameForm_launchArgsLabel()}
+      <input placeholder={m.gameForm_launchArgsPlaceholder()} bind:value={launchArgs} />
     </label>
   {:else if activeTab === "performance"}
-    {@render inheritHint(t("nav.performance"))}
+    {@render inheritHint(m.nav_performance())}
     <PerformanceEditor value={perfShown} onchange={changePerf} overrides={perfHooks} />
   {:else if activeTab === "graphics"}
-    {@render inheritHint(t("nav.graphics"))}
+    {@render inheritHint(m.nav_graphics())}
     <GraphicsEditor value={gfxShown} onchange={changeGfx} overrides={gfxHooks} compact />
   {:else if activeTab === "overlay"}
-    {@render inheritHint(t("nav.overlay"))}
+    {@render inheritHint(m.nav_overlay())}
     <OverlayEditor value={overlayShown} onchange={changeOverlay} overrides={overlayHooks} />
   {:else if activeTab === "proton"}
     <UmuIdPicker
@@ -433,7 +434,7 @@
         umuStore = store;
       }}
     />
-    {@render inheritHint(t("nav.proton"))}
+    {@render inheritHint(m.nav_proton())}
     <ProtonEditor
       options={protonOptions}
       values={proton}
@@ -449,9 +450,9 @@
 
   <button type="submit" class="primary" disabled={submitting}>
     {#if submitting}
-      {existingGame ? t("gameForm.submitSaving") : t("gameForm.submitAdding")}
+      {existingGame ? m.gameForm_submitSaving() : m.gameForm_submitAdding()}
     {:else}
-      {existingGame ? t("common.save") : t("gameForm.submitAdd")}
+      {existingGame ? m.common_save() : m.gameForm_submitAdd()}
     {/if}
   </button>
 </form>

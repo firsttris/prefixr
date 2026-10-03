@@ -1,4 +1,5 @@
 <script lang="ts">
+  import * as m from "$lib/paraglide/messages";
   import { onMount } from "svelte";
   import PerformanceEditor from "$lib/components/PerformanceEditor.svelte";
   import SettingsPanel from "$lib/components/SettingsPanel.svelte";
@@ -9,7 +10,7 @@
   } from "$lib/stores/performance";
   import { maxMapCountStatus, refreshMaxMapCountStatus, fixMaxMapCount } from "$lib/stores/system";
   import type { PerformanceConfig } from "$lib/types";
-  import { backendError, t, getLocale } from "$lib/i18n/index.svelte";
+  import { backendError, getLocale } from "$lib/i18n/index.svelte";
 
   let draft = $state<PerformanceConfig | null>(null);
   let saving = $state(false);
@@ -60,9 +61,9 @@
   {#if $maxMapCountStatus && !$maxMapCountStatus.sufficient}
     <div class="warning-banner">
       <div>
-        <strong>{t("performanceSettings.mapCountWarningTitle")}</strong>
+        <strong>{m.performanceSettings_mapCountWarningTitle()}</strong>
         <p>
-          {t("performanceSettings.mapCountWarningBody", {
+          {m.performanceSettings_mapCountWarningBody( {
             current: $maxMapCountStatus.current.toLocaleString(
               getLocale() === "de" ? "de-DE" : "en-US",
             ),
@@ -88,7 +89,7 @@
           disabled={fixingMapCount}
           onclick={handleFixMapCount}
         >
-          {fixingMapCount ? t("performanceSettings.fixing") : t("performanceSettings.fixNow")}
+          {fixingMapCount ? m.performanceSettings_fixing() : m.performanceSettings_fixNow()}
         </button>
       {/if}
     </div>
@@ -96,8 +97,8 @@
 
 
   <SettingsPanel
-    title={t("performanceSettings.title")}
-    hint={t("performanceSettings.hint")}
+    title={m.performanceSettings_title()}
+    hint={m.performanceSettings_hint()}
     {saving}
     {saved}
     error={backendError(error)}

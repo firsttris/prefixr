@@ -1,9 +1,10 @@
 <script lang="ts">
+  import * as m from "$lib/paraglide/messages";
   import type { Game } from "$lib/types";
   import type { GameRunState } from "$lib/stores/games";
   import { getGameCover } from "$lib/stores/steamgriddb";
   import ConfirmDialog from "./ConfirmDialog.svelte";
-  import { backendError, t } from "$lib/i18n/index.svelte";
+  import { backendError } from "$lib/i18n/index.svelte";
 
   let {
     game,
@@ -106,11 +107,11 @@
 
   <div class="status">
     {#if runState?.running}
-      <span class="status-badge running"><span class="dot"></span>{t("gameCard.running")}</span>
+      <span class="status-badge running"><span class="dot"></span>{m.gameCard_running()}</span>
     {:else if runState?.initializing}
-      <span class="status-badge init"><span class="dot"></span>{t("gameCard.initializing")}</span>
+      <span class="status-badge init"><span class="dot"></span>{m.gameCard_initializing()}</span>
     {:else if runState?.error}
-      <span class="status-badge error">{t("gameCard.error")}</span>
+      <span class="status-badge error">{m.gameCard_error()}</span>
     {/if}
   </div>
 
@@ -124,8 +125,8 @@
         disabled={shortcutState === "creating"}
         aria-haspopup="true"
         aria-expanded={shortcutMenuOpen}
-        aria-label={t("gameCard.shortcutMenuLabel")}
-        title={t("gameCard.shortcutMenuLabel")}
+        aria-label={m.gameCard_shortcutMenuLabel()}
+        title={m.gameCard_shortcutMenuLabel()}
       >
         {shortcutState === "done" ? "✓" : "🔗"}
       </button>
@@ -137,10 +138,10 @@
         ></div>
         <div class="menu" class:menu-up={shortcutMenuUpward} role="menu">
           <button type="button" role="menuitem" onclick={() => handleCreateShortcut("desktop")}>
-            {t("gameCard.menuDesktopShortcut")}
+            {m.gameCard_menuDesktopShortcut()}
           </button>
           <button type="button" role="menuitem" onclick={() => handleCreateShortcut("menu")}>
-            {t("gameCard.menuMenuShortcut")}
+            {m.gameCard_menuMenuShortcut()}
           </button>
           <button
             type="button"
@@ -150,7 +151,7 @@
               onExportToSteam();
             }}
           >
-            {inSteam ? t("gameCard.menuUpdateInSteam") : t("gameCard.menuAddToSteam")}
+            {inSteam ? m.gameCard_menuUpdateInSteam() : m.gameCard_menuAddToSteam()}
           </button>
           {#if inSteam}
             <button
@@ -161,7 +162,7 @@
                 onRemoveFromSteam();
               }}
             >
-              {t("gameCard.menuRemoveFromSteam")}
+              {m.gameCard_menuRemoveFromSteam()}
             </button>
           {/if}
         </div>
@@ -171,8 +172,8 @@
       type="button"
       class="icon-btn"
       onclick={onEditArtwork}
-      aria-label={t("library.selectArtworkTitle")}
-      title={t("library.selectArtworkTitle")}
+      aria-label={m.library_selectArtworkTitle()}
+      title={m.library_selectArtworkTitle()}
     >
       🖼
     </button>
@@ -180,8 +181,8 @@
       type="button"
       class="icon-btn"
       onclick={onEdit}
-      aria-label={t("library.editGameTitle")}
-      title={t("library.editGameTitle")}
+      aria-label={m.library_editGameTitle()}
+      title={m.library_editGameTitle()}
     >
       ✎
     </button>
@@ -190,14 +191,14 @@
       type="button"
       class="icon-btn danger"
       onclick={() => (confirmingRemove = true)}
-      aria-label={t("gameCard.removeAriaLabel")}
-      title={t("gameCard.removeAriaLabel")}
+      aria-label={m.gameCard_removeAriaLabel()}
+      title={m.gameCard_removeAriaLabel()}
     >
       ✕
     </button>
 
     {#if runState?.running}
-      <button type="button" class="kill-sm" onclick={onKill}>{t("gameCard.kill")}</button>
+      <button type="button" class="kill-sm" onclick={onKill}>{m.gameCard_kill()}</button>
     {:else}
       <button
         type="button"
@@ -205,7 +206,7 @@
         onclick={onLaunch}
         disabled={runState?.initializing}
       >
-        {runState?.initializing ? t("gameCard.initializingShort") : t("gameCard.start")}
+        {runState?.initializing ? m.gameCard_initializingShort() : m.gameCard_start()}
       </button>
     {/if}
   </div>
@@ -216,7 +217,7 @@
     <span>{backendError(runState.error)}</span>
     {#if runState.logPath}
       <button type="button" class="ghost" onclick={() => onShowLog(runState.logPath!)}>
-        {t("gameCard.showLog")}
+        {m.gameCard_showLog()}
       </button>
     {/if}
   </div>
@@ -224,16 +225,16 @@
 
 {#if typeof shortcutState === "object"}
   <div class="toast">
-    <span>{t("gameCard.shortcutFailed", { error: backendError(shortcutState.error) })}</span>
+    <span>{m.gameCard_shortcutFailed( { error: backendError(shortcutState.error) })}</span>
   </div>
 {/if}
 
 <ConfirmDialog
   open={confirmingRemove}
-  title={t("gameCard.removeConfirmTitle")}
-  message={t("gameCard.removeConfirmMessage", {
+  title={m.gameCard_removeConfirmTitle()}
+  message={m.gameCard_removeConfirmMessage( {
     name: game.name,
-    steamPart: inSteam ? t("gameCard.removeConfirmSteamPart") : "",
+    steamPart: inSteam ? m.gameCard_removeConfirmSteamPart() : "",
   })}
   onConfirm={() => {
     confirmingRemove = false;

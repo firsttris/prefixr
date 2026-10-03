@@ -1,8 +1,9 @@
 <script lang="ts">
+  import { msgGroup } from "$lib/i18n/msg-groups";
   import SettingToggle from "$lib/components/SettingToggle.svelte";
   import type { OverrideHooks } from "$lib/settings";
   import type { PerformanceConfig } from "$lib/types";
-  import { t } from "$lib/i18n/index.svelte";
+  import { pickMsg } from "$lib/i18n/index.svelte";
 
   // Leistung — see settings.ts for how the editors are shared between the
   // global page and the game dialog.
@@ -26,9 +27,9 @@
 <div class="list">
   {#each ROWS as row (row.key)}
     <SettingToggle
-      label={t(`performanceEditor.${row.key}.label`)}
-      description={t(`performanceEditor.${row.key}.description`)}
-      info={t(`performanceEditor.${row.key}.info`)}
+      label={pickMsg(msgGroup.performanceEditor_label, row.key)}
+      description={pickMsg(msgGroup.performanceEditor_description, row.key)}
+      info={pickMsg(msgGroup.performanceEditor_info, row.key)}
       checked={value[row.key]}
       onToggle={(checked) => onchange({ [row.key]: checked })}
       overridden={overrides?.isOverridden(row.key)}

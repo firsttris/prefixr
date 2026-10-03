@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { t } from "$lib/i18n/index.svelte";
+  import * as m from "$lib/paraglide/messages";
+  
 
   let { text }: { text: string } = $props();
 
@@ -30,7 +31,7 @@
     class:active={open}
     onclick={toggle}
     aria-expanded={open}
-    aria-label={t("common.moreInfo")}
+    aria-label={m.common_moreInfo()}
   >
     ⓘ
   </button>
