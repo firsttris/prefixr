@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { writable } from "svelte/store";
 import type {
   ArtworkKind,
@@ -46,8 +46,19 @@ export async function removeGameCover(gameId: string): Promise<void> {
   await refreshGames();
 }
 
-export async function getGameCover(gameId: string): Promise<string | null> {
-  return await invoke<string | null>("get_game_cover", { gameId });
+/**
+ * An asset-protocol URL for a cached artwork file, so the webview reads it
+ * from disk instead of receiving it base64-encoded over IPC. `version`
+ * changes with the chosen image and keeps the webview from showing a cached
+ * older file under the same path; the asset protocol ignores the query.
+ */
+function artworkUrl(path: string | null, version: number | null): string | null {
+  if (!path) return null;
+  return version == null ? convertFileSrc(path) : `${convertFileSrc(path)}?v=${version}`;
+}
+
+export async function getGameCover(gameId: string, version: number | null = null): Promise<string | null> {
+  return artworkUrl(await invoke<string | null>("get_game_cover", { gameId }), version);
 }
 
 export async function setGameIcon(
@@ -65,8 +76,8 @@ export async function removeGameIcon(gameId: string): Promise<void> {
   await refreshGames();
 }
 
-export async function getGameIcon(gameId: string): Promise<string | null> {
-  return await invoke<string | null>("get_game_icon", { gameId });
+export async function getGameIcon(gameId: string, version: number | null = null): Promise<string | null> {
+  return artworkUrl(await invoke<string | null>("get_game_icon", { gameId }), version);
 }
 
 export async function listSteamGridDbArtwork(

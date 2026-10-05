@@ -2,8 +2,6 @@ use crate::error::AppError;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use base64::engine::general_purpose::STANDARD;
-use base64::Engine;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, State};
 use uuid::Uuid;
@@ -348,18 +346,6 @@ pub(crate) fn image_extension(url: &str) -> &'static str {
     }
 }
 
-fn image_mime(ext: &str) -> &'static str {
-    match ext {
-        "jpg" => "image/jpeg",
-        "webp" => "image/webp",
-        _ => "image/png",
-    }
-}
-
-fn image_data_url(bytes: &[u8], ext: &str) -> String {
-    format!("data:{};base64,{}", image_mime(ext), STANDARD.encode(bytes))
-}
-
 /// The cache path for a game's asset of a given `kind` ("" for the cover,
 /// kept suffix-less for backward compatibility with already-cached files;
 /// "_icon" etc. for anything added since).
@@ -482,8 +468,10 @@ pub async fn set_game_cover(
     Ok(updated)
 }
 
-/// Reads a game's cached cover, if any, as a `data:image/...;base64,...`
-/// URI. Returns `Ok(None)` (rather than an error) both when the game has no
+/// The path of a game's cached cover, if any. The frontend loads the file
+/// through the asset protocol (scoped to the artwork directory in
+/// tauri.conf.json) instead of receiving its bytes base64-encoded over IPC.
+/// Returns `Ok(None)` (rather than an error) both when the game has no
 /// cover set and when the cache file is unexpectedly missing, since either
 /// case just means the card should fall back to showing no cover.
 #[tauri::command(async)]
@@ -506,8 +494,7 @@ pub fn get_game_cover(app: AppHandle, state: State<ConfigState>, game_id: String
         return Ok(None);
     }
 
-    let bytes = fs::read(&path).map_err(|e| format!("Could not read cover file: {e}"))?;
-    Ok(Some(image_data_url(&bytes, ext)))
+    Ok(Some(path.to_string_lossy().into_owned()))
 }
 
 /// Clears a game's cover and deletes its cached file. Deliberately keeps
@@ -564,9 +551,9 @@ pub async fn set_game_icon(
     Ok(updated)
 }
 
-/// Reads a game's cached icon, if any, as a `data:image/...;base64,...`
-/// URI. Returns `Ok(None)` both when the game has no icon set and when the
-/// cache file is unexpectedly missing.
+/// The path of a game's cached icon, if any, for the asset protocol like
+/// `get_game_cover`. Returns `Ok(None)` both when the game has no icon set
+/// and when the cache file is unexpectedly missing.
 #[tauri::command(async)]
 pub fn get_game_icon(app: AppHandle, state: State<ConfigState>, game_id: String) -> Result<Option<String>, AppError> {
     let icon_url = {
@@ -587,8 +574,7 @@ pub fn get_game_icon(app: AppHandle, state: State<ConfigState>, game_id: String)
         return Ok(None);
     }
 
-    let bytes = fs::read(&path).map_err(|e| format!("Could not read icon file: {e}"))?;
-    Ok(Some(image_data_url(&bytes, ext)))
+    Ok(Some(path.to_string_lossy().into_owned()))
 }
 
 /// Clears a game's SteamGridDB icon and deletes its cached file. Keeps
