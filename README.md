@@ -160,6 +160,12 @@ bun run tauri build
 
 Builds the frontend and produces the native binary as well as the configured bundles (including an AppImage) under `src-tauri/target/release/`.
 
+Releases are built by CI from a tag `vX.Y.Z`, as in the other projects
+([firsttris/workflows](https://github.com/firsttris/workflows)): *Actions → Bump version → Run
+workflow* (patch, minor or major) raises the version in `package.json`, `src-tauri/tauri.conf.json`
+and `src-tauri/Cargo.toml`, commits and tags it and starts the release, which builds the bundles and
+attaches them to a GitHub release.
+
 When downloading release assets, you may see two AppImage variants:
 
 - `*-ubuntu-compat.AppImage`: built on Ubuntu (compatibility-focused baseline). Prefer this on most distros.
