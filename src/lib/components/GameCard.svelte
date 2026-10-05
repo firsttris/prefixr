@@ -42,16 +42,31 @@
   let menuButtonEl: HTMLButtonElement | undefined;
   let confirmingRemove = $state(false);
 
-  let coverDataUrl = $state<string | null>(null);
+  let coverSrc = $state<string | null>(null);
+
+  // Only these primitives decide which cover to show; depending on them
+  // instead of `game` keeps every games refresh (a new object per game)
+  // from fetching the cover again.
+  const gameId = $derived(game.id);
+  const coverUrl = $derived(game.cover_url);
+  const coverGridId = $derived(game.cover_grid_id);
 
   $effect(() => {
-    if (!game.cover_url) {
-      coverDataUrl = null;
+    if (!coverUrl) {
+      coverSrc = null;
       return;
     }
-    getGameCover(game.id)
-      .then((url) => (coverDataUrl = url))
-      .catch(() => (coverDataUrl = null));
+    let stale = false;
+    getGameCover(gameId, coverGridId)
+      .then((src) => {
+        if (!stale) coverSrc = src;
+      })
+      .catch(() => {
+        if (!stale) coverSrc = null;
+      });
+    return () => {
+      stale = true;
+    };
   });
 
   function toggleMenu() {
@@ -79,8 +94,8 @@
 
 <article class="card" class:running={runState?.running}>
   <div class="cover-wrap">
-    {#if coverDataUrl}
-      <img class="cover" src={coverDataUrl} alt="" />
+    {#if coverSrc}
+      <img class="cover" src={coverSrc} alt="" loading="lazy" decoding="async" />
     {:else}
       <div class="cover placeholder">
         {#if game.icon}

@@ -71,21 +71,11 @@ fn artwork_kinds_map_to_expected_endpoints() {
 }
 
 #[test]
-fn detects_image_extensions_and_mime_types() {
+fn detects_image_extensions() {
     assert_eq!(image_extension("https://cdn/foo/bar.jpg?size=600"), "jpg");
     assert_eq!(image_extension("https://cdn/foo/bar.JPEG"), "jpg");
     assert_eq!(image_extension("https://cdn/foo/bar.webp"), "webp");
     assert_eq!(image_extension("https://cdn/foo/bar.unknown"), "png");
-    assert_eq!(image_mime("jpg"), "image/jpeg");
-    assert_eq!(image_mime("webp"), "image/webp");
-    assert_eq!(image_mime("png"), "image/png");
-}
-
-#[test]
-fn image_data_url_uses_matching_mime_and_base64() {
-    assert_eq!(image_data_url(b"\xff\xd8", "jpg"), "data:image/jpeg;base64,/9g=");
-    assert_eq!(image_data_url(b"RIFF", "webp"), "data:image/webp;base64,UklGRg==");
-    assert_eq!(image_data_url(b"PNG", "png"), "data:image/png;base64,UE5H");
 }
 
 #[test]
