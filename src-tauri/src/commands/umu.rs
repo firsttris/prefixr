@@ -7,7 +7,7 @@ use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Manager, State};
 
 use crate::commands::github::read_token;
-use crate::commands::runner_downloads::{replace_dir, restore_replaced_dir};
+use crate::commands::runner_downloads::{replace_dir, restore_replaced_dir, with_optional_auth};
 use crate::config::ConfigState;
 
 /// umu-launcher (https://github.com/Open-Wine-Components/umu-launcher) is
@@ -108,16 +108,9 @@ struct GitHubRelease {
     assets: Vec<GitHubAsset>,
 }
 
-fn with_auth(builder: reqwest::RequestBuilder, token: Option<&str>) -> reqwest::RequestBuilder {
-    match token {
-        Some(token) => builder.bearer_auth(token),
-        None => builder,
-    }
-}
-
 async fn latest_release(token: Option<&str>) -> Result<GitHubRelease, String> {
     let url = format!("https://api.github.com/repos/{UMU_REPO}/releases/latest");
-    let response = with_auth(crate::http::client().get(url), token)
+    let response = with_optional_auth(crate::http::client().get(url), token)
         .send()
         .await
         .map_err(|e| format!("Could not reach GitHub: {e}"))?;
@@ -143,7 +136,7 @@ async fn install_latest(app: &AppHandle, token: Option<&str>) -> Result<UmuStatu
         .ok_or_else(|| format!("GitHub reported no SHA-256 digest for {}", asset.name))?
         .to_string();
 
-    let bytes = with_auth(crate::http::client().get(&asset.browser_download_url), token)
+    let bytes = with_optional_auth(crate::http::client().get(&asset.browser_download_url), token)
         .send()
         .await
         .map_err(|e| format!("Could not download {}: {e}", asset.name))?

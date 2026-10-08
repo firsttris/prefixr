@@ -19,7 +19,7 @@ use crate::models::RunnerKind;
 /// Adds a bearer `Authorization` header when a GitHub token is configured,
 /// leaving the request unauthenticated otherwise — GitHub's API accepts both,
 /// just at a much lower rate limit (60 vs 5000 requests/hour) when anonymous.
-fn with_optional_auth(builder: RequestBuilder, token: Option<&str>) -> RequestBuilder {
+pub(crate) fn with_optional_auth(builder: RequestBuilder, token: Option<&str>) -> RequestBuilder {
     match token {
         Some(token) => builder.bearer_auth(token),
         None => builder,

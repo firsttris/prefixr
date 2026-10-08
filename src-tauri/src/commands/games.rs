@@ -996,8 +996,16 @@ pub(crate) async fn prepare_prefix(
             // costs some games noticeable performance. A game's own
             // `WINEDEBUG` comes later and still wins.
             env.push(("WINEDEBUG".to_string(), "-all".to_string()));
-            prepare_wine(app, runner, prefix_path, log_path, on_initializing, &mut dll_overrides)
-                .await?
+            prepare_wine(
+                app,
+                token,
+                runner,
+                prefix_path,
+                log_path,
+                on_initializing,
+                &mut dll_overrides,
+            )
+            .await?
         }
     };
     env.push(("WINEDLLOVERRIDES".to_string(), dll_overrides.join(";")));
@@ -1067,6 +1075,7 @@ const WINEBOOT_DLL_OVERRIDES: &str = "mscoree,mshtml=;winemenubuilder.exe=";
 /// `WINEDLLOVERRIDES` entries those need appended to `dll_overrides`.
 async fn prepare_wine(
     app: &AppHandle,
+    token: Option<&str>,
     runner: &Runner,
     prefix_path: &Path,
     log_path: &Path,
@@ -1106,7 +1115,7 @@ async fn prepare_wine(
     }
 
     install_wine_mono(app, &wine, &runner.path, prefix_path, log_path).await?;
-    let cache = ensure_directx_layer_cache(app).await?;
+    let cache = ensure_directx_layer_cache(app, token).await?;
     dll_overrides.push(sync_directx_overrides_from_cache(&cache, prefix_path)?);
 
     // Proton only re-copies its own DXVK/VKD3D (and builtin DLLs) into a

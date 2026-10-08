@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 use tauri::{AppHandle, Manager};
 
-use crate::commands::runner_downloads::{extraction_dir, move_extracted_dir};
+use crate::commands::runner_downloads::{extraction_dir, move_extracted_dir, with_optional_auth};
 
 /// A plain Wine build (unlike Proton) has no DXVK/VKD3D of its own — see
 /// `sync_directx_overrides_from_cache` in `games.rs`. This downloads and
@@ -30,10 +30,10 @@ static CACHE_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 /// GETs `url` and fails on an error status, so a 404 or rate-limit page is
 /// never taken for the file itself — everything here is cached for good once
-/// it's on disk.
-async fn get(url: &str) -> Result<reqwest::Response, String> {
-    crate::http::client()
-        .get(url)
+/// it's on disk. A GitHub token, where given, counts the request against the
+/// user's own rate limit instead of the low anonymous one.
+async fn get(url: &str, token: Option<&str>) -> Result<reqwest::Response, String> {
+    with_optional_auth(crate::http::client().get(url), token)
         .send()
         .await
         .and_then(reqwest::Response::error_for_status)
@@ -50,10 +50,11 @@ fn cache_dir(app: &AppHandle) -> Result<PathBuf, String> {
 
 async fn download_latest_asset(
     repo: &str,
+    token: Option<&str>,
     matches_asset: impl Fn(&str) -> bool,
 ) -> Result<(String, Vec<u8>), String> {
     let url = format!("https://api.github.com/repos/{repo}/releases/latest");
-    let release: GitHubRelease = get(&url)
+    let release: GitHubRelease = get(&url, token)
         .await?
         .json()
         .await
@@ -64,7 +65,7 @@ async fn download_latest_asset(
         .find(|a| matches_asset(&a.name))
         .ok_or_else(|| format!("No matching release asset found in {repo}"))?;
 
-    let bytes = get(&asset.browser_download_url)
+    let bytes = get(&asset.browser_download_url, token)
         .await?
         .bytes()
         .await
@@ -94,6 +95,7 @@ fn extract_archive(name: &str, bytes: &[u8], dest_dir: &Path) -> Result<(), Stri
 
 async fn ensure_layer(
     app: &AppHandle,
+    token: Option<&str>,
     dir_name: &str,
     repo: &str,
     matches_asset: impl Fn(&str) -> bool,
@@ -103,7 +105,7 @@ async fn ensure_layer(
         return Ok(target);
     }
 
-    let (asset_name, bytes) = download_latest_asset(repo, matches_asset).await?;
+    let (asset_name, bytes) = download_latest_asset(repo, token, matches_asset).await?;
 
     let extract_dir = extraction_dir(&cache_dir(app)?);
     if let Err(e) = extract_archive(&asset_name, &bytes, &extract_dir) {
@@ -119,14 +121,18 @@ async fn ensure_layer(
 /// fetching each the first time it's needed (a no-op once both are already
 /// there). Returns the cache directory; `<dir>/dxvk/{x32,x64}` and
 /// `<dir>/vkd3d-proton/{x86,x64}` hold the actual DLLs.
-pub async fn ensure_directx_layer_cache(app: &AppHandle) -> Result<PathBuf, String> {
+pub async fn ensure_directx_layer_cache(
+    app: &AppHandle,
+    token: Option<&str>,
+) -> Result<PathBuf, String> {
     let _lock = CACHE_LOCK.lock().await;
-    ensure_layer(app, "dxvk", "doitsujin/dxvk", |name| {
+    ensure_layer(app, token, "dxvk", "doitsujin/dxvk", |name| {
         name.starts_with("dxvk-") && name.ends_with(".tar.gz") && !name.contains("native")
     })
     .await?;
     ensure_layer(
         app,
+        token,
         "vkd3d-proton",
         "HansKristian-Work/vkd3d-proton",
         |name| name.ends_with(".tar.zst"),
@@ -210,7 +216,7 @@ fn cached_mono_msi(cache: &Path) -> Option<PathBuf> {
 /// version; the index lists them in ascending version order, so the last
 /// `X.Y.Z/` entry is the latest.
 async fn latest_mono_release() -> Result<(String, String), String> {
-    let index = get(MONO_BASE_URL)
+    let index = get(MONO_BASE_URL, None)
         .await?
         .text()
         .await
@@ -229,7 +235,7 @@ async fn latest_mono_release() -> Result<(String, String), String> {
         .map(|href| href.trim_end_matches('/').to_string())
         .ok_or_else(|| "Could not find a wine-mono version in the listing".to_string())?;
 
-    let version_index = get(&format!("{MONO_BASE_URL}{version}/"))
+    let version_index = get(&format!("{MONO_BASE_URL}{version}/"), None)
         .await?
         .text()
         .await
@@ -270,7 +276,7 @@ pub async fn ensure_wine_mono_msi(app: &AppHandle, runner_path: &Path) -> Result
         return Ok(msi_path);
     }
 
-    let bytes = get(&format!("{MONO_BASE_URL}{version}/{msi_name}"))
+    let bytes = get(&format!("{MONO_BASE_URL}{version}/{msi_name}"), None)
         .await?
         .bytes()
         .await
