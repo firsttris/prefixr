@@ -381,8 +381,30 @@ pub(crate) fn remove_game_artwork_files(app: &AppHandle, id: Uuid) {
     }
 }
 
-/// Downloads an artwork image from its source URL.
+/// The most an artwork image may be. SteamGridDB's largest (heroes) are a
+/// few MB.
+const MAX_IMAGE_BYTES: usize = 20 * 1024 * 1024;
+
+/// Whether `url` is an image on SteamGridDB, which is where every artwork
+/// URL the frontend passes back came from (its CDN is `cdn2.steamgriddb.com`).
+fn is_steamgriddb_image_url(url: &str) -> bool {
+    reqwest::Url::parse(url).is_ok_and(|url| {
+        url.scheme() == "https"
+            && url
+                .host_str()
+                .is_some_and(|host| host == "steamgriddb.com" || host.ends_with(".steamgriddb.com"))
+    })
+}
+
+/// Downloads an artwork image from its source URL — only from SteamGridDB,
+/// and only up to `MAX_IMAGE_BYTES`.
 async fn download_image(image_url: &str) -> Result<Vec<u8>, String> {
+    use futures_util::StreamExt;
+
+    if !is_steamgriddb_image_url(image_url) {
+        return Err(format!("Not a SteamGridDB image: {image_url}"));
+    }
+    let too_large = || format!("Image is larger than {} MB", MAX_IMAGE_BYTES / 1024 / 1024);
     let response = crate::http::client()
         .get(image_url)
         .send()
@@ -394,11 +416,23 @@ async fn download_image(image_url: &str) -> Result<Vec<u8>, String> {
             response.status()
         ));
     }
-    Ok(response
-        .bytes()
-        .await
-        .map_err(|e| format!("Could not read image data: {e}"))?
-        .to_vec())
+    if response
+        .content_length()
+        .is_some_and(|length| length > MAX_IMAGE_BYTES as u64)
+    {
+        return Err(too_large());
+    }
+    // Counted while reading too: the length header may be missing or wrong.
+    let mut bytes = Vec::new();
+    let mut stream = response.bytes_stream();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| format!("Could not read image data: {e}"))?;
+        if bytes.len() + chunk.len() > MAX_IMAGE_BYTES {
+            return Err(too_large());
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    Ok(bytes)
 }
 
 /// SteamGridDB serves some icons as `.ico`, which `image_extension` files as

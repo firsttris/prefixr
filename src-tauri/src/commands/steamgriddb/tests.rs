@@ -175,3 +175,19 @@ fn ico_icons_become_png() {
     let other = b"\x89PNG not touched".to_vec();
     assert_eq!(ico_to_png(other.clone()).unwrap(), other);
 }
+
+#[test]
+fn only_steamgriddb_images_are_downloaded() {
+    assert!(is_steamgriddb_image_url("https://cdn2.steamgriddb.com/grid/abc.png"));
+    assert!(is_steamgriddb_image_url("https://steamgriddb.com/x.png"));
+    for url in [
+        "http://cdn2.steamgriddb.com/grid/abc.png",
+        "https://steamgriddb.com.evil.example/x.png",
+        "https://evilsteamgriddb.com/x.png",
+        "file:///etc/passwd",
+        "https://localhost:8080/x.png",
+        "not a url",
+    ] {
+        assert!(!is_steamgriddb_image_url(url), "{url}");
+    }
+}
