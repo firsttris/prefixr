@@ -11,6 +11,7 @@
   import { mangoHudConfig, refreshMangoHudConfig } from "$lib/stores/mangohud";
   import { listProtonOptions, protonConfig, refreshProtonConfig } from "$lib/stores/proton";
   import { prettifyExeName } from "$lib/gameName";
+  import { formatEnvVars, parseEnvVars } from "$lib/envVars";
   import { PRESETS } from "$lib/mangohudPresets";
   import { onOff, sameBlock, sameFields, type OverrideHooks } from "$lib/settings";
   import { backendError } from "$lib/i18n/index.svelte";
@@ -51,12 +52,6 @@
     initialRunnerId?: string;
     onSuccess?: () => void;
   } = $props();
-
-  function formatEnvVars(envVars: Record<string, string>): string {
-    return Object.entries(envVars)
-      .map(([key, value]) => `${key}=${value}`)
-      .join("\n");
-  }
 
   // Modal fully unmounts/remounts this form on every open, so reading
   // existingGame once here to seed the fields is intentional, not a bug.
@@ -283,19 +278,6 @@
         name = prettifyExeName(fileName);
       }
     }
-  }
-
-  function parseEnvVars(text: string): Record<string, string> {
-    const result: Record<string, string> = {};
-    for (const line of text.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      const [key, ...rest] = trimmed.split("=");
-      if (key && rest.length > 0) {
-        result[key.trim()] = rest.join("=").trim();
-      }
-    }
-    return result;
   }
 
   // The required fields still empty; marked once a save was tried.
