@@ -296,8 +296,10 @@ fn mono_version_in(module: &[u8]) -> Option<String> {
         let start = offset + found + needle.len();
         offset = start;
         let version: String = module[start..]
-            .chunks_exact(2)
-            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|&pair| u16::from_le_bytes(pair))
             .map_while(|unit| {
                 char::from_u32(unit.into()).filter(|c| c.is_ascii_digit() || *c == '.')
             })
