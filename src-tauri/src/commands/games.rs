@@ -23,6 +23,7 @@ use crate::commands::mangohud::{ensure_mangohud_conf, mangohud_conf_path};
 use crate::commands::runners::{
     find_runner, runner_command, umu_command, wine_binary, wineserver_binary,
 };
+use crate::commands::prefixes::known_prefix;
 use crate::commands::shell_link::{find_recently_created_shortcuts, DetectedShortcut};
 use crate::commands::steamgriddb::{
     artwork_dir, asset_cache_path, image_extension, remove_game_artwork_files,
@@ -479,14 +480,13 @@ pub async fn run_installer(
     runner_id: String,
     exe_path: String,
 ) -> Result<InstallerResult, AppError> {
-    let runners_dir = {
+    let (runners_dir, prefix) = {
         let config = state.locked();
-        config.runners_dir.clone()
+        (config.runners_dir.clone(), known_prefix(&config, &prefix_path)?)
     };
     let token = read_token(&state);
 
     let runner = find_runner(&runners_dir, &runner_id)?;
-    let prefix = PathBuf::from(&prefix_path);
     let log_path = new_log_file(&prefix_log_dir(&app, &prefix)?)?;
     let log_path_string = log_path.display().to_string();
 

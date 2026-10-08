@@ -21,3 +21,25 @@ fn proton_compat_data_folders_use_their_pfx() {
     assert_eq!(effective_prefix_path(&dir.join("new")), dir.join("new"));
     fs::remove_dir_all(&dir).unwrap();
 }
+
+#[test]
+fn known_prefixes_are_listed_or_used_by_a_game() {
+    let game: crate::models::Game = serde_json::from_value(serde_json::json!({
+        "id": uuid::Uuid::new_v4(),
+        "name": "Game",
+        "exe_path": "/games/game.exe",
+        "prefix_path": "/prefixes/removed-from-list",
+        "runner_id": "wine",
+    }))
+    .unwrap();
+    let config: AppConfig = serde_json::from_value(serde_json::json!({
+        "runners_dir": "/runners",
+        "prefixes": [{ "path": "/prefixes/listed" }],
+        "games": [game],
+    }))
+    .unwrap();
+
+    assert!(known_prefix(&config, "/prefixes/listed").is_ok());
+    assert!(known_prefix(&config, "/prefixes/removed-from-list").is_ok());
+    assert!(known_prefix(&config, "/home/user/.ssh").is_err());
+}

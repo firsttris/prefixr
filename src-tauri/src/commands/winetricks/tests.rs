@@ -1,5 +1,6 @@
 use super::{
-    list_installed_winetricks_verbs, looks_like_winetricks, parse_verb_catalogue, uses_umu_winetricks,
+    is_verb_name, looks_like_winetricks, parse_verb_catalogue, read_installed_verbs,
+    uses_umu_winetricks,
 };
 use crate::models::{Runner, RunnerKind};
 use std::fs;
@@ -69,7 +70,7 @@ fn reads_installed_winetricks_verbs_and_ignores_blank_lines() {
     .unwrap();
 
     assert_eq!(
-        list_installed_winetricks_verbs(prefix.display().to_string()).unwrap(),
+        read_installed_verbs(&prefix).unwrap(),
         vec![
             "corefonts".to_string(),
             "vcrun2022".to_string(),
@@ -85,7 +86,7 @@ fn missing_winetricks_log_is_not_an_error() {
     let prefix = temp_path("winetricks-missing-log");
 
     assert_eq!(
-        list_installed_winetricks_verbs(prefix.display().to_string()).unwrap(),
+        read_installed_verbs(&prefix).unwrap(),
         Vec::<String>::new()
     );
 
@@ -124,4 +125,14 @@ fn only_the_winetricks_script_is_accepted() {
     ));
     assert!(!looks_like_winetricks(b"<!DOCTYPE html><html>Sign in to the network</html>"));
     assert!(!looks_like_winetricks(b"#!/bin/sh\necho no version here\n"));
+}
+
+#[test]
+fn only_verb_shaped_names_are_passed_to_winetricks() {
+    for verb in ["vcrun2022", "d3dx9_43", "dotnet48", "corefonts", "renderer=vulkan"] {
+        assert!(is_verb_name(verb), "{verb}");
+    }
+    for verb in ["", "--self-update", "-q", "VCRUN", "a b", "x;rm", "../x"] {
+        assert!(!is_verb_name(verb), "{verb}");
+    }
 }

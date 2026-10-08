@@ -6,7 +6,7 @@ use tauri::{AppHandle, State};
 
 use crate::commands::games::LaunchingGames;
 use crate::lock::LockExt;
-use crate::config::{save_config, ConfigState};
+use crate::config::{save_config, AppConfig, ConfigState};
 use crate::models::PrefixInfo;
 
 /// The folder to use as `WINEPREFIX` for a folder the user picked. A Proton
@@ -24,6 +24,22 @@ pub fn effective_prefix_path(path: &Path) -> PathBuf {
         pfx
     } else {
         path.to_path_buf()
+    }
+}
+
+/// `path` as a prefix Prefixr knows: one in its list, or one a game uses
+/// (a prefix removed from the list is still that game's own). The commands
+/// that run something in a prefix (winetricks, Wine's tools, an installer)
+/// only take those, rather than create and write to any directory they're
+/// handed.
+pub(crate) fn known_prefix(config: &AppConfig, path: &str) -> Result<PathBuf, String> {
+    let path = PathBuf::from(path);
+    let known = config.prefixes.iter().any(|p| p.path == path)
+        || config.games.iter().any(|g| g.prefix_path == path);
+    if known {
+        Ok(path)
+    } else {
+        Err(format!("No prefix known at {}", path.display()))
     }
 }
 

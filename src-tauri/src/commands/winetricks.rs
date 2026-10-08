@@ -14,6 +14,7 @@ use crate::commands::runners::{
     find_runner, runner_command, umu_command, wine_binary, wineserver_binary,
 };
 use crate::lock::LockExt;
+use crate::commands::prefixes::known_prefix;
 use crate::config::ConfigState;
 use crate::models::{Runner, RunnerKind};
 
@@ -175,8 +176,16 @@ pub async fn list_all_winetricks_verbs(app: AppHandle) -> Result<Vec<WinetricksV
 /// user to guess or just click install again. Missing file (nothing
 /// installed in this prefix yet) is not an error — just an empty list.
 #[tauri::command]
-pub fn list_installed_winetricks_verbs(prefix_path: String) -> Result<Vec<String>, AppError> {
-    match fs::read_to_string(Path::new(&prefix_path).join("winetricks.log")) {
+pub fn list_installed_winetricks_verbs(
+    state: State<ConfigState>,
+    prefix_path: String,
+) -> Result<Vec<String>, AppError> {
+    let prefix = known_prefix(&state.locked(), &prefix_path)?;
+    read_installed_verbs(&prefix).map_err(AppError::from)
+}
+
+fn read_installed_verbs(prefix: &Path) -> Result<Vec<String>, String> {
+    match fs::read_to_string(prefix.join("winetricks.log")) {
         Ok(content) => Ok(content
             .lines()
             .map(str::trim)
@@ -184,7 +193,7 @@ pub fn list_installed_winetricks_verbs(prefix_path: String) -> Result<Vec<String
             .map(str::to_string)
             .collect()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Vec::new()),
-        Err(e) => Err(format!("Could not read winetricks.log: {e}").into()),
+        Err(e) => Err(format!("Could not read winetricks.log: {e}")),
     }
 }
 
@@ -218,15 +227,17 @@ pub async fn install_winetricks_verbs(
     if verbs.is_empty() {
         return Err(AppError::NoPackagesSelected);
     }
+    if let Some(verb) = verbs.iter().find(|verb| !is_verb_name(verb)) {
+        return Err(format!("Not a winetricks package: {verb}").into());
+    }
 
-    let runners_dir = {
+    let (runners_dir, prefix) = {
         let config = state.locked();
-        config.runners_dir.clone()
+        (config.runners_dir.clone(), known_prefix(&config, &prefix_path)?)
     };
     let token = read_token(&state);
 
     let runner = find_runner(&runners_dir, &runner_id)?;
-    let prefix = PathBuf::from(&prefix_path);
 
     let log_path = new_log_file(&prefix_log_dir(&app, &prefix)?)?;
     let (log_out, log_err) = log_stdio(&log_path)?;
@@ -262,6 +273,16 @@ pub async fn install_winetricks_verbs(
         });
     }
     Ok(log_path_string)
+}
+
+/// Whether `verb` is shaped like a winetricks verb (`vcrun2022`,
+/// `d3dx9_43`, ...): it goes on winetricks' command line as is, where
+/// something starting with `-` would be an option instead.
+fn is_verb_name(verb: &str) -> bool {
+    verb.starts_with(|c: char| c.is_ascii_lowercase() || c.is_ascii_digit())
+        && verb
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || "_.=-".contains(c))
 }
 
 /// Whether `umu-run winetricks` works for this runner: it only supports a
