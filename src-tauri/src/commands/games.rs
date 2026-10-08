@@ -1369,9 +1369,9 @@ async fn run_game(
 
     if scheduler_conflict {
         let note = if use_power_profile {
-            "[prefixr] GameMode uebersprungen: konkurrierender Scheduler-Daemon aktiv, nutze Power-Profile stattdessen\n"
+            "[prefixr] GameMode skipped: a competing scheduler daemon is active, using the performance power profile instead\n"
         } else {
-            "[prefixr] GameMode uebersprungen: konkurrierender Scheduler-Daemon aktiv, powerprofilesctl nicht verfuegbar\n"
+            "[prefixr] GameMode skipped: a competing scheduler daemon is active, and powerprofilesctl is not available\n"
         };
         let _ = fs::OpenOptions::new()
             .append(true)
