@@ -95,7 +95,9 @@ export async function downloadRunner(
 ): Promise<void> {
   patchDownloadState(tag, { downloaded: 0, total: undefined, done: false, error: undefined });
   try {
-    await invoke("download_runner", { source, tag, downloadUrl });
+    // The backend reads the tag from the URL itself; `tag` only keys the
+    // progress shown here, as the events do.
+    await invoke("download_runner", { source, downloadUrl });
   } catch (e) {
     patchDownloadState(tag, { done: false, error: e });
   }

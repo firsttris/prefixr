@@ -79,17 +79,31 @@ fn asset_matchers_pick_the_right_asset() {
 #[test]
 fn download_requests_are_checked() {
     let source = find_source("proton-ge").unwrap();
-    let url = "https://github.com/GloriousEggroll/proton-ge-custom/releases/download/GE-Proton11-7/GE-Proton11-7.tar.gz";
-    assert!(check_download_request(source, "GE-Proton11-7", url).is_ok());
-    for tag in ["", "..", ".hidden", "../x", "a/b", "/abs"] {
-        assert!(check_download_request(source, tag, url).is_err(), "{tag}");
+    let base = "https://github.com/GloriousEggroll/proton-ge-custom/releases/download";
+    assert_eq!(
+        parse_download_url(source, &format!("{base}/GE-Proton11-7/GE-Proton11-7.tar.gz")),
+        Ok(DownloadRequest {
+            tag: "GE-Proton11-7".to_string(),
+            asset_name: "GE-Proton11-7.tar.gz".to_string(),
+        })
+    );
+    assert_eq!(
+        parse_download_url(source, &format!("{base}/v1.0%2Bfix/a.tar.gz")).map(|r| r.tag),
+        Ok("v1.0+fix".to_string())
+    );
+    for tag in ["", "..", ".hidden", "%2E%2E", "a%2Fb", "%ZZ"] {
+        let url = format!("{base}/{tag}/x.tar.gz");
+        assert!(parse_download_url(source, &url).is_err(), "{tag}");
     }
     for url in [
-        "https://evil.example/GloriousEggroll/proton-ge-custom/releases/download/x.tar.gz",
+        "https://evil.example/GloriousEggroll/proton-ge-custom/releases/download/x/x.tar.gz",
         "https://github.com/Kron4ek/Wine-Builds/releases/download/x/x.tar.xz",
-        "http://github.com/GloriousEggroll/proton-ge-custom/releases/download/x.tar.gz",
+        "http://github.com/GloriousEggroll/proton-ge-custom/releases/download/x/x.tar.gz",
+        "https://github.com/GloriousEggroll/proton-ge-custom/releases/download/x.tar.gz",
+        "https://github.com/GloriousEggroll/proton-ge-custom/releases/download/x/",
+        "https://github.com/GloriousEggroll/proton-ge-custom/releases/download/x/y/z.tar.gz",
     ] {
-        assert!(check_download_request(source, "x", url).is_err(), "{url}");
+        assert!(parse_download_url(source, url).is_err(), "{url}");
     }
 }
 

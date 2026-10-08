@@ -464,23 +464,59 @@ async fn verify_checksum(
     }
 }
 
-/// Checks the `tag` and `download_url` the frontend passes back from
-/// `list_runner_releases`: the tag becomes a directory name inside the
-/// runners directory, and the URL gets the GitHub token, so neither is
-/// taken on trust — only a plain name, and only a release asset of this
-/// source's own repo.
-fn check_download_request(source: &RunnerSource, tag: &str, download_url: &str) -> Result<(), String> {
+/// A download request, as read from the URL (see `parse_download_url`).
+#[derive(Debug, PartialEq)]
+struct DownloadRequest {
+    /// The release tag — the runner's directory name.
+    tag: String,
+    asset_name: String,
+}
+
+/// Checks the `download_url` the frontend passes back from
+/// `list_runner_releases` and reads the release tag and asset name out of
+/// it (`.../releases/download/<tag>/<asset>`). The URL gets the GitHub
+/// token and the tag becomes a directory name inside the runners directory,
+/// so neither is taken on trust — only a release asset of this source's own
+/// repo, and only a plain name.
+fn parse_download_url(source: &RunnerSource, download_url: &str) -> Result<DownloadRequest, String> {
+    let not_a_download = || format!("Not a {} release download: {download_url}", source.label);
+    let expected = format!("https://github.com/{}/releases/download/", source.repo);
+    let rest = download_url
+        .get(..expected.len())
+        .filter(|start| start.eq_ignore_ascii_case(&expected))
+        .and_then(|_| download_url.get(expected.len()..))
+        .ok_or_else(not_a_download)?;
+    let (tag, asset_name) = rest.split_once('/').ok_or_else(not_a_download)?;
+    if asset_name.is_empty() || asset_name.contains('/') {
+        return Err(not_a_download());
+    }
+    let tag = percent_decode(tag).ok_or_else(not_a_download)?;
     if tag.is_empty() || tag.starts_with('.') || tag.contains(['/', '\\', '\0']) {
         return Err(format!("Invalid runner tag '{tag}'"));
     }
-    let expected = format!("https://github.com/{}/releases/download/", source.repo);
-    let matches = download_url
-        .get(..expected.len())
-        .is_some_and(|start| start.eq_ignore_ascii_case(&expected));
-    if !matches {
-        return Err(format!("Not a {} release download: {download_url}", source.label));
+    Ok(DownloadRequest {
+        tag,
+        asset_name: asset_name.to_string(),
+    })
+}
+
+/// Decodes a URL path segment's `%XX` escapes (GitHub escapes a tag's
+/// reserved characters); `None` for a malformed escape or non-UTF-8 result.
+fn percent_decode(segment: &str) -> Option<String> {
+    let bytes = segment.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' {
+            let hex = segment.get(i + 1..i + 3)?;
+            out.push(u8::from_str_radix(hex, 16).ok()?);
+            i += 3;
+        } else {
+            out.push(bytes[i]);
+            i += 1;
+        }
     }
-    Ok(())
+    String::from_utf8(out).ok()
 }
 
 /// How often `runner-download-progress` goes out at most: once per chunk
@@ -497,17 +533,10 @@ pub async fn download_runner(
     app: AppHandle,
     state: State<'_, ConfigState>,
     source: String,
-    tag: String,
     download_url: String,
 ) -> Result<(), AppError> {
     let runner_source = find_source(&source)?;
-    check_download_request(runner_source, &tag, &download_url)?;
-    let asset_name = download_url
-        .rsplit('/')
-        .next()
-        .filter(|name| !name.is_empty())
-        .ok_or_else(|| format!("Download URL has no file name: {download_url}"))?
-        .to_string();
+    let DownloadRequest { tag, asset_name } = parse_download_url(runner_source, &download_url)?;
 
     let runners_dir = {
         let config = state.locked();
