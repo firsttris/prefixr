@@ -138,17 +138,17 @@ async fn sgdb_get<T: for<'de> Deserialize<'de> + Default>(
         .send()
         .await
         .map_err(|e| format!("Could not reach SteamGridDB: {e}"))?;
+    let status = response.status();
+    let body = response
+        .text()
+        .await
+        .map_err(|e| format!("Could not read SteamGridDB response: {e}"))?;
 
-    if !response.status().is_success() {
-        return Err(format!(
-            "SteamGridDB API returned status {}",
-            response.status()
-        ));
+    if !status.is_success() {
+        return Err(error_status_message(status, &body));
     }
 
-    let envelope: SgdbEnvelope<T> = response
-        .json()
-        .await
+    let envelope: SgdbEnvelope<T> = serde_json::from_str(&body)
         .map_err(|e| format!("Could not parse SteamGridDB response: {e}"))?;
 
     if !envelope.success {
@@ -160,6 +160,19 @@ async fn sgdb_get<T: for<'de> Deserialize<'de> + Default>(
     }
 
     Ok(envelope.data)
+}
+
+/// An error status's message: the reasons SteamGridDB's envelope gives with
+/// it (e.g. "Invalid API key" with a 401), or the status itself.
+fn error_status_message(status: reqwest::StatusCode, body: &str) -> String {
+    let reasons = serde_json::from_str::<SgdbEnvelope<serde::de::IgnoredAny>>(body)
+        .map(|envelope| envelope.errors)
+        .unwrap_or_default();
+    if reasons.is_empty() {
+        format!("SteamGridDB API returned status {status}")
+    } else {
+        reasons.join(", ")
+    }
 }
 
 #[tauri::command]

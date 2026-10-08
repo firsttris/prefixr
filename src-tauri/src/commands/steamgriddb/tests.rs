@@ -216,3 +216,16 @@ fn slots_record_and_clear_their_image() {
     assert_eq!(game.cover_grid_id, None);
     assert!(game.artwork.is_empty());
 }
+
+#[test]
+fn error_statuses_keep_steamgriddbs_reasons() {
+    let unauthorized = reqwest::StatusCode::UNAUTHORIZED;
+    assert_eq!(
+        error_status_message(unauthorized, r#"{"success":false,"errors":["Invalid API key"]}"#),
+        "Invalid API key"
+    );
+    assert_eq!(
+        error_status_message(unauthorized, "<html>Bad gateway</html>"),
+        "SteamGridDB API returned status 401 Unauthorized"
+    );
+}
