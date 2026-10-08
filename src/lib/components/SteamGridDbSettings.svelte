@@ -18,7 +18,7 @@
   let saved = $state(false);
 
   onMount(() => {
-    refreshSteamGridDbConfig();
+    refreshSteamGridDbConfig().catch((e) => (error = e));
   });
 
   $effect(() => {

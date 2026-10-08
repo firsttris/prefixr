@@ -1,13 +1,10 @@
 use super::{parse_link_info, read_ascii_cstr, read_utf16_cstr, resolve_windows_path};
+use crate::test_util::TestDir;
 use std::fs;
 use std::os::unix::fs::symlink;
-use std::path::PathBuf;
-use uuid::Uuid;
 
-fn temp_path(name: &str) -> PathBuf {
-    let path = std::env::temp_dir().join(format!("prefixr-{name}-{}", Uuid::new_v4()));
-    fs::create_dir_all(&path).unwrap();
-    path
+fn temp_path(name: &str) -> TestDir {
+    TestDir::new(name)
 }
 
 fn build_ascii_link_info(base: &str, suffix: &str) -> Vec<u8> {
@@ -63,8 +60,6 @@ fn resolves_windows_paths_through_dosdevices_symlinks() {
 
     let resolved = resolve_windows_path(&prefix, r"C:\Games/Foo\game.exe").unwrap();
     assert_eq!(resolved, drive_target.join("Games/Foo/game.exe"));
-
-    let _ = fs::remove_dir_all(prefix);
 }
 
 #[test]
@@ -93,4 +88,24 @@ fn c_string_helpers_stop_at_the_first_null() {
 
     let utf16 = [b'f', 0, b'o', 0, b'o', 0, 0, 0, b'b', 0, b'a', 0, b'r', 0];
     assert_eq!(read_utf16_cstr(&utf16, 0), Some("foo".to_string()));
+}
+
+#[test]
+fn resolves_windows_paths_ignoring_case() {
+    let prefix = temp_path("shell-link-case");
+    let drive = prefix.join("drive_c");
+    fs::create_dir_all(drive.join("Games/Foo")).unwrap();
+    fs::write(drive.join("Games/Foo/Game.exe"), "").unwrap();
+    fs::create_dir_all(prefix.join("dosdevices")).unwrap();
+    symlink("../drive_c", prefix.join("dosdevices/c:")).unwrap();
+
+    let resolved = resolve_windows_path(&prefix, r"C:\GAMES\foo\GAME.EXE").unwrap();
+    assert_eq!(
+        resolved,
+        drive.canonicalize().unwrap().join("Games/Foo/Game.exe")
+    );
+    assert!(resolved.is_file());
+    // A part that doesn't exist in any case stays as written.
+    let missing = resolve_windows_path(&prefix, r"C:\Games\Bar\x.exe").unwrap();
+    assert!(missing.ends_with("Games/Bar/x.exe"));
 }

@@ -6,8 +6,6 @@ import * as m from "$lib/paraglide/messages";
 // values; in the game dialog they additionally get `OverrideHooks` to show
 // which rows deviate from the global setting and to reset them.
 
-
-
 export interface OverrideHooks<K extends string> {
   isOverridden: (key: K) => boolean;
   reset: (key: K) => void;

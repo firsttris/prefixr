@@ -1,16 +1,9 @@
 use super::*;
+use crate::test_util::TestDir;
 use std::os::unix::fs::PermissionsExt;
-use std::sync::{Mutex as StdMutex, OnceLock};
 
-fn env_lock() -> &'static StdMutex<()> {
-    static LOCK: OnceLock<StdMutex<()>> = OnceLock::new();
-    LOCK.get_or_init(|| StdMutex::new(()))
-}
-
-fn temp_path(name: &str) -> PathBuf {
-    let path = std::env::temp_dir().join(format!("prefixr-test-{name}-{}", Uuid::new_v4()));
-    fs::create_dir_all(&path).unwrap();
-    path
+fn temp_path(name: &str) -> TestDir {
+    TestDir::new(name)
 }
 
 fn set_executable(path: &Path) {
@@ -22,9 +15,7 @@ fn set_executable(path: &Path) {
 fn write_prefix_arch(prefix_dir: &Path, arch: &str) {
     fs::write(
         prefix_dir.join("system.reg"),
-        format!(
-            "WINE REGISTRY Version 2\n;; All keys relative to \\\\Machine\n\n#arch={arch}\n\n"
-        ),
+        format!("WINE REGISTRY Version 2\n;; All keys relative to \\\\Machine\n\n#arch={arch}\n\n"),
     )
     .unwrap();
 }
@@ -36,57 +27,53 @@ fn normalizes_umu_fields_together() {
         (Some("umu-12345".to_string()), Some("gog".to_string()))
     );
     assert_eq!(umu_fields(None, Some("steam".to_string())), (None, None));
-    assert_eq!(umu_fields(Some("".to_string()), Some("none".to_string())), (None, None));
+    assert_eq!(
+        umu_fields(Some("".to_string()), Some("none".to_string())),
+        (None, None)
+    );
 }
 
 #[test]
 fn command_on_path_uses_current_path_entries() {
-    let _guard = env_lock().lock().unwrap();
     let temp_dir = temp_path("path-check");
     let command = temp_dir.join("gamemoderun");
     fs::write(&command, b"#!/bin/sh\n").unwrap();
     set_executable(&command);
+    let path = temp_dir.to_str().unwrap();
+    let env = crate::env::fake(&[("PATH", path)]);
 
-    let old_path = std::env::var_os("PATH");
-    std::env::set_var("PATH", &temp_dir);
-
-    assert!(command_on_path("gamemoderun"));
-    assert!(!command_on_path("definitely-missing"));
-
-    match old_path {
-        Some(value) => std::env::set_var("PATH", value),
-        None => std::env::remove_var("PATH"),
-    }
-    fs::remove_dir_all(temp_dir).unwrap();
+    assert!(command_on_path_in("gamemoderun", &env));
+    assert!(!command_on_path_in("definitely-missing", &env));
 }
-
 #[test]
 fn launch_lock_dir_prefers_xdg_runtime_dir() {
-    let _guard = env_lock().lock().unwrap();
-    let runtime_dir = temp_path("runtime-dir");
-    let old_runtime = std::env::var_os("XDG_RUNTIME_DIR");
-    std::env::set_var("XDG_RUNTIME_DIR", &runtime_dir);
+    let env = crate::env::fake(&[("XDG_RUNTIME_DIR", "/run/user/1000")]);
+    assert_eq!(
+        launch_lock_dir(&env),
+        PathBuf::from("/run/user/1000/prefixr")
+    );
 
-    assert_eq!(launch_lock_dir(), runtime_dir.join("prefixr"));
-
-    match old_runtime {
-        Some(value) => std::env::set_var("XDG_RUNTIME_DIR", value),
-        None => std::env::remove_var("XDG_RUNTIME_DIR"),
-    }
-    fs::remove_dir_all(runtime_dir).unwrap();
+    // SAFETY: getuid(2) can't fail and has no preconditions.
+    let uid = unsafe { libc::getuid() };
+    let fallback = std::env::temp_dir().join(format!("prefixr-{uid}"));
+    assert_eq!(launch_lock_dir(&crate::env::fake(&[])), fallback);
 }
-
 #[test]
 fn sanitizes_shortcut_filenames() {
-    assert_eq!(sanitize_filename("Baldur's Gate 3: Deluxe/Edition"), "Baldur_s Gate 3_ Deluxe_Edition");
+    assert_eq!(
+        sanitize_filename("Baldur's Gate 3: Deluxe/Edition"),
+        "Baldur_s Gate 3_ Deluxe_Edition"
+    );
     assert_eq!(sanitize_filename(""), "game");
     assert_eq!(sanitize_filename("  \t\n  "), "__");
-    assert_eq!(sanitize_filename("Already_Good-Name 2"), "Already_Good-Name 2");
+    assert_eq!(
+        sanitize_filename("Already_Good-Name 2"),
+        "Already_Good-Name 2"
+    );
 }
 
 #[test]
 fn desktop_directory_prefers_user_dirs_config() {
-    let _guard = env_lock().lock().unwrap();
     let home = temp_path("home-desktop-dir");
     fs::create_dir_all(home.join(".config")).unwrap();
     fs::write(
@@ -94,149 +81,99 @@ fn desktop_directory_prefers_user_dirs_config() {
         "XDG_DESKTOP_DIR=\"$HOME/Schreibtisch\"\n",
     )
     .unwrap();
+    let env = crate::env::fake(&[("HOME", home.to_str().unwrap())]);
 
-    let old_home = std::env::var_os("HOME");
-    std::env::set_var("HOME", &home);
-
-    assert_eq!(desktop_directory().unwrap(), home.join("Schreibtisch"));
-
-    match old_home {
-        Some(value) => std::env::set_var("HOME", value),
-        None => std::env::remove_var("HOME"),
-    }
-    fs::remove_dir_all(home).unwrap();
+    assert_eq!(desktop_directory(&env).unwrap(), home.join("Schreibtisch"));
 }
-
 #[test]
 fn desktop_directory_falls_back_to_home_desktop() {
-    let _guard = env_lock().lock().unwrap();
     let home = temp_path("home-desktop-fallback");
+    let env = crate::env::fake(&[("HOME", home.to_str().unwrap())]);
 
-    let old_home = std::env::var_os("HOME");
-    std::env::set_var("HOME", &home);
-
-    assert_eq!(desktop_directory().unwrap(), home.join("Desktop"));
-
-    match old_home {
-        Some(value) => std::env::set_var("HOME", value),
-        None => std::env::remove_var("HOME"),
-    }
-    fs::remove_dir_all(home).unwrap();
+    assert_eq!(desktop_directory(&env).unwrap(), home.join("Desktop"));
+    assert!(desktop_directory(&crate::env::fake(&[])).is_err());
 }
-
 #[test]
 fn steer_profile_to_steamuser_creates_missing_user_symlink() {
-    let _guard = env_lock().lock().unwrap();
     let prefix = temp_path("steamuser-link");
     let users_dir = prefix.join("drive_c/users");
     fs::create_dir_all(&users_dir).unwrap();
 
-    let old_user = std::env::var_os("USER");
-    std::env::set_var("USER", "tristan");
-
-    steer_profile_to_steamuser(&prefix).unwrap();
+    steer_profiles_to_steamuser(&prefix, &["tristan".into(), "steamuser".into()]).unwrap();
 
     let steamuser_dir = users_dir.join("steamuser");
     let user_dir = users_dir.join("tristan");
     assert!(steamuser_dir.is_dir());
-    assert_eq!(fs::read_link(&user_dir).unwrap(), PathBuf::from("steamuser"));
+    assert_eq!(
+        fs::read_link(&user_dir).unwrap(),
+        PathBuf::from("steamuser")
+    );
+}
 
-    match old_user {
-        Some(value) => std::env::set_var("USER", value),
-        None => std::env::remove_var("USER"),
+#[test]
+fn steer_profile_to_steamuser_links_every_candidate_name() {
+    let prefix = temp_path("steamuser-names");
+    let users_dir = prefix.join("drive_c/users");
+
+    steer_profiles_to_steamuser(&prefix, &["tristan".into(), "builder".into()]).unwrap();
+
+    for name in ["tristan", "builder"] {
+        assert_eq!(
+            fs::read_link(users_dir.join(name)).unwrap(),
+            PathBuf::from("steamuser")
+        );
     }
-    fs::remove_dir_all(prefix).unwrap();
 }
 
 #[test]
 fn steer_profile_to_steamuser_keeps_existing_user_dir() {
-    let _guard = env_lock().lock().unwrap();
     let prefix = temp_path("steamuser-existing");
     let user_dir = prefix.join("drive_c/users/tristan");
     fs::create_dir_all(&user_dir).unwrap();
 
-    let old_user = std::env::var_os("USER");
-    std::env::set_var("USER", "tristan");
+    steer_profiles_to_steamuser(&prefix, &["tristan".into()]).unwrap();
 
-    steer_profile_to_steamuser(&prefix).unwrap();
+    assert!(fs::symlink_metadata(&user_dir)
+        .unwrap()
+        .file_type()
+        .is_dir());
+}
 
-    assert!(fs::symlink_metadata(&user_dir).unwrap().file_type().is_dir());
-
-    match old_user {
-        Some(value) => std::env::set_var("USER", value),
-        None => std::env::remove_var("USER"),
-    }
-    fs::remove_dir_all(prefix).unwrap();
+#[test]
+fn account_name_is_found() {
+    assert!(account_name().is_some_and(|name| !name.is_empty()));
 }
 
 #[test]
 fn applications_directory_prefers_xdg_data_home() {
-    let _guard = env_lock().lock().unwrap();
-    let home = temp_path("home-apps-dir");
-    let data_home = temp_path("xdg-data-home");
-
-    let old_home = std::env::var_os("HOME");
-    let old_xdg = std::env::var_os("XDG_DATA_HOME");
-    std::env::set_var("HOME", &home);
-    std::env::set_var("XDG_DATA_HOME", &data_home);
-
-    assert_eq!(applications_directory().unwrap(), data_home.join("applications"));
-
-    match old_home {
-        Some(value) => std::env::set_var("HOME", value),
-        None => std::env::remove_var("HOME"),
-    }
-    match old_xdg {
-        Some(value) => std::env::set_var("XDG_DATA_HOME", value),
-        None => std::env::remove_var("XDG_DATA_HOME"),
-    }
-    fs::remove_dir_all(home).unwrap();
-    fs::remove_dir_all(data_home).unwrap();
+    let env = crate::env::fake(&[("HOME", "/home/u"), ("XDG_DATA_HOME", "/data")]);
+    assert_eq!(
+        applications_directory(&env).unwrap(),
+        PathBuf::from("/data/applications")
+    );
 }
-
 #[test]
 fn applications_directory_falls_back_to_local_share() {
-    let _guard = env_lock().lock().unwrap();
-    let home = temp_path("home-apps-fallback");
-
-    let old_home = std::env::var_os("HOME");
-    let old_xdg = std::env::var_os("XDG_DATA_HOME");
-    std::env::set_var("HOME", &home);
-    std::env::remove_var("XDG_DATA_HOME");
-
+    let env = crate::env::fake(&[("HOME", "/home/u")]);
     assert_eq!(
-        applications_directory().unwrap(),
-        home.join(".local/share/applications")
+        applications_directory(&env).unwrap(),
+        PathBuf::from("/home/u/.local/share/applications")
     );
-
-    match old_home {
-        Some(value) => std::env::set_var("HOME", value),
-        None => std::env::remove_var("HOME"),
-    }
-    match old_xdg {
-        Some(value) => std::env::set_var("XDG_DATA_HOME", value),
-        None => std::env::remove_var("XDG_DATA_HOME"),
-    }
-    fs::remove_dir_all(home).unwrap();
 }
-
 #[test]
 fn own_executable_path_prefers_appimage_env() {
-    let _guard = env_lock().lock().unwrap();
-    let old_appimage = std::env::var_os("APPIMAGE");
-    std::env::set_var("APPIMAGE", "/opt/Prefixr.AppImage");
-
-    assert_eq!(own_executable_path().unwrap(), PathBuf::from("/opt/Prefixr.AppImage"));
-
-    match old_appimage {
-        Some(value) => std::env::set_var("APPIMAGE", value),
-        None => std::env::remove_var("APPIMAGE"),
-    }
+    let env = crate::env::fake(&[("APPIMAGE", "/opt/Prefixr.AppImage")]);
+    assert_eq!(
+        own_executable_path(&env).unwrap(),
+        PathBuf::from("/opt/Prefixr.AppImage")
+    );
+    assert_eq!(
+        own_executable_path(&crate::env::fake(&[])).unwrap(),
+        std::env::current_exe().unwrap()
+    );
 }
-
 #[test]
 fn log_stdio_appends_stdout_and_stderr_to_the_same_file() {
-    let _guard = env_lock().lock().unwrap();
     let log_dir = temp_path("log-stdio");
     let log_path = log_dir.join("game.log");
     fs::write(&log_path, b"existing\n").unwrap();
@@ -250,9 +187,10 @@ fn log_stdio_appends_stdout_and_stderr_to_the_same_file() {
         .unwrap();
 
     assert!(status.success());
-    assert_eq!(fs::read_to_string(&log_path).unwrap(), "existing\nout\nerr\n");
-
-    fs::remove_dir_all(log_dir).unwrap();
+    assert_eq!(
+        fs::read_to_string(&log_path).unwrap(),
+        "existing\nout\nerr\n"
+    );
 }
 
 #[test]
@@ -266,13 +204,17 @@ fn relink_if_needed_replaces_wrong_links_and_ignores_missing_sources() {
     std::os::unix::fs::symlink(&src_a, &dst).unwrap();
 
     relink_if_needed(&src_b, &dst).unwrap();
-    assert_eq!(fs::canonicalize(&dst).unwrap(), fs::canonicalize(&src_b).unwrap());
+    assert_eq!(
+        fs::canonicalize(&dst).unwrap(),
+        fs::canonicalize(&src_b).unwrap()
+    );
 
     let missing = dir.join("missing.dll");
     relink_if_needed(&missing, &dst).unwrap();
-    assert_eq!(fs::canonicalize(&dst).unwrap(), fs::canonicalize(&src_b).unwrap());
-
-    fs::remove_dir_all(dir).unwrap();
+    assert_eq!(
+        fs::canonicalize(&dst).unwrap(),
+        fs::canonicalize(&src_b).unwrap()
+    );
 }
 
 #[test]
@@ -320,9 +262,6 @@ fn syncs_directx_layers_into_a_64_bit_prefix() {
         overrides,
         "d3d8,d3d9,d3d10core,d3d11,dxgi,d3d12,d3d12core=n,b"
     );
-
-    fs::remove_dir_all(cache_dir).unwrap();
-    fs::remove_dir_all(prefix_dir).unwrap();
 }
 
 #[test]
@@ -343,16 +282,18 @@ fn syncs_directx_layers_into_a_32_bit_prefix() {
         fs::canonicalize(system32.join("dxgi.dll")).unwrap(),
         fs::canonicalize(dxvk32.join("dxgi.dll")).unwrap()
     );
-    assert!(!prefix_dir.join("drive_c/windows/syswow64/dxgi.dll").exists());
-
-    fs::remove_dir_all(cache_dir).unwrap();
-    fs::remove_dir_all(prefix_dir).unwrap();
+    assert!(!prefix_dir
+        .join("drive_c/windows/syswow64/dxgi.dll")
+        .exists());
 }
 
 #[test]
 fn game_env_merges_list_variables() {
     let mut env = vec![
-        ("WINEDLLOVERRIDES".to_string(), "winemenubuilder.exe=;d3d11=n".to_string()),
+        (
+            "WINEDLLOVERRIDES".to_string(),
+            "winemenubuilder.exe=;d3d11=n".to_string(),
+        ),
         ("LD_PRELOAD".to_string(), "libgamemodeauto.so.0".to_string()),
         ("DXVK_HUD".to_string(), "0".to_string()),
     ];
@@ -369,7 +310,10 @@ fn game_env_merges_list_variables() {
             .find(|(k, _)| k == key)
             .map(|(_, v)| v.as_str())
     };
-    assert_eq!(get("WINEDLLOVERRIDES"), Some("winemenubuilder.exe=;d3d11=n;dinput8=n,b"));
+    assert_eq!(
+        get("WINEDLLOVERRIDES"),
+        Some("winemenubuilder.exe=;d3d11=n;dinput8=n,b")
+    );
     assert_eq!(get("LD_PRELOAD"), Some("libgamemodeauto.so.0:libfoo.so"));
     assert_eq!(get("DXVK_HUD"), Some("fps"));
 }
@@ -409,7 +353,7 @@ fn env_pairs_borrow_existing_entries_in_order() {
 
 #[test]
 fn finds_a_games_shortcuts_by_their_launch_argument() {
-    let dir = std::env::temp_dir().join(format!("prefixr-test-{}", Uuid::new_v4()));
+    let dir = TestDir::new("dir");
     fs::create_dir_all(&dir).unwrap();
     let (id, other) = (Uuid::new_v4(), Uuid::new_v4());
     let entry = |id: Uuid| format!("[Desktop Entry]\nName=X\nExec=\"/a/prefixr\" --launch {id}\n");
@@ -418,7 +362,6 @@ fn finds_a_games_shortcuts_by_their_launch_argument() {
     fs::write(dir.join("notes.txt"), entry(id)).unwrap();
 
     assert_eq!(game_shortcuts(&dir, id), vec![dir.join("X.desktop")]);
-    fs::remove_dir_all(&dir).unwrap();
 }
 
 #[test]
@@ -428,12 +371,15 @@ fn desktop_entries_are_escaped() {
         desktop_exec_arg(Path::new("/Apps/100% \"Pre$fixr\"/a\\b.AppImage")),
         r#""/Apps/100%% \\"Pre\\$fixr\\"/a\\\\b.AppImage""#
     );
-    assert_eq!(desktop_exec_arg(Path::new("/opt/prefixr")), "\"/opt/prefixr\"");
+    assert_eq!(
+        desktop_exec_arg(Path::new("/opt/prefixr")),
+        "\"/opt/prefixr\""
+    );
 }
 
 #[test]
 fn detects_32_bit_prefixes() {
-    let dir = std::env::temp_dir().join(format!("prefixr-test-{}", Uuid::new_v4()));
+    let dir = TestDir::new("dir");
     fs::create_dir_all(&dir).unwrap();
     assert!(!is_win32_prefix(&dir));
     let header = |arch: &str| {
@@ -443,7 +389,6 @@ fn detects_32_bit_prefixes() {
     assert!(!is_win32_prefix(&dir));
     fs::write(dir.join("system.reg"), header("win32")).unwrap();
     assert!(is_win32_prefix(&dir));
-    fs::remove_dir_all(&dir).unwrap();
 }
 
 fn claim_eventually(launching: &LaunchingGames, id: Uuid) -> Option<LaunchGuard<'_>> {
@@ -529,7 +474,6 @@ fn pkill_pattern_matches_the_process_but_not_itself() {
         return;
     }
 
-    let _guard = env_lock().lock().unwrap();
     let fraction = format!("0.{}", Uuid::new_v4().as_u128() % 1_000_000_000);
     let target = format!("sleep 30 {fraction}");
     let mut child = std::process::Command::new("sleep")
@@ -561,7 +505,11 @@ fn regex_self_match(pattern: &str) -> bool {
         .stdin(Stdio::piped())
         .spawn()
         .unwrap();
-    grep.stdin.take().unwrap().write_all(pattern.as_bytes()).unwrap();
+    grep.stdin
+        .take()
+        .unwrap()
+        .write_all(pattern.as_bytes())
+        .unwrap();
     grep.wait().unwrap().success()
 }
 
@@ -571,7 +519,6 @@ fn process_tree_helpers_see_real_processes() {
         return;
     }
 
-    let _guard = env_lock().lock().unwrap();
     let mut child = std::process::Command::new("sh")
         .args(["-c", "sleep 30 & wait"])
         .spawn()
@@ -596,4 +543,12 @@ fn process_tree_helpers_see_real_processes() {
         std::thread::sleep(Duration::from_millis(20));
     }
     assert!(!process_running(descendants[0]));
+}
+
+#[test]
+fn any_unit_active_reads_systemctl_is_active_output() {
+    assert!(!any_unit_active("inactive\ninactive\nunknown\n"));
+    assert!(any_unit_active("inactive\nactive\ninactive\n"));
+    assert!(!any_unit_active("activating\nfailed\n"));
+    assert!(!any_unit_active(""));
 }

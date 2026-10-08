@@ -2,10 +2,12 @@ use crate::error::AppError;
 use tauri::{AppHandle, State};
 
 use crate::config::{save_config, ConfigState};
+use crate::lock::LockExt;
 use crate::models::GitHubConfig;
 
 fn sanitized_token(token: Option<&str>) -> Option<String> {
-    token.map(str::trim)
+    token
+        .map(str::trim)
         .filter(|token| !token.is_empty())
         .map(str::to_string)
 }
@@ -15,30 +17,23 @@ fn sanitized_token(token: Option<&str>) -> Option<String> {
 /// `None` means "no token configured" — callers should fall back to an
 /// unauthenticated request rather than erroring, since GitHub's API accepts
 /// those too (just at a much lower rate limit).
-pub(crate) fn read_token(state: &State<ConfigState>) -> Result<Option<String>, String> {
-    let config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
-    Ok(sanitized_token(config.github.token.as_deref()))
+pub(crate) fn read_token(state: &State<ConfigState>) -> Option<String> {
+    sanitized_token(state.locked().github.token.as_deref())
 }
 
 #[tauri::command]
 pub fn get_github_config(state: State<ConfigState>) -> Result<GitHubConfig, AppError> {
-    let config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let config = state.locked();
     Ok(config.github.clone())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn save_github_config(
     app: AppHandle,
     state: State<ConfigState>,
     config: GitHubConfig,
 ) -> Result<GitHubConfig, AppError> {
-    let mut app_config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let mut app_config = state.locked();
     app_config.github = config;
     save_config(&app, &app_config)?;
     Ok(app_config.github.clone())

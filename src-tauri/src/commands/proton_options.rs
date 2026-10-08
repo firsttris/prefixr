@@ -6,6 +6,7 @@ use tauri::{AppHandle, State};
 
 use crate::commands::runners::find_runner;
 use crate::config::{save_config, ConfigState};
+use crate::lock::LockExt;
 use crate::models::{ProtonConfig, RunnerKind};
 
 /// One on/off option a Proton build's `proton` script reads from the
@@ -13,6 +14,7 @@ use crate::models::{ProtonConfig, RunnerKind};
 /// script accepts for the same `config` flag (e.g. `PROTON_USE_HDR` next to
 /// `PROTON_ENABLE_HDR`), listed so the UI can tell they're the same switch.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct ProtonOption {
     pub env: String,
     pub config: String,
@@ -69,20 +71,22 @@ pub fn parse_proton_options(script: &str) -> Vec<ProtonOption> {
 /// literals (a variable passed instead, say) is skipped.
 fn parse_call_args(s: &str) -> Option<(&str, &str)> {
     let (env, s) = s.split_once('"')?;
-    let s = s.trim_start().strip_prefix(',')?.trim_start().strip_prefix('"')?;
+    let s = s
+        .trim_start()
+        .strip_prefix(',')?
+        .trim_start()
+        .strip_prefix('"')?;
     let (config, s) = s.split_once('"')?;
     s.trim_start().strip_prefix(')')?;
 
     let is_env_name = |v: &str| {
         !v.is_empty()
-            && v
-                .chars()
+            && v.chars()
                 .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
     };
     let is_config_name = |v: &str| {
         !v.is_empty()
-            && v
-                .chars()
+            && v.chars()
                 .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
     };
     (is_env_name(env) && is_config_name(config)).then_some((env, config))
@@ -90,15 +94,13 @@ fn parse_call_args(s: &str) -> Option<(&str, &str)> {
 
 /// Lists the switches the given runner's `proton` script understands, for
 /// the "Proton" settings, both global and per game. Wine runners have none.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_proton_options(
     state: State<ConfigState>,
     runner_id: String,
 ) -> Result<Vec<ProtonOption>, AppError> {
     let runners_dir = {
-        let config = state
-            .lock()
-            .map_err(|_| "Configuration is locked".to_string())?;
+        let config = state.locked();
         config.runners_dir.clone()
     };
     let runner = find_runner(&runners_dir, &runner_id)?;
@@ -113,21 +115,17 @@ pub fn list_proton_options(
 
 #[tauri::command]
 pub fn get_proton_config(state: State<ConfigState>) -> Result<ProtonConfig, AppError> {
-    let config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let config = state.locked();
     Ok(config.proton.clone())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn save_proton_config(
     app: AppHandle,
     state: State<ConfigState>,
     config: ProtonConfig,
 ) -> Result<ProtonConfig, AppError> {
-    let mut app_config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let mut app_config = state.locked();
     app_config.proton = config;
     save_config(&app, &app_config)?;
     Ok(app_config.proton.clone())

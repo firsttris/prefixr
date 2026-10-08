@@ -5,7 +5,8 @@ use std::path::{Path, PathBuf};
 use tauri::{AppHandle, State};
 
 use crate::commands::games::LaunchingGames;
-use crate::config::{save_config, ConfigState};
+use crate::config::{save_config, AppConfig, ConfigState};
+use crate::lock::LockExt;
 use crate::models::PrefixInfo;
 
 /// The folder to use as `WINEPREFIX` for a folder the user picked. A Proton
@@ -26,6 +27,22 @@ pub fn effective_prefix_path(path: &Path) -> PathBuf {
     }
 }
 
+/// `path` as a prefix Prefixr knows: one in its list, or one a game uses
+/// (a prefix removed from the list is still that game's own). The commands
+/// that run something in a prefix (winetricks, Wine's tools, an installer)
+/// only take those, rather than create and write to any directory they're
+/// handed.
+pub(crate) fn known_prefix(config: &AppConfig, path: &str) -> Result<PathBuf, String> {
+    let path = PathBuf::from(path);
+    let known = config.prefixes.iter().any(|p| p.path == path)
+        || config.games.iter().any(|g| g.prefix_path == path);
+    if known {
+        Ok(path)
+    } else {
+        Err(format!("No prefix known at {}", path.display()))
+    }
+}
+
 /// Registers a prefix path with the app — either a brand-new, empty folder
 /// (created here, initialized lazily via `wineboot` on the first game launch
 /// that uses it) or an already-existing Wine prefix from another tool. No
@@ -33,7 +50,7 @@ pub fn effective_prefix_path(path: &Path) -> PathBuf {
 /// decided per-game, via `Game::runner_id`. Returns the path registered,
 /// which for a Proton compat data folder is its `pfx/` (see
 /// `effective_prefix_path`).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn add_prefix(
     app: AppHandle,
     state: State<ConfigState>,
@@ -41,9 +58,7 @@ pub fn add_prefix(
 ) -> Result<PathBuf, AppError> {
     let prefix_path = effective_prefix_path(Path::new(&path));
 
-    let mut config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let mut config = state.locked();
 
     if config.prefixes.iter().any(|p| p.path == prefix_path) {
         return Err(AppError::PrefixAlreadyExists {
@@ -93,9 +108,7 @@ pub async fn delete_prefix(
     // already runs is launching until it exits, so the claim is refused.
     let mut guards = Vec::new();
     {
-        let config = state
-            .lock()
-            .map_err(|_| "Configuration is locked".to_string())?;
+        let config = state.locked();
         if !config.prefixes.iter().any(|p| p.path == prefix_path) {
             return Err(format!("No prefix known at {path}").into());
         }
@@ -109,18 +122,14 @@ pub async fn delete_prefix(
         }
     }
 
-    let mut config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let mut config = state.locked();
     config.prefixes.retain(|p| p.path != prefix_path);
     save_config(&app, &config).map_err(AppError::from)
 }
 
 #[tauri::command]
 pub fn list_prefixes(state: State<ConfigState>) -> Result<Vec<PrefixInfo>, AppError> {
-    let config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let config = state.locked();
     Ok(config.prefixes.clone())
 }
 

@@ -1,4 +1,6 @@
-use super::{data_url_png, decode_icon_resource, png_data_url};
+use super::{data_url_png, decode_icon_resource};
+use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
 use image::{DynamicImage, ImageFormat, Rgba, RgbaImage};
 use std::io::Cursor;
 
@@ -11,11 +13,10 @@ fn one_pixel_png() -> Vec<u8> {
 }
 
 #[test]
-fn png_data_urls_round_trip() {
+fn icon_data_urls_from_older_configs_decode() {
     let png = one_pixel_png();
-    let data_url = png_data_url(&png);
+    let data_url = format!("data:image/png;base64,{}", STANDARD.encode(&png));
 
-    assert!(data_url.starts_with("data:image/png;base64,"));
     assert_eq!(data_url_png(&data_url), Some(png));
 }
 

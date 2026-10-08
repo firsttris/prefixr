@@ -38,14 +38,18 @@ fn adds_then_updates_the_same_entry() {
     assert_eq!(shortcuts[1].0, "1");
 
     // The user hid it in Steam; a rename in Prefixr keeps that.
-    let Value::Map(fields) = &mut shortcuts[1].1 else { panic!() };
+    let Value::Map(fields) = &mut shortcuts[1].1 else {
+        panic!()
+    };
     binary_vdf::set(fields, "IsHidden", Value::Int(1));
     let renamed = game("New");
     assert_eq!(existing_app_id(&shortcuts, renamed.id), Some(42));
     upsert_shortcut(&mut shortcuts, &renamed, 42, exe, Some(Path::new("/i.png")));
 
     assert_eq!(shortcuts.len(), 2);
-    let Value::Map(fields) = &shortcuts[1].1 else { panic!() };
+    let Value::Map(fields) = &shortcuts[1].1 else {
+        panic!()
+    };
     assert_eq!(string(fields, "AppName"), "New");
     assert_eq!(string(fields, "Exe"), "\"/apps/prefixr\"");
     assert_eq!(string(fields, "StartDir"), "\"/apps\"");

@@ -2,19 +2,20 @@ use crate::error::AppError;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
-use std::process::Stdio;
 use std::time::{Duration, SystemTime};
 
 use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
 
-use crate::commands::games::{prepare_prefix, steer_profile_to_steamuser};
+use crate::commands::games::{log_stdio, prepare_prefix, steer_profile_to_steamuser};
 use crate::commands::github::read_token;
 use crate::commands::logs::{new_log_file, prefix_log_dir};
+use crate::commands::prefixes::known_prefix;
 use crate::commands::runners::{
-    find_runner, prefix_command, runner_command, wine_binary, wineserver_binary,
+    find_runner, runner_command, umu_command, wine_binary, wineserver_binary,
 };
 use crate::config::ConfigState;
+use crate::lock::LockExt;
 use crate::models::{Runner, RunnerKind};
 
 fn winetricks_script_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -68,7 +69,19 @@ async fn ensure_winetricks_script(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(path)
 }
 
+/// Whether `bytes` is the winetricks script, rather than whatever else came
+/// back with a success status (a captive portal's login page, say) — it's
+/// made executable and run as is.
+fn looks_like_winetricks(bytes: &[u8]) -> bool {
+    let text = String::from_utf8_lossy(bytes);
+    text.starts_with("#!/bin/sh")
+        && text
+            .lines()
+            .any(|line| line.starts_with("WINETRICKS_VERSION="))
+}
+
 /// Downloads the current winetricks from its `master` branch to `path`.
+/// `master` rather than a release on purpose: see `SCRIPT_MAX_AGE`.
 async fn download_script(path: &Path) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
@@ -85,6 +98,11 @@ async fn download_script(path: &Path) -> Result<(), String> {
         .bytes()
         .await
         .map_err(|e| format!("Could not download winetricks: {e}"))?;
+    if !looks_like_winetricks(&bytes) {
+        return Err(
+            "Could not download winetricks: the response is not the winetricks script".to_string(),
+        );
+    }
 
     // Made executable under another name first and renamed into place, so
     // `path` only ever exists as the complete script.
@@ -101,6 +119,7 @@ async fn download_script(path: &Path) -> Result<(), String> {
 }
 
 #[derive(Serialize, Clone)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "snake_case")]
 pub struct WinetricksVerbMeta {
     pub id: String,
@@ -149,10 +168,12 @@ fn parse_verb_catalogue(script: &str) -> Vec<WinetricksVerbMeta> {
 /// shows a small curated subset front-and-center and this behind a "search
 /// everything else" disclosure, rather than a flat 370-item list.
 #[tauri::command]
-pub async fn list_all_winetricks_verbs(app: AppHandle) -> Result<Vec<WinetricksVerbMeta>, AppError> {
+pub async fn list_all_winetricks_verbs(
+    app: AppHandle,
+) -> Result<Vec<WinetricksVerbMeta>, AppError> {
     let script = ensure_winetricks_script(&app).await?;
-    let text =
-        fs::read_to_string(&script).map_err(|e| format!("Could not read winetricks script: {e}"))?;
+    let text = fs::read_to_string(&script)
+        .map_err(|e| format!("Could not read winetricks script: {e}"))?;
     Ok(parse_verb_catalogue(&text))
 }
 
@@ -162,9 +183,17 @@ pub async fn list_all_winetricks_verbs(app: AppHandle) -> Result<Vec<WinetricksV
 /// frontend mark verbs already present in a prefix instead of leaving the
 /// user to guess or just click install again. Missing file (nothing
 /// installed in this prefix yet) is not an error — just an empty list.
-#[tauri::command]
-pub fn list_installed_winetricks_verbs(prefix_path: String) -> Result<Vec<String>, AppError> {
-    match fs::read_to_string(Path::new(&prefix_path).join("winetricks.log")) {
+#[tauri::command(async)]
+pub fn list_installed_winetricks_verbs(
+    state: State<ConfigState>,
+    prefix_path: String,
+) -> Result<Vec<String>, AppError> {
+    let prefix = known_prefix(&state.locked(), &prefix_path)?;
+    read_installed_verbs(&prefix).map_err(AppError::from)
+}
+
+fn read_installed_verbs(prefix: &Path) -> Result<Vec<String>, String> {
+    match fs::read_to_string(prefix.join("winetricks.log")) {
         Ok(content) => Ok(content
             .lines()
             .map(str::trim)
@@ -172,7 +201,7 @@ pub fn list_installed_winetricks_verbs(prefix_path: String) -> Result<Vec<String
             .map(str::to_string)
             .collect()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Vec::new()),
-        Err(e) => Err(format!("Could not read winetricks.log: {e}").into()),
+        Err(e) => Err(format!("Could not read winetricks.log: {e}")),
     }
 }
 
@@ -206,29 +235,26 @@ pub async fn install_winetricks_verbs(
     if verbs.is_empty() {
         return Err(AppError::NoPackagesSelected);
     }
+    if let Some(verb) = verbs.iter().find(|verb| !is_verb_name(verb)) {
+        return Err(format!("Not a winetricks package: {verb}").into());
+    }
 
-    let runners_dir = {
-        let config = state
-            .lock()
-            .map_err(|_| "Configuration is locked".to_string())?;
-        config.runners_dir.clone()
+    let (runners_dir, prefix) = {
+        let config = state.locked();
+        (
+            config.runners_dir.clone(),
+            known_prefix(&config, &prefix_path)?,
+        )
     };
-    let token = read_token(&state)?;
+    let token = read_token(&state);
 
     let runner = find_runner(&runners_dir, &runner_id)?;
-    let prefix = PathBuf::from(&prefix_path);
 
     let log_path = new_log_file(&prefix_log_dir(&app, &prefix)?)?;
-    let log_out = fs::OpenOptions::new()
-        .append(true)
-        .open(&log_path)
-        .map_err(|e| format!("Could not open log file: {e}"))?;
-    let log_err = log_out
-        .try_clone()
-        .map_err(|e| format!("Could not open log file: {e}"))?;
+    let (log_out, log_err) = log_stdio(&log_path)?;
 
     let mut command = if uses_umu_winetricks(&runner) {
-        let mut command = prefix_command(&app, token.as_deref(), &runner, &prefix_path).await?;
+        let mut command = umu_command(&app, token.as_deref(), &runner.path, &prefix_path).await?;
         command.arg("winetricks").args(&verbs);
         command
     } else {
@@ -244,8 +270,8 @@ pub async fn install_winetricks_verbs(
     };
 
     let status = command
-        .stdout(Stdio::from(log_out))
-        .stderr(Stdio::from(log_err))
+        .stdout(log_out)
+        .stderr(log_err)
         .status()
         .await
         .map_err(|e| format!("Could not run winetricks: {e}"))?;
@@ -258,6 +284,16 @@ pub async fn install_winetricks_verbs(
         });
     }
     Ok(log_path_string)
+}
+
+/// Whether `verb` is shaped like a winetricks verb (`vcrun2022`,
+/// `d3dx9_43`, ...): it goes on winetricks' command line as is, where
+/// something starting with `-` would be an option instead.
+fn is_verb_name(verb: &str) -> bool {
+    verb.starts_with(|c: char| c.is_ascii_lowercase() || c.is_ascii_digit())
+        && verb
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || "_.=-".contains(c))
 }
 
 /// Whether `umu-run winetricks` works for this runner: it only supports a

@@ -1,13 +1,15 @@
 use super::*;
+use crate::test_util::TestDir;
 use std::fs;
 
 use crate::config::AppConfig;
-use crate::models::{GameOverrides, GitHubConfig, GraphicsConfig, MangoHudConfig, PerformanceConfig, PrefixInfo, ProtonConfig};
+use crate::models::{
+    GameOverrides, GitHubConfig, GraphicsConfig, MangoHudConfig, PerformanceConfig, PrefixInfo,
+    ProtonConfig,
+};
 
-fn temp_path(name: &str) -> PathBuf {
-    let path = std::env::temp_dir().join(format!("prefixr-{name}-{}", Uuid::new_v4()));
-    fs::create_dir_all(&path).unwrap();
-    path
+fn temp_path(name: &str) -> TestDir {
+    TestDir::new(name)
 }
 
 fn sample_game(id: Uuid, name: &str) -> Game {
@@ -58,14 +60,20 @@ fn builds_urls_with_percent_encoded_segments() {
 
 #[test]
 fn trims_or_rejects_api_keys() {
-    assert_eq!(sanitized_api_key(Some("  secret-key  ")), Some("secret-key".to_string()));
+    assert_eq!(
+        sanitized_api_key(Some("  secret-key  ")),
+        Some("secret-key".to_string())
+    );
     assert_eq!(sanitized_api_key(Some("  \t\n  ")), None);
     assert_eq!(sanitized_api_key(None), None);
 }
 
 #[test]
 fn artwork_kinds_map_to_expected_endpoints() {
-    assert_eq!(artwork_endpoint(ArtworkKind::Wide), ("grids", Some("920x430,460x215")));
+    assert_eq!(
+        artwork_endpoint(ArtworkKind::Wide),
+        ("grids", Some("920x430,460x215"))
+    );
     assert_eq!(artwork_endpoint(ArtworkKind::Hero), ("heroes", None));
     assert_eq!(artwork_endpoint(ArtworkKind::Logo), ("logos", None));
 }
@@ -110,8 +118,6 @@ fn removes_only_stale_files_for_the_requested_kind() {
     assert!(!cover.exists());
     assert!(icon.exists());
     assert!(other_game.exists());
-
-    let _ = fs::remove_dir_all(dir);
 }
 
 #[test]
@@ -147,7 +153,10 @@ fn find_game_returns_the_matching_entry() {
 
     assert_eq!(game.name, "Cyberpunk 2077");
     game.cover_url = Some("https://cdn.example/cover.png".to_string());
-    assert_eq!(config.games[0].cover_url.as_deref(), Some("https://cdn.example/cover.png"));
+    assert_eq!(
+        config.games[0].cover_url.as_deref(),
+        Some("https://cdn.example/cover.png")
+    );
 }
 
 #[test]
@@ -159,7 +168,10 @@ fn find_game_rejects_invalid_or_unknown_ids() {
         .starts_with("Invalid game id:"));
 
     let missing = Uuid::new_v4().to_string();
-    assert_eq!(find_game(&mut config, &missing).unwrap_err(), format!("No game with id {missing}"));
+    assert_eq!(
+        find_game(&mut config, &missing).unwrap_err(),
+        format!("No game with id {missing}")
+    );
 }
 
 #[test]
@@ -174,4 +186,69 @@ fn ico_icons_become_png() {
 
     let other = b"\x89PNG not touched".to_vec();
     assert_eq!(ico_to_png(other.clone()).unwrap(), other);
+}
+
+#[test]
+fn only_steamgriddb_images_are_downloaded() {
+    assert!(is_steamgriddb_image_url(
+        "https://cdn2.steamgriddb.com/grid/abc.png"
+    ));
+    assert!(is_steamgriddb_image_url("https://steamgriddb.com/x.png"));
+    for url in [
+        "http://cdn2.steamgriddb.com/grid/abc.png",
+        "https://steamgriddb.com.evil.example/x.png",
+        "https://evilsteamgriddb.com/x.png",
+        "file:///etc/passwd",
+        "https://localhost:8080/x.png",
+        "not a url",
+    ] {
+        assert!(!is_steamgriddb_image_url(url), "{url}");
+    }
+}
+
+#[test]
+fn slots_record_and_clear_their_image() {
+    let mut game: Game = serde_json::from_value(serde_json::json!({
+        "id": Uuid::new_v4(),
+        "name": "Game",
+        "exe_path": "/g.exe",
+        "prefix_path": "/p",
+        "runner_id": "r",
+    }))
+    .unwrap();
+
+    for (slot, grid_id) in [
+        (Slot::Cover, Some(1)),
+        (Slot::Icon, Some(2)),
+        (Slot::Artwork(ArtworkKind::Hero), None),
+    ] {
+        let url = format!("https://cdn2.steamgriddb.com/{}.png", slot.suffix());
+        slot.set(&mut game, Some((url.clone(), grid_id)));
+        assert_eq!(slot.url(&game), Some(&url));
+    }
+    assert_eq!(game.cover_grid_id, Some(1));
+    assert_eq!(game.steamgriddb_icon_grid_id, Some(2));
+
+    for slot in [Slot::Cover, Slot::Icon, Slot::Artwork(ArtworkKind::Hero)] {
+        slot.set(&mut game, None);
+        assert_eq!(slot.url(&game), None);
+    }
+    assert_eq!(game.cover_grid_id, None);
+    assert!(game.artwork.is_empty());
+}
+
+#[test]
+fn error_statuses_keep_steamgriddbs_reasons() {
+    let unauthorized = reqwest::StatusCode::UNAUTHORIZED;
+    assert_eq!(
+        error_status_message(
+            unauthorized,
+            r#"{"success":false,"errors":["Invalid API key"]}"#
+        ),
+        "Invalid API key"
+    );
+    assert_eq!(
+        error_status_message(unauthorized, "<html>Bad gateway</html>"),
+        "SteamGridDB API returned status 401 Unauthorized"
+    );
 }

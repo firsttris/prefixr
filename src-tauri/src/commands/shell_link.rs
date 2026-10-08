@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -10,6 +11,7 @@ use serde::Serialize;
 /// the actual game once its installer has finished (see `run_installer` in
 /// `commands::games`).
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct DetectedShortcut {
     /// The shortcut's own file name, without the `.lnk` extension — e.g.
     /// "Baldur's Gate 3".
@@ -145,6 +147,8 @@ fn collect_lnk_files(dir: &Path, depth: u32, out: &mut Vec<PathBuf>) {
 /// `C:\Games\Foo\foo.exe`) to a real filesystem path inside `prefix_path`,
 /// via that drive letter's `dosdevices` symlink — rather than assuming `C:`
 /// always maps straight to `drive_c`, since a prefix can remap drives.
+/// Each part matches case-insensitively, as it does in Wine: a shortcut
+/// may say `C:\GAMES\Foo` for a folder on disk named `Games`.
 fn resolve_windows_path(prefix_path: &Path, windows_path: &str) -> Option<PathBuf> {
     let mut chars = windows_path.chars();
     let drive = chars.next()?.to_ascii_lowercase();
@@ -157,12 +161,25 @@ fn resolve_windows_path(prefix_path: &Path, windows_path: &str) -> Option<PathBu
 
     let drive_link = prefix_path.join("dosdevices").join(format!("{drive}:"));
     let mut resolved = fs::canonicalize(&drive_link).ok()?;
-    for part in rest.split(['\\', '/']) {
-        if !part.is_empty() {
-            resolved.push(part);
-        }
+    for part in rest.split(['\\', '/']).filter(|part| !part.is_empty()) {
+        let on_disk = existing_name_ignoring_case(&resolved, part);
+        resolved.push(on_disk.as_deref().unwrap_or(OsStr::new(part)));
     }
     Some(resolved)
+}
+
+/// The name of the entry in `dir` that is `name` but for case, preferring
+/// an exact match; `None` if there's none.
+fn existing_name_ignoring_case(dir: &Path, name: &str) -> Option<OsString> {
+    if dir.join(name).exists() {
+        return Some(name.into());
+    }
+    let lower = name.to_lowercase();
+    fs::read_dir(dir)
+        .ok()?
+        .flatten()
+        .map(|entry| entry.file_name())
+        .find(|entry| entry.to_string_lossy().to_lowercase() == lower)
 }
 
 // --- Minimal Windows Shell Link (.lnk) parser (MS-SHLLINK) -----------------

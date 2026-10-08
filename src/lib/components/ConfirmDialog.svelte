@@ -1,7 +1,6 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
   import Modal from "./Modal.svelte";
-  
 
   let {
     open,

@@ -78,8 +78,8 @@ pub fn load_config(app: &AppHandle) -> Result<AppConfig, String> {
         return AppConfig::default_for(app);
     }
     let invalid = |e: &dyn std::fmt::Display| format!("{} is invalid: {e}", path.display());
-    let raw = fs::read_to_string(&path)
-        .map_err(|e| format!("Could not read {}: {e}", path.display()))?;
+    let raw =
+        fs::read_to_string(&path).map_err(|e| format!("Could not read {}: {e}", path.display()))?;
     let mut value: Value = serde_json::from_str(&raw).map_err(|e| invalid(&e))?;
     migrate(&mut value);
     let mut config: AppConfig = serde_json::from_value(value).map_err(|e| invalid(&e))?;
@@ -103,21 +103,20 @@ fn fix_prefix_paths(config: &mut AppConfig) {
     }
 }
 
-/// Fills in each game's exe icon from its file (see `icons::exe_icon_path`).
-/// A config from before those files existed still has the icons inline:
-/// they're moved to files here, and `save_config` leaves them out from then
-/// on. Best-effort throughout, the icons are only cosmetic.
+/// Fills in each game's exe icon path (see `icons::exe_icon_path`). A
+/// config from before those files existed still has the icons inline as
+/// `data:` URIs: they're moved to files here, and `save_config` leaves the
+/// field out from then on. Best-effort throughout, the icons are only
+/// cosmetic.
 fn load_icons(app: &AppHandle, config: &mut AppConfig) {
     for game in &mut config.games {
-        match &game.icon {
-            Some(data_url) => {
-                let missing = icons::exe_icon_path(app, game.id).is_ok_and(|path| !path.exists());
-                if let (true, Some(png)) = (missing, icons::data_url_png(data_url)) {
-                    let _ = icons::store_exe_icon(app, game.id, Some(&png));
-                }
+        if let Some(data_url) = &game.icon {
+            let missing = icons::exe_icon_path(app, game.id).is_ok_and(|path| !path.exists());
+            if let (true, Some(png)) = (missing, icons::data_url_png(data_url)) {
+                let _ = icons::store_exe_icon(app, game.id, Some(&png));
             }
-            None => game.icon = icons::load_exe_icon(app, game.id),
         }
+        game.icon = icons::exe_icon_file(app, game.id);
     }
 }
 
@@ -157,7 +156,8 @@ fn migrate(config: &mut Value) {
                     .filter_map(|(k, v)| Some((k.strip_prefix(prefix)?.to_string(), v.clone())))
                     .collect()
             };
-            let graphics = json!({ "gamescope": take("gamescope_"), "vkbasalt": take("vkbasalt_") });
+            let graphics =
+                json!({ "gamescope": take("gamescope_"), "vkbasalt": take("vkbasalt_") });
             config.insert("graphics".to_string(), graphics);
         }
     }
@@ -210,5 +210,5 @@ pub fn save_config(app: &AppHandle, config: &AppConfig) -> Result<(), String> {
     fs::rename(&tmp, &path).map_err(|e| format!("Could not write config file: {e}"))
 }
 
-    #[cfg(test)]
-    mod tests;
+#[cfg(test)]
+mod tests;

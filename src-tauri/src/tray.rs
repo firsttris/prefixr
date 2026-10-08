@@ -9,6 +9,7 @@ use uuid::Uuid;
 
 use crate::commands::games::{kill_running_game, LaunchingGames, RunningGames};
 use crate::locale::{text, Locale, LocaleState};
+use crate::lock::LockExt;
 
 pub const TRAY_ID: &str = "main-tray";
 const MAIN_WINDOW: &str = "main";
@@ -34,7 +35,27 @@ impl WindowVisible {
 /// AppIndicator extension has none: the icon then silently doesn't appear,
 /// and a window closed "into the tray" could only be brought back by
 /// starting Prefixr again. See `lib.rs`'s close handling.
-pub struct TrayAvailable(pub bool);
+///
+/// Assumed until `check_tray_host` has the answer, which can take a moment
+/// on a slow session bus, and startup doesn't wait for that.
+pub struct TrayAvailable(AtomicBool);
+
+impl TrayAvailable {
+    pub fn get(&self) -> bool {
+        self.0.load(Ordering::SeqCst)
+    }
+}
+
+/// Manages `TrayAvailable` and asks the session bus in the background.
+pub fn check_tray_host(app: &AppHandle) {
+    app.manage(TrayAvailable(AtomicBool::new(true)));
+    let app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        app.state::<TrayAvailable>()
+            .0
+            .store(tray_host_available(), Ordering::SeqCst);
+    });
+}
 
 fn tray_host_available_from_gdbus(success: bool, stdout: &[u8]) -> bool {
     if success {
@@ -52,7 +73,7 @@ fn sorted_running_games(mut games: Vec<(Uuid, String)>) -> Vec<(Uuid, String)> {
 /// Asks the session bus whether a StatusNotifier host (what Tauri's tray
 /// icon registers with) is running. `gdbus` ships with GLib, which Prefixr
 /// needs anyway; if it can't answer, a tray is assumed as before.
-pub fn tray_host_available() -> bool {
+fn tray_host_available() -> bool {
     let output = std::process::Command::new("gdbus")
         .args([
             "call",
@@ -75,7 +96,9 @@ pub fn tray_host_available() -> bool {
 }
 
 fn set_main_window_visible(app: &AppHandle, visible: bool) {
-    app.state::<WindowVisible>().0.store(visible, Ordering::SeqCst);
+    app.state::<WindowVisible>()
+        .0
+        .store(visible, Ordering::SeqCst);
 }
 
 fn is_main_window_visible(app: &AppHandle) -> bool {
@@ -135,7 +158,9 @@ fn toggle_main_window(app: &AppHandle) {
 }
 
 fn tray_locale(app: &AppHandle) -> Locale {
-    app.try_state::<LocaleState>().map(|s| s.get()).unwrap_or(Locale::De)
+    app.try_state::<LocaleState>()
+        .map(|s| s.get())
+        .unwrap_or(Locale::En)
 }
 
 fn toggle_label(visible: bool, locale: Locale) -> String {
@@ -164,10 +189,18 @@ fn quit_dialog_copy(active: usize, locale: Locale) -> (String, String, String, S
     let count = active.to_string();
     let running = match active {
         1 => text(locale, "native_quitDialog_oneRunning", &[]),
-        _ => text(locale, "native_quitDialog_manyRunning", &[("count", &count)]),
+        _ => text(
+            locale,
+            "native_quitDialog_manyRunning",
+            &[("count", &count)],
+        ),
     };
     (
-        text(locale, "native_quitDialog_message", &[("running", &running)]),
+        text(
+            locale,
+            "native_quitDialog_message",
+            &[("running", &running)],
+        ),
         text(locale, "native_quitDialog_title", &[]),
         text(locale, "native_quitDialog_confirm", &[]),
         text(locale, "common_cancel", &[]),
@@ -187,9 +220,11 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let running_games = app
         .state::<RunningGames>()
         .0
-        .lock()
-        .map(|games| sorted_running_games(games.iter().map(|(id, g)| (*id, g.name.clone())).collect()))
-        .unwrap_or_default();
+        .locked()
+        .iter()
+        .map(|(id, g)| (*id, g.name.clone()))
+        .collect();
+    let running_games = sorted_running_games(running_games);
 
     let builder = if running_games.is_empty() {
         builder
@@ -256,18 +291,17 @@ fn quit(app: &AppHandle) {
         .message(message)
         .title(title)
         .kind(MessageDialogKind::Warning)
-        .buttons(MessageDialogButtons::OkCancelCustom(confirm_label, cancel_label))
+        .buttons(MessageDialogButtons::OkCancelCustom(
+            confirm_label,
+            cancel_label,
+        ))
         .show(move |confirmed| {
             if !confirmed {
                 return;
             }
             tauri::async_runtime::spawn(async move {
                 let running = app.state::<RunningGames>();
-                let ids: Vec<Uuid> = running
-                    .0
-                    .lock()
-                    .map(|games| games.keys().copied().collect())
-                    .unwrap_or_default();
+                let ids: Vec<Uuid> = running.0.locked().keys().copied().collect();
                 join_all(ids.into_iter().map(|id| kill_running_game(&running, id))).await;
                 app.exit(0);
             });

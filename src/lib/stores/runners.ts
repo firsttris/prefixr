@@ -1,9 +1,23 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { writable } from "svelte/store";
-import type { Runner, RunnerRelease, RunnerSourceInfo } from "$lib/types";
+import type {
+  Game,
+  Runner,
+  RunnerDownloadDonePayload,
+  RunnerDownloadProgressPayload,
+  RunnerRelease,
+  RunnerSourceInfo,
+} from "$lib/types";
 
 export const runners = writable<Runner[]>([]);
+
+// The runner every game in a prefix uses, to start the prefix tools with;
+// "" when the games disagree or none uses the prefix.
+export function prefixRunner(games: Game[], prefixPath: string): string {
+  const used = new Set(games.filter((g) => g.prefix_path === prefixPath).map((g) => g.runner_id));
+  return used.size === 1 ? [...used][0]! : "";
+}
 
 export async function refreshRunners(): Promise<void> {
   runners.set(await invoke<Runner[]>("list_runners"));
@@ -21,7 +35,13 @@ export async function refreshRunnerSources(): Promise<void> {
   runnerSources.set(await invoke<RunnerSourceInfo[]>("list_runner_sources"));
 }
 
-export const runnerReleases = writable<RunnerRelease[]>([]);
+// Keyed by source, so a slow response for one source can't show up under
+// another one's tab.
+export const runnerReleases = writable<Record<string, RunnerRelease[]>>({});
+
+function setReleases(source: string, releases: RunnerRelease[]) {
+  runnerReleases.update((all) => ({ ...all, [source]: releases }));
+}
 
 // GitHub's unauthenticated API rate limit (60 requests/hour) is easy to
 // exhaust if every tab switch re-fetches releases from scratch, so cache
@@ -32,12 +52,12 @@ const releasesCache = new Map<string, { releases: RunnerRelease[]; fetchedAt: nu
 export async function refreshRunnerReleases(source: string, force = false): Promise<void> {
   const cached = releasesCache.get(source);
   if (!force && cached && Date.now() - cached.fetchedAt < RELEASES_CACHE_TTL_MS) {
-    runnerReleases.set(cached.releases);
+    setReleases(source, cached.releases);
     return;
   }
   const releases = await invoke<RunnerRelease[]>("list_runner_releases", { source });
   releasesCache.set(source, { releases, fetchedAt: Date.now() });
-  runnerReleases.set(releases);
+  setReleases(source, releases);
 }
 
 export interface RunnerDownloadState {
@@ -57,24 +77,8 @@ function patchDownloadState(tag: string, patch: Partial<RunnerDownloadState>) {
   });
 }
 
-interface DownloadProgressPayload {
-  tag: string;
-  downloaded: number;
-  total: number | null;
-}
-
-interface DownloadErrorPayload {
-  tag: string;
-  // The backend's structured AppError (see src-tauri/src/error.rs) —
-  // pass it through backendError() to render it, same as a command's Err.
-  message: unknown;
-}
-
-interface DownloadDonePayload {
-  tag: string;
-}
-
 let eventsInitialized = false;
+let downloadEventListeners: Promise<UnlistenFn>[] = [];
 
 // Registers the download-progress listeners once; must run client-side only
 // (call from onMount), since it touches the Tauri IPC bridge.
@@ -82,23 +86,27 @@ export function initRunnerDownloadEvents(): void {
   if (eventsInitialized) return;
   eventsInitialized = true;
 
-  listen<DownloadProgressPayload>("runner-download-progress", (event) => {
-    patchDownloadState(event.payload.tag, {
-      downloaded: event.payload.downloaded,
-      total: event.payload.total ?? undefined,
-    });
-  });
+  downloadEventListeners = [
+    listen<RunnerDownloadProgressPayload>("runner-download-progress", (event) => {
+      patchDownloadState(event.payload.tag, {
+        downloaded: event.payload.downloaded,
+        total: event.payload.total ?? undefined,
+      });
+    }),
 
-  listen<DownloadDonePayload>("runner-download-done", (event) => {
-    patchDownloadState(event.payload.tag, { done: true, error: undefined });
-    refreshRunners();
-  });
+    listen<RunnerDownloadDonePayload>("runner-download-done", (event) => {
+      const { tag } = event.payload;
+      patchDownloadState(tag, { done: true, error: undefined });
+      refreshRunners().catch((e) => patchDownloadState(tag, { error: e }));
+    }),
+  ];
+}
 
-  listen<DownloadErrorPayload>("runner-download-error", (event) => {
-    patchDownloadState(event.payload.tag, {
-      done: false,
-      error: event.payload.message,
-    });
+// In development, a hot-reloaded copy of this module registers its own
+// listeners; the replaced copy's must go, or every event is handled twice.
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    for (const unlisten of downloadEventListeners) unlisten.then((stop) => stop());
   });
 }
 
@@ -109,10 +117,10 @@ export async function downloadRunner(
 ): Promise<void> {
   patchDownloadState(tag, { downloaded: 0, total: undefined, done: false, error: undefined });
   try {
-    await invoke("download_runner", { source, tag, downloadUrl });
+    // The backend reads the tag from the URL itself; `tag` only keys the
+    // progress shown here, as the events do.
+    await invoke("download_runner", { source, downloadUrl });
   } catch (e) {
-    // Usually already set via the runner-download-error event, which isn't
-    // sent for a failure before the download got going (e.g. no network).
-    patchDownloadState(tag, { error: e });
+    patchDownloadState(tag, { done: false, error: e });
   }
 }

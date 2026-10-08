@@ -47,6 +47,7 @@
   let editing = $state<Game | "new" | null>(null);
   let pickingArtworkFor = $state<Game | null>(null);
   let installingExePath = $state<string | null>(null);
+  let installerRunning = $state(false);
 
   let modalGame = $derived(editing && editing !== "new" ? editing : undefined);
   let modalTitle = $derived(
@@ -60,27 +61,35 @@
   // this already-running instance — open the install dialog instead.
   // The listeners go in first: a handoff arriving while the startup
   // arguments are still being read would otherwise be lost.
-  onMount(async () => {
-    await Promise.all([
+  onMount(() => {
+    const listeners = Promise.all([
       listenForPendingLaunch((gameId) => {
         initGameEvents();
         launchGame(gameId);
       }),
       listenForPendingInstall((exePath) => (installingExePath = exePath)),
     ]);
+    listeners.then(takePending);
+    return () => {
+      listeners.then((unlisten) => unlisten.forEach((stop) => stop()));
+    };
+  });
 
-    const pendingGameId = await takePendingLaunch();
+  async function takePending() {
+    // Each on its own, so one that fails doesn't skip the other.
+    const [pendingGameId, pendingExePath] = await Promise.all([
+      takePendingLaunch().catch(() => null),
+      takePendingInstall().catch(() => null),
+    ]);
     if (pendingGameId) {
       view = "library";
       initGameEvents();
       launchGame(pendingGameId);
     }
-
-    const pendingExePath = await takePendingInstall();
     if (pendingExePath) {
       installingExePath = pendingExePath;
     }
-  });
+  }
 </script>
 
 <div class="shell">
@@ -154,8 +163,7 @@
           <h1>{m.library_heading()}</h1>
           {#if $games.length > 0}
             <p class="subtitle">
-              {$games.length}
-              {$games.length === 1 ? m.library_gameSingular() : m.library_gamePlural()}
+              {m.library_gameCount({ count: $games.length })}
             </p>
           {/if}
         </div>
@@ -212,10 +220,15 @@
 <Modal
   open={installingExePath !== null}
   title={m.library_installTitle()}
+  closable={!installerRunning}
   onClose={() => (installingExePath = null)}
 >
   {#if installingExePath}
-    <InstallDialog exePath={installingExePath} onClose={() => (installingExePath = null)} />
+    <InstallDialog
+      exePath={installingExePath}
+      onClose={() => (installingExePath = null)}
+      onBusyChange={(busy) => (installerRunning = busy)}
+    />
   {/if}
 </Modal>
 
@@ -324,5 +337,4 @@
     font-size: 0.9em;
     margin-top: 0.2em;
   }
-
 </style>

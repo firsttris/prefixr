@@ -1,5 +1,6 @@
 use crate::error::AppError;
 use std::collections::{HashMap, HashSet};
+use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -13,14 +14,14 @@ use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use uuid::Uuid;
 
 use crate::commands::github::read_token;
-use crate::commands::graphics_layers::{ensure_directx_layer_cache, ensure_wine_mono_msi};
-use crate::commands::icons::{exe_icon_path, extract_icon_png, png_data_url, store_exe_icon};
-use crate::commands::logs::{game_log_dir, new_log_file, prefix_log_dir};
-use crate::locale::LocaleState;
 use crate::commands::graphics::{ensure_vkbasalt_conf, vkbasalt_conf_path};
+use crate::commands::graphics_layers::{ensure_directx_layer_cache, ensure_wine_mono_msi};
+use crate::commands::icons::{exe_icon_path, extract_icon_png, save_exe_icon};
+use crate::commands::logs::{game_log_dir, new_log_file, prefix_log_dir};
 use crate::commands::mangohud::{ensure_mangohud_conf, mangohud_conf_path};
+use crate::commands::prefixes::known_prefix;
 use crate::commands::runners::{
-    find_runner, prefix_command, runner_command, wine_binary, wineserver_binary,
+    find_runner, runner_command, umu_command, wine_binary, wineserver_binary,
 };
 use crate::commands::shell_link::{find_recently_created_shortcuts, DetectedShortcut};
 use crate::commands::steamgriddb::{
@@ -28,6 +29,9 @@ use crate::commands::steamgriddb::{
 };
 use crate::commands::umu::{ensure_umu, runtime_present};
 use crate::config::{save_config, ConfigState};
+use crate::env::{self, Env};
+use crate::locale::LocaleState;
+use crate::lock::LockExt;
 use crate::models::{
     normalize_umu_id, normalize_umu_store, split_launch_args, Game, GameInput, Runner, RunnerKind,
 };
@@ -38,7 +42,11 @@ use crate::tray::rebuild_tray_menu;
 /// installed on every system. `pub(crate)` since `commands::performance` also
 /// needs it (to gate the `pkexec`-based max_map_count fix).
 pub(crate) fn command_on_path(name: &str) -> bool {
-    std::env::var_os("PATH")
+    command_on_path_in(name, &env::process)
+}
+
+fn command_on_path_in(name: &str, env: Env) -> bool {
+    env("PATH")
         .map(|paths| std::env::split_paths(&paths).any(|dir| dir.join(name).is_file()))
         .unwrap_or(false)
 }
@@ -58,19 +66,20 @@ const COMPETING_SCHEDULER_UNITS: &[&str] = &[
 /// Whether one of `COMPETING_SCHEDULER_UNITS` is currently active, in which
 /// case GameMode's own niceness/governor tweaks should be skipped in favor of
 /// `power_profile` (see `launch_game`).
+///
+/// One `systemctl is-active` call for all of them, which prints one state
+/// per unit, in order.
 async fn competing_scheduler_active() -> bool {
-    for unit in COMPETING_SCHEDULER_UNITS {
-        let active = tokio::process::Command::new("systemctl")
-            .args(["is-active", "--quiet", unit])
-            .status()
-            .await
-            .map(|status| status.success())
-            .unwrap_or(false);
-        if active {
-            return true;
-        }
-    }
-    false
+    tokio::process::Command::new("systemctl")
+        .arg("is-active")
+        .args(COMPETING_SCHEDULER_UNITS)
+        .output()
+        .await
+        .is_ok_and(|output| any_unit_active(&String::from_utf8_lossy(&output.stdout)))
+}
+
+fn any_unit_active(states: &str) -> bool {
+    states.lines().any(|state| state.trim() == "active")
 }
 
 /// A game process currently running under its runner, tracked so the tray
@@ -126,7 +135,7 @@ impl LaunchingGames {
         // The lock is released before a guard exists: dropping one locks
         // again (and must never happen for a refused claim, whose drop
         // would end the launch already in progress).
-        let inserted = self.0.lock().ok()?.insert(id);
+        let inserted = self.0.locked().insert(id);
         if !inserted {
             return None;
         }
@@ -143,10 +152,7 @@ impl LaunchingGames {
 
     /// The games launching or running in this process.
     pub(crate) fn ids(&self) -> Vec<Uuid> {
-        self.0
-            .lock()
-            .map(|launching| launching.iter().copied().collect())
-            .unwrap_or_default()
+        self.0.locked().iter().copied().collect()
     }
 }
 
@@ -162,8 +168,8 @@ pub(crate) struct LaunchGuard<'a> {
 /// Where the per-game lock files live: the user's runtime directory, which
 /// every Prefixr process of the same user shares, including one started by
 /// Steam.
-fn launch_lock_dir() -> PathBuf {
-    match std::env::var_os("XDG_RUNTIME_DIR") {
+fn launch_lock_dir(env: Env) -> PathBuf {
+    match env("XDG_RUNTIME_DIR") {
         Some(dir) => PathBuf::from(dir).join("prefixr"),
         // SAFETY: getuid(2) can't fail and has no preconditions.
         None => std::env::temp_dir().join(format!("prefixr-{}", unsafe { libc::getuid() })),
@@ -174,7 +180,7 @@ fn launch_lock_dir() -> PathBuf {
 /// that can't be created or locked for any other reason gives `Ok(None)`:
 /// the launch then goes ahead, guarded only within this process as before.
 fn lock_launch_file(id: Uuid) -> Result<Option<fs::File>, ()> {
-    let dir = launch_lock_dir();
+    let dir = launch_lock_dir(&env::process);
     if fs::create_dir_all(&dir).is_err() {
         return Ok(None);
     }
@@ -195,9 +201,7 @@ fn lock_launch_file(id: Uuid) -> Result<Option<fs::File>, ()> {
 
 impl Drop for LaunchGuard<'_> {
     fn drop(&mut self) {
-        if let Ok(mut launching) = self.launching.0.lock() {
-            launching.remove(&self.id);
-        }
+        self.launching.0.locked().remove(&self.id);
     }
 }
 
@@ -209,7 +213,11 @@ fn process_descendants(root: u32) -> Vec<u32> {
     };
     let mut children: HashMap<u32, Vec<u32>> = HashMap::new();
     for entry in entries.flatten() {
-        let Some(pid) = entry.file_name().to_str().and_then(|n| n.parse::<u32>().ok()) else {
+        let Some(pid) = entry
+            .file_name()
+            .to_str()
+            .and_then(|n| n.parse::<u32>().ok())
+        else {
             continue;
         };
         let Ok(status) = fs::read_to_string(entry.path().join("status")) else {
@@ -226,10 +234,11 @@ fn process_descendants(root: u32) -> Vec<u32> {
     }
 
     let mut descendants = Vec::new();
+    let mut seen = HashSet::new();
     let mut queue = vec![root];
     while let Some(pid) = queue.pop() {
         for &child in children.get(&pid).into_iter().flatten() {
-            if !descendants.contains(&child) {
+            if seen.insert(child) {
                 descendants.push(child);
                 queue.push(child);
             }
@@ -342,16 +351,12 @@ fn pkill_pattern(text: &str) -> String {
 ///    tree, and a game started through `distrobox-host-exec`, where the tree
 ///    visible to us only contains the relay (see `RunningGame::wineserver`).
 pub async fn kill_running_game(running: &RunningGames, id: Uuid) -> Result<(), String> {
-    let game = {
-        let games = running
-            .0
-            .lock()
-            .map_err(|_| "Running games list is locked".to_string())?;
-        games
-            .get(&id)
-            .cloned()
-            .ok_or_else(|| "Game is not running".to_string())?
-    };
+    let game = running
+        .0
+        .locked()
+        .get(&id)
+        .cloned()
+        .ok_or_else(|| "Game is not running".to_string())?;
     game.killed.store(true, Ordering::SeqCst);
 
     if let Some(pid) = game.pid {
@@ -397,6 +402,7 @@ pub async fn kill_running_game(running: &RunningGames, id: Uuid) -> Result<(), S
 /// its state back up after the webview reloaded (the launch events it
 /// tracks that state from are gone by then).
 #[derive(Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct ActiveGame {
     id: String,
     /// The process runs; otherwise it's still being prepared.
@@ -408,11 +414,7 @@ pub fn list_active_games(
     running: State<RunningGames>,
     launching: State<LaunchingGames>,
 ) -> Vec<ActiveGame> {
-    let running = running
-        .0
-        .lock()
-        .map(|games| games.keys().copied().collect::<HashSet<_>>())
-        .unwrap_or_default();
+    let running: HashSet<Uuid> = running.0.locked().keys().copied().collect();
     launching
         .ids()
         .into_iter()
@@ -426,36 +428,40 @@ pub fn list_active_games(
 #[tauri::command]
 pub async fn kill_game(running: State<'_, RunningGames>, id: String) -> Result<(), AppError> {
     let game_id = Uuid::parse_str(&id).map_err(|e| format!("Invalid game id: {e}"))?;
-    kill_running_game(&running, game_id).await.map_err(AppError::from)
+    kill_running_game(&running, game_id)
+        .await
+        .map_err(AppError::from)
 }
 
-/// Holds a `--launch <game-id>` argument found at startup (see `run()` in
-/// `lib.rs`), so the frontend can pick it up once and start that game
-/// immediately — this is what a desktop shortcut created by
-/// `create_desktop_shortcut` invokes the app with.
+/// Holds a `--launch <game-id>` argument found at startup, or forwarded by
+/// a second app instance (see `run()` in `lib.rs`), so the frontend can pick
+/// it up once and start that game immediately — this is what a desktop
+/// shortcut created by `create_desktop_shortcut` invokes the app with. The
+/// frontend takes it on startup and again on every `pending-launch` event.
 pub struct PendingLaunch(pub Mutex<Option<String>>);
 
 #[tauri::command]
 pub fn take_pending_launch(state: State<PendingLaunch>) -> Option<String> {
-    state.0.lock().ok()?.take()
+    state.0.locked().take()
 }
 
 /// Holds a `--install <exe-path>` argument found at startup, or forwarded by
 /// a second app instance (see `tauri_plugin_single_instance` in `lib.rs`) —
 /// the "Install with Prefixr" file-manager context menu entry launches
-/// Prefixr this way. The frontend picks it up once (either via
-/// `take_pending_install` on startup, or via the `pending-install` event a
-/// second instance triggers while the app is already running) and opens the
-/// installer dialog with this exe path pre-filled.
+/// Prefixr this way. The frontend picks it up once (via
+/// `take_pending_install`, on startup and again on every `pending-install`
+/// event a second instance triggers while the app is already running) and
+/// opens the installer dialog with this exe path pre-filled.
 pub struct PendingInstall(pub Mutex<Option<String>>);
 
 #[tauri::command]
 pub fn take_pending_install(state: State<PendingInstall>) -> Option<String> {
-    state.0.lock().ok()?.take()
+    state.0.locked().take()
 }
 
 /// What `run_installer` reports back once the installer exited.
 #[derive(Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct InstallerResult {
     shortcuts: Vec<DetectedShortcut>,
     log_path: String,
@@ -487,16 +493,16 @@ pub async fn run_installer(
     runner_id: String,
     exe_path: String,
 ) -> Result<InstallerResult, AppError> {
-    let runners_dir = {
-        let config = state
-            .lock()
-            .map_err(|_| "Configuration is locked".to_string())?;
-        config.runners_dir.clone()
+    let (runners_dir, prefix) = {
+        let config = state.locked();
+        (
+            config.runners_dir.clone(),
+            known_prefix(&config, &prefix_path)?,
+        )
     };
-    let token = read_token(&state)?;
+    let token = read_token(&state);
 
     let runner = find_runner(&runners_dir, &runner_id)?;
-    let prefix = PathBuf::from(&prefix_path);
     let log_path = new_log_file(&prefix_log_dir(&app, &prefix)?)?;
     let log_path_string = log_path.display().to_string();
 
@@ -548,9 +554,7 @@ pub(crate) fn env_pairs(env: &[(String, String)]) -> Vec<(&str, &str)> {
 
 #[tauri::command]
 pub fn list_games(state: State<ConfigState>) -> Result<Vec<Game>, AppError> {
-    let config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let config = state.locked();
     Ok(config.games.clone())
 }
 
@@ -573,8 +577,7 @@ pub fn add_game(
     let icon = extract_icon_png(&game.exe_path);
     let (umu_id, umu_store) = umu_fields(game.umu_id, game.umu_store);
     let id = Uuid::new_v4();
-    // Best-effort, like the icon itself: it's only cosmetic.
-    let _ = store_exe_icon(&app, id, icon.as_deref());
+    let icon = save_exe_icon(&app, id, icon.as_deref());
     let new_game = Game {
         id,
         name: game.name,
@@ -583,7 +586,7 @@ pub fn add_game(
         runner_id: game.runner_id,
         env_vars: game.env_vars,
         launch_args: game.launch_args,
-        icon: icon.as_deref().map(png_data_url),
+        icon,
         steamgriddb_id: None,
         cover_grid_id: None,
         cover_url: None,
@@ -595,9 +598,7 @@ pub fn add_game(
         overrides: game.overrides,
     };
 
-    let mut config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let mut config = state.locked();
     config.games.push(new_game.clone());
     save_config(&app, &config)?;
     Ok(new_game)
@@ -622,25 +623,19 @@ pub fn update_game(
     // Parsing the exe for its icon means reading all of it, so that only
     // happens when there's something new to find — and outside the lock.
     let needs_icon = {
-        let config = state
-            .lock()
-            .map_err(|_| "Configuration is locked".to_string())?;
+        let config = state.locked();
         let existing = &config.games[find(&config.games)?];
         existing.exe_path != game.exe_path || existing.icon.is_none()
     };
-    let icon = needs_icon.then(|| extract_icon_png(&game.exe_path));
-    if let Some(icon) = &icon {
-        let _ = store_exe_icon(&app, game_id, icon.as_deref());
-    }
+    let icon = needs_icon
+        .then(|| save_exe_icon(&app, game_id, extract_icon_png(&game.exe_path).as_deref()));
 
-    let mut config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let mut config = state.locked();
     let index = find(&config.games)?;
     let existing = &mut config.games[index];
 
     if let Some(icon) = icon {
-        existing.icon = icon.as_deref().map(png_data_url);
+        existing.icon = icon;
     }
     existing.name = game.name;
     existing.exe_path = game.exe_path;
@@ -661,12 +656,22 @@ pub fn update_game(
 /// shortcuts, which would otherwise launch a game that no longer exists.
 /// Its prefix stays, which other games may share. Best-effort past the
 /// config itself: a leftover file is no reason to keep the game.
+///
+/// Refused while the game is launching or running (here or in a Prefixr
+/// Steam started), which still writes to its logs; the claim also keeps it
+/// from being started while it's removed.
 #[tauri::command(async)]
-pub fn remove_game(app: AppHandle, state: State<ConfigState>, id: String) -> Result<(), AppError> {
+pub fn remove_game(
+    app: AppHandle,
+    state: State<ConfigState>,
+    launching: State<LaunchingGames>,
+    id: String,
+) -> Result<(), AppError> {
     let game_id = Uuid::parse_str(&id).map_err(|e| format!("Invalid game id: {e}"))?;
-    let mut config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let Some(_guard) = launching.claim(game_id) else {
+        return Err(AppError::GameRunning);
+    };
+    let mut config = state.locked();
 
     if !config.games.iter().any(|g| g.id == game_id) {
         return Err(format!("No game with id {id}").into());
@@ -697,13 +702,13 @@ pub fn remove_game(app: AppHandle, state: State<ConfigState>, id: String) -> Res
         let _ = fs::remove_dir_all(logs);
     }
 
-    let desktop_shortcuts = desktop_directory()
+    let desktop_shortcuts = desktop_directory(&env::process)
         .map(|dir| game_shortcuts(&dir, game_id))
         .unwrap_or_default();
     for shortcut in desktop_shortcuts {
         let _ = fs::remove_file(shortcut);
     }
-    if let Ok(applications_dir) = applications_directory() {
+    if let Ok(applications_dir) = applications_directory(&env::process) {
         let menu_entries = game_shortcuts(&applications_dir, game_id);
         for entry in &menu_entries {
             let _ = fs::remove_file(entry);
@@ -718,23 +723,27 @@ pub fn remove_game(app: AppHandle, state: State<ConfigState>, id: String) -> Res
 }
 
 #[derive(Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 struct GameInitializingPayload<'a> {
     id: &'a str,
 }
 
 #[derive(Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 struct GameStartedPayload<'a> {
     id: &'a str,
     log_path: String,
 }
 
 #[derive(Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 struct GameExitedPayload<'a> {
     id: &'a str,
     exit_code: Option<i32>,
 }
 
 #[derive(Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 struct GameLaunchErrorPayload<'a> {
     id: &'a str,
     message: AppError,
@@ -778,7 +787,10 @@ const VKD3D_MODULES: &[&str] = &["d3d12", "d3d12core"];
 /// prefix imported from another tool, or last used with a Proton runner,
 /// may have these files pointing at a different build or be missing them
 /// entirely, so they're re-linked on every launch rather than once.
-fn sync_directx_overrides_from_cache(cache_dir: &Path, prefix_path: &Path) -> Result<String, String> {
+fn sync_directx_overrides_from_cache(
+    cache_dir: &Path,
+    prefix_path: &Path,
+) -> Result<String, String> {
     let windows_dir = prefix_path.join("drive_c/windows");
     let win32 = is_win32_prefix(prefix_path);
 
@@ -852,18 +864,11 @@ async fn install_wine_mono(
         .to_str()
         .ok_or_else(|| format!("Installer path is not valid UTF-8: {}", msi_path.display()))?;
 
-    let out = fs::OpenOptions::new()
-        .append(true)
-        .open(log_path)
-        .map_err(|e| format!("Could not open log file: {e}"))?;
-    let err = out
-        .try_clone()
-        .map_err(|e| format!("Could not open log file: {e}"))?;
-
+    let (out, err) = log_stdio(log_path)?;
     let status = runner_command(wine, [("WINEPREFIX", prefix_str)])
         .args(["msiexec", "/i", msi_str, "/qn"])
-        .stdout(Stdio::from(out))
-        .stderr(Stdio::from(err))
+        .stdout(out)
+        .stderr(err)
         .status()
         .await
         .map_err(|e| format!("Could not run wine-mono installer: {e}"))?;
@@ -894,20 +899,67 @@ async fn install_wine_mono(
 /// be the very first thing to touch a fresh prefix (installing dependencies
 /// before ever launching the game once) and implicitly runs wineboot itself.
 pub(crate) fn steer_profile_to_steamuser(prefix_path: &Path) -> Result<(), String> {
+    steer_profiles_to_steamuser(prefix_path, &profile_user_names())
+}
+
+/// The names Wine may pick for the prefix's user profile: the account name
+/// from the password database, which is what Wine asks, and `$USER`, which
+/// differs from it under `sudo -u`, in some containers or when set by hand.
+fn profile_user_names() -> Vec<OsString> {
+    let mut names: Vec<OsString> = account_name().into_iter().collect();
+    if let Some(user) = std::env::var_os("USER").filter(|user| !user.is_empty()) {
+        if !names.contains(&user) {
+            names.push(user);
+        }
+    }
+    names
+}
+
+/// The name of the account this process runs as, via getpwuid_r(3).
+fn account_name() -> Option<OsString> {
+    use std::ffi::CStr;
+    use std::os::unix::ffi::OsStrExt;
+
+    let mut buf = vec![0 as libc::c_char; 4096];
+    // SAFETY: an all-zero passwd is a valid value (null pointers, zero ids)
+    // for getpwuid_r to fill in.
+    let mut pwd: libc::passwd = unsafe { std::mem::zeroed() };
+    let mut result: *mut libc::passwd = std::ptr::null_mut();
+    // SAFETY: every pointer is valid for the duration of the call, and
+    // `buf.len()` is the buffer's real size; getuid(2) can't fail.
+    let rc = unsafe {
+        libc::getpwuid_r(
+            libc::getuid(),
+            &mut pwd,
+            buf.as_mut_ptr(),
+            buf.len(),
+            &mut result,
+        )
+    };
+    if rc != 0 || result.is_null() || pwd.pw_name.is_null() {
+        return None;
+    }
+    // SAFETY: on success `pw_name` points to a NUL-terminated string inside
+    // `buf`, which is still alive here.
+    let name = unsafe { CStr::from_ptr(pwd.pw_name) };
+    (!name.is_empty()).then(|| std::ffi::OsStr::from_bytes(name.to_bytes()).to_owned())
+}
+
+fn steer_profiles_to_steamuser(prefix_path: &Path, usernames: &[OsString]) -> Result<(), String> {
     let users_dir = prefix_path.join("drive_c/users");
     let steamuser_dir = users_dir.join("steamuser");
     fs::create_dir_all(&steamuser_dir)
         .map_err(|e| format!("Could not create {}: {e}", steamuser_dir.display()))?;
 
-    let Some(username) = std::env::var_os("USER").filter(|u| u != "steamuser") else {
-        return Ok(());
-    };
-    let user_dir = users_dir.join(&username);
-    if fs::symlink_metadata(&user_dir).is_ok() {
-        return Ok(());
+    for username in usernames.iter().filter(|name| *name != "steamuser") {
+        let user_dir = users_dir.join(username);
+        if fs::symlink_metadata(&user_dir).is_ok() {
+            continue;
+        }
+        std::os::unix::fs::symlink("steamuser", &user_dir)
+            .map_err(|e| format!("Could not link {}: {e}", user_dir.display()))?;
     }
-    std::os::unix::fs::symlink("steamuser", &user_dir)
-        .map_err(|e| format!("Could not link {}: {e}", user_dir.display()))
+    Ok(())
 }
 
 /// Opens a launch's log file for appending, as a stdout/stderr pair for a
@@ -961,8 +1013,16 @@ pub(crate) async fn prepare_prefix(
 
     let binary = match runner.kind {
         RunnerKind::Proton => {
-            prepare_proton(app, token, runner, prefix_path, log_path, on_initializing, &mut env)
-                .await?
+            prepare_proton(
+                app,
+                token,
+                runner,
+                prefix_path,
+                log_path,
+                on_initializing,
+                &mut env,
+            )
+            .await?
         }
         RunnerKind::Wine => {
             // Proton turns wine's debug channels off itself unless asked to
@@ -970,8 +1030,16 @@ pub(crate) async fn prepare_prefix(
             // costs some games noticeable performance. A game's own
             // `WINEDEBUG` comes later and still wins.
             env.push(("WINEDEBUG".to_string(), "-all".to_string()));
-            prepare_wine(app, runner, prefix_path, log_path, on_initializing, &mut dll_overrides)
-                .await?
+            prepare_wine(
+                app,
+                token,
+                runner,
+                prefix_path,
+                log_path,
+                on_initializing,
+                &mut dll_overrides,
+            )
+            .await?
         }
     };
     env.push(("WINEDLLOVERRIDES".to_string(), dll_overrides.join(";")));
@@ -1008,7 +1076,7 @@ async fn prepare_proton(
         // Exit status deliberately not checked: after setting everything up,
         // GE-Proton still tries to launch the empty exe `createprefix` hands
         // it and exits 1 on "file not found", even on complete success.
-        prefix_command(app, token, runner, &prefix_path_str)
+        umu_command(app, token, &runner.path, &prefix_path_str)
             .await?
             .arg("createprefix")
             .stdout(out)
@@ -1041,6 +1109,7 @@ const WINEBOOT_DLL_OVERRIDES: &str = "mscoree,mshtml=;winemenubuilder.exe=";
 /// `WINEDLLOVERRIDES` entries those need appended to `dll_overrides`.
 async fn prepare_wine(
     app: &AppHandle,
+    token: Option<&str>,
     runner: &Runner,
     prefix_path: &Path,
     log_path: &Path,
@@ -1080,7 +1149,7 @@ async fn prepare_wine(
     }
 
     install_wine_mono(app, &wine, &runner.path, prefix_path, log_path).await?;
-    let cache = ensure_directx_layer_cache(app).await?;
+    let cache = ensure_directx_layer_cache(app, token).await?;
     dll_overrides.push(sync_directx_overrides_from_cache(&cache, prefix_path)?);
 
     // Proton only re-copies its own DXVK/VKD3D (and builtin DLLs) into a
@@ -1134,7 +1203,7 @@ pub async fn launch_game(
             },
         );
     }
-    result.map_err(AppError::from)
+    result
 }
 
 /// Runs a game without any window and exits along with it: how Steam
@@ -1167,7 +1236,8 @@ pub fn launch_game_headless(app: &AppHandle, id: String) {
                         .message(text)
                         .title(title)
                         .kind(MessageDialogKind::Error);
-                    let _ = tauri::async_runtime::spawn_blocking(move || dialog.blocking_show()).await;
+                    let _ =
+                        tauri::async_runtime::spawn_blocking(move || dialog.blocking_show()).await;
                 }
                 1
             }
@@ -1186,9 +1256,7 @@ async fn run_game(
     let game_id = Uuid::parse_str(id).map_err(|e| format!("Invalid game id: {e}"))?;
 
     let (game, runners_dir, settings) = {
-        let config = state
-            .lock()
-            .map_err(|_| "Configuration is locked".to_string())?;
+        let config = state.locked();
         let game = config
             .games
             .iter()
@@ -1206,7 +1274,7 @@ async fn run_game(
     let performance = &settings.performance;
     let graphics = &settings.graphics;
     let mangohud = &settings.mangohud;
-    let token = read_token(state)?;
+    let token = read_token(state);
 
     let runner = find_runner(&runners_dir, &game.runner_id)?;
     let log_path_string = log_path.display().to_string();
@@ -1253,7 +1321,11 @@ async fn run_game(
             conf_path.display().to_string(),
         ));
         if !use_mangoapp {
-            let target = if use_gamescope { &mut game_only_env } else { &mut env };
+            let target = if use_gamescope {
+                &mut game_only_env
+            } else {
+                &mut env
+            };
             target.push(("MANGOHUD".to_string(), "1".to_string()));
         }
     }
@@ -1261,14 +1333,17 @@ async fn run_game(
     // competing auto-nice/scheduler daemon if one is running — so in that
     // case we skip the LD_PRELOAD and fall back to `power_profile` instead
     // (see `use_power_profile` below), which doesn't touch niceness at all.
-    let scheduler_conflict =
-        performance.gamemode_enabled && competing_scheduler_active().await;
+    let scheduler_conflict = performance.gamemode_enabled && competing_scheduler_active().await;
     if performance.gamemode_enabled && !scheduler_conflict {
         env.push(("LD_PRELOAD".to_string(), "libgamemodeauto.so.0".to_string()));
     }
     if graphics.vkbasalt.enabled {
         let vkbasalt_conf = ensure_vkbasalt_conf(app, id, &graphics.vkbasalt)?;
-        let target = if use_gamescope { &mut game_only_env } else { &mut env };
+        let target = if use_gamescope {
+            &mut game_only_env
+        } else {
+            &mut env
+        };
         target.push(("ENABLE_VKBASALT".to_string(), "1".to_string()));
         target.push((
             "VKBASALT_CONFIG_FILE".to_string(),
@@ -1366,7 +1441,11 @@ async fn run_game(
         wrapped.push("--".to_string());
         if !game_only_env.is_empty() {
             wrapped.push("env".to_string());
-            wrapped.extend(game_only_env.iter().map(|(key, value)| format!("{key}={value}")));
+            wrapped.extend(
+                game_only_env
+                    .iter()
+                    .map(|(key, value)| format!("{key}={value}")),
+            );
         }
         wrapped.append(&mut launch_chain);
         launch_chain = wrapped;
@@ -1382,9 +1461,9 @@ async fn run_game(
 
     if scheduler_conflict {
         let note = if use_power_profile {
-            "[prefixr] GameMode uebersprungen: konkurrierender Scheduler-Daemon aktiv, nutze Power-Profile stattdessen\n"
+            "[prefixr] GameMode skipped: a competing scheduler daemon is active, using the performance power profile instead\n"
         } else {
-            "[prefixr] GameMode uebersprungen: konkurrierender Scheduler-Daemon aktiv, powerprofilesctl nicht verfuegbar\n"
+            "[prefixr] GameMode skipped: a competing scheduler daemon is active, and powerprofilesctl is not available\n"
         };
         let _ = fs::OpenOptions::new()
             .append(true)
@@ -1407,19 +1486,17 @@ async fn run_game(
         .map_err(|e| format!("Could not start game: {e}"))?;
 
     let killed = Arc::new(AtomicBool::new(false));
-    if let Ok(mut running) = running.0.lock() {
-        running.insert(
-            game_id,
-            RunningGame {
-                name: game.name.clone(),
-                pid: child.id(),
-                wineserver: wineserver.clone(),
-                wineprefix: wineprefix.clone(),
-                exe_path: game.exe_path.clone(),
-                killed: killed.clone(),
-            },
-        );
-    }
+    running.0.locked().insert(
+        game_id,
+        RunningGame {
+            name: game.name.clone(),
+            pid: child.id(),
+            wineserver: wineserver.clone(),
+            wineprefix: wineprefix.clone(),
+            exe_path: game.exe_path.clone(),
+            killed: killed.clone(),
+        },
+    );
     rebuild_tray_menu(app);
 
     let _ = app.emit(
@@ -1432,9 +1509,7 @@ async fn run_game(
 
     let wait_result = child.wait().await;
 
-    if let Ok(mut running) = running.0.lock() {
-        running.remove(&game_id);
-    }
+    running.0.locked().remove(&game_id);
     rebuild_tray_menu(app);
 
     let status = wait_result.map_err(|e| format!("Game process failed: {e}"))?;
@@ -1502,8 +1577,8 @@ fn keep_inherited_preload(env: &mut [(String, String)], inherited: Option<String
 /// The user's Desktop folder, honoring a localized `XDG_DESKTOP_DIR` (e.g.
 /// "Schreibtisch" on a German system) if `~/.config/user-dirs.dirs` sets one,
 /// falling back to `~/Desktop`.
-fn desktop_directory() -> Result<PathBuf, String> {
-    let home = std::env::var_os("HOME")
+fn desktop_directory(env: Env) -> Result<PathBuf, String> {
+    let home = env("HOME")
         .map(PathBuf::from)
         .ok_or_else(|| "HOME is not set".to_string())?;
 
@@ -1525,11 +1600,11 @@ fn desktop_directory() -> Result<PathBuf, String> {
 /// falling back to `~/.local/share/applications`) — where a `.desktop` file
 /// needs to live for the desktop environment's start menu / app launcher to
 /// pick it up, as opposed to `desktop_directory` for an icon on the Desktop.
-fn applications_directory() -> Result<PathBuf, String> {
-    if let Some(data_home) = std::env::var_os("XDG_DATA_HOME") {
+fn applications_directory(env: Env) -> Result<PathBuf, String> {
+    if let Some(data_home) = env("XDG_DATA_HOME") {
         return Ok(PathBuf::from(data_home).join("applications"));
     }
-    let home = std::env::var_os("HOME")
+    let home = env("HOME")
         .map(PathBuf::from)
         .ok_or_else(|| "HOME is not set".to_string())?;
     Ok(home.join(".local/share/applications"))
@@ -1578,8 +1653,8 @@ pub(crate) fn write_shortcut_icon(app: &AppHandle, game: &Game) -> Result<Option
 /// re-randomized on every launch — useless for a persistent shortcut.
 /// AppImages set `APPIMAGE` to the real `.AppImage` file's path exactly for
 /// cases like this, so that's preferred when present.
-pub(crate) fn own_executable_path() -> Result<PathBuf, String> {
-    if let Some(appimage_path) = std::env::var_os("APPIMAGE") {
+pub(crate) fn own_executable_path(env: Env) -> Result<PathBuf, String> {
+    if let Some(appimage_path) = env("APPIMAGE") {
         return Ok(PathBuf::from(appimage_path));
     }
     std::env::current_exe().map_err(|e| format!("Could not resolve own executable path: {e}"))
@@ -1657,9 +1732,7 @@ fn write_game_shortcut(
 ) -> Result<(), String> {
     let game_id = Uuid::parse_str(id).map_err(|e| format!("Invalid game id: {e}"))?;
     let game = {
-        let config = state
-            .lock()
-            .map_err(|_| "Configuration is locked".to_string())?;
+        let config = state.locked();
         config
             .games
             .iter()
@@ -1672,7 +1745,7 @@ fn write_game_shortcut(
         .map_err(|e| format!("Could not access {}: {e}", target_dir.display()))?;
 
     let icon_path = write_shortcut_icon(app, &game)?;
-    let exe_path = own_executable_path()?;
+    let exe_path = own_executable_path(&env::process)?;
 
     let mut contents = String::new();
     contents.push_str("[Desktop Entry]\n");
@@ -1684,7 +1757,10 @@ fn write_game_shortcut(
         game.id
     ));
     if let Some(icon_path) = &icon_path {
-        contents.push_str(&format!("Icon={}\n", desktop_string(&icon_path.to_string_lossy())));
+        contents.push_str(&format!(
+            "Icon={}\n",
+            desktop_string(&icon_path.to_string_lossy())
+        ));
     }
     contents.push_str("Terminal=false\n");
     contents.push_str("Categories=Game;\n");
@@ -1696,8 +1772,10 @@ fn write_game_shortcut(
         let _ = fs::remove_file(old);
     }
     let short_id = &game.id.simple().to_string()[..8];
-    let shortcut_path =
-        target_dir.join(format!("{}-{short_id}.desktop", sanitize_filename(&game.name)));
+    let shortcut_path = target_dir.join(format!(
+        "{}-{short_id}.desktop",
+        sanitize_filename(&game.name)
+    ));
     fs::write(&shortcut_path, contents)
         .map_err(|e| format!("Could not write shortcut file: {e}"))?;
 
@@ -1723,7 +1801,7 @@ pub fn create_desktop_shortcut(
     state: State<ConfigState>,
     id: String,
 ) -> Result<(), AppError> {
-    let desktop_dir = desktop_directory()?;
+    let desktop_dir = desktop_directory(&env::process)?;
     write_game_shortcut(&app, &state, &id, &desktop_dir).map_err(AppError::from)
 }
 
@@ -1740,7 +1818,7 @@ pub fn create_menu_shortcut(
     state: State<ConfigState>,
     id: String,
 ) -> Result<(), AppError> {
-    let applications_dir = applications_directory()?;
+    let applications_dir = applications_directory(&env::process)?;
     write_game_shortcut(&app, &state, &id, &applications_dir)?;
     let _ = std::process::Command::new("update-desktop-database")
         .arg(&applications_dir)
@@ -1769,7 +1847,7 @@ const EXE_MIME_TYPES: &str = "application/x-ms-dos-executable;application/x-msdo
 /// sync with the app's own executable path (relevant for an AppImage, whose
 /// mount path can move between updates).
 pub fn ensure_install_desktop_entry(app: &AppHandle) -> Result<(), String> {
-    let applications_dir = applications_directory()?;
+    let applications_dir = applications_directory(&env::process)?;
     fs::create_dir_all(&applications_dir)
         .map_err(|e| format!("Could not access {}: {e}", applications_dir.display()))?;
 
@@ -1784,7 +1862,7 @@ pub fn ensure_install_desktop_entry(app: &AppHandle) -> Result<(), String> {
     fs::write(&icon_path, APP_ICON_PNG)
         .map_err(|e| format!("Could not write install icon: {e}"))?;
 
-    let exe_path = own_executable_path()?;
+    let exe_path = own_executable_path(&env::process)?;
     let mut contents = String::new();
     contents.push_str("[Desktop Entry]\n");
     contents.push_str("Type=Application\n");
@@ -1795,8 +1873,14 @@ pub fn ensure_install_desktop_entry(app: &AppHandle) -> Result<(), String> {
     // compose its own sentence around it, same as every other app's entry.
     contents.push_str("Name=Prefixr installieren\n");
     contents.push_str("Name[en]=Install Prefixr\n");
-    contents.push_str(&format!("Exec={} --install %f\n", desktop_exec_arg(&exe_path)));
-    contents.push_str(&format!("Icon={}\n", desktop_string(&icon_path.to_string_lossy())));
+    contents.push_str(&format!(
+        "Exec={} --install %f\n",
+        desktop_exec_arg(&exe_path)
+    ));
+    contents.push_str(&format!(
+        "Icon={}\n",
+        desktop_string(&icon_path.to_string_lossy())
+    ));
     contents.push_str("Terminal=false\n");
     contents.push_str("NoDisplay=true\n");
     contents.push_str(&format!("MimeType={EXE_MIME_TYPES}\n"));

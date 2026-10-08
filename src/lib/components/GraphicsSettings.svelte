@@ -13,7 +13,7 @@
   let saved = $state(false);
 
   onMount(() => {
-    refreshGraphicsConfig();
+    refreshGraphicsConfig().catch((e) => (error = e));
   });
 
   $effect(() => {

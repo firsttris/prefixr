@@ -7,7 +7,9 @@ use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Manager, State};
 
 use crate::commands::github::read_token;
+use crate::commands::runner_downloads::{replace_dir, restore_replaced_dir, with_optional_auth};
 use crate::config::ConfigState;
+use crate::env::{self, Env};
 
 /// umu-launcher (https://github.com/Open-Wine-Components/umu-launcher) is
 /// what every Proton runner is launched through — see `launch_game`. It runs
@@ -44,7 +46,9 @@ fn version_file(dir: &Path) -> PathBuf {
 }
 
 fn release_zipapp_asset(assets: &[GitHubAsset]) -> Option<&GitHubAsset> {
-    assets.iter().find(|asset| asset.name.ends_with("-zipapp.tar"))
+    assets
+        .iter()
+        .find(|asset| asset.name.ends_with("-zipapp.tar"))
 }
 
 fn asset_sha256_hex(asset: &GitHubAsset) -> Option<&str> {
@@ -52,6 +56,7 @@ fn asset_sha256_hex(asset: &GitHubAsset) -> Option<&str> {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct UmuStatus {
     pub installed: bool,
     /// The GitHub release tag the installed copy came from.
@@ -107,16 +112,9 @@ struct GitHubRelease {
     assets: Vec<GitHubAsset>,
 }
 
-fn with_auth(builder: reqwest::RequestBuilder, token: Option<&str>) -> reqwest::RequestBuilder {
-    match token {
-        Some(token) => builder.bearer_auth(token),
-        None => builder,
-    }
-}
-
 async fn latest_release(token: Option<&str>) -> Result<GitHubRelease, String> {
     let url = format!("https://api.github.com/repos/{UMU_REPO}/releases/latest");
-    let response = with_auth(crate::http::client().get(url), token)
+    let response = with_optional_auth(crate::http::client().get(url), token)
         .send()
         .await
         .map_err(|e| format!("Could not reach GitHub: {e}"))?;
@@ -130,9 +128,9 @@ async fn latest_release(token: Option<&str>) -> Result<GitHubRelease, String> {
 }
 
 /// Downloads the latest umu release's zipapp, verifies it and swaps it in
-/// place of whatever copy was there before. Unpacked into a staging
-/// directory first, so a failed or interrupted update never leaves a
-/// half-extracted copy behind in place of a working one.
+/// place of whatever copy was there before (see `replace_dir`). Unpacked
+/// into a staging directory first, so a failed or interrupted update never
+/// leaves a half-extracted copy behind in place of a working one.
 async fn install_latest(app: &AppHandle, token: Option<&str>) -> Result<UmuStatus, String> {
     let release = latest_release(token).await?;
 
@@ -142,45 +140,57 @@ async fn install_latest(app: &AppHandle, token: Option<&str>) -> Result<UmuStatu
         .ok_or_else(|| format!("GitHub reported no SHA-256 digest for {}", asset.name))?
         .to_string();
 
-    let bytes = with_auth(crate::http::client().get(&asset.browser_download_url), token)
-        .send()
-        .await
-        .map_err(|e| format!("Could not download {}: {e}", asset.name))?
-        .bytes()
-        .await
-        .map_err(|e| format!("Could not download {}: {e}", asset.name))?;
+    let bytes = with_optional_auth(
+        crate::http::client().get(&asset.browser_download_url),
+        token,
+    )
+    .send()
+    .await
+    .map_err(|e| format!("Could not download {}: {e}", asset.name))?
+    .bytes()
+    .await
+    .map_err(|e| format!("Could not download {}: {e}", asset.name))?;
 
     let actual = format!("{:x}", Sha256::digest(&bytes));
     if !actual.eq_ignore_ascii_case(&expected) {
         return Err(format!(
-            "Checksum mismatch for {}: expected {expected}, got {actual}",
+            "Checksum mismatch for {}: expected {expected}, got {actual} — \
+             the download is corrupted or incomplete",
             asset.name
         ));
     }
 
     let dir = umu_dir(app)?;
-    let staging = dir.with_extension("new");
-    if staging.exists() {
-        fs::remove_dir_all(&staging)
-            .map_err(|e| format!("Could not clean up {}: {e}", staging.display()))?;
-    }
-    fs::create_dir_all(&staging)
-        .map_err(|e| format!("Could not create {}: {e}", staging.display()))?;
-    tar::Archive::new(bytes.as_ref())
-        .unpack(&staging)
-        .map_err(|e| format!("Could not extract {}: {e}", asset.name))?;
-    if !umu_run_path(&staging).is_file() {
-        return Err(format!("{} did not contain umu/umu-run", asset.name));
-    }
-    fs::write(version_file(&staging), &release.tag_name)
-        .map_err(|e| format!("Could not write umu version file: {e}"))?;
+    let asset_name = asset.name.clone();
+    let tag = release.tag_name.clone();
+    let target = dir.clone();
+    // Unpacking and deleting the old copy is blocking work, kept off the
+    // async runtime that a game launch waits on.
+    tauri::async_runtime::spawn_blocking(move || {
+        let dir = target;
+        let staging = dir.with_extension("new");
+        if staging.exists() {
+            fs::remove_dir_all(&staging)
+                .map_err(|e| format!("Could not clean up {}: {e}", staging.display()))?;
+        }
+        fs::create_dir_all(&staging)
+            .map_err(|e| format!("Could not create {}: {e}", staging.display()))?;
+        tar::Archive::new(bytes.as_ref())
+            .unpack(&staging)
+            .map_err(|e| format!("Could not extract {asset_name}: {e}"))?;
+        if !umu_run_path(&staging).is_file() {
+            return Err(format!("{asset_name} did not contain umu/umu-run"));
+        }
+        fs::write(version_file(&staging), &tag)
+            .map_err(|e| format!("Could not write umu version file: {e}"))?;
 
-    if dir.exists() {
-        fs::remove_dir_all(&dir)
-            .map_err(|e| format!("Could not remove old {}: {e}", dir.display()))?;
-    }
-    fs::rename(&staging, &dir)
-        .map_err(|e| format!("Could not move umu into {}: {e}", dir.display()))?;
+        // The old copy stays usable until the new one is in its place, so a
+        // failed update — or a launch starting umu-run meanwhile — never
+        // finds no umu at all.
+        replace_dir(&staging, &dir)
+    })
+    .await
+    .map_err(|e| format!("Extraction task failed: {e}"))??;
 
     Ok(read_status(&dir))
 }
@@ -197,6 +207,9 @@ pub async fn ensure_umu(app: &AppHandle, token: Option<&str>) -> Result<PathBuf,
     let dir = umu_dir(app)?;
     let path = umu_run_path(&dir);
     if !path.is_file() {
+        restore_replaced_dir(&dir);
+    }
+    if !path.is_file() {
         let _lock = INSTALL_LOCK.lock().await;
         // Another launch may have installed it while this one waited.
         if !path.is_file() {
@@ -210,13 +223,13 @@ pub async fn ensure_umu(app: &AppHandle, token: Option<&str>) -> Result<PathBuf,
 /// downloads — shared with every other umu-based launcher on the system
 /// (Lutris, Heroic, ...), so a runtime any of them already fetched is reused
 /// as-is. Mirrors `UMU_LOCAL` in umu's `umu_consts.py`.
-fn umu_local_dir() -> Option<PathBuf> {
-    if let Some(folders) = std::env::var_os("UMU_FOLDERS_PATH") {
+fn umu_local_dir(env: Env) -> Option<PathBuf> {
+    if let Some(folders) = env("UMU_FOLDERS_PATH") {
         return Some(PathBuf::from(folders).join("umu"));
     }
-    let data_home = std::env::var_os("XDG_DATA_HOME")
+    let data_home = env("XDG_DATA_HOME")
         .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/share")))?;
+        .or_else(|| env("HOME").map(|h| PathBuf::from(h).join(".local/share")))?;
     Some(data_home.join("umu"))
 }
 
@@ -228,6 +241,10 @@ fn umu_local_dir() -> Option<PathBuf> {
 /// or unparsable manifests count as present: this is only a UI hint, umu
 /// itself is the authority on what gets downloaded.
 pub fn runtime_present(runner_path: &Path) -> bool {
+    runtime_present_in(runner_path, &env::process)
+}
+
+fn runtime_present_in(runner_path: &Path, env: Env) -> bool {
     let Ok(manifest) = fs::read_to_string(runner_path.join("toolmanifest.vdf")) else {
         return true;
     };
@@ -236,10 +253,10 @@ pub fn runtime_present(runner_path: &Path) -> bool {
     };
     // umu's own completeness check: an interrupted download leaves the
     // runtime's directory behind, but no `<name>_platform_<version>` inside.
-    umu_local_dir().is_none_or(|dir| runtime_dir_complete(&dir.join(runtime)))
+    umu_local_dir(env).is_none_or(|dir| runtime_dir_complete(&dir.join(runtime)))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_umu_status(app: AppHandle) -> Result<UmuStatus, AppError> {
     Ok(read_status(&umu_dir(&app)?))
 }
@@ -248,7 +265,7 @@ pub fn get_umu_status(app: AppHandle) -> Result<UmuStatus, AppError> {
 /// when it's newer than the installed `UmuStatus::version`.
 #[tauri::command]
 pub async fn latest_umu_version(state: State<'_, ConfigState>) -> Result<String, AppError> {
-    let token = read_token(&state)?;
+    let token = read_token(&state);
     Ok(latest_release(token.as_deref()).await?.tag_name)
 }
 
@@ -259,9 +276,11 @@ pub async fn install_umu(
     app: AppHandle,
     state: State<'_, ConfigState>,
 ) -> Result<UmuStatus, AppError> {
-    let token = read_token(&state)?;
+    let token = read_token(&state);
     let _lock = INSTALL_LOCK.lock().await;
-    install_latest(&app, token.as_deref()).await.map_err(AppError::from)
+    install_latest(&app, token.as_deref())
+        .await
+        .map_err(AppError::from)
 }
 
 #[cfg(test)]

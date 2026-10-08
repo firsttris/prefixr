@@ -1,7 +1,17 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { get, writable } from "svelte/store";
-import type { Game, GameInput, InstallerResult, SteamChange } from "$lib/types";
+import type {
+  ActiveGame,
+  Game,
+  GameExitedPayload,
+  GameInitializingPayload,
+  GameInput,
+  GameLaunchErrorPayload,
+  GameStartedPayload,
+  InstallerResult,
+  SteamChange,
+} from "$lib/types";
 
 export const games = writable<Game[]>([]);
 
@@ -43,34 +53,8 @@ export async function removeGame(id: string): Promise<void> {
   await refreshGames();
 }
 
-interface InitializingPayload {
-  id: string;
-}
-
-interface StartedPayload {
-  id: string;
-  log_path: string;
-}
-
-interface ExitedPayload {
-  id: string;
-  exit_code: number | null;
-}
-
-interface LaunchErrorPayload {
-  id: string;
-  // The backend's structured AppError (see src-tauri/src/error.rs) —
-  // pass it through backendError() to render it, same as a command's Err.
-  message: unknown;
-  log_path: string | null;
-}
-
-interface ActiveGame {
-  id: string;
-  running: boolean;
-}
-
 let eventsInitialized = false;
+let gameEventListeners: Promise<UnlistenFn>[] = [];
 
 // Registers the launch-status listeners once; must run client-side only
 // (call from onMount), since it touches the Tauri IPC bridge.
@@ -78,12 +62,12 @@ export function initGameEvents(): void {
   if (eventsInitialized) return;
   eventsInitialized = true;
 
-  const listeners = [
-    listen<InitializingPayload>("game-initializing", (event) => {
+  const listeners = (gameEventListeners = [
+    listen<GameInitializingPayload>("game-initializing", (event) => {
       patchRunState(event.payload.id, { initializing: true, error: undefined });
     }),
 
-    listen<StartedPayload>("game-started", (event) => {
+    listen<GameStartedPayload>("game-started", (event) => {
       patchRunState(event.payload.id, {
         initializing: false,
         running: true,
@@ -92,11 +76,11 @@ export function initGameEvents(): void {
       });
     }),
 
-    listen<ExitedPayload>("game-exited", (event) => {
+    listen<GameExitedPayload>("game-exited", (event) => {
       patchRunState(event.payload.id, { running: false });
     }),
 
-    listen<LaunchErrorPayload>("game-launch-error", (event) => {
+    listen<GameLaunchErrorPayload>("game-launch-error", (event) => {
       patchRunState(event.payload.id, {
         initializing: false,
         running: false,
@@ -104,7 +88,7 @@ export function initGameEvents(): void {
         logPath: event.payload.log_path ?? undefined,
       });
     }),
-  ];
+  ]);
 
   // Games launched before the webview (re)loaded sent their events to a
   // page that's gone; their current state comes from the backend instead,
@@ -153,9 +137,13 @@ export async function takePendingLaunch(): Promise<string | null> {
 
 // Listens for a `pending-launch` event, fired when a desktop shortcut is
 // used while Prefixr is already running: that second instance hands its
-// game id off to this one instead.
+// game id off to this one instead. The id waits in the backend until it's
+// taken, so a webview that wasn't listening yet still finds it on startup.
 export function listenForPendingLaunch(callback: (id: string) => void): Promise<UnlistenFn> {
-  return listen<string>("pending-launch", (event) => callback(event.payload));
+  return listen("pending-launch", async () => {
+    const id = await takePendingLaunch();
+    if (id) callback(id);
+  });
 }
 
 // Checks whether the app was started via the "Mit Prefixr installieren"
@@ -170,10 +158,11 @@ export async function takePendingInstall(): Promise<string | null> {
 // Listens for a `pending-install` event, fired when a second "Mit Prefixr
 // installieren" click hands its exe path off to this already-running
 // instance instead of opening a new one.
-export function listenForPendingInstall(
-  callback: (exePath: string) => void,
-): Promise<UnlistenFn> {
-  return listen<string>("pending-install", (event) => callback(event.payload));
+export function listenForPendingInstall(callback: (exePath: string) => void): Promise<UnlistenFn> {
+  return listen("pending-install", async () => {
+    const exePath = await takePendingInstall();
+    if (exePath) callback(exePath);
+  });
 }
 
 // Runs the installer exe under the given prefix/runner and waits for it to
@@ -212,4 +201,12 @@ export async function exportToSteam(id: string, shutdownSteam: boolean): Promise
 
 export async function removeFromSteam(id: string, shutdownSteam: boolean): Promise<SteamChange> {
   return await invoke<SteamChange>("remove_from_steam", { id, shutdownSteam });
+}
+
+// In development, a hot-reloaded copy of this module registers its own
+// listeners; the replaced copy's must go, or every event is handled twice.
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    for (const unlisten of gameEventListeners) unlisten.then((stop) => stop());
+  });
 }

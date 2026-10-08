@@ -1,6 +1,8 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
+  import Message from "$lib/components/Message.svelte";
   import { onMount } from "svelte";
+  import { loadAll } from "$lib/load";
   import { open } from "@tauri-apps/plugin-dialog";
   import { prefixes, refreshPrefixes, addPrefix, deletePrefix } from "$lib/stores/prefixes";
   import { games, refreshGames } from "$lib/stores/games";
@@ -13,6 +15,7 @@
   let path = $state("");
   let busy = $state(false);
   let error = $state<unknown>(null);
+  let loadError = $state<unknown>(null);
   let winetricksFor = $state<string | null>(null);
   let wineToolsFor = $state<string | null>(null);
   let deleting = $state<string | null>(null);
@@ -31,9 +34,7 @@
 
   function usageLabel(count: number): string {
     if (count === 0) return m.prefixManager_unused();
-    return count === 1
-      ? m.prefixManager_usedByOne()
-      : m.prefixManager_usedByMany( { count });
+    return m.prefixManager_usedByCount({ count });
   }
 
   // The games that use the prefix about to be deleted, so the dialog can
@@ -43,8 +44,7 @@
   );
 
   onMount(() => {
-    refreshPrefixes();
-    refreshGames();
+    loadAll(refreshPrefixes(), refreshGames()).catch((e) => (loadError = e));
   });
 
   async function pickFolder() {
@@ -89,11 +89,12 @@
   }
 </script>
 
+{#snippet drive()}<strong>{m.prefixManager_explainerDrive()}</strong>{/snippet}
+{#snippet gameNames()}<strong>{affectedGames.join(", ")}</strong>{/snippet}
+
 <section class="panel">
   <p class="explainer">
-    {m.prefixManager_explainerBefore()}
-    <strong>{m.prefixManager_explainerDrive()}</strong>
-    {m.prefixManager_explainerAfter()}
+    <Message message={m.prefixManager_explainer} parts={{ drive }} />
   </p>
 
   <p class="hint">{m.prefixManager_hint()}</p>
@@ -116,7 +117,9 @@
     <p class="error">{backendError(error)}</p>
   {/if}
 
-  {#if $prefixes.length > 0}
+  {#if loadError}
+    <p class="error">{backendError(loadError)}</p>
+  {:else if $prefixes.length > 0}
     <ul>
       {#each $prefixes as prefix (prefix.path)}
         {@const count = usage[prefix.path] ?? 0}
@@ -161,8 +164,7 @@
     <p class="path">{deleting}</p>
     {#if affectedGames.length > 0}
       <p>
-        {m.prefixManager_usedByBefore()}
-        <strong>{affectedGames.join(", ")}</strong>. {m.prefixManager_usedByAfter()}
+        <Message message={m.prefixManager_usedBy} parts={{ games: gameNames }} />
       </p>
     {/if}
     <p>{m.prefixManager_deleteExplain()}</p>

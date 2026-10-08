@@ -1,14 +1,21 @@
 use super::*;
+use crate::test_util::TestDir;
 
 #[test]
 fn checksum_asset_names_match_real_releases() {
     // Real asset-name pairs, sampled from each source's GitHub releases.
-    assert_eq!(strip_tar_gz("GE-Proton11-7-x86_64.tar.gz"), "GE-Proton11-7-x86_64.sha512sum");
+    assert_eq!(
+        strip_tar_gz("GE-Proton11-7-x86_64.tar.gz"),
+        "GE-Proton11-7-x86_64.sha512sum"
+    );
     assert_eq!(
         strip_tar_xz("proton-cachyos-11.0-20260703-slr-x86_64.tar.xz"),
         "proton-cachyos-11.0-20260703-slr-x86_64.sha512sum"
     );
-    assert_eq!(shared_sha256sums_name("wine-11.18-staging-amd64-wow64.tar.xz"), "sha256sums.txt");
+    assert_eq!(
+        shared_sha256sums_name("wine-11.18-staging-amd64-wow64.tar.xz"),
+        "sha256sums.txt"
+    );
 }
 
 #[test]
@@ -30,7 +37,10 @@ f899879b8c37e0b20adca19d147cf77436f3f1a37bf16d08d27fa7137a52b9ba  wine-11.18-amd
         extract_shared_digest(contents, "wine-11.18-amd64-wow64.tar.xz"),
         Some("f899879b8c37e0b20adca19d147cf77436f3f1a37bf16d08d27fa7137a52b9ba".to_string())
     );
-    assert_eq!(extract_shared_digest(contents, "wine-11.18-nonexistent.tar.xz"), None);
+    assert_eq!(
+        extract_shared_digest(contents, "wine-11.18-nonexistent.tar.xz"),
+        None
+    );
 }
 
 #[test]
@@ -45,8 +55,12 @@ fn extract_shared_digest_strips_binary_mode_marker() {
 #[test]
 fn asset_matchers_pick_the_right_asset() {
     // Real release asset names, sampled from each source's GitHub API.
-    assert!((find_source("proton-ge").unwrap().matches_asset)("GE-Proton9-20.tar.gz"));
-    assert!(!(find_source("proton-ge").unwrap().matches_asset)("GE-Proton9-20.sha512sum"));
+    assert!((find_source("proton-ge").unwrap().matches_asset)(
+        "GE-Proton9-20.tar.gz"
+    ));
+    assert!(!(find_source("proton-ge").unwrap().matches_asset)(
+        "GE-Proton9-20.sha512sum"
+    ));
 
     assert!((find_source("wine-kron4ek").unwrap().matches_asset)(
         "wine-11.18-staging-amd64-wow64.tar.xz"
@@ -63,7 +77,9 @@ fn asset_matchers_pick_the_right_asset() {
     assert!(!(find_source("wine-kron4ek").unwrap().matches_asset)(
         "wine-11.18-staging-x86.tar.xz"
     ));
-    assert!(!(find_source("wine-kron4ek").unwrap().matches_asset)("sha256sums.txt"));
+    assert!(!(find_source("wine-kron4ek").unwrap().matches_asset)(
+        "sha256sums.txt"
+    ));
 
     assert!((find_source("proton-cachyos").unwrap().matches_asset)(
         "proton-cachyos-11.0-20260703-slr-x86_64.tar.xz"
@@ -79,23 +95,40 @@ fn asset_matchers_pick_the_right_asset() {
 #[test]
 fn download_requests_are_checked() {
     let source = find_source("proton-ge").unwrap();
-    let url = "https://github.com/GloriousEggroll/proton-ge-custom/releases/download/GE-Proton11-7/GE-Proton11-7.tar.gz";
-    assert!(check_download_request(source, "GE-Proton11-7", url).is_ok());
-    for tag in ["", "..", ".hidden", "../x", "a/b", "/abs"] {
-        assert!(check_download_request(source, tag, url).is_err(), "{tag}");
+    let base = "https://github.com/GloriousEggroll/proton-ge-custom/releases/download";
+    assert_eq!(
+        parse_download_url(
+            source,
+            &format!("{base}/GE-Proton11-7/GE-Proton11-7.tar.gz")
+        ),
+        Ok(DownloadRequest {
+            tag: "GE-Proton11-7".to_string(),
+            asset_name: "GE-Proton11-7.tar.gz".to_string(),
+        })
+    );
+    assert_eq!(
+        parse_download_url(source, &format!("{base}/v1.0%2Bfix/a.tar.gz")).map(|r| r.tag),
+        Ok("v1.0+fix".to_string())
+    );
+    for tag in ["", "..", ".hidden", "%2E%2E", "a%2Fb", "%ZZ"] {
+        let url = format!("{base}/{tag}/x.tar.gz");
+        assert!(parse_download_url(source, &url).is_err(), "{tag}");
     }
     for url in [
-        "https://evil.example/GloriousEggroll/proton-ge-custom/releases/download/x.tar.gz",
+        "https://evil.example/GloriousEggroll/proton-ge-custom/releases/download/x/x.tar.gz",
         "https://github.com/Kron4ek/Wine-Builds/releases/download/x/x.tar.xz",
-        "http://github.com/GloriousEggroll/proton-ge-custom/releases/download/x.tar.gz",
+        "http://github.com/GloriousEggroll/proton-ge-custom/releases/download/x/x.tar.gz",
+        "https://github.com/GloriousEggroll/proton-ge-custom/releases/download/x.tar.gz",
+        "https://github.com/GloriousEggroll/proton-ge-custom/releases/download/x/",
+        "https://github.com/GloriousEggroll/proton-ge-custom/releases/download/x/y/z.tar.gz",
     ] {
-        assert!(check_download_request(source, "x", url).is_err(), "{url}");
+        assert!(parse_download_url(source, url).is_err(), "{url}");
     }
 }
 
 #[test]
 fn move_renames_the_extracted_dir_and_cleans_up() {
-    let dir = std::env::temp_dir().join(format!("prefixr-test-{}", uuid::Uuid::new_v4()));
+    let dir = TestDir::new("dir");
     fs::create_dir_all(&dir).unwrap();
 
     // An archive whose top-level folder name doesn't match the GitHub
@@ -112,13 +145,11 @@ fn move_renames_the_extracted_dir_and_cleans_up() {
 
     move_extracted_dir(&other, &dir.join("wine-11.18")).unwrap();
     assert!(dir.join("wine-11.18").is_dir());
-
-    fs::remove_dir_all(&dir).unwrap();
 }
 
 #[test]
 fn move_rejects_archives_without_a_single_dir() {
-    let dir = std::env::temp_dir().join(format!("prefixr-test-{}", uuid::Uuid::new_v4()));
+    let dir = TestDir::new("dir");
     let extract = extraction_dir(&dir);
     fs::create_dir_all(extract.join("a")).unwrap();
     fs::create_dir_all(extract.join("b")).unwrap();
@@ -126,6 +157,51 @@ fn move_rejects_archives_without_a_single_dir() {
     assert!(move_extracted_dir(&extract, &dir.join("target")).is_err());
     assert!(!extract.exists());
     assert!(!dir.join("target").exists());
+}
 
-    fs::remove_dir_all(&dir).unwrap();
+fn replace_dir_fixture(name: &str) -> (TestDir, PathBuf, PathBuf) {
+    let root = TestDir::new(name);
+    let new = root.join("app.new");
+    let target = root.join("app");
+    fs::create_dir_all(&new).unwrap();
+    fs::write(new.join("file"), "new").unwrap();
+    (root, new, target)
+}
+
+#[test]
+fn replace_dir_moves_into_a_missing_target() {
+    let (_root, new, target) = replace_dir_fixture("replace-missing");
+
+    replace_dir(&new, &target).unwrap();
+
+    assert_eq!(fs::read_to_string(target.join("file")).unwrap(), "new");
+    assert!(!new.exists());
+}
+
+#[test]
+fn replace_dir_swaps_out_an_existing_target() {
+    let (_root, new, target) = replace_dir_fixture("replace-existing");
+    fs::create_dir_all(&target).unwrap();
+    fs::write(target.join("file"), "old").unwrap();
+    fs::write(target.join("only-old"), "").unwrap();
+
+    replace_dir(&new, &target).unwrap();
+
+    assert_eq!(fs::read_to_string(target.join("file")).unwrap(), "new");
+    assert!(!target.join("only-old").exists());
+    assert!(!new.exists());
+    assert!(!replaced_dir(&target).exists());
+}
+
+#[test]
+fn restore_replaced_dir_brings_back_an_interrupted_swap() {
+    let (_root, _new, target) = replace_dir_fixture("replace-restore");
+    let old = replaced_dir(&target);
+    fs::create_dir_all(&old).unwrap();
+    fs::write(old.join("file"), "old").unwrap();
+
+    restore_replaced_dir(&target);
+
+    assert_eq!(fs::read_to_string(target.join("file")).unwrap(), "old");
+    assert!(!old.exists());
 }

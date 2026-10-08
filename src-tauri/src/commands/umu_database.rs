@@ -2,13 +2,15 @@ use crate::error::AppError;
 use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
-use std::time::{Duration, SystemTime};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant, SystemTime};
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, State};
 
 use crate::commands::steamgriddb::{read_api_key, search_steam_apps, steam_apps, SteamApp};
 use crate::config::ConfigState;
+use crate::lock::LockExt;
 
 /// The umu-database (https://github.com/Open-Wine-Components/umu-database)
 /// maps games from other stores to the UMU id that umu-protonfixes keys its
@@ -39,6 +41,7 @@ struct DatabaseEntry {
 
 /// Where a suggestion came from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "lowercase")]
 pub enum UmuMatchSource {
     /// The Steam app id SteamGridDB has on record for the game.
@@ -48,6 +51,7 @@ pub enum UmuMatchSource {
 
 /// A suggested UMU id for a game, as surfaced to the frontend.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct UmuMatch {
     pub umu_id: String,
     pub title: String,
@@ -93,28 +97,62 @@ async fn download_database() -> Result<Vec<DatabaseEntry>, String> {
         .map_err(|e| format!("Could not parse the umu-database: {e}"))
 }
 
-/// The cached table, refreshed once a day. A stale copy still beats none
-/// when the download fails, e.g. offline.
-async fn load_database(app: &AppHandle) -> Result<Vec<DatabaseEntry>, String> {
-    let path = cache_path(app)?;
-    let cached = read_cache(&path);
-    if let Some((entries, age)) = &cached {
-        if *age < CACHE_MAX_AGE {
+/// A database entry with its title and acronym normalized once, rather
+/// than for each of the ~1200 entries on every keystroke of a search.
+#[derive(Debug, Clone)]
+struct IndexedEntry {
+    entry: DatabaseEntry,
+    title: Option<String>,
+    acronym: String,
+}
+
+fn index(entries: Vec<DatabaseEntry>) -> Vec<IndexedEntry> {
+    entries
+        .into_iter()
+        .map(|entry| IndexedEntry {
+            title: entry.title.as_deref().map(normalize),
+            acronym: entry.acronym.as_deref().map(normalize).unwrap_or_default(),
+            entry,
+        })
+        .collect()
+}
+
+/// How long a stale copy, used because the download failed, is kept in
+/// memory before the download is tried again.
+const RETRY_AFTER: Duration = Duration::from_secs(5 * 60);
+
+/// The database as last loaded, until when it may be used without looking
+/// at the disk or the network again.
+static LOADED: Mutex<Option<(Instant, Arc<Vec<IndexedEntry>>)>> = Mutex::new(None);
+
+/// The cached table, refreshed once a day; kept in memory between searches.
+/// A stale copy still beats none when the download fails, e.g. offline.
+async fn load_database(app: &AppHandle) -> Result<Arc<Vec<IndexedEntry>>, String> {
+    if let Some((until, entries)) = LOADED.locked().as_ref() {
+        if Instant::now() < *until {
             return Ok(entries.clone());
         }
     }
-    match download_database().await {
-        Ok(entries) => {
-            if let Some(dir) = path.parent() {
-                let _ = fs::create_dir_all(dir);
+    let path = cache_path(app)?;
+    let cached = read_cache(&path);
+    let (entries, fresh_for) = match cached {
+        Some((entries, age)) if age < CACHE_MAX_AGE => (entries, CACHE_MAX_AGE - age),
+        cached => match download_database().await {
+            Ok(entries) => {
+                if let Some(dir) = path.parent() {
+                    let _ = fs::create_dir_all(dir);
+                }
+                if let Ok(json) = serde_json::to_vec(&entries) {
+                    let _ = fs::write(&path, json);
+                }
+                (entries, CACHE_MAX_AGE)
             }
-            if let Ok(json) = serde_json::to_vec(&entries) {
-                let _ = fs::write(&path, json);
-            }
-            Ok(entries)
-        }
-        Err(e) => cached.map(|(entries, _)| entries).ok_or(e),
-    }
+            Err(e) => (cached.ok_or(e)?.0, RETRY_AFTER),
+        },
+    };
+    let entries = Arc::new(index(entries));
+    *LOADED.locked() = Some((Instant::now() + fresh_for, entries.clone()));
+    Ok(entries)
 }
 
 /// Lowercase words, punctuation dropped: "DOOM: The Dark Ages" and
@@ -130,9 +168,9 @@ fn normalize(text: &str) -> String {
 }
 
 /// How well an entry matches the (normalized) query; `None` for no match.
-fn score(entry: &DatabaseEntry, query: &str) -> Option<u32> {
-    let title = normalize(entry.title.as_deref()?);
-    let acronym = entry.acronym.as_deref().map(normalize).unwrap_or_default();
+fn score(entry: &IndexedEntry, query: &str) -> Option<u32> {
+    let title = entry.title.as_deref()?;
+    let acronym = entry.acronym.as_str();
     if title == query {
         Some(100)
     } else if !acronym.is_empty() && acronym == query.replace(' ', "") {
@@ -141,21 +179,24 @@ fn score(entry: &DatabaseEntry, query: &str) -> Option<u32> {
         Some(80)
     } else if title.contains(query) {
         Some(60)
-    } else if query.split(' ').all(|word| title.split(' ').any(|t| t == word)) {
+    } else if query
+        .split(' ')
+        .all(|word| title.split(' ').any(|t| t == word))
+    {
         Some(40)
     } else {
         None
     }
 }
 
-fn search_database(entries: &[DatabaseEntry], query: &str) -> Vec<UmuMatch> {
+fn search_database(entries: &[IndexedEntry], query: &str) -> Vec<UmuMatch> {
     let query = normalize(query);
     if query.is_empty() {
         return Vec::new();
     }
     let mut scored: Vec<(u32, &DatabaseEntry)> = entries
         .iter()
-        .filter_map(|entry| Some((score(entry, &query)?, entry)))
+        .filter_map(|indexed| Some((score(indexed, &query)?, &indexed.entry)))
         .collect();
     scored.sort_by(|(a_score, a), (b_score, b)| {
         b_score.cmp(a_score).then_with(|| a.title.cmp(&b.title))
@@ -203,7 +244,7 @@ pub async fn search_umu_ids(
     steamgriddb_id: Option<i64>,
 ) -> Result<Vec<UmuMatch>, AppError> {
     let query = query.trim();
-    let api_key = read_api_key(&state)?;
+    let api_key = read_api_key(&state);
 
     let steam = async {
         let Some(key) = api_key.as_deref() else {

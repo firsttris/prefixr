@@ -8,6 +8,7 @@ use crate::error::AppError;
 
 /// The kind of compatibility layer a runner provides.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "lowercase")]
 pub enum RunnerKind {
     Proton,
@@ -18,6 +19,7 @@ pub enum RunnerKind {
 /// `id` is the folder name and doubles as the stable identifier used elsewhere
 /// (e.g. `Game::runner_id`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct Runner {
     pub id: String,
     pub name: String,
@@ -29,12 +31,14 @@ pub struct Runner {
 /// runner — the runner that (lazily) initializes it is decided per-game, via
 /// `Game::runner_id`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct PrefixInfo {
     pub path: PathBuf,
 }
 
 /// A game the user has added to the library.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct Game {
     pub id: Uuid,
     pub name: String,
@@ -48,9 +52,12 @@ pub struct Game {
     /// launch time by `split_launch_args`.
     #[serde(default)]
     pub launch_args: String,
-    /// The exe's embedded icon, as a `data:image/png;base64,...` URI.
-    /// Extracted once when the game is added/updated; `None` if the exe has
-    /// no icon resource or it couldn't be parsed.
+    /// The path of the exe's embedded icon, saved as a PNG (see
+    /// `icons::exe_icon_path`), which the frontend loads through the asset
+    /// protocol. Extracted once when the game is added/updated; `None` if
+    /// the exe has no icon resource or it couldn't be parsed. Never written
+    /// to `config.json`, where versions before the file kept the icon
+    /// itself as a `data:` URI (see `config::load_icons`).
     #[serde(default)]
     pub icon: Option<String>,
     /// The matched SteamGridDB *game* id, so re-opening the cover picker (or
@@ -104,6 +111,7 @@ pub struct Game {
 /// Steam's artwork slots besides the cover and icon, picked from
 /// SteamGridDB just like those two.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "lowercase")]
 pub enum ArtworkKind {
     /// The wide grid image, shown e.g. under "recent games".
@@ -212,6 +220,7 @@ pub fn normalize_umu_store(store: Option<String>) -> Option<String> {
 
 /// Payload for `add_game`; the id is assigned by the backend.
 #[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct GameInput {
     pub name: String,
     pub exe_path: PathBuf,
@@ -229,7 +238,6 @@ pub struct GameInput {
     pub overrides: GameOverrides,
 }
 
-
 // Game settings come in four categories, each with a global config in
 // `AppConfig` and a matching block in `GameOverrides`:
 //
@@ -245,6 +253,7 @@ pub struct GameInput {
 /// field is `None` (or, for Proton, a missing key) to inherit the global
 /// setting.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct GameOverrides {
     #[serde(default)]
     pub performance: PerformanceOverrides,
@@ -259,6 +268,7 @@ pub struct GameOverrides {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct PerformanceOverrides {
     #[serde(default)]
     pub gamemode_enabled: Option<bool>,
@@ -273,6 +283,7 @@ pub struct PerformanceOverrides {
 /// per-field options couldn't tell "inherit the width" apart from
 /// "explicitly no width".
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct GraphicsOverrides {
     #[serde(default)]
     pub gamescope: Option<GamescopeSettings>,
@@ -283,6 +294,7 @@ pub struct GraphicsOverrides {
 /// On/off separately from the look, so a game can switch MangoHud off (or
 /// on) while still following the global layout.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct OverlayOverrides {
     #[serde(default)]
     pub enabled: Option<bool>,
@@ -310,7 +322,9 @@ impl GameOverrides {
     ) -> EffectiveSettings {
         let perf = &self.performance;
         let performance = PerformanceConfig {
-            gamemode_enabled: perf.gamemode_enabled.unwrap_or(performance.gamemode_enabled),
+            gamemode_enabled: perf
+                .gamemode_enabled
+                .unwrap_or(performance.gamemode_enabled),
             power_profile_enabled: perf
                 .power_profile_enabled
                 .unwrap_or(performance.power_profile_enabled),
@@ -364,6 +378,7 @@ impl EffectiveSettings {
 /// Kept opt-in (all off by default), since we can't know whether the
 /// underlying tool is even installed, so nothing gets silently switched on.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct PerformanceConfig {
     #[serde(default)]
     pub gamemode_enabled: bool,
@@ -385,6 +400,7 @@ pub struct PerformanceConfig {
 
 /// Bild: what the game's output goes through on its way to the screen.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct GraphicsConfig {
     #[serde(default)]
     pub gamescope: GamescopeSettings,
@@ -398,6 +414,7 @@ pub struct GraphicsConfig {
 /// if we're already running inside a gamescope session ourselves (nesting it
 /// again is pointless). See `launch_game`.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct GamescopeSettings {
     #[serde(default)]
     pub enabled: bool,
@@ -413,6 +430,7 @@ pub struct GamescopeSettings {
 
 /// vkBasalt post-processing — see `commands::graphics`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 #[serde(default)]
 pub struct VkBasaltSettings {
     pub enabled: bool,
@@ -439,6 +457,7 @@ impl Default for VkBasaltSettings {
 /// hand-editing a `MangoHud.conf`. The layout is flattened into the same JSON
 /// object, so it's stored exactly as before the split.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct MangoHudConfig {
     #[serde(default)]
     pub enabled: bool,
@@ -447,9 +466,14 @@ pub struct MangoHudConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 #[serde(default)]
 pub struct MangoHudLayout {
     pub preset: String,
+    #[cfg_attr(
+        test,
+        ts(type = r#""top-left" | "top-right" | "bottom-left" | "bottom-right""#)
+    )]
     pub position: String,
     pub theme_color: String,
     pub background_alpha: f32,
@@ -511,6 +535,7 @@ impl Default for MangoHudLayout {
 /// game on a Proton runner, keyed by variable name; a missing key leaves
 /// Proton's own default.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct ProtonConfig {
     #[serde(default)]
     pub options: BTreeMap<String, bool>,
@@ -518,6 +543,7 @@ pub struct ProtonConfig {
 
 /// SteamGridDB API settings — see `commands::steamgriddb`.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct SteamGridDbConfig {
     #[serde(default)]
     pub api_key: Option<String>,
@@ -528,6 +554,7 @@ pub struct SteamGridDbConfig {
 /// release listings) to raise its rate limit from 60 to 5000 requests/hour;
 /// GitHub accepts unauthenticated requests too, so this stays optional.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct GitHubConfig {
     #[serde(default)]
     pub token: Option<String>,

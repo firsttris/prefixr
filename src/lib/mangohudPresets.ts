@@ -126,4 +126,3 @@ export const POSITIONS: { value: MangoHudPosition }[] = [
   { value: "bottom-left" },
   { value: "bottom-right" },
 ];
-

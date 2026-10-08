@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use tauri::{AppHandle, Manager, State};
 
 use crate::config::{save_config, ConfigState};
+use crate::lock::LockExt;
 use crate::models::{MangoHudConfig, MangoHudLayout};
 
 /// Builds the contents of a `MangoHud.conf` (see
@@ -65,14 +66,20 @@ fn render_conf(config: &MangoHudLayout) -> String {
         lines.push("horizontal".to_string());
     }
 
-    lines.push(format!("position={}", config.position));
+    lines.push(format!("position={}", conf_value(&config.position)));
     lines.push(format!("background_alpha={}", config.background_alpha));
-    lines.push(format!("text_color={}", config.theme_color));
+    lines.push(format!("text_color={}", conf_value(&config.theme_color)));
     if config.round_corners {
         lines.push("round_corners=10".to_string());
     }
 
     lines.join("\n") + "\n"
+}
+
+/// A text setting as one line's value: a line break in it (say, in a
+/// hand-edited `config.json`) would otherwise start a directive of its own.
+fn conf_value(value: &str) -> String {
+    value.chars().filter(|c| !c.is_control()).collect()
 }
 
 /// One file per game, since the layout can be overridden per game (see
@@ -107,21 +114,17 @@ pub fn ensure_mangohud_conf(
 
 #[tauri::command]
 pub fn get_mangohud_config(state: State<ConfigState>) -> Result<MangoHudConfig, AppError> {
-    let config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let config = state.locked();
     Ok(config.mangohud.clone())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn save_mangohud_config(
     app: AppHandle,
     state: State<ConfigState>,
     config: MangoHudConfig,
 ) -> Result<MangoHudConfig, AppError> {
-    let mut app_config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let mut app_config = state.locked();
     app_config.mangohud = config;
     save_config(&app, &app_config)?;
     Ok(app_config.mangohud.clone())

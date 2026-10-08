@@ -1,6 +1,9 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
+  import RunnerSelect from "$lib/components/RunnerSelect.svelte";
+  import Message from "$lib/components/Message.svelte";
   import { onMount, untrack } from "svelte";
+  import { loadAll } from "$lib/load";
   import { open } from "@tauri-apps/plugin-dialog";
   import { runners, refreshRunners } from "$lib/stores/runners";
   import { prefixes, refreshPrefixes } from "$lib/stores/prefixes";
@@ -10,6 +13,7 @@
   import { mangoHudConfig, refreshMangoHudConfig } from "$lib/stores/mangohud";
   import { listProtonOptions, protonConfig, refreshProtonConfig } from "$lib/stores/proton";
   import { prettifyExeName } from "$lib/gameName";
+  import { formatEnvVars, parseEnvVars } from "$lib/envVars";
   import { PRESETS } from "$lib/mangohudPresets";
   import { onOff, sameBlock, sameFields, type OverrideHooks } from "$lib/settings";
   import { backendError } from "$lib/i18n/index.svelte";
@@ -50,12 +54,6 @@
     initialRunnerId?: string;
     onSuccess?: () => void;
   } = $props();
-
-  function formatEnvVars(envVars: Record<string, string>): string {
-    return Object.entries(envVars)
-      .map(([key, value]) => `${key}=${value}`)
-      .join("\n");
-  }
 
   // Modal fully unmounts/remounts this form on every open, so reading
   // existingGame once here to seed the fields is intentional, not a bug.
@@ -105,12 +103,14 @@
   let proton = $state<Record<string, boolean>>({ ...(saved?.proton ?? {}) });
 
   onMount(() => {
-    refreshRunners();
-    refreshPrefixes();
-    refreshPerformanceConfig();
-    refreshGraphicsConfig();
-    refreshMangoHudConfig();
-    refreshProtonConfig();
+    loadAll(
+      refreshRunners(),
+      refreshPrefixes(),
+      refreshPerformanceConfig(),
+      refreshGraphicsConfig(),
+      refreshMangoHudConfig(),
+      refreshProtonConfig(),
+    ).catch((e) => (error = e));
   });
 
   // --- Leistung ---
@@ -140,7 +140,7 @@
   const perfHooks: OverrideHooks<keyof PerformanceConfig> = {
     isOverridden: (key) => perf[key] !== null,
     reset: (key) => (perf[key] = null),
-    resetTitle: (key) => m.gameForm_resetToGlobal( { state: onOff(globalPerf[key]) }),
+    resetTitle: (key) => m.gameForm_resetToGlobal({ state: onOff(globalPerf[key]) }),
   };
 
   // --- Bild ---
@@ -174,7 +174,7 @@
   const gfxHooks: OverrideHooks<keyof GraphicsConfig> = {
     isOverridden: (key) => gfx[key] !== null,
     reset: (key) => (gfx[key] = null),
-    resetTitle: (key) => m.gameForm_resetToGlobal( { state: onOff(globalGfx[key].enabled) }),
+    resetTitle: (key) => m.gameForm_resetToGlobal({ state: onOff(globalGfx[key].enabled) }),
   };
 
   // --- Overlay ---
@@ -193,9 +193,7 @@
     ...(overlay.layout ?? layoutOf(globalOverlay)),
     enabled: overlay.enabled ?? globalOverlay.enabled,
   });
-  const overlayCount = $derived(
-    [overlay.enabled, overlay.layout].filter((o) => o !== null).length,
-  );
+  const overlayCount = $derived([overlay.enabled, overlay.layout].filter((o) => o !== null).length);
 
   function changeOverlay(patch: Partial<MangoHudConfig>) {
     const { enabled, ...layoutPatch } = patch;
@@ -206,10 +204,7 @@
       const next = { ...layoutOf(overlayShown), ...layoutPatch };
       // The preset name alone ("custom" after a manual tweak) is no reason
       // to keep an override whose values match the global look.
-      const same = sameFields(
-        { ...next, preset: "" },
-        { ...layoutOf(globalOverlay), preset: "" },
-      );
+      const same = sameFields({ ...next, preset: "" }, { ...layoutOf(globalOverlay), preset: "" });
       overlay.layout = same ? null : next;
     }
   }
@@ -219,7 +214,7 @@
     reset: (key) => (overlay[key] = null),
     resetTitle: (key) =>
       key === "enabled"
-        ? m.gameForm_resetToGlobal( { state: onOff(globalOverlay.enabled) })
+        ? m.gameForm_resetToGlobal({ state: onOff(globalOverlay.enabled) })
         : m.gameForm_resetOverlayLook(),
   };
 
@@ -282,22 +277,19 @@
     }
   }
 
-  function parseEnvVars(text: string): Record<string, string> {
-    const result: Record<string, string> = {};
-    for (const line of text.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      const [key, ...rest] = trimmed.split("=");
-      if (key && rest.length > 0) {
-        result[key.trim()] = rest.join("=").trim();
-      }
-    }
-    return result;
-  }
+  // The required fields still empty; marked once a save was tried.
+  const missing = $derived({
+    name: !name.trim(),
+    exe: !exePath,
+    prefix: !prefixPath,
+    runner: !runnerId,
+  });
+  let showMissing = $state(false);
 
   async function handleSubmit(event: Event) {
     event.preventDefault();
-    if (!name || !exePath || !prefixPath || !runnerId) {
+    if (Object.values(missing).some(Boolean)) {
+      showMissing = true;
       tab = "general";
       return;
     }
@@ -329,8 +321,18 @@
   }
 </script>
 
+{#snippet protonTabLink()}
+  <button type="button" class="link" onclick={() => (tab = "proton")}>{m.nav_proton()}</button>
+{/snippet}
+
+{#snippet requiredHint(isMissing: boolean)}
+  {#if showMissing && isMissing}
+    <span class="error required">{m.gameForm_required()}</span>
+  {/if}
+{/snippet}
+
 {#snippet inheritHint(page: string)}
-  <p class="hint">{m.gameForm_inheritHint( { page })}</p>
+  <p class="hint">{m.gameForm_inheritHint({ page })}</p>
 {/snippet}
 
 <form onsubmit={handleSubmit}>
@@ -345,7 +347,7 @@
       >
         {tabItem.label}
         {#if tabItem.count > 0}
-          <span class="count" title={m.gameForm_tabCount( { count: tabItem.count })}
+          <span class="count" title={m.gameForm_tabCount({ count: tabItem.count })}
             >{tabItem.count}</span
           >
         {/if}
@@ -356,20 +358,31 @@
   {#if activeTab === "general"}
     <label>
       {m.gameForm_nameLabel()}
-      <input bind:value={name} placeholder={m.gameForm_namePlaceholder()} />
+      <input
+        bind:value={name}
+        placeholder={m.gameForm_namePlaceholder()}
+        aria-invalid={showMissing && missing.name}
+      />
+      {@render requiredHint(missing.name)}
     </label>
 
     <label>
       {m.gameForm_exeLabel()}
       <div class="row">
-        <input bind:value={exePath} readonly placeholder={m.gameForm_exePlaceholder()} />
+        <input
+          bind:value={exePath}
+          readonly
+          placeholder={m.gameForm_exePlaceholder()}
+          aria-invalid={showMissing && missing.exe}
+        />
         <button type="button" onclick={pickExe}>{m.gameForm_exeChoose()}</button>
       </div>
+      {@render requiredHint(missing.exe)}
     </label>
 
     <label>
       {m.gameForm_prefixLabel()}
-      <select bind:value={prefixPath}>
+      <select bind:value={prefixPath} aria-invalid={showMissing && missing.prefix}>
         <option value="" disabled selected>{m.gameForm_prefixChoose()}</option>
         {#each $prefixes as prefix (prefix.path)}
           <option value={prefix.path}>{prefix.path}</option>
@@ -382,31 +395,23 @@
       {#if $prefixes.length === 0}
         <span class="hint">{m.gameForm_prefixEmptyHint()}</span>
       {/if}
+      {@render requiredHint(missing.prefix)}
     </label>
 
     <label>
       {m.gameForm_runnerLabel()}
-      <select bind:value={runnerId}>
-        <option value="" disabled selected>{m.gameForm_runnerChoose()}</option>
-        {#each $runners as runner (runner.id)}
-          <option value={runner.id}>{runner.name} ({runner.kind})</option>
-        {/each}
-      </select>
+      <RunnerSelect bind:value={runnerId} invalid={showMissing && missing.runner} />
       {#if isProton && !umuId}
         <span class="hint">
-          {m.gameForm_runnerNoProtonfixesHint()}
-          <button type="button" class="link" onclick={() => (tab = "proton")}
-            >{m.nav_proton()}</button
-          >
-          {m.gameForm_runnerNoProtonfixesHintSuffix()}
+          <Message message={m.gameForm_runnerNoProtonfixesHint} parts={{ tab: protonTabLink }} />
         </span>
       {/if}
+      {@render requiredHint(missing.runner)}
     </label>
 
     <label>
       {m.gameForm_envVarsLabel()}
-      <textarea placeholder={m.gameForm_envVarsPlaceholder()} bind:value={envVarsText}
-      ></textarea>
+      <textarea placeholder={m.gameForm_envVarsPlaceholder()} bind:value={envVarsText}></textarea>
       <span class="hint">{m.gameForm_envVarsHint()}</span>
     </label>
 
@@ -444,6 +449,9 @@
     />
   {/if}
 
+  {#if showMissing && Object.values(missing).some(Boolean)}
+    <p class="error" role="alert">{m.gameForm_missingFields()}</p>
+  {/if}
   {#if error}
     <p class="error">{backendError(error)}</p>
   {/if}
@@ -520,6 +528,14 @@
 
   .error {
     color: var(--danger);
+  }
+
+  .required {
+    font-size: 0.85em;
+  }
+
+  [aria-invalid="true"] {
+    border-color: var(--danger);
   }
 
   .hint {

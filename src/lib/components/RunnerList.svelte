@@ -1,6 +1,8 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
+  import Message from "$lib/components/Message.svelte";
   import { onMount } from "svelte";
+  import { loadAll } from "$lib/load";
   import { runners, refreshRunners, deleteRunner } from "$lib/stores/runners";
   import { games, refreshGames } from "$lib/stores/games";
   import type { Runner } from "$lib/types";
@@ -9,11 +11,13 @@
   import RunnerDownloads from "./RunnerDownloads.svelte";
   import GitHubSettings from "./GitHubSettings.svelte";
   import UmuSettings from "./UmuSettings.svelte";
+  import DirectXLayerSettings from "./DirectXLayerSettings.svelte";
   import { backendError } from "$lib/i18n/index.svelte";
 
   let showDownloads = $state(false);
   let deleting = $state<Runner | null>(null);
   let error = $state<unknown>(null);
+  let loadError = $state<unknown>(null);
 
   // How many games use each runner. The library may not have been loaded
   // yet when this view opens first, hence the refresh below.
@@ -26,7 +30,7 @@
 
   function usageLabel(count: number): string {
     if (count === 0) return m.runnerList_unused();
-    return count === 1 ? m.runnerList_usedByOne() : m.runnerList_usedByMany( { count });
+    return m.runnerList_usedByCount({ count });
   }
 
   async function confirmDelete() {
@@ -42,16 +46,16 @@
   }
 
   onMount(() => {
-    refreshRunners();
-    refreshGames();
+    loadAll(refreshRunners(), refreshGames()).catch((e) => (loadError = e));
   });
 </script>
 
+{#snippet proton()}<strong>Proton</strong>{/snippet}
+{#snippet wine()}<strong>Wine</strong>{/snippet}
+
 <section class="panel">
   <p class="explainer">
-    {m.runnerList_explainerBefore()} <strong>{m.runnerList_explainerProton()}</strong>
-    {m.runnerList_explainerOr()} <strong>{m.runnerList_explainerWine()}</strong>.
-    {m.runnerList_explainerAfter()}
+    <Message message={m.runnerList_explainer} parts={{ proton, wine }} />
   </p>
 
   <div class="panel-header">
@@ -66,8 +70,11 @@
 
   <GitHubSettings />
   <UmuSettings />
+  <DirectXLayerSettings />
 
-  {#if $runners.length === 0}
+  {#if loadError}
+    <p class="error">{backendError(loadError)}</p>
+  {:else if $runners.length === 0}
     <p class="hint">{m.runnerList_empty()}</p>
   {:else}
     <ul>
@@ -96,7 +103,7 @@
 <ConfirmDialog
   open={deleting !== null}
   title={m.runnerList_deleteConfirmTitle()}
-  message={m.runnerList_deleteConfirmMessage( { name: deleting?.name ?? "" })}
+  message={m.runnerList_deleteConfirmMessage({ name: deleting?.name ?? "" })}
   confirmLabel={m.runnerList_delete()}
   onConfirm={confirmDelete}
   onCancel={() => (deleting = null)}

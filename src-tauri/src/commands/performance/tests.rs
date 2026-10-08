@@ -1,7 +1,7 @@
 use super::{
     build_max_map_count_status, finalize_max_map_count_fix, manual_fix_command,
     parse_max_map_count, sysctl_fix_script, MaxMapCountStatus, RECOMMENDED_MAX_MAP_COUNT,
-    SYSCTL_DROPIN_PATH,
+    SUFFICIENT_MAX_MAP_COUNT, SYSCTL_DROPIN_PATH,
 };
 use crate::error::AppError;
 
@@ -14,17 +14,34 @@ fn assert_status(status: MaxMapCountStatus, current: u64, sufficient: bool, can_
 
 #[test]
 fn parses_max_map_count_or_falls_back_to_zero() {
-    assert_eq!(parse_max_map_count(Some("2147483642\n")), RECOMMENDED_MAX_MAP_COUNT);
+    assert_eq!(
+        parse_max_map_count(Some("2147483642\n")),
+        RECOMMENDED_MAX_MAP_COUNT
+    );
     assert_eq!(parse_max_map_count(Some("not-a-number")), 0);
     assert_eq!(parse_max_map_count(None), 0);
 }
 
 #[test]
 fn builds_status_with_threshold_and_fix_availability() {
+    // The old kernel default.
     assert_status(
-        build_max_map_count_status(RECOMMENDED_MAX_MAP_COUNT - 1, false),
-        RECOMMENDED_MAX_MAP_COUNT - 1,
+        build_max_map_count_status(65530, false),
+        65530,
         false,
+        false,
+    );
+    assert_status(
+        build_max_map_count_status(SUFFICIENT_MAX_MAP_COUNT - 1, true),
+        SUFFICIENT_MAX_MAP_COUNT - 1,
+        false,
+        true,
+    );
+    // Today's distro default.
+    assert_status(
+        build_max_map_count_status(SUFFICIENT_MAX_MAP_COUNT, false),
+        SUFFICIENT_MAX_MAP_COUNT,
+        true,
         false,
     );
     assert_status(
@@ -65,8 +82,8 @@ fn reports_missing_pkexec_with_manual_fallback() {
 
 #[test]
 fn reports_failed_or_unspawnable_pkexec_runs() {
-    let error = finalize_max_map_count_fix(true, Ok((false, "exit status: 126".to_string())))
-        .unwrap_err();
+    let error =
+        finalize_max_map_count_fix(true, Ok((false, "exit status: 126".to_string()))).unwrap_err();
     match error {
         AppError::SysctlChangeFailed { status } => {
             assert_eq!(status, "exit status: 126");

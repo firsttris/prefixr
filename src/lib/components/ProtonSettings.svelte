@@ -1,6 +1,7 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
   import { onMount } from "svelte";
+  import { loadAll } from "$lib/load";
   import ProtonEditor from "$lib/components/ProtonEditor.svelte";
   import SettingsPanel from "$lib/components/SettingsPanel.svelte";
   import {
@@ -31,8 +32,7 @@
   let optionsError = $state<unknown>(null);
 
   onMount(() => {
-    refreshRunners();
-    refreshProtonConfig();
+    loadAll(refreshRunners(), refreshProtonConfig()).catch((e) => (error = e));
   });
 
   $effect(() => {
@@ -91,10 +91,7 @@
   {:else}
     <label class="runner">
       {m.protonSettings_availableSwitches()}
-      <select
-        value={runnerId}
-        onchange={(e) => (pickedRunnerId = e.currentTarget.value)}
-      >
+      <select value={runnerId} onchange={(e) => (pickedRunnerId = e.currentTarget.value)}>
         {#each protonRunners as runner (runner.id)}
           <option value={runner.id}>{runner.name}</option>
         {/each}

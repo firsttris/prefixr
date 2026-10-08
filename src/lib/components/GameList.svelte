@@ -1,22 +1,17 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import {
     games,
     gameRunState,
     refreshGames,
     removeGame,
-    launchGame,
-    killGame,
     initGameEvents,
-    createDesktopShortcut,
-    createMenuShortcut,
     exportToSteam,
     removeFromSteam,
     steamGameIds,
     refreshSteamGames,
   } from "$lib/stores/games";
-  import { showLog } from "$lib/logViewer";
   import { backendError } from "$lib/i18n/index.svelte";
   import GameCard from "./GameCard.svelte";
   import GameListRow from "./GameListRow.svelte";
@@ -66,16 +61,18 @@
     } else if (sortBy === "name-desc") {
       list.sort((a, b) => b.name.localeCompare(a.name));
     } else {
-      list.sort(
-        (a, b) => a.runner_id.localeCompare(b.runner_id) || a.name.localeCompare(b.name),
-      );
+      list.sort((a, b) => a.runner_id.localeCompare(b.runner_id) || a.name.localeCompare(b.name));
     }
     return list;
   });
 
+  // A library that failed to load must not look like an empty one.
+  let loadError = $state<unknown>(null);
+
   onMount(() => {
     initGameEvents();
-    refreshGames();
+    refreshGames().catch((e) => (loadError = e));
+    // Only marks which games are in Steam; without it, none are.
     refreshSteamGames().catch(() => {});
   });
 
@@ -87,6 +84,7 @@
   let steamConfirm = $state<{ game: Game; action: SteamAction } | null>(null);
   let steamNotice = $state<{ text: string; kind: "busy" | "done" | "error" } | null>(null);
   let noticeTimer: ReturnType<typeof setTimeout> | undefined;
+  onDestroy(() => clearTimeout(noticeTimer));
 
   function notify(text: string, kind: "busy" | "done" | "error") {
     clearTimeout(noticeTimer);
@@ -102,8 +100,8 @@
       shutdownSteam
         ? m.gameList_steam_busyQuitting()
         : action === "export"
-          ? m.gameList_steam_busyExporting( { name: game.name })
-          : m.gameList_steam_busyRemoving( { name: game.name }),
+          ? m.gameList_steam_busyExporting({ name: game.name })
+          : m.gameList_steam_busyRemoving({ name: game.name }),
       "busy",
     );
     try {
@@ -120,12 +118,12 @@
       const restarted = result.restarted_steam ? m.gameList_steam_restartedSuffix() : "";
       if (action === "remove-game") {
         await removeGame(game.id);
-        notify(m.gameList_steam_doneRemovedBoth( { name: game.name, restarted }), "done");
+        notify(m.gameList_steam_doneRemovedBoth({ name: game.name, restarted }), "done");
       } else if (action === "remove") {
-        notify(m.gameList_steam_doneRemoved( { name: game.name, restarted }), "done");
+        notify(m.gameList_steam_doneRemoved({ name: game.name, restarted }), "done");
       } else {
         notify(
-          m.gameList_steam_doneAdded( {
+          m.gameList_steam_doneAdded({
             name: game.name,
             restarted: restarted || m.gameList_steam_doneAddedNextStartSuffix(),
           }),
@@ -133,7 +131,7 @@
         );
       }
     } catch (e) {
-      notify(m.gameList_steam_errorPrefix( { error: backendError(e) }), "error");
+      notify(m.gameList_steam_errorPrefix({ error: backendError(e) }), "error");
     }
   }
 
@@ -142,7 +140,7 @@
       runSteamAction(game, "remove-game");
     } else {
       removeGame(game.id).catch((e) =>
-        notify(m.gameList_steam_removeFailed( { name: game.name, error: backendError(e) }), "error"),
+        notify(m.gameList_steam_removeFailed({ name: game.name, error: backendError(e) }), "error"),
       );
     }
   }
@@ -186,7 +184,9 @@
   </div>
 {/if}
 
-{#if $games.length === 0}
+{#if loadError && $games.length === 0}
+  <p class="load-error">{m.gameList_loadFailed({ error: backendError(loadError) })}</p>
+{:else if $games.length === 0}
   <div class="empty">
     <span class="empty-icon">🎮</span>
     <h3>{m.gameList_emptyLibrary_title()}</h3>
@@ -199,7 +199,7 @@
   <div class="empty">
     <span class="empty-icon">🔍</span>
     <h3>{m.gameList_emptySearch_title()}</h3>
-    <p>{m.gameList_emptySearch_hint( { query })}</p>
+    <p>{m.gameList_emptySearch_hint({ query })}</p>
   </div>
 {:else if viewMode === "grid"}
   <div class="grid">
@@ -208,16 +208,11 @@
         {game}
         runState={$gameRunState[game.id]}
         inSteam={$steamGameIds.has(game.id)}
-        onLaunch={() => launchGame(game.id)}
-        onKill={() => killGame(game.id)}
         onEdit={() => onEdit(game)}
+        onEditArtwork={() => onEditArtwork(game)}
         onRemove={() => handleRemove(game)}
-        onShowLog={showLog}
-        onCreateDesktopShortcut={() => createDesktopShortcut(game.id)}
-        onCreateMenuShortcut={() => createMenuShortcut(game.id)}
         onExportToSteam={() => runSteamAction(game, "export")}
         onRemoveFromSteam={() => runSteamAction(game, "remove")}
-        onEditArtwork={() => onEditArtwork(game)}
       />
     {/each}
   </div>
@@ -228,16 +223,11 @@
         {game}
         runState={$gameRunState[game.id]}
         inSteam={$steamGameIds.has(game.id)}
-        onLaunch={() => launchGame(game.id)}
-        onKill={() => killGame(game.id)}
         onEdit={() => onEdit(game)}
+        onEditArtwork={() => onEditArtwork(game)}
         onRemove={() => handleRemove(game)}
-        onShowLog={showLog}
-        onCreateDesktopShortcut={() => createDesktopShortcut(game.id)}
-        onCreateMenuShortcut={() => createMenuShortcut(game.id)}
         onExportToSteam={() => runSteamAction(game, "export")}
         onRemoveFromSteam={() => runSteamAction(game, "remove")}
-        onEditArtwork={() => onEditArtwork(game)}
       />
     {/each}
   </div>
@@ -251,11 +241,11 @@
   open={steamConfirm !== null}
   title={m.gameList_steam_confirmTitle()}
   message={steamConfirm
-    ? m.gameList_steam_confirmMessage( {
+    ? m.gameList_steam_confirmMessage({
         action:
           steamConfirm.action === "export"
-            ? m.gameList_steam_confirmActionExport( { name: steamConfirm.game.name })
-            : m.gameList_steam_confirmActionRemove( { name: steamConfirm.game.name }),
+            ? m.gameList_steam_confirmActionExport({ name: steamConfirm.game.name })
+            : m.gameList_steam_confirmActionRemove({ name: steamConfirm.game.name }),
       })
     : ""}
   confirmLabel={m.gameList_steam_confirmButton()}
@@ -284,6 +274,10 @@
     background: var(--success-bg);
     color: var(--success);
     border-color: transparent;
+  }
+
+  .load-error {
+    color: var(--danger);
   }
 
   .notice.error {

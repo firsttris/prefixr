@@ -1,9 +1,11 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
+  import RunnerSelect from "$lib/components/RunnerSelect.svelte";
   import { onMount } from "svelte";
+  import { loadAll } from "$lib/load";
   import { open } from "@tauri-apps/plugin-dialog";
   import { prefixes, refreshPrefixes, addPrefix } from "$lib/stores/prefixes";
-  import { runners, refreshRunners } from "$lib/stores/runners";
+  import { refreshRunners } from "$lib/stores/runners";
   import { runInstaller } from "$lib/stores/games";
   import { prettifyExeName } from "$lib/gameName";
   import { showLog } from "$lib/logViewer";
@@ -11,13 +13,24 @@
   import type { DetectedShortcut } from "$lib/types";
   import { backendError } from "$lib/i18n/index.svelte";
 
-  let { exePath, onClose }: { exePath: string; onClose: () => void } = $props();
+  let {
+    exePath,
+    onClose,
+    onBusyChange,
+  }: {
+    exePath: string;
+    onClose: () => void;
+    // Told while the installer runs, so the surrounding modal stays open
+    // until its result (the shortcuts it created) is in.
+    onBusyChange?: (busy: boolean) => void;
+  } = $props();
 
   let exeName = $derived(exePath.split(/[/\\]/).pop() ?? exePath);
 
   let prefixPath = $state("");
   let runnerId = $state("");
   let busy = $state(false);
+  $effect(() => onBusyChange?.(busy));
   let creatingPrefix = $state(false);
   let error = $state<unknown>(null);
 
@@ -32,8 +45,7 @@
   let logPath = $state("");
 
   onMount(() => {
-    refreshPrefixes();
-    refreshRunners();
+    loadAll(refreshPrefixes(), refreshRunners()).catch((e) => (error = e));
   });
 
   async function createNewPrefix() {
@@ -122,12 +134,7 @@
 
       <label>
         {m.gameForm_runnerLabel()}
-        <select bind:value={runnerId} disabled={busy}>
-          <option value="" disabled selected>{m.gameForm_runnerChoose()}</option>
-          {#each $runners as runner (runner.id)}
-            <option value={runner.id}>{runner.name} ({runner.kind})</option>
-          {/each}
-        </select>
+        <RunnerSelect bind:value={runnerId} disabled={busy} />
       </label>
 
       <button type="submit" class="primary" disabled={busy || !runnerId || !prefixPath}>
@@ -164,8 +171,7 @@
         >
           {m.installDialog_continueButton()}
         </button>
-        <button type="button" onclick={pickExeManually}>{m.installDialog_pickOtherFile()}</button
-        >
+        <button type="button" onclick={pickExeManually}>{m.installDialog_pickOtherFile()}</button>
       </div>
     {:else}
       <p class="hint">{m.installDialog_noCandidatesHint()}</p>

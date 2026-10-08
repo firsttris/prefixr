@@ -10,8 +10,14 @@ fn toggle_labels_follow_visibility_and_locale() {
 
 #[test]
 fn tray_labels_are_localized() {
-    assert_eq!(kill_game_label("Cyberpunk 2077", Locale::De), "„Cyberpunk 2077“ beenden (erzwingen)");
-    assert_eq!(kill_game_label("Cyberpunk 2077", Locale::En), "Quit “Cyberpunk 2077” (force)");
+    assert_eq!(
+        kill_game_label("Cyberpunk 2077", Locale::De),
+        "„Cyberpunk 2077“ beenden (erzwingen)"
+    );
+    assert_eq!(
+        kill_game_label("Cyberpunk 2077", Locale::En),
+        "Quit “Cyberpunk 2077” (force)"
+    );
     assert_eq!(quit_label(Locale::De), "Beenden");
     assert_eq!(quit_label(Locale::En), "Quit");
 }

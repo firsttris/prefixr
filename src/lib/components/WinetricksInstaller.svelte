@@ -1,8 +1,12 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
+  import RunnerSelect from "$lib/components/RunnerSelect.svelte";
+  import Message from "$lib/components/Message.svelte";
   import { msgGroup } from "$lib/i18n/msg-groups";
-  import { onMount } from "svelte";
-  import { runners, refreshRunners } from "$lib/stores/runners";
+  import { onMount, untrack } from "svelte";
+  import { SvelteSet } from "svelte/reactivity";
+  import { prefixRunner, refreshRunners } from "$lib/stores/runners";
+  import { games } from "$lib/stores/games";
   import {
     WINETRICKS_VERBS,
     installWinetricksVerbs,
@@ -15,8 +19,9 @@
   let { prefixPath, onShowLog }: { prefixPath: string; onShowLog: (path: string) => void } =
     $props();
 
-  let runnerId = $state("");
-  let selected = $state<Set<string>>(new Set());
+  // Started with the runner the prefix's games use, if they agree on one.
+  let runnerId = $state(untrack(() => prefixRunner($games, prefixPath)));
+  const selected = new SvelteSet<string>();
   let installing = $state(false);
   let error = $state<unknown>(null);
   let successLogPath = $state("");
@@ -38,7 +43,7 @@
   });
 
   onMount(() => {
-    refreshRunners();
+    refreshRunners().catch((e) => (error = e));
     refreshInstalled();
   });
 
@@ -66,13 +71,7 @@
   }
 
   function toggle(id: string) {
-    const next = new Set(selected);
-    if (next.has(id)) {
-      next.delete(id);
-    } else {
-      next.add(id);
-    }
-    selected = next;
+    if (!selected.delete(id)) selected.add(id);
   }
 
   async function handleInstall() {
@@ -91,30 +90,22 @@
   }
 </script>
 
+{#snippet prefix()}<code>{prefixPath}</code>{/snippet}
+
 <div class="winetricks">
   <p class="hint">
-    {m.winetricksInstaller_hintBefore()}<code>{prefixPath}</code
-    >{m.winetricksInstaller_hintAfter()}
+    <Message message={m.winetricksInstaller_hint} parts={{ prefix }} />
   </p>
 
   <label>
     {m.winetricksInstaller_runnerLabel()}
-    <select bind:value={runnerId}>
-      <option value="" disabled selected>{m.gameForm_runnerChoose()}</option>
-      {#each $runners as runner (runner.id)}
-        <option value={runner.id}>{runner.name} ({runner.kind})</option>
-      {/each}
-    </select>
+    <RunnerSelect bind:value={runnerId} />
   </label>
 
   <div class="verb-list">
     {#each WINETRICKS_VERBS as verb (verb.id)}
       <label class="verb-row">
-        <input
-          type="checkbox"
-          checked={selected.has(verb.id)}
-          onchange={() => toggle(verb.id)}
-        />
+        <input type="checkbox" checked={selected.has(verb.id)} onchange={() => toggle(verb.id)} />
         <div>
           <span class="verb-label">
             {pickMsg(msgGroup.winetricksVerbs_label, verb.id)}
@@ -193,7 +184,7 @@
   >
     {installing
       ? m.winetricksInstaller_installing()
-      : m.winetricksInstaller_installButton( { count: selected.size })}
+      : m.winetricksInstaller_installButton({ count: selected.size })}
   </button>
 </div>
 

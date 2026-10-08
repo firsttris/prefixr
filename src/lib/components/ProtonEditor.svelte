@@ -73,7 +73,7 @@
     const global = lookup(inherited, option);
     return global === null
       ? m.protonEditor_neutralGlobal()
-      : m.protonEditor_neutralGlobalState( { state: global ? m.common_on() : m.common_off() });
+      : m.protonEditor_neutralGlobalState({ state: global ? m.common_on() : m.common_off() });
   }
 </script>
 
@@ -112,14 +112,14 @@
 
   {#if others.length > 0}
     <details class="advanced">
-      <summary>{m.protonEditor_advanced( { count: others.length })}</summary>
+      <summary>{m.protonEditor_advanced({ count: others.length })}</summary>
       <p class="hint">{m.protonEditor_advancedHint()}</p>
       <div class="compact-list">
         {#each others as option (option.config)}
           <div class="compact-row" class:overridden={lookup(values, option) !== null}>
             <code
               title={option.aliases.length
-                ? m.protonEditor_alsoAliases( { aliases: option.aliases.join(", ") })
+                ? m.protonEditor_alsoAliases({ aliases: option.aliases.join(", ") })
                 : ""}
             >
               {option.env}

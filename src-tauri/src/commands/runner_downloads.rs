@@ -13,12 +13,13 @@ use tokio::io::AsyncWriteExt;
 
 use crate::commands::github::read_token;
 use crate::config::ConfigState;
+use crate::lock::LockExt;
 use crate::models::RunnerKind;
 
 /// Adds a bearer `Authorization` header when a GitHub token is configured,
 /// leaving the request unauthenticated otherwise — GitHub's API accepts both,
 /// just at a much lower rate limit (60 vs 5000 requests/hour) when anonymous.
-fn with_optional_auth(builder: RequestBuilder, token: Option<&str>) -> RequestBuilder {
+pub(crate) fn with_optional_auth(builder: RequestBuilder, token: Option<&str>) -> RequestBuilder {
     match token {
         Some(token) => builder.bearer_auth(token),
         None => builder,
@@ -146,6 +147,7 @@ fn find_source(id: &str) -> Result<&'static RunnerSource, String> {
 /// A runner source as surfaced to the frontend, to drive the source picker
 /// without duplicating labels/kinds on the TypeScript side.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct RunnerSourceInfo {
     pub id: &'static str,
     pub label: &'static str,
@@ -181,6 +183,7 @@ struct GitHubRelease {
 
 /// A downloadable runner build, as surfaced to the frontend.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct RunnerRelease {
     pub source: String,
     pub tag: String,
@@ -191,6 +194,7 @@ pub struct RunnerRelease {
 }
 
 #[derive(Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 struct RunnerDownloadProgressPayload<'a> {
     tag: &'a str,
     downloaded: u64,
@@ -198,12 +202,7 @@ struct RunnerDownloadProgressPayload<'a> {
 }
 
 #[derive(Clone, Serialize)]
-struct RunnerDownloadErrorPayload<'a> {
-    tag: &'a str,
-    message: AppError,
-}
-
-#[derive(Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 struct RunnerDownloadDonePayload<'a> {
     tag: &'a str,
 }
@@ -217,19 +216,16 @@ pub async fn list_runner_releases(
     source: String,
 ) -> Result<Vec<RunnerRelease>, AppError> {
     let runner_source = find_source(&source)?;
-    let token = read_token(&state)?;
+    let token = read_token(&state);
     let url = format!(
         "https://api.github.com/repos/{}/releases?per_page=20",
         runner_source.repo
     );
 
-    let response = with_optional_auth(
-        crate::http::client().get(&url),
-        token.as_deref(),
-    )
-    .send()
-    .await
-    .map_err(|e| format!("Could not reach GitHub: {e}"))?;
+    let response = with_optional_auth(crate::http::client().get(&url), token.as_deref())
+        .send()
+        .await
+        .map_err(|e| format!("Could not reach GitHub: {e}"))?;
 
     if !response.status().is_success() {
         let status = response.status();
@@ -304,6 +300,84 @@ pub(crate) fn move_extracted_dir(extract_dir: &Path, target: &Path) -> Result<()
     result
 }
 
+/// Puts the directory `new` in place of `target`, which may or may not exist
+/// yet. An existing `target` is swapped out atomically (renameat2's
+/// `RENAME_EXCHANGE`), so anything resolving a path inside it at the same
+/// time — a game launch starting umu-run, say — sees either the old or the
+/// new copy, never neither; the old copy is then deleted. Where the
+/// filesystem can't exchange, the old copy is moved aside to `<target>.old`
+/// first and moved back if the second rename fails (`restore_replaced_dir`
+/// covers being interrupted in between).
+pub(crate) fn replace_dir(new: &Path, target: &Path) -> Result<(), String> {
+    let moved = |e: std::io::Error| format!("Could not move {} into place: {e}", new.display());
+    if fs::symlink_metadata(target).is_err() {
+        return fs::rename(new, target).map_err(moved);
+    }
+    if exchange_paths(new, target).is_ok() {
+        // `new` now holds the old copy.
+        let _ = fs::remove_dir_all(new);
+        return Ok(());
+    }
+
+    let old = replaced_dir(target);
+    if fs::symlink_metadata(&old).is_ok() {
+        fs::remove_dir_all(&old).map_err(|e| format!("Could not remove {}: {e}", old.display()))?;
+    }
+    fs::rename(target, &old)
+        .map_err(|e| format!("Could not move {} aside: {e}", target.display()))?;
+    if let Err(e) = fs::rename(new, target) {
+        let _ = fs::rename(&old, target);
+        return Err(moved(e));
+    }
+    let _ = fs::remove_dir_all(&old);
+    Ok(())
+}
+
+/// Where `replace_dir` keeps the old copy while it can't exchange.
+fn replaced_dir(target: &Path) -> PathBuf {
+    let mut name = target.file_name().unwrap_or_default().to_os_string();
+    name.push(".old");
+    target.with_file_name(name)
+}
+
+/// Moves the old copy `replace_dir` set aside back into place, if it was
+/// interrupted after moving it aside and before the new copy was in.
+pub(crate) fn restore_replaced_dir(target: &Path) {
+    let old = replaced_dir(target);
+    if fs::symlink_metadata(target).is_err() && old.is_dir() {
+        let _ = fs::rename(&old, target);
+    }
+}
+
+/// Atomically swaps two paths, via renameat2(2) with `RENAME_EXCHANGE`
+/// (called as a raw syscall, so it doesn't depend on the glibc version).
+fn exchange_paths(a: &Path, b: &Path) -> std::io::Result<()> {
+    use std::ffi::CString;
+    use std::os::unix::ffi::OsStrExt;
+    let c_path = |path: &Path| {
+        CString::new(path.as_os_str().as_bytes())
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))
+    };
+    let (a, b) = (c_path(a)?, c_path(b)?);
+    // SAFETY: both strings are valid and NUL-terminated for the duration of
+    // the call; renameat2 takes no other pointers.
+    let rc = unsafe {
+        libc::syscall(
+            libc::SYS_renameat2,
+            libc::AT_FDCWD,
+            a.as_ptr(),
+            libc::AT_FDCWD,
+            b.as_ptr(),
+            libc::RENAME_EXCHANGE,
+        )
+    };
+    if rc == 0 {
+        Ok(())
+    } else {
+        Err(std::io::Error::last_os_error())
+    }
+}
+
 /// Hashes a file on disk with the given algorithm, returning its digest as a
 /// lowercase hex string. Run inside `spawn_blocking` by callers, since
 /// hashing a multi-hundred-MB archive is real CPU work.
@@ -336,7 +410,8 @@ fn compute_digest(path: &Path, algorithm: ChecksumAlgorithm) -> Result<String, S
 
 /// Fetches the checksum file this source publishes for `asset_name` and
 /// verifies the just-downloaded `archive_path` against it, before it's ever
-/// extracted. A source that doesn't publish checksums (none currently, but
+/// extracted. Both come from the same release, so this proves the download
+/// complete and intact, not who made it. A source that doesn't publish checksums (none currently, but
 /// `ChecksumInfo` is per-source so this stays possible) would need an
 /// `Option` here instead — as it stands, every listed source is checked.
 async fn verify_checksum(
@@ -352,13 +427,10 @@ async fn verify_checksum(
         .map(|prefix| format!("{prefix}{checksum_asset_name}"))
         .ok_or_else(|| "Could not derive checksum file URL".to_string())?;
 
-    let response = with_optional_auth(
-        crate::http::client().get(&checksum_url),
-        token,
-    )
-    .send()
-    .await
-    .map_err(|e| format!("Could not fetch checksum file: {e}"))?;
+    let response = with_optional_auth(crate::http::client().get(&checksum_url), token)
+        .send()
+        .await
+        .map_err(|e| format!("Could not fetch checksum file: {e}"))?;
     if !response.status().is_success() {
         return Err(format!(
             "Could not fetch checksum file (status {})",
@@ -385,28 +457,67 @@ async fn verify_checksum(
     } else {
         Err(format!(
             "Checksum mismatch for {asset_name}: expected {expected}, got {actual} — \
-             the download may be corrupted or tampered with"
+             the download is corrupted or incomplete"
         ))
     }
 }
 
-/// Checks the `tag` and `download_url` the frontend passes back from
-/// `list_runner_releases`: the tag becomes a directory name inside the
-/// runners directory, and the URL gets the GitHub token, so neither is
-/// taken on trust — only a plain name, and only a release asset of this
-/// source's own repo.
-fn check_download_request(source: &RunnerSource, tag: &str, download_url: &str) -> Result<(), String> {
+/// A download request, as read from the URL (see `parse_download_url`).
+#[derive(Debug, PartialEq)]
+struct DownloadRequest {
+    /// The release tag — the runner's directory name.
+    tag: String,
+    asset_name: String,
+}
+
+/// Checks the `download_url` the frontend passes back from
+/// `list_runner_releases` and reads the release tag and asset name out of
+/// it (`.../releases/download/<tag>/<asset>`). The URL gets the GitHub
+/// token and the tag becomes a directory name inside the runners directory,
+/// so neither is taken on trust — only a release asset of this source's own
+/// repo, and only a plain name.
+fn parse_download_url(
+    source: &RunnerSource,
+    download_url: &str,
+) -> Result<DownloadRequest, String> {
+    let not_a_download = || format!("Not a {} release download: {download_url}", source.label);
+    let expected = format!("https://github.com/{}/releases/download/", source.repo);
+    let rest = download_url
+        .get(..expected.len())
+        .filter(|start| start.eq_ignore_ascii_case(&expected))
+        .and_then(|_| download_url.get(expected.len()..))
+        .ok_or_else(not_a_download)?;
+    let (tag, asset_name) = rest.split_once('/').ok_or_else(not_a_download)?;
+    if asset_name.is_empty() || asset_name.contains('/') {
+        return Err(not_a_download());
+    }
+    let tag = percent_decode(tag).ok_or_else(not_a_download)?;
     if tag.is_empty() || tag.starts_with('.') || tag.contains(['/', '\\', '\0']) {
         return Err(format!("Invalid runner tag '{tag}'"));
     }
-    let expected = format!("https://github.com/{}/releases/download/", source.repo);
-    let matches = download_url
-        .get(..expected.len())
-        .is_some_and(|start| start.eq_ignore_ascii_case(&expected));
-    if !matches {
-        return Err(format!("Not a {} release download: {download_url}", source.label));
+    Ok(DownloadRequest {
+        tag,
+        asset_name: asset_name.to_string(),
+    })
+}
+
+/// Decodes a URL path segment's `%XX` escapes (GitHub escapes a tag's
+/// reserved characters); `None` for a malformed escape or non-UTF-8 result.
+fn percent_decode(segment: &str) -> Option<String> {
+    let bytes = segment.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' {
+            let hex = segment.get(i + 1..i + 3)?;
+            out.push(u8::from_str_radix(hex, 16).ok()?);
+            i += 3;
+        } else {
+            out.push(bytes[i]);
+            i += 1;
+        }
     }
-    Ok(())
+    String::from_utf8(out).ok()
 }
 
 /// How often `runner-download-progress` goes out at most: once per chunk
@@ -415,32 +526,24 @@ const PROGRESS_INTERVAL: Duration = Duration::from_millis(100);
 
 /// Downloads a runner release into the runners directory and extracts it.
 /// Progress (bytes downloaded so far, and the total if known) is streamed via
-/// `runner-download-progress` events; the final outcome is reported both as
-/// the command's `Result` and as `runner-download-done` / `runner-download-error`.
+/// `runner-download-progress` events, a success also as
+/// `runner-download-done`; a failure is the command's `Err` alone, with the
+/// downloaded archive and anything extracted from it removed.
 #[tauri::command]
 pub async fn download_runner(
     app: AppHandle,
     state: State<'_, ConfigState>,
     source: String,
-    tag: String,
     download_url: String,
 ) -> Result<(), AppError> {
     let runner_source = find_source(&source)?;
-    check_download_request(runner_source, &tag, &download_url)?;
-    let asset_name = download_url
-        .rsplit('/')
-        .next()
-        .filter(|name| !name.is_empty())
-        .ok_or_else(|| format!("Download URL has no file name: {download_url}"))?
-        .to_string();
+    let DownloadRequest { tag, asset_name } = parse_download_url(runner_source, &download_url)?;
 
     let runners_dir = {
-        let config = state
-            .lock()
-            .map_err(|_| "Configuration is locked".to_string())?;
+        let config = state.locked();
         config.runners_dir.clone()
     };
-    let token = read_token(&state)?;
+    let token = read_token(&state);
 
     fs::create_dir_all(&runners_dir)
         .map_err(|e| format!("Could not create runners directory: {e}"))?;
@@ -452,24 +555,13 @@ pub async fn download_runner(
 
     let is_xz = download_url.ends_with(".tar.xz");
 
-    let response = with_optional_auth(
-        crate::http::client().get(&download_url),
-        token.as_deref(),
-    )
-    .send()
-    .await
-    .map_err(|e| format!("Could not start download: {e}"))?;
+    let response = with_optional_auth(crate::http::client().get(&download_url), token.as_deref())
+        .send()
+        .await
+        .map_err(|e| format!("Could not start download: {e}"))?;
 
     if !response.status().is_success() {
-        let message = format!("Download failed with status {}", response.status());
-        let _ = app.emit(
-            "runner-download-error",
-            RunnerDownloadErrorPayload {
-                tag: &tag,
-                message: message.clone().into(),
-            },
-        );
-        return Err(message.into());
+        return Err(format!("Download failed with status {}", response.status()).into());
     }
 
     let total = response.content_length();
@@ -517,13 +609,6 @@ pub async fn download_runner(
 
     if let Err(message) = download_result {
         let _ = tokio::fs::remove_file(&archive_path).await;
-        let _ = app.emit(
-            "runner-download-error",
-            RunnerDownloadErrorPayload {
-                tag: &tag,
-                message: message.clone().into(),
-            },
-        );
         return Err(message.into());
     }
 
@@ -537,13 +622,6 @@ pub async fn download_runner(
     .await
     {
         let _ = tokio::fs::remove_file(&archive_path).await;
-        let _ = app.emit(
-            "runner-download-error",
-            RunnerDownloadErrorPayload {
-                tag: &tag,
-                message: message.clone().into(),
-            },
-        );
         return Err(message.into());
     }
 
@@ -566,32 +644,16 @@ pub async fn download_runner(
         }
     })
     .await
-    .map_err(|e| format!("Extraction task panicked: {e}"))?;
+    .map_err(|e| format!("Extraction task failed: {e}"))
+    .and_then(|extracted| extracted);
 
     let _ = tokio::fs::remove_file(&archive_path).await;
 
     if let Err(message) = extraction {
         let _ = fs::remove_dir_all(&extract_dir);
-        let _ = app.emit(
-            "runner-download-error",
-            RunnerDownloadErrorPayload {
-                tag: &tag,
-                message: message.clone().into(),
-            },
-        );
         return Err(message.into());
     }
-
-    if let Err(message) = move_extracted_dir(&extract_dir, &target_dir) {
-        let _ = app.emit(
-            "runner-download-error",
-            RunnerDownloadErrorPayload {
-                tag: &tag,
-                message: message.clone().into(),
-            },
-        );
-        return Err(message.into());
-    }
+    move_extracted_dir(&extract_dir, &target_dir)?;
 
     let _ = app.emit(
         "runner-download-done",

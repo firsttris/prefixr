@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { WinetricksVerbMeta } from "$lib/types";
 
 export interface WinetricksVerb {
   id: string;
@@ -7,11 +8,7 @@ export interface WinetricksVerb {
 // The full catalogue entry as parsed backend-side from winetricks' own
 // `w_metadata` declarations — just id/category/title, no curated
 // label/description (that only exists for WINETRICKS_VERBS below).
-export interface WinetricksVerbMeta {
-  id: string;
-  category: string;
-  title: string;
-}
+export type { WinetricksVerbMeta };
 
 // Curated subset of winetricks' full verb catalogue — the ones that actually
 // explain most "game won't start" cases, named and described in plain

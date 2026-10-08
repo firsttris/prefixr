@@ -39,3 +39,18 @@ fn leaves_disabled_mangohud_toggles_out_of_the_file() {
         "position=top-left\nbackground_alpha=0.4\ntext_color=ffffff\n"
     );
 }
+
+#[test]
+fn text_settings_cannot_add_lines() {
+    let layout = MangoHudLayout {
+        position: "top-left\nfps_limit=1".to_string(),
+        theme_color: "ffffff\r\nlog_duration=0".to_string(),
+        ..MangoHudLayout::default()
+    };
+    let conf = render_conf(&layout);
+    assert!(conf.contains("position=top-leftfps_limit=1\n"));
+    assert!(conf.contains("text_color=fffffflog_duration=0\n"));
+    assert!(!conf
+        .lines()
+        .any(|line| line.starts_with("fps_limit") || line.starts_with("log_duration")));
+}

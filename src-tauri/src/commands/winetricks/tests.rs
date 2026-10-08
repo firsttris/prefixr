@@ -1,13 +1,13 @@
-use super::{list_installed_winetricks_verbs, parse_verb_catalogue, uses_umu_winetricks};
+use super::{
+    is_verb_name, looks_like_winetricks, parse_verb_catalogue, read_installed_verbs,
+    uses_umu_winetricks,
+};
 use crate::models::{Runner, RunnerKind};
+use crate::test_util::TestDir;
 use std::fs;
-use std::path::PathBuf;
-use uuid::Uuid;
 
-fn temp_path(name: &str) -> PathBuf {
-    let path = std::env::temp_dir().join(format!("prefixr-{name}-{}", Uuid::new_v4()));
-    fs::create_dir_all(&path).unwrap();
-    path
+fn temp_path(name: &str) -> TestDir {
+    TestDir::new(name)
 }
 
 #[test]
@@ -48,11 +48,7 @@ load_physx()
                 "dlls".to_string(),
                 "Visual C++ 2022".to_string(),
             ),
-            (
-                "physx".to_string(),
-                "dlls".to_string(),
-                "physx".to_string(),
-            ),
+            ("physx".to_string(), "dlls".to_string(), "physx".to_string(),),
         ]
     );
 }
@@ -67,27 +63,20 @@ fn reads_installed_winetricks_verbs_and_ignores_blank_lines() {
     .unwrap();
 
     assert_eq!(
-        list_installed_winetricks_verbs(prefix.display().to_string()).unwrap(),
+        read_installed_verbs(&prefix).unwrap(),
         vec![
             "corefonts".to_string(),
             "vcrun2022".to_string(),
             "dxvk".to_string(),
         ]
     );
-
-    let _ = fs::remove_dir_all(prefix);
 }
 
 #[test]
 fn missing_winetricks_log_is_not_an_error() {
     let prefix = temp_path("winetricks-missing-log");
 
-    assert_eq!(
-        list_installed_winetricks_verbs(prefix.display().to_string()).unwrap(),
-        Vec::<String>::new()
-    );
-
-    let _ = fs::remove_dir_all(prefix);
+    assert_eq!(read_installed_verbs(&prefix).unwrap(), Vec::<String>::new());
 }
 
 #[test]
@@ -99,18 +88,43 @@ fn uses_umu_winetricks_only_for_proton_with_bundled_script() {
     let proton_runner = Runner {
         id: "proton".to_string(),
         name: "GE-Proton".to_string(),
-        path: proton_dir.clone(),
+        path: proton_dir.to_path_buf(),
         kind: RunnerKind::Proton,
     };
     let wine_runner = Runner {
         id: "wine".to_string(),
         name: "Wine".to_string(),
-        path: proton_dir.clone(),
+        path: proton_dir.to_path_buf(),
         kind: RunnerKind::Wine,
     };
 
     assert!(uses_umu_winetricks(&proton_runner));
     assert!(!uses_umu_winetricks(&wine_runner));
+}
 
-    let _ = fs::remove_dir_all(proton_dir);
+#[test]
+fn only_the_winetricks_script_is_accepted() {
+    assert!(looks_like_winetricks(
+        b"#!/bin/sh\n# comment\nWINETRICKS_VERSION=20260125-next\nw_metadata vcrun2022 dlls \\\n"
+    ));
+    assert!(!looks_like_winetricks(
+        b"<!DOCTYPE html><html>Sign in to the network</html>"
+    ));
+    assert!(!looks_like_winetricks(b"#!/bin/sh\necho no version here\n"));
+}
+
+#[test]
+fn only_verb_shaped_names_are_passed_to_winetricks() {
+    for verb in [
+        "vcrun2022",
+        "d3dx9_43",
+        "dotnet48",
+        "corefonts",
+        "renderer=vulkan",
+    ] {
+        assert!(is_verb_name(verb), "{verb}");
+    }
+    for verb in ["", "--self-update", "-q", "VCRUN", "a b", "x;rm", "../x"] {
+        assert!(!is_verb_name(verb), "{verb}");
+    }
 }

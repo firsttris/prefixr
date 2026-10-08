@@ -1,9 +1,13 @@
 mod commands;
 mod config;
+mod env;
 mod error;
 mod http;
 mod locale;
+mod lock;
 mod models;
+#[cfg(test)]
+mod test_util;
 mod tray;
 
 use std::path::Path;
@@ -18,8 +22,9 @@ use commands::games::{
     PendingInstall, PendingLaunch, RunningGames,
 };
 use commands::github::{get_github_config, save_github_config};
-use commands::locale::set_ui_locale;
 use commands::graphics::{get_graphics_config, save_graphics_config};
+use commands::graphics_layers::{get_directx_layers_status, update_directx_layers};
+use commands::locale::set_ui_locale;
 use commands::mangohud::{get_mangohud_config, save_mangohud_config};
 use commands::performance::{
     check_max_map_count, fix_max_map_count, get_performance_config, save_performance_config,
@@ -43,8 +48,9 @@ use commands::winetricks::{
 };
 use config::load_config;
 use locale::LocaleState;
+use lock::LockExt;
 use tray::{
-    hide_main_window, rebuild_tray_menu, setup_tray, show_and_focus, tray_host_available,
+    check_tray_host, hide_main_window, rebuild_tray_menu, setup_tray, show_and_focus,
     TrayAvailable, WindowVisible,
 };
 
@@ -109,9 +115,17 @@ pub fn run() {
         // click or a desktop shortcut, while Prefixr is already running, hand
         // its `--install <path>` or `--launch <id>` off to this instance
         // instead of opening a second window.
+        //
+        // Either is stored before the event goes out: a webview that isn't
+        // listening yet (the first instance is still starting up) picks it
+        // up through `take_pending_*` once it is, and one that is listening
+        // takes it on the event, so it's handled exactly once either way.
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             if let Some(game_id) = find_launch_arg(&argv) {
-                let _ = app.emit("pending-launch", game_id);
+                if let Some(state) = app.try_state::<PendingLaunch>() {
+                    *state.0.locked() = Some(game_id);
+                }
+                let _ = app.emit("pending-launch", ());
                 return;
             }
             let Some(exe_path) = find_install_arg(&argv) else {
@@ -120,11 +134,9 @@ pub fn run() {
                 return;
             };
             if let Some(state) = app.try_state::<PendingInstall>() {
-                if let Ok(mut pending) = state.0.lock() {
-                    *pending = Some(exe_path.clone());
-                }
+                *state.0.locked() = Some(exe_path);
             }
-            let _ = app.emit("pending-install", exe_path);
+            let _ = app.emit("pending-install", ());
             show_and_focus(app);
             rebuild_tray_menu(app);
         }));
@@ -174,7 +186,9 @@ pub fn run() {
             };
             app.manage(std::sync::Mutex::new(config));
             app.manage(PendingLaunch(std::sync::Mutex::new(find_launch_arg(&args))));
-            app.manage(PendingInstall(std::sync::Mutex::new(find_install_arg(&args))));
+            app.manage(PendingInstall(std::sync::Mutex::new(find_install_arg(
+                &args,
+            ))));
             app.manage(RunningGames::default());
             app.manage(LaunchingGames::default());
             app.manage(WindowVisible::new(true));
@@ -189,7 +203,7 @@ pub fn run() {
             for window in app.config().app.windows.clone() {
                 WebviewWindowBuilder::from_config(app.handle(), &window)?.build()?;
             }
-            app.manage(TrayAvailable(tray_host_available()));
+            check_tray_host(app.handle());
             setup_tray(app.handle())?;
             // Best-effort: a file manager's "Öffnen mit" context menu working
             // is a nice-to-have, not something worth failing startup over —
@@ -217,7 +231,7 @@ pub fn run() {
             };
             let app = window.app_handle();
             api.prevent_close();
-            if app.state::<TrayAvailable>().0 {
+            if app.state::<TrayAvailable>().get() {
                 hide_main_window(app);
                 rebuild_tray_menu(app);
             } else if !app.state::<LaunchingGames>().ids().is_empty() {
@@ -257,6 +271,8 @@ pub fn run() {
             save_performance_config,
             get_graphics_config,
             save_graphics_config,
+            get_directx_layers_status,
+            update_directx_layers,
             get_proton_config,
             save_proton_config,
             check_max_map_count,

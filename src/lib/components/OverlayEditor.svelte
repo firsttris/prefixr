@@ -63,9 +63,7 @@
           class:active={value.preset === preset.key}
           onclick={() => applyPreset(preset)}
         >
-          <span class="preset-label"
-            >{pickMsg(msgGroup.mangohud_presets_label, preset.key)}</span
-          >
+          <span class="preset-label">{pickMsg(msgGroup.mangohud_presets_label, preset.key)}</span>
           <span class="preset-description"
             >{pickMsg(msgGroup.mangohud_presets_description, preset.key)}</span
           >
@@ -176,14 +174,20 @@
         </label>
 
         <label class="checkbox-row">
-          <input type="checkbox" checked={value.round_corners}
-                onchange={(e) => setLayout({ round_corners: e.currentTarget.checked })} />
+          <input
+            type="checkbox"
+            checked={value.round_corners}
+            onchange={(e) => setLayout({ round_corners: e.currentTarget.checked })}
+          />
           {m.overlayEditor_roundedCorners()}
         </label>
 
         <label class="checkbox-row">
-          <input type="checkbox" checked={value.horizontal}
-                onchange={(e) => setLayout({ horizontal: e.currentTarget.checked })} />
+          <input
+            type="checkbox"
+            checked={value.horizontal}
+            onchange={(e) => setLayout({ horizontal: e.currentTarget.checked })}
+          />
           {m.overlayEditor_horizontalLayout()}
         </label>
 
@@ -191,38 +195,59 @@
           <span class="tune-title">{m.overlayEditor_perfValuesTitle()}</span>
           <div class="checkbox-list">
             <label class="checkbox-row">
-              <input type="checkbox" checked={value.show_fps}
-                onchange={(e) => setLayout({ show_fps: e.currentTarget.checked })} />
+              <input
+                type="checkbox"
+                checked={value.show_fps}
+                onchange={(e) => setLayout({ show_fps: e.currentTarget.checked })}
+              />
               {m.overlayEditor_fpsCounter()}
             </label>
             <label class="checkbox-row">
-              <input type="checkbox" checked={value.show_frametime}
-                onchange={(e) => setLayout({ show_frametime: e.currentTarget.checked })} />
+              <input
+                type="checkbox"
+                checked={value.show_frametime}
+                onchange={(e) => setLayout({ show_frametime: e.currentTarget.checked })}
+              />
               {m.overlayEditor_frametimeGraph()}
             </label>
             <label class="checkbox-row">
-              <input type="checkbox" checked={value.show_cpu}
-                onchange={(e) => setLayout({ show_cpu: e.currentTarget.checked })} />
+              <input
+                type="checkbox"
+                checked={value.show_cpu}
+                onchange={(e) => setLayout({ show_cpu: e.currentTarget.checked })}
+              />
               {m.overlayEditor_cpu()}
             </label>
             <label class="checkbox-row">
-              <input type="checkbox" checked={value.show_gpu}
-                onchange={(e) => setLayout({ show_gpu: e.currentTarget.checked })} />
+              <input
+                type="checkbox"
+                checked={value.show_gpu}
+                onchange={(e) => setLayout({ show_gpu: e.currentTarget.checked })}
+              />
               {m.overlayEditor_gpu()}
             </label>
             <label class="checkbox-row">
-              <input type="checkbox" checked={value.show_ram}
-                onchange={(e) => setLayout({ show_ram: e.currentTarget.checked })} />
+              <input
+                type="checkbox"
+                checked={value.show_ram}
+                onchange={(e) => setLayout({ show_ram: e.currentTarget.checked })}
+              />
               {m.overlayEditor_ram()}
             </label>
             <label class="checkbox-row">
-              <input type="checkbox" checked={value.show_vram}
-                onchange={(e) => setLayout({ show_vram: e.currentTarget.checked })} />
+              <input
+                type="checkbox"
+                checked={value.show_vram}
+                onchange={(e) => setLayout({ show_vram: e.currentTarget.checked })}
+              />
               {m.overlayEditor_vram()}
             </label>
             <label class="checkbox-row">
-              <input type="checkbox" checked={value.show_temps}
-                onchange={(e) => setLayout({ show_temps: e.currentTarget.checked })} />
+              <input
+                type="checkbox"
+                checked={value.show_temps}
+                onchange={(e) => setLayout({ show_temps: e.currentTarget.checked })}
+              />
               {m.overlayEditor_temps()}
             </label>
           </div>
@@ -232,18 +257,27 @@
           <span class="tune-title">{m.overlayEditor_statusIconsTitle()}</span>
           <div class="checkbox-list">
             <label class="checkbox-row">
-              <input type="checkbox" checked={value.show_gamemode}
-                onchange={(e) => setLayout({ show_gamemode: e.currentTarget.checked })} />
+              <input
+                type="checkbox"
+                checked={value.show_gamemode}
+                onchange={(e) => setLayout({ show_gamemode: e.currentTarget.checked })}
+              />
               {m.overlayEditor_gamemodeActive()}
             </label>
             <label class="checkbox-row">
-              <input type="checkbox" checked={value.show_vkbasalt}
-                onchange={(e) => setLayout({ show_vkbasalt: e.currentTarget.checked })} />
+              <input
+                type="checkbox"
+                checked={value.show_vkbasalt}
+                onchange={(e) => setLayout({ show_vkbasalt: e.currentTarget.checked })}
+              />
               {m.overlayEditor_vkbasaltActive()}
             </label>
             <label class="checkbox-row">
-              <input type="checkbox" checked={value.show_hdr}
-                onchange={(e) => setLayout({ show_hdr: e.currentTarget.checked })} />
+              <input
+                type="checkbox"
+                checked={value.show_hdr}
+                onchange={(e) => setLayout({ show_hdr: e.currentTarget.checked })}
+              />
               {m.overlayEditor_hdrActive()}
             </label>
           </div>
@@ -253,28 +287,43 @@
           <span class="tune-title">{m.overlayEditor_techInfoTitle()}</span>
           <div class="checkbox-list">
             <label class="checkbox-row">
-              <input type="checkbox" checked={value.show_driver}
-                onchange={(e) => setLayout({ show_driver: e.currentTarget.checked })} />
+              <input
+                type="checkbox"
+                checked={value.show_driver}
+                onchange={(e) => setLayout({ show_driver: e.currentTarget.checked })}
+              />
               {m.overlayEditor_driver()}
             </label>
             <label class="checkbox-row">
-              <input type="checkbox" checked={value.show_engine_version}
-                onchange={(e) => setLayout({ show_engine_version: e.currentTarget.checked })} />
+              <input
+                type="checkbox"
+                checked={value.show_engine_version}
+                onchange={(e) => setLayout({ show_engine_version: e.currentTarget.checked })}
+              />
               {m.overlayEditor_engineVersion()}
             </label>
             <label class="checkbox-row">
-              <input type="checkbox" checked={value.show_wine}
-                onchange={(e) => setLayout({ show_wine: e.currentTarget.checked })} />
+              <input
+                type="checkbox"
+                checked={value.show_wine}
+                onchange={(e) => setLayout({ show_wine: e.currentTarget.checked })}
+              />
               {m.overlayEditor_wineVersion()}
             </label>
             <label class="checkbox-row">
-              <input type="checkbox" checked={value.show_gpu_name}
-                onchange={(e) => setLayout({ show_gpu_name: e.currentTarget.checked })} />
+              <input
+                type="checkbox"
+                checked={value.show_gpu_name}
+                onchange={(e) => setLayout({ show_gpu_name: e.currentTarget.checked })}
+              />
               {m.overlayEditor_gpuName()}
             </label>
             <label class="checkbox-row">
-              <input type="checkbox" checked={value.show_resolution}
-                onchange={(e) => setLayout({ show_resolution: e.currentTarget.checked })} />
+              <input
+                type="checkbox"
+                checked={value.show_resolution}
+                onchange={(e) => setLayout({ show_resolution: e.currentTarget.checked })}
+              />
               {m.overlayEditor_resolution()}
             </label>
           </div>

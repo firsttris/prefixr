@@ -12,6 +12,7 @@ use crate::commands::binary_vdf::{self, Map, Value};
 use crate::commands::games::{command_on_path, own_executable_path, write_shortcut_icon};
 use crate::commands::steamgriddb::{artwork_dir, asset_cache_path, image_extension};
 use crate::config::ConfigState;
+use crate::lock::LockExt;
 use crate::models::{ArtworkKind, Game};
 
 /// How long `steam -shutdown` gets before the export gives up.
@@ -86,7 +87,13 @@ fn steam_running() -> bool {
     };
     entries
         .filter_map(Result::ok)
-        .filter(|entry| entry.file_name().to_string_lossy().chars().all(|c| c.is_ascii_digit()))
+        .filter(|entry| {
+            entry
+                .file_name()
+                .to_string_lossy()
+                .chars()
+                .all(|c| c.is_ascii_digit())
+        })
         .any(|entry| {
             fs::read_to_string(entry.path().join("comm"))
                 .is_ok_and(|comm| comm.trim_end() == "steam")
@@ -176,13 +183,7 @@ fn quoted(path: &Path) -> String {
 /// Adds the game's shortcut or updates the one from an earlier export. An
 /// update only touches the fields Prefixr owns, so what the user changed in
 /// Steam (collections, hidden, own launch settings) stays.
-fn upsert_shortcut(
-    shortcuts: &mut Map,
-    game: &Game,
-    app_id: u32,
-    exe: &Path,
-    icon: Option<&Path>,
-) {
+fn upsert_shortcut(shortcuts: &mut Map, game: &Game, app_id: u32, exe: &Path, icon: Option<&Path>) {
     let index = find_shortcut(shortcuts, game.id).unwrap_or_else(|| {
         let s = |v: &str| Value::String(v.to_string());
         let defaults: Map = vec![
@@ -215,7 +216,11 @@ fn upsert_shortcut(
         "icon",
         Value::String(icon.map(|p| p.display().to_string()).unwrap_or_default()),
     );
-    binary_vdf::set(fields, "LaunchOptions", Value::String(launch_options(game.id)));
+    binary_vdf::set(
+        fields,
+        "LaunchOptions",
+        Value::String(launch_options(game.id)),
+    );
 
     renumber(shortcuts);
 }
@@ -251,7 +256,12 @@ fn remove_grid_files(grid_dir: &Path, app_id: u32, suffix: &str) {
 
 /// Copies an image into Steam's grid folder as `<app id><suffix>.<ext>`
 /// (`p` is the portrait cover, `_icon` the icon), replacing any earlier one.
-fn copy_to_grid(grid_dir: &Path, app_id: u32, suffix: &str, source: &Path) -> Result<PathBuf, String> {
+fn copy_to_grid(
+    grid_dir: &Path,
+    app_id: u32,
+    suffix: &str,
+    source: &Path,
+) -> Result<PathBuf, String> {
     remove_grid_files(grid_dir, app_id, suffix);
     let ext = source.extension().and_then(|e| e.to_str()).unwrap_or("png");
     let target = grid_dir.join(format!("{app_id}{suffix}.{ext}"));
@@ -297,7 +307,8 @@ impl SteamUser {
 
 fn add_shortcut(app: &AppHandle, game: &Game, user: &SteamUser) -> Result<(), AppError> {
     let grid_dir = &user.grid_dir;
-    fs::create_dir_all(grid_dir).map_err(|e| format!("Could not create Steam's grid folder: {e}"))?;
+    fs::create_dir_all(grid_dir)
+        .map_err(|e| format!("Could not create Steam's grid folder: {e}"))?;
 
     let vdf_path = &user.shortcuts_path;
     let mut file = read_shortcuts_file(vdf_path)?;
@@ -307,14 +318,14 @@ fn add_shortcut(app: &AppHandle, game: &Game, user: &SteamUser) -> Result<(), Ap
     // Only artwork the user picked goes to Steam; a slot without a pick
     // keeps whatever Steam has.
     let cache_dir = artwork_dir(app)?;
-    let picked = game
-        .cover_url
-        .iter()
-        .map(|url| ("", "p", url))
-        .chain(ArtworkKind::ALL.iter().filter_map(|kind| {
-            let url = game.artwork.get(kind)?;
-            Some((kind.cache_suffix(), kind.grid_suffix(), url))
-        }));
+    let picked =
+        game.cover_url
+            .iter()
+            .map(|url| ("", "p", url))
+            .chain(ArtworkKind::ALL.iter().filter_map(|kind| {
+                let url = game.artwork.get(kind)?;
+                Some((kind.cache_suffix(), kind.grid_suffix(), url))
+            }));
     for (cache_suffix, grid_suffix, url) in picked {
         let cached = asset_cache_path(&cache_dir, game.id, cache_suffix, image_extension(url));
         if cached.exists() {
@@ -326,7 +337,13 @@ fn add_shortcut(app: &AppHandle, game: &Game, user: &SteamUser) -> Result<(), Ap
         None => None,
     };
 
-    upsert_shortcut(shortcuts, game, app_id, &own_executable_path()?, icon.as_deref());
+    upsert_shortcut(
+        shortcuts,
+        game,
+        app_id,
+        &own_executable_path(&crate::env::process)?,
+        icon.as_deref(),
+    );
     write_shortcuts_file(vdf_path, &file).map_err(AppError::from)
 }
 
@@ -346,6 +363,7 @@ fn remove_shortcut(game_id: Uuid, user: &SteamUser) -> Result<(), AppError> {
 }
 
 #[derive(Debug, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 #[serde(tag = "status", rename_all = "snake_case")]
 pub enum SteamChange {
     /// `restarted_steam`: Steam was quit for the change and started again.
@@ -379,9 +397,7 @@ async fn change_steam(
 
 fn find_game(state: &State<ConfigState>, id: &str) -> Result<Game, String> {
     let game_id = Uuid::parse_str(id).map_err(|e| format!("Invalid game id: {e}"))?;
-    let config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let config = state.locked();
     config
         .games
         .iter()
@@ -419,7 +435,7 @@ pub async fn remove_from_steam(
 
 /// The ids of the games that have an entry in Steam. Empty without Steam,
 /// or if its shortcuts can't be read.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_steam_games(state: State<ConfigState>) -> Result<Vec<String>, AppError> {
     let Ok(user) = SteamUser::find() else {
         return Ok(Vec::new());
@@ -428,9 +444,7 @@ pub fn list_steam_games(state: State<ConfigState>) -> Result<Vec<String>, AppErr
         return Ok(Vec::new());
     };
     let shortcuts = binary_vdf::map_entry(&mut file, "shortcuts");
-    let config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let config = state.locked();
     Ok(config
         .games
         .iter()

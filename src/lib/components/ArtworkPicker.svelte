@@ -76,17 +76,24 @@
     }
   });
 
+  // Every search and asset list request gets a number; a response that
+  // arrives after a newer request was made (a quick switch between kinds,
+  // say) is dropped instead of showing the wrong kind's options.
+  let request = 0;
+
   async function handleSearch() {
     if (!query.trim()) return;
+    const current = ++request;
     loading = true;
     error = null;
     matches = [];
     try {
-      matches = await searchSteamGridDbGames(query);
+      const result = await searchSteamGridDbGames(query);
+      if (current === request) matches = result;
     } catch (e) {
-      error = e;
+      if (current === request) error = e;
     } finally {
-      loading = false;
+      if (current === request) loading = false;
     }
   }
 
@@ -97,20 +104,22 @@
   }
 
   async function loadAssets(steamgriddbId: number) {
+    const current = ++request;
     loading = true;
     error = null;
     assetOptions = [];
     try {
-      assetOptions =
+      const result =
         kind === "cover"
           ? await listSteamGridDbGrids(steamgriddbId)
           : kind === "icon"
             ? await listSteamGridDbIcons(steamgriddbId)
             : await listSteamGridDbArtwork(steamgriddbId, kind);
+      if (current === request) assetOptions = result;
     } catch (e) {
-      error = e;
+      if (current === request) error = e;
     } finally {
-      loading = false;
+      if (current === request) loading = false;
     }
   }
 
@@ -160,6 +169,8 @@
   }
 
   function backToSearch() {
+    request++;
+    loading = false;
     stage = "search";
     selectedGame = null;
     assetOptions = [];
@@ -168,10 +179,12 @@
 </script>
 
 <div class="picker">
-  <div class="kind-tabs">
+  <div class="kind-tabs" role="tablist">
     {#each Object.keys(kindLabels) as k (k)}
       <button
         type="button"
+        role="tab"
+        aria-selected={kind === k}
         class="kind-tab"
         class:active={kind === k}
         onclick={() => switchKind(k as Kind)}
@@ -216,7 +229,7 @@
     {:else if error}
       <p class="error">{backendError(error)}</p>
     {:else if matches.length === 0}
-      <p class="hint">{m.artworkPicker_noMatches( { query })}</p>
+      <p class="hint">{m.artworkPicker_noMatches({ query })}</p>
     {:else}
       <ul class="matches">
         {#each matches as match (match.id)}
@@ -235,13 +248,16 @@
     >
 
     {#if loading}
-      <p class="hint">{m.artworkPicker_loadingKind( { kind: kindLabels[kind] })}</p>
+      <p class="hint">{m.artworkPicker_loadingKind({ kind: kindLabels[kind] })}</p>
     {:else if error}
       <p class="error">{backendError(error)}</p>
     {:else if assetOptions.length === 0}
-      <p class="hint">{m.artworkPicker_noKindOptions( { kind: kindLabels[kind] })}</p>
+      <p class="hint">{m.artworkPicker_noKindOptions({ kind: kindLabels[kind] })}</p>
     {:else}
-      <div class="grid-options" class:landscape={kind === "wide" || kind === "hero" || kind === "logo"}>
+      <div
+        class="grid-options"
+        class:landscape={kind === "wide" || kind === "hero" || kind === "logo"}
+      >
         {#each assetOptions as asset (asset.id)}
           <button
             type="button"

@@ -1,6 +1,11 @@
 use super::*;
 
-fn globals() -> (PerformanceConfig, GraphicsConfig, MangoHudConfig, ProtonConfig) {
+fn globals() -> (
+    PerformanceConfig,
+    GraphicsConfig,
+    MangoHudConfig,
+    ProtonConfig,
+) {
     (
         PerformanceConfig {
             gamemode_enabled: true,
@@ -35,8 +40,7 @@ fn globals() -> (PerformanceConfig, GraphicsConfig, MangoHudConfig, ProtonConfig
 #[test]
 fn empty_overrides_keep_global_settings() {
     let (performance, graphics, mangohud, proton) = globals();
-    let settings =
-        GameOverrides::default().resolve(&performance, &graphics, &mangohud, &proton);
+    let settings = GameOverrides::default().resolve(&performance, &graphics, &mangohud, &proton);
     assert!(settings.performance.gamemode_enabled);
     assert!(settings.performance.power_profile_enabled);
     assert_eq!(settings.graphics.gamescope, graphics.gamescope);
@@ -119,7 +123,10 @@ fn games_without_overrides_deserialize() {
 #[test]
 fn launch_args_split_like_a_windows_command_line() {
     let split = |args: &str| split_launch_args(args).unwrap();
-    assert_eq!(split("  --launcher-skip   -dx11 "), ["--launcher-skip", "-dx11"]);
+    assert_eq!(
+        split("  --launcher-skip   -dx11 "),
+        ["--launcher-skip", "-dx11"]
+    );
     assert_eq!(
         split(r#"-path "C:\My Games\x" --name=O'Brien"#),
         ["-path", r"C:\My Games\x", "--name=O'Brien"]
@@ -133,8 +140,17 @@ fn launch_args_split_like_a_windows_command_line() {
 fn umu_ids_are_normalized() {
     assert_eq!(normalize_umu_id(None), None);
     assert_eq!(normalize_umu_id(Some("  ".into())), None);
-    assert_eq!(normalize_umu_id(Some(" 1091500 ".into())).as_deref(), Some("umu-1091500"));
-    assert_eq!(normalize_umu_id(Some("umu-61500".into())).as_deref(), Some("umu-61500"));
+    assert_eq!(
+        normalize_umu_id(Some(" 1091500 ".into())).as_deref(),
+        Some("umu-1091500")
+    );
+    assert_eq!(
+        normalize_umu_id(Some("umu-61500".into())).as_deref(),
+        Some("umu-61500")
+    );
     assert_eq!(normalize_umu_store(Some("none".into())), None);
-    assert_eq!(normalize_umu_store(Some("GOG".into())).as_deref(), Some("gog"));
+    assert_eq!(
+        normalize_umu_store(Some("GOG".into())).as_deref(),
+        Some("gog")
+    );
 }

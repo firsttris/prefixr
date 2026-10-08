@@ -1,117 +1,44 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
   import type { Game } from "$lib/types";
-  import type { GameRunState } from "$lib/stores/games";
-  import { getGameCover } from "$lib/stores/steamgriddb";
-  import ConfirmDialog from "./ConfirmDialog.svelte";
-  import { backendError } from "$lib/i18n/index.svelte";
+  import { killGame, launchGame, type GameRunState } from "$lib/stores/games";
+  import { exeIconUrl } from "$lib/stores/steamgriddb";
+  import GameActionsMenu from "./GameActionsMenu.svelte";
+  import GameFallbackIcon from "./GameFallbackIcon.svelte";
+  import GameItemNotices from "./GameItemNotices.svelte";
+  import { GameItem } from "./gameItem.svelte";
 
   let {
     game,
     runState,
     inSteam,
-    onLaunch,
-    onKill,
     onEdit,
+    onEditArtwork,
     onRemove,
-    onShowLog,
-    onCreateDesktopShortcut,
-    onCreateMenuShortcut,
     onExportToSteam,
     onRemoveFromSteam,
-    onEditArtwork,
   }: {
     game: Game;
     runState?: GameRunState;
     inSteam: boolean;
-    onLaunch: () => void;
-    onKill: () => void;
     onEdit: () => void;
+    onEditArtwork: () => void;
     onRemove: () => void;
-    onShowLog: (path: string) => void;
-    onCreateDesktopShortcut: () => Promise<void>;
-    onCreateMenuShortcut: () => Promise<void>;
     onExportToSteam: () => void;
     onRemoveFromSteam: () => void;
-    onEditArtwork: () => void;
   } = $props();
 
-  let shortcutState = $state<"idle" | "creating" | "done" | { error: unknown }>("idle");
-  let shortcutMenuOpen = $state(false);
-  let shortcutMenuUpward = $state(false);
-  let shortcutButtonEl: HTMLButtonElement | undefined;
-  let confirmingRemove = $state(false);
-
-  let coverSrc = $state<string | null>(null);
-
-  // Only these primitives decide which cover to show; depending on them
-  // instead of `game` keeps every games refresh (a new object per game)
-  // from fetching the cover again.
-  const gameId = $derived(game.id);
-  const coverUrl = $derived(game.cover_url);
-  const coverGridId = $derived(game.cover_grid_id);
-
-  $effect(() => {
-    if (!coverUrl) {
-      coverSrc = null;
-      return;
-    }
-    let stale = false;
-    getGameCover(gameId, coverGridId)
-      .then((src) => {
-        if (!stale) coverSrc = src;
-      })
-      .catch(() => {
-        if (!stale) coverSrc = null;
-      });
-    return () => {
-      stale = true;
-    };
-  });
-
-  function toggleShortcutMenu() {
-    if (!shortcutMenuOpen && shortcutButtonEl) {
-      const rect = shortcutButtonEl.getBoundingClientRect();
-      shortcutMenuUpward = window.innerHeight - rect.bottom < 200;
-    }
-    shortcutMenuOpen = !shortcutMenuOpen;
-  }
-
-  async function handleCreateShortcut(target: "desktop" | "menu") {
-    shortcutMenuOpen = false;
-    shortcutState = "creating";
-    try {
-      await (target === "desktop" ? onCreateDesktopShortcut() : onCreateMenuShortcut());
-      shortcutState = "done";
-      setTimeout(() => {
-        shortcutState = "idle";
-      }, 2000);
-    } catch (e) {
-      shortcutState = { error: e };
-    }
-  }
+  const item = new GameItem(() => game);
 </script>
 
 <div class="row" class:running={runState?.running}>
   <div class="thumb">
-    {#if coverSrc}
-      <img class="cover" src={coverSrc} alt="" loading="lazy" decoding="async" />
+    {#if item.coverSrc}
+      <img class="cover" src={item.coverSrc} alt="" loading="lazy" decoding="async" />
     {:else if game.icon}
-      <img class="icon" src={game.icon} alt="" />
+      <img class="icon" src={exeIconUrl(game)} alt="" />
     {:else}
-      <svg class="icon fallback" viewBox="0 0 64 40" aria-hidden="true">
-        <path
-          fill="#64748b"
-          d="M19 6h26a12 12 0 0 1 12 12v5a7 7 0 0 1-12.5 4.5L40 24H24l-4.5 3.5A7 7 0 0 1 7 23v-5A12 12 0 0 1 19 6z"
-        />
-        <ellipse cx="32" cy="11" rx="16" ry="4" fill="#fff" opacity="0.1" />
-        <rect x="15.5" y="11" width="3" height="12" rx="1.5" fill="#e2e8f0" />
-        <rect x="11" y="15.5" width="12" height="3" rx="1.5" fill="#e2e8f0" />
-        <circle cx="47" cy="12" r="2.2" fill="#22c55e" />
-        <circle cx="52" cy="17" r="2.2" fill="#ef4444" />
-        <circle cx="47" cy="22" r="2.2" fill="#eab308" />
-        <circle cx="42" cy="17" r="2.2" fill="#3b82f6" />
-      </svg>
+      <GameFallbackIcon class="icon fallback" />
     {/if}
   </div>
 
@@ -131,58 +58,17 @@
   </div>
 
   <div class="row-actions">
-    <div class="shortcut-menu">
-      <button
-        bind:this={shortcutButtonEl}
-        type="button"
-        class="icon-btn"
-        onclick={toggleShortcutMenu}
-        disabled={shortcutState === "creating"}
-        aria-haspopup="true"
-        aria-expanded={shortcutMenuOpen}
-        aria-label={m.gameCard_shortcutMenuLabel()}
-        title={m.gameCard_shortcutMenuLabel()}
-      >
-        {shortcutState === "done" ? "✓" : "🔗"}
-      </button>
-      {#if shortcutMenuOpen}
-        <div
-          class="menu-backdrop"
-          onclick={() => (shortcutMenuOpen = false)}
-          role="presentation"
-        ></div>
-        <div class="menu" class:menu-up={shortcutMenuUpward} role="menu">
-          <button type="button" role="menuitem" onclick={() => handleCreateShortcut("desktop")}>
-            {m.gameCard_menuDesktopShortcut()}
-          </button>
-          <button type="button" role="menuitem" onclick={() => handleCreateShortcut("menu")}>
-            {m.gameCard_menuMenuShortcut()}
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onclick={() => {
-              shortcutMenuOpen = false;
-              onExportToSteam();
-            }}
-          >
-            {inSteam ? m.gameCard_menuUpdateInSteam() : m.gameCard_menuAddToSteam()}
-          </button>
-          {#if inSteam}
-            <button
-              type="button"
-              role="menuitem"
-              onclick={() => {
-                shortcutMenuOpen = false;
-                onRemoveFromSteam();
-              }}
-            >
-              {m.gameCard_menuRemoveFromSteam()}
-            </button>
-          {/if}
-        </div>
-      {/if}
-    </div>
+    <GameActionsMenu
+      {item}
+      {inSteam}
+      label={m.gameCard_shortcutMenuLabel()}
+      {onEdit}
+      {onEditArtwork}
+      {onExportToSteam}
+      {onRemoveFromSteam}
+    >
+      {#snippet trigger()}{item.shortcutState === "done" ? "✓" : "🔗"}{/snippet}
+    </GameActionsMenu>
     <button
       type="button"
       class="icon-btn"
@@ -205,7 +91,7 @@
     <button
       type="button"
       class="icon-btn danger"
-      onclick={() => (confirmingRemove = true)}
+      onclick={() => (item.confirmingRemove = true)}
       aria-label={m.gameCard_removeAriaLabel()}
       title={m.gameCard_removeAriaLabel()}
     >
@@ -213,12 +99,14 @@
     </button>
 
     {#if runState?.running}
-      <button type="button" class="kill-sm" onclick={onKill}>{m.gameCard_kill()}</button>
+      <button type="button" class="kill-sm" onclick={() => killGame(game.id)}
+        >{m.gameCard_kill()}</button
+      >
     {:else}
       <button
         type="button"
         class="primary start-sm"
-        onclick={onLaunch}
+        onclick={() => launchGame(game.id)}
         disabled={runState?.initializing}
       >
         {runState?.initializing ? m.gameCard_initializingShort() : m.gameCard_start()}
@@ -227,36 +115,7 @@
   </div>
 </div>
 
-{#if runState?.error}
-  <div class="toast">
-    <span>{backendError(runState.error)}</span>
-    {#if runState.logPath}
-      <button type="button" class="ghost" onclick={() => onShowLog(runState.logPath!)}>
-        {m.gameCard_showLog()}
-      </button>
-    {/if}
-  </div>
-{/if}
-
-{#if typeof shortcutState === "object"}
-  <div class="toast">
-    <span>{m.gameCard_shortcutFailed( { error: backendError(shortcutState.error) })}</span>
-  </div>
-{/if}
-
-<ConfirmDialog
-  open={confirmingRemove}
-  title={m.gameCard_removeConfirmTitle()}
-  message={m.gameCard_removeConfirmMessage( {
-    name: game.name,
-    steamPart: inSteam ? m.gameCard_removeConfirmSteamPart() : "",
-  })}
-  onConfirm={() => {
-    confirmingRemove = false;
-    onRemove();
-  }}
-  onCancel={() => (confirmingRemove = false)}
-/>
+<GameItemNotices {game} {item} {runState} {inSteam} inline {onRemove} />
 
 <style>
   .row {
@@ -297,7 +156,7 @@
     object-fit: cover;
   }
 
-  .thumb .icon {
+  .thumb :global(.icon) {
     width: 1.7em;
     height: 1.7em;
     object-fit: contain;
@@ -385,51 +244,6 @@
     gap: 0.4em;
   }
 
-  .shortcut-menu {
-    position: relative;
-    display: flex;
-  }
-
-  .menu-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 10;
-  }
-
-  .menu {
-    position: absolute;
-    top: calc(100% + 0.3em);
-    right: 0;
-    z-index: 11;
-    display: flex;
-    flex-direction: column;
-    min-width: 9.5em;
-    background: var(--surface-raised);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 0.3em;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-  }
-
-  .menu.menu-up {
-    top: auto;
-    bottom: calc(100% + 0.3em);
-  }
-
-  .menu button {
-    text-align: left;
-    background: transparent;
-    border: none;
-    padding: 0.5em 0.6em;
-    border-radius: 6px;
-    font-size: 0.85em;
-    color: var(--text);
-  }
-
-  .menu button:hover {
-    background: var(--surface);
-  }
-
   .divider {
     flex-shrink: 0;
     width: 1px;
@@ -453,17 +267,5 @@
 
   .kill-sm:hover:not(:disabled) {
     border-color: var(--danger);
-  }
-
-  .toast {
-    display: flex;
-    align-items: center;
-    gap: 0.6em;
-    background: var(--danger-bg);
-    color: var(--danger);
-    border-radius: 8px;
-    padding: 0.5em 0.8em;
-    margin-top: 0.4em;
-    font-size: 0.85em;
   }
 </style>

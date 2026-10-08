@@ -1,9 +1,12 @@
 [package]
 name = "prefixr"
 version = "0.1.1"
-description = "A Tauri App"
-authors = ["you"]
+description = "A native Linux app for managing Wine and Proton prefixes to run Windows games"
+authors = ["Tristan Teufel"]
+license = "MIT"
 edition = "2021"
+# `File::try_lock` (see `lock_launch_file`) is stable since 1.89.
+rust-version = "1.89"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -37,6 +40,10 @@ image = { version = "0.25", default-features = false, features = ["png", "bmp", 
 base64 = "0.22"
 sha2 = "0.10"
 libc = "0.2"
+
+[dev-dependencies]
+tempfile = "3"
+ts-rs = { version = "12", features = ["uuid-impl", "no-serde-warnings"] }
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

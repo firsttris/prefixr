@@ -2,7 +2,10 @@ use super::client;
 
 #[test]
 fn client_builds_https_requests() {
-    let request = client().get("https://example.invalid/test").build().unwrap();
+    let request = client()
+        .get("https://example.invalid/test")
+        .build()
+        .unwrap();
 
     assert_eq!(request.method(), reqwest::Method::GET);
     assert_eq!(request.url().as_str(), "https://example.invalid/test");
