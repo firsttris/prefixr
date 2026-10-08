@@ -6,17 +6,12 @@
     gameRunState,
     refreshGames,
     removeGame,
-    launchGame,
-    killGame,
     initGameEvents,
-    createDesktopShortcut,
-    createMenuShortcut,
     exportToSteam,
     removeFromSteam,
     steamGameIds,
     refreshSteamGames,
   } from "$lib/stores/games";
-  import { showLog } from "$lib/logViewer";
   import { backendError } from "$lib/i18n/index.svelte";
   import GameCard from "./GameCard.svelte";
   import GameListRow from "./GameListRow.svelte";
@@ -214,16 +209,11 @@
         {game}
         runState={$gameRunState[game.id]}
         inSteam={$steamGameIds.has(game.id)}
-        onLaunch={() => launchGame(game.id)}
-        onKill={() => killGame(game.id)}
         onEdit={() => onEdit(game)}
+        onEditArtwork={() => onEditArtwork(game)}
         onRemove={() => handleRemove(game)}
-        onShowLog={showLog}
-        onCreateDesktopShortcut={() => createDesktopShortcut(game.id)}
-        onCreateMenuShortcut={() => createMenuShortcut(game.id)}
         onExportToSteam={() => runSteamAction(game, "export")}
         onRemoveFromSteam={() => runSteamAction(game, "remove")}
-        onEditArtwork={() => onEditArtwork(game)}
       />
     {/each}
   </div>
@@ -234,16 +224,11 @@
         {game}
         runState={$gameRunState[game.id]}
         inSteam={$steamGameIds.has(game.id)}
-        onLaunch={() => launchGame(game.id)}
-        onKill={() => killGame(game.id)}
         onEdit={() => onEdit(game)}
+        onEditArtwork={() => onEditArtwork(game)}
         onRemove={() => handleRemove(game)}
-        onShowLog={showLog}
-        onCreateDesktopShortcut={() => createDesktopShortcut(game.id)}
-        onCreateMenuShortcut={() => createMenuShortcut(game.id)}
         onExportToSteam={() => runSteamAction(game, "export")}
         onRemoveFromSteam={() => runSteamAction(game, "remove")}
-        onEditArtwork={() => onEditArtwork(game)}
       />
     {/each}
   </div>
