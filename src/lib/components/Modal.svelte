@@ -26,17 +26,13 @@
 <svelte:window onkeydown={open ? handleKeydown : undefined} />
 
 {#if open}
-  <div class="backdrop" onclick={onClose} role="presentation">
-    <div
-      class="panel"
-      class:wide
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
-      tabindex="-1"
-      onclick={(e) => e.stopPropagation()}
-      onkeydown={(e) => e.stopPropagation()}
-    >
+  <!-- Only a click on the backdrop itself closes, not one inside the panel. -->
+  <div
+    class="backdrop"
+    onclick={(e) => e.target === e.currentTarget && onClose()}
+    role="presentation"
+  >
+    <div class="panel" class:wide role="dialog" aria-modal="true" aria-label={title} tabindex="-1">
       <header>
         <h2>{title}</h2>
         <button type="button" class="ghost" onclick={onClose} aria-label={m.common_close()}
