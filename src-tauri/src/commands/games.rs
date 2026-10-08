@@ -15,7 +15,7 @@ use uuid::Uuid;
 
 use crate::commands::github::read_token;
 use crate::commands::graphics_layers::{ensure_directx_layer_cache, ensure_wine_mono_msi};
-use crate::commands::icons::{exe_icon_path, extract_icon_png, png_data_url, store_exe_icon};
+use crate::commands::icons::{exe_icon_path, extract_icon_png, save_exe_icon};
 use crate::commands::logs::{game_log_dir, new_log_file, prefix_log_dir};
 use crate::locale::LocaleState;
 use crate::commands::graphics::{ensure_vkbasalt_conf, vkbasalt_conf_path};
@@ -561,8 +561,7 @@ pub fn add_game(
     let icon = extract_icon_png(&game.exe_path);
     let (umu_id, umu_store) = umu_fields(game.umu_id, game.umu_store);
     let id = Uuid::new_v4();
-    // Best-effort, like the icon itself: it's only cosmetic.
-    let _ = store_exe_icon(&app, id, icon.as_deref());
+    let icon = save_exe_icon(&app, id, icon.as_deref());
     let new_game = Game {
         id,
         name: game.name,
@@ -571,7 +570,7 @@ pub fn add_game(
         runner_id: game.runner_id,
         env_vars: game.env_vars,
         launch_args: game.launch_args,
-        icon: icon.as_deref().map(png_data_url),
+        icon,
         steamgriddb_id: None,
         cover_grid_id: None,
         cover_url: None,
@@ -612,17 +611,14 @@ pub fn update_game(
         let existing = &config.games[find(&config.games)?];
         existing.exe_path != game.exe_path || existing.icon.is_none()
     };
-    let icon = needs_icon.then(|| extract_icon_png(&game.exe_path));
-    if let Some(icon) = &icon {
-        let _ = store_exe_icon(&app, game_id, icon.as_deref());
-    }
+    let icon = needs_icon.then(|| save_exe_icon(&app, game_id, extract_icon_png(&game.exe_path).as_deref()));
 
     let mut config = state.locked();
     let index = find(&config.games)?;
     let existing = &mut config.games[index];
 
     if let Some(icon) = icon {
-        existing.icon = icon.as_deref().map(png_data_url);
+        existing.icon = icon;
     }
     existing.name = game.name;
     existing.exe_path = game.exe_path;

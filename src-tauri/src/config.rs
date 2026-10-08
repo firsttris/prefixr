@@ -103,21 +103,20 @@ fn fix_prefix_paths(config: &mut AppConfig) {
     }
 }
 
-/// Fills in each game's exe icon from its file (see `icons::exe_icon_path`).
-/// A config from before those files existed still has the icons inline:
-/// they're moved to files here, and `save_config` leaves them out from then
-/// on. Best-effort throughout, the icons are only cosmetic.
+/// Fills in each game's exe icon path (see `icons::exe_icon_path`). A
+/// config from before those files existed still has the icons inline as
+/// `data:` URIs: they're moved to files here, and `save_config` leaves the
+/// field out from then on. Best-effort throughout, the icons are only
+/// cosmetic.
 fn load_icons(app: &AppHandle, config: &mut AppConfig) {
     for game in &mut config.games {
-        match &game.icon {
-            Some(data_url) => {
-                let missing = icons::exe_icon_path(app, game.id).is_ok_and(|path| !path.exists());
-                if let (true, Some(png)) = (missing, icons::data_url_png(data_url)) {
-                    let _ = icons::store_exe_icon(app, game.id, Some(&png));
-                }
+        if let Some(data_url) = &game.icon {
+            let missing = icons::exe_icon_path(app, game.id).is_ok_and(|path| !path.exists());
+            if let (true, Some(png)) = (missing, icons::data_url_png(data_url)) {
+                let _ = icons::store_exe_icon(app, game.id, Some(&png));
             }
-            None => game.icon = icons::load_exe_icon(app, game.id),
         }
+        game.icon = icons::exe_icon_file(app, game.id);
     }
 }
 

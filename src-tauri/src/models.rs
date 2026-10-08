@@ -48,9 +48,12 @@ pub struct Game {
     /// launch time by `split_launch_args`.
     #[serde(default)]
     pub launch_args: String,
-    /// The exe's embedded icon, as a `data:image/png;base64,...` URI.
-    /// Extracted once when the game is added/updated; `None` if the exe has
-    /// no icon resource or it couldn't be parsed.
+    /// The path of the exe's embedded icon, saved as a PNG (see
+    /// `icons::exe_icon_path`), which the frontend loads through the asset
+    /// protocol. Extracted once when the game is added/updated; `None` if
+    /// the exe has no icon resource or it couldn't be parsed. Never written
+    /// to `config.json`, where versions before the file kept the icon
+    /// itself as a `data:` URI (see `config::load_icons`).
     #[serde(default)]
     pub icon: Option<String>,
     /// The matched SteamGridDB *game* id, so re-opening the cover picker (or

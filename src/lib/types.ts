@@ -19,6 +19,7 @@ export interface Game {
   runner_id: string;
   env_vars: Record<string, string>;
   launch_args: string;
+  // Path of the exe's own icon (a PNG); show it via exeIconUrl().
   icon: string | null;
   steamgriddb_id: number | null;
   cover_grid_id: number | null;

@@ -27,16 +27,9 @@ pub fn extract_icon_png(exe_path: &Path) -> Option<Vec<u8>> {
     Some(png_bytes)
 }
 
-/// A PNG as the `data:` URI the frontend shows as `Game::icon`.
-pub fn png_data_url(png: &[u8]) -> String {
-    format!("data:image/png;base64,{}", STANDARD.encode(png))
-}
-
-/// Where a game's exe icon is kept. Only in memory is it part of the
-/// `Game` (as `icon`), for the frontend; `config.json` leaves it out (see
-/// `config::save_config`), since a few dozen KB per game would otherwise
-/// make up nearly all of that file, rewritten on every settings change.
-/// Also what a shortcut's `Icon=` points to, as a real file.
+/// Where a game's exe icon is kept: what the frontend shows (through the
+/// asset protocol, scoped to this directory in tauri.conf.json) and what a
+/// shortcut's `Icon=` points to.
 pub fn exe_icon_path(app: &AppHandle, id: Uuid) -> Result<PathBuf, String> {
     Ok(app
         .path()
@@ -44,6 +37,14 @@ pub fn exe_icon_path(app: &AppHandle, id: Uuid) -> Result<PathBuf, String> {
         .map_err(|e| format!("Could not resolve data directory: {e}"))?
         .join("exe-icons")
         .join(format!("{id}.png")))
+}
+
+/// Saves a game's exe icon, or removes the old one when there is none, and
+/// returns what `Game::icon` should be now.
+pub fn save_exe_icon(app: &AppHandle, id: Uuid, png: Option<&[u8]>) -> Option<String> {
+    // Best-effort: the icon is only cosmetic.
+    store_exe_icon(app, id, png).ok()?;
+    png.and_then(|_| exe_icon_file(app, id))
 }
 
 /// Saves a game's exe icon, or removes the old one when there is none.
@@ -63,10 +64,10 @@ pub fn store_exe_icon(app: &AppHandle, id: Uuid, png: Option<&[u8]>) -> Result<(
     fs::write(&path, png).map_err(|e| format!("Could not write {}: {e}", path.display()))
 }
 
-/// A game's saved exe icon as a `data:` URI, if it has one.
-pub fn load_exe_icon(app: &AppHandle, id: Uuid) -> Option<String> {
-    let png = fs::read(exe_icon_path(app, id).ok()?).ok()?;
-    Some(png_data_url(&png))
+/// The path of a game's saved exe icon, if it has one, as `Game::icon`.
+pub fn exe_icon_file(app: &AppHandle, id: Uuid) -> Option<String> {
+    let path = exe_icon_path(app, id).ok()?;
+    path.is_file().then(|| path.to_string_lossy().into_owned())
 }
 
 /// The PNG inside an icon `data:` URI, as older versions kept in

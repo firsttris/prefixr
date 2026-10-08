@@ -2,7 +2,7 @@
   import * as m from "$lib/paraglide/messages";
   import type { Game } from "$lib/types";
   import type { GameRunState } from "$lib/stores/games";
-  import { getGameCover } from "$lib/stores/steamgriddb";
+  import { exeIconUrl, getGameCover } from "$lib/stores/steamgriddb";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import { backendError } from "$lib/i18n/index.svelte";
 
@@ -99,7 +99,7 @@
     {:else}
       <div class="cover placeholder">
         {#if game.icon}
-          <img class="icon" src={game.icon} alt="" />
+          <img class="icon" src={exeIconUrl(game)} alt="" />
         {:else}
           <svg class="icon fallback" viewBox="0 0 64 40" aria-hidden="true">
             <path

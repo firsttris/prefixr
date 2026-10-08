@@ -2,6 +2,7 @@ import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { writable } from "svelte/store";
 import type {
   ArtworkKind,
+  Game,
   SteamGridDbConfig,
   SteamGridDbGameMatch,
   SteamGridDbGrid,
@@ -55,6 +56,14 @@ export async function removeGameCover(gameId: string): Promise<void> {
 function artworkUrl(path: string | null, version: number | null): string | null {
   if (!path) return null;
   return version == null ? convertFileSrc(path) : `${convertFileSrc(path)}?v=${version}`;
+}
+
+/**
+ * An asset-protocol URL for a game's exe icon, if it has one. Its file is
+ * rewritten when the exe changes, so the exe path tells the versions apart.
+ */
+export function exeIconUrl(game: Game): string | null {
+  return game.icon ? `${convertFileSrc(game.icon)}?v=${encodeURIComponent(game.exe_path)}` : null;
 }
 
 export async function getGameCover(gameId: string, version: number | null = null): Promise<string | null> {
