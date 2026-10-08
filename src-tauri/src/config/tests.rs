@@ -52,7 +52,10 @@ fn migrates_flat_performance_and_overrides() {
     assert_eq!(overrides.overlay.enabled, Some(false));
     assert!(overrides.performance.gamemode_enabled.is_none());
     assert!(overrides.graphics.vkbasalt.is_none());
-    assert_eq!(overrides.graphics.gamescope.as_ref().unwrap().width, Some(800));
+    assert_eq!(
+        overrides.graphics.gamescope.as_ref().unwrap().width,
+        Some(800)
+    );
     assert_eq!(overrides.proton.get("PROTON_ENABLE_HDR"), Some(&true));
 }
 

@@ -1,9 +1,9 @@
-use crate::test_util::TestDir;
 use super::{
     is_verb_name, looks_like_winetricks, parse_verb_catalogue, read_installed_verbs,
     uses_umu_winetricks,
 };
 use crate::models::{Runner, RunnerKind};
+use crate::test_util::TestDir;
 use std::fs;
 
 fn temp_path(name: &str) -> TestDir {
@@ -48,11 +48,7 @@ load_physx()
                 "dlls".to_string(),
                 "Visual C++ 2022".to_string(),
             ),
-            (
-                "physx".to_string(),
-                "dlls".to_string(),
-                "physx".to_string(),
-            ),
+            ("physx".to_string(), "dlls".to_string(), "physx".to_string(),),
         ]
     );
 }
@@ -74,18 +70,13 @@ fn reads_installed_winetricks_verbs_and_ignores_blank_lines() {
             "dxvk".to_string(),
         ]
     );
-
 }
 
 #[test]
 fn missing_winetricks_log_is_not_an_error() {
     let prefix = temp_path("winetricks-missing-log");
 
-    assert_eq!(
-        read_installed_verbs(&prefix).unwrap(),
-        Vec::<String>::new()
-    );
-
+    assert_eq!(read_installed_verbs(&prefix).unwrap(), Vec::<String>::new());
 }
 
 #[test]
@@ -109,7 +100,6 @@ fn uses_umu_winetricks_only_for_proton_with_bundled_script() {
 
     assert!(uses_umu_winetricks(&proton_runner));
     assert!(!uses_umu_winetricks(&wine_runner));
-
 }
 
 #[test]
@@ -117,13 +107,21 @@ fn only_the_winetricks_script_is_accepted() {
     assert!(looks_like_winetricks(
         b"#!/bin/sh\n# comment\nWINETRICKS_VERSION=20260125-next\nw_metadata vcrun2022 dlls \\\n"
     ));
-    assert!(!looks_like_winetricks(b"<!DOCTYPE html><html>Sign in to the network</html>"));
+    assert!(!looks_like_winetricks(
+        b"<!DOCTYPE html><html>Sign in to the network</html>"
+    ));
     assert!(!looks_like_winetricks(b"#!/bin/sh\necho no version here\n"));
 }
 
 #[test]
 fn only_verb_shaped_names_are_passed_to_winetricks() {
-    for verb in ["vcrun2022", "d3dx9_43", "dotnet48", "corefonts", "renderer=vulkan"] {
+    for verb in [
+        "vcrun2022",
+        "d3dx9_43",
+        "dotnet48",
+        "corefonts",
+        "renderer=vulkan",
+    ] {
         assert!(is_verb_name(verb), "{verb}");
     }
     for verb in ["", "--self-update", "-q", "VCRUN", "a b", "x;rm", "../x"] {

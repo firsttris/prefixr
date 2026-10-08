@@ -13,7 +13,12 @@ fn entries() -> Vec<IndexedEntry> {
     index(vec![
         entry("Borderlands 3", "umu-397540", Some("bl3"), "egs"),
         entry("Borderlands 2", "umu-49520", Some("bl2"), "egs"),
-        entry("Tiny Tina's Assault on Dragon Keep", "umu-1712840", None, "egs"),
+        entry(
+            "Tiny Tina's Assault on Dragon Keep",
+            "umu-1712840",
+            None,
+            "egs",
+        ),
         entry("Cyberpunk 2077", "umu-1091500", None, "egs"),
         entry("Cyberpunk 2077", "umu-1091500", None, "gog"),
         entry("Dark and Darker", "umu-2016590", Some("dad"), "none"),

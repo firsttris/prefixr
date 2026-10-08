@@ -10,12 +10,12 @@ use tauri::{AppHandle, Manager, State};
 use crate::commands::games::{log_stdio, prepare_prefix, steer_profile_to_steamuser};
 use crate::commands::github::read_token;
 use crate::commands::logs::{new_log_file, prefix_log_dir};
+use crate::commands::prefixes::known_prefix;
 use crate::commands::runners::{
     find_runner, runner_command, umu_command, wine_binary, wineserver_binary,
 };
-use crate::lock::LockExt;
-use crate::commands::prefixes::known_prefix;
 use crate::config::ConfigState;
+use crate::lock::LockExt;
 use crate::models::{Runner, RunnerKind};
 
 fn winetricks_script_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -74,7 +74,10 @@ async fn ensure_winetricks_script(app: &AppHandle) -> Result<PathBuf, String> {
 /// made executable and run as is.
 fn looks_like_winetricks(bytes: &[u8]) -> bool {
     let text = String::from_utf8_lossy(bytes);
-    text.starts_with("#!/bin/sh") && text.lines().any(|line| line.starts_with("WINETRICKS_VERSION="))
+    text.starts_with("#!/bin/sh")
+        && text
+            .lines()
+            .any(|line| line.starts_with("WINETRICKS_VERSION="))
 }
 
 /// Downloads the current winetricks from its `master` branch to `path`.
@@ -96,7 +99,9 @@ async fn download_script(path: &Path) -> Result<(), String> {
         .await
         .map_err(|e| format!("Could not download winetricks: {e}"))?;
     if !looks_like_winetricks(&bytes) {
-        return Err("Could not download winetricks: the response is not the winetricks script".to_string());
+        return Err(
+            "Could not download winetricks: the response is not the winetricks script".to_string(),
+        );
     }
 
     // Made executable under another name first and renamed into place, so
@@ -162,10 +167,12 @@ fn parse_verb_catalogue(script: &str) -> Vec<WinetricksVerbMeta> {
 /// shows a small curated subset front-and-center and this behind a "search
 /// everything else" disclosure, rather than a flat 370-item list.
 #[tauri::command]
-pub async fn list_all_winetricks_verbs(app: AppHandle) -> Result<Vec<WinetricksVerbMeta>, AppError> {
+pub async fn list_all_winetricks_verbs(
+    app: AppHandle,
+) -> Result<Vec<WinetricksVerbMeta>, AppError> {
     let script = ensure_winetricks_script(&app).await?;
-    let text =
-        fs::read_to_string(&script).map_err(|e| format!("Could not read winetricks script: {e}"))?;
+    let text = fs::read_to_string(&script)
+        .map_err(|e| format!("Could not read winetricks script: {e}"))?;
     Ok(parse_verb_catalogue(&text))
 }
 
@@ -233,7 +240,10 @@ pub async fn install_winetricks_verbs(
 
     let (runners_dir, prefix) = {
         let config = state.locked();
-        (config.runners_dir.clone(), known_prefix(&config, &prefix_path)?)
+        (
+            config.runners_dir.clone(),
+            known_prefix(&config, &prefix_path)?,
+        )
     };
     let token = read_token(&state);
 

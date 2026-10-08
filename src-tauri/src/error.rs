@@ -16,13 +16,17 @@ use crate::locale::Locale;
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "code", rename_all = "snake_case")]
 pub enum AppError {
-    Other { message: String },
+    Other {
+        message: String,
+    },
     /// games::launch_game — the game is already starting or running.
     GameAlreadyRunning,
     /// games::remove_game — the game is still starting or running.
     GameRunning,
     /// prefixes::delete_prefix — a game using this prefix is still running.
-    PrefixInUse { game_name: String },
+    PrefixInUse {
+        game_name: String,
+    },
     /// steam::stop_steam — the `steam` binary isn't on PATH, so Prefixr
     /// can't ask a running Steam to quit for the shortcuts change.
     SteamCommandNotFound,
@@ -38,7 +42,9 @@ pub enum AppError {
     NoSteamAccountFound,
     /// steam::read_shortcuts_file — the existing shortcuts.vdf didn't parse;
     /// left untouched rather than risking data loss by overwriting it.
-    ShortcutsVdfUnreadable { error: String },
+    ShortcutsVdfUnreadable {
+        error: String,
+    },
     /// winetricks::install_winetricks_verbs — called with an empty selection.
     NoPackagesSelected,
     /// models::parse_launch_args — an odd number of `"` in the launch args.
@@ -46,47 +52,78 @@ pub enum AppError {
     /// performance::fix_max_map_count — `pkexec` isn't installed, so the fix
     /// can't be applied automatically; `command` is the manual fallback
     /// shell command, shown verbatim regardless of language.
-    PkexecNotInstalled { command: String },
+    PkexecNotInstalled {
+        command: String,
+    },
     /// performance::fix_max_map_count — the `pkexec sysctl` call itself
     /// failed or was cancelled (e.g. the PolicyKit prompt was dismissed).
-    SysctlChangeFailed { status: String },
+    SysctlChangeFailed {
+        status: String,
+    },
     /// runners::delete_runner — still used by one or more games; `games` is
     /// their names, already joined for display (e.g. „A“, „B“).
-    RunnerInUse { runner_name: String, games: String },
+    RunnerInUse {
+        runner_name: String,
+        games: String,
+    },
     /// winetricks::install_winetricks_verbs — the prefix wasn't ready
     /// (readying it failed before winetricks itself even ran); also reused
     /// by wine_tools::launch_wine_tool and games::run_installer for the same
     /// "readying the prefix failed" case. `message` is the underlying
     /// (often technical/untranslated) failure.
-    WithLogDetails { message: String, log_path: String },
+    WithLogDetails {
+        message: String,
+        log_path: String,
+    },
     /// winetricks::install_winetricks_verbs — the winetricks process itself
     /// exited with a non-zero status.
-    WinetricksFailed { status: String, log_path: String },
+    WinetricksFailed {
+        status: String,
+        log_path: String,
+    },
     /// prefixes::add_prefix — the path is already a known prefix.
-    PrefixAlreadyExists { path: String },
+    PrefixAlreadyExists {
+        path: String,
+    },
     /// prefixes::add_prefix — the path exists but isn't a directory.
-    PathNotADirectory { path: String },
+    PathNotADirectory {
+        path: String,
+    },
     /// prefixes::add_prefix — the folder has files in it that don't look
     /// like an existing Wine/Proton prefix (no `drive_c`).
-    PrefixDirNotEmpty { path: String },
+    PrefixDirNotEmpty {
+        path: String,
+    },
     /// runner_downloads::download_runner — a runner with this tag/version is
     /// already installed.
-    RunnerAlreadyExists { tag: String },
+    RunnerAlreadyExists {
+        tag: String,
+    },
     /// runner_downloads — GitHub's unauthenticated rate limit was hit; a
     /// token in Settings raises it (see `GitHubSettings.svelte`).
     GitHubRateLimited,
     /// runner_downloads — the GitHub API returned some other non-success
     /// status.
-    GitHubApiError { status: String },
+    GitHubApiError {
+        status: String,
+    },
     /// wine_tools::launch_wine_tool — the tool's process itself failed to
     /// spawn (after the prefix was readied successfully).
-    ToolLaunchFailed { tool: String, error: String },
+    ToolLaunchFailed {
+        tool: String,
+        error: String,
+    },
     /// games::run_installer — the installer's process itself failed to
     /// spawn (after the prefix was readied successfully).
-    SetupLaunchFailed { error: String, log_path: String },
+    SetupLaunchFailed {
+        error: String,
+        log_path: String,
+    },
     /// wine_tools::launch_wine_tool — `tool` isn't one of the fixed set the
     /// frontend offers; unreachable in normal use (defense in depth).
-    UnknownWineTool { tool: String },
+    UnknownWineTool {
+        tool: String,
+    },
 }
 
 impl From<String> for AppError {

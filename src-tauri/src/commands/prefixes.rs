@@ -5,8 +5,8 @@ use std::path::{Path, PathBuf};
 use tauri::{AppHandle, State};
 
 use crate::commands::games::LaunchingGames;
-use crate::lock::LockExt;
 use crate::config::{save_config, AppConfig, ConfigState};
+use crate::lock::LockExt;
 use crate::models::PrefixInfo;
 
 /// The folder to use as `WINEPREFIX` for a folder the user picked. A Proton

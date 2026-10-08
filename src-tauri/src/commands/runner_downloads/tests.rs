@@ -4,12 +4,18 @@ use crate::test_util::TestDir;
 #[test]
 fn checksum_asset_names_match_real_releases() {
     // Real asset-name pairs, sampled from each source's GitHub releases.
-    assert_eq!(strip_tar_gz("GE-Proton11-7-x86_64.tar.gz"), "GE-Proton11-7-x86_64.sha512sum");
+    assert_eq!(
+        strip_tar_gz("GE-Proton11-7-x86_64.tar.gz"),
+        "GE-Proton11-7-x86_64.sha512sum"
+    );
     assert_eq!(
         strip_tar_xz("proton-cachyos-11.0-20260703-slr-x86_64.tar.xz"),
         "proton-cachyos-11.0-20260703-slr-x86_64.sha512sum"
     );
-    assert_eq!(shared_sha256sums_name("wine-11.18-staging-amd64-wow64.tar.xz"), "sha256sums.txt");
+    assert_eq!(
+        shared_sha256sums_name("wine-11.18-staging-amd64-wow64.tar.xz"),
+        "sha256sums.txt"
+    );
 }
 
 #[test]
@@ -31,7 +37,10 @@ f899879b8c37e0b20adca19d147cf77436f3f1a37bf16d08d27fa7137a52b9ba  wine-11.18-amd
         extract_shared_digest(contents, "wine-11.18-amd64-wow64.tar.xz"),
         Some("f899879b8c37e0b20adca19d147cf77436f3f1a37bf16d08d27fa7137a52b9ba".to_string())
     );
-    assert_eq!(extract_shared_digest(contents, "wine-11.18-nonexistent.tar.xz"), None);
+    assert_eq!(
+        extract_shared_digest(contents, "wine-11.18-nonexistent.tar.xz"),
+        None
+    );
 }
 
 #[test]
@@ -46,8 +55,12 @@ fn extract_shared_digest_strips_binary_mode_marker() {
 #[test]
 fn asset_matchers_pick_the_right_asset() {
     // Real release asset names, sampled from each source's GitHub API.
-    assert!((find_source("proton-ge").unwrap().matches_asset)("GE-Proton9-20.tar.gz"));
-    assert!(!(find_source("proton-ge").unwrap().matches_asset)("GE-Proton9-20.sha512sum"));
+    assert!((find_source("proton-ge").unwrap().matches_asset)(
+        "GE-Proton9-20.tar.gz"
+    ));
+    assert!(!(find_source("proton-ge").unwrap().matches_asset)(
+        "GE-Proton9-20.sha512sum"
+    ));
 
     assert!((find_source("wine-kron4ek").unwrap().matches_asset)(
         "wine-11.18-staging-amd64-wow64.tar.xz"
@@ -64,7 +77,9 @@ fn asset_matchers_pick_the_right_asset() {
     assert!(!(find_source("wine-kron4ek").unwrap().matches_asset)(
         "wine-11.18-staging-x86.tar.xz"
     ));
-    assert!(!(find_source("wine-kron4ek").unwrap().matches_asset)("sha256sums.txt"));
+    assert!(!(find_source("wine-kron4ek").unwrap().matches_asset)(
+        "sha256sums.txt"
+    ));
 
     assert!((find_source("proton-cachyos").unwrap().matches_asset)(
         "proton-cachyos-11.0-20260703-slr-x86_64.tar.xz"
@@ -82,7 +97,10 @@ fn download_requests_are_checked() {
     let source = find_source("proton-ge").unwrap();
     let base = "https://github.com/GloriousEggroll/proton-ge-custom/releases/download";
     assert_eq!(
-        parse_download_url(source, &format!("{base}/GE-Proton11-7/GE-Proton11-7.tar.gz")),
+        parse_download_url(
+            source,
+            &format!("{base}/GE-Proton11-7/GE-Proton11-7.tar.gz")
+        ),
         Ok(DownloadRequest {
             tag: "GE-Proton11-7".to_string(),
             asset_name: "GE-Proton11-7.tar.gz".to_string(),
@@ -127,7 +145,6 @@ fn move_renames_the_extracted_dir_and_cleans_up() {
 
     move_extracted_dir(&other, &dir.join("wine-11.18")).unwrap();
     assert!(dir.join("wine-11.18").is_dir());
-
 }
 
 #[test]
@@ -140,7 +157,6 @@ fn move_rejects_archives_without_a_single_dir() {
     assert!(move_extracted_dir(&extract, &dir.join("target")).is_err());
     assert!(!extract.exists());
     assert!(!dir.join("target").exists());
-
 }
 
 fn replace_dir_fixture(name: &str) -> (TestDir, PathBuf, PathBuf) {

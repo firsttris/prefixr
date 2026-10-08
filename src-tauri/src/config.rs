@@ -78,8 +78,8 @@ pub fn load_config(app: &AppHandle) -> Result<AppConfig, String> {
         return AppConfig::default_for(app);
     }
     let invalid = |e: &dyn std::fmt::Display| format!("{} is invalid: {e}", path.display());
-    let raw = fs::read_to_string(&path)
-        .map_err(|e| format!("Could not read {}: {e}", path.display()))?;
+    let raw =
+        fs::read_to_string(&path).map_err(|e| format!("Could not read {}: {e}", path.display()))?;
     let mut value: Value = serde_json::from_str(&raw).map_err(|e| invalid(&e))?;
     migrate(&mut value);
     let mut config: AppConfig = serde_json::from_value(value).map_err(|e| invalid(&e))?;
@@ -156,7 +156,8 @@ fn migrate(config: &mut Value) {
                     .filter_map(|(k, v)| Some((k.strip_prefix(prefix)?.to_string(), v.clone())))
                     .collect()
             };
-            let graphics = json!({ "gamescope": take("gamescope_"), "vkbasalt": take("vkbasalt_") });
+            let graphics =
+                json!({ "gamescope": take("gamescope_"), "vkbasalt": take("vkbasalt_") });
             config.insert("graphics".to_string(), graphics);
         }
     }
@@ -209,5 +210,5 @@ pub fn save_config(app: &AppHandle, config: &AppConfig) -> Result<(), String> {
     fs::rename(&tmp, &path).map_err(|e| format!("Could not write config file: {e}"))
 }
 
-    #[cfg(test)]
-    mod tests;
+#[cfg(test)]
+mod tests;

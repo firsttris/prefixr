@@ -96,7 +96,10 @@ fn read_version(layer_dir: &Path) -> Option<String> {
 }
 
 async fn latest_release(layer: &Layer, token: Option<&str>) -> Result<GitHubRelease, String> {
-    let url = format!("https://api.github.com/repos/{}/releases/latest", layer.repo);
+    let url = format!(
+        "https://api.github.com/repos/{}/releases/latest",
+        layer.repo
+    );
     get(&url, token)
         .await?
         .json()
@@ -280,7 +283,8 @@ fn required_mono_version(runner_path: &Path) -> Option<String> {
 /// The version out of the first `wine-mono-<X.Y.Z>-x86.msi` in a module's
 /// UTF-16 strings.
 fn mono_version_in(module: &[u8]) -> Option<String> {
-    let utf16 = |text: &str| -> Vec<u8> { text.encode_utf16().flat_map(u16::to_le_bytes).collect() };
+    let utf16 =
+        |text: &str| -> Vec<u8> { text.encode_utf16().flat_map(u16::to_le_bytes).collect() };
     let needle = utf16("wine-mono-");
     let suffix = utf16("-x86.msi");
     let mut offset = 0;
@@ -293,7 +297,9 @@ fn mono_version_in(module: &[u8]) -> Option<String> {
         let version: String = module[start..]
             .chunks_exact(2)
             .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
-            .map_while(|unit| char::from_u32(unit.into()).filter(|c| c.is_ascii_digit() || *c == '.'))
+            .map_while(|unit| {
+                char::from_u32(unit.into()).filter(|c| c.is_ascii_digit() || *c == '.')
+            })
             .collect();
         let end = start + version.len() * 2;
         if version.contains('.') && module[end..].starts_with(&suffix) {
@@ -305,10 +311,14 @@ fn mono_version_in(module: &[u8]) -> Option<String> {
 
 /// Any wine-mono installer already in the cache.
 fn cached_mono_msi(cache: &Path) -> Option<PathBuf> {
-    fs::read_dir(cache).ok()?.flatten().map(|entry| entry.path()).find(|path| {
-        let name = path.file_name().unwrap_or_default().to_string_lossy();
-        name.starts_with("wine-mono-") && name.ends_with(".msi")
-    })
+    fs::read_dir(cache)
+        .ok()?
+        .flatten()
+        .map(|entry| entry.path())
+        .find(|path| {
+            let name = path.file_name().unwrap_or_default().to_string_lossy();
+            name.starts_with("wine-mono-") && name.ends_with(".msi")
+        })
 }
 
 /// The highest version among a listing's `X.Y.Z/` directory entries,

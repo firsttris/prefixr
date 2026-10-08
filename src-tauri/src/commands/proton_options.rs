@@ -5,8 +5,8 @@ use serde::Serialize;
 use tauri::{AppHandle, State};
 
 use crate::commands::runners::find_runner;
-use crate::lock::LockExt;
 use crate::config::{save_config, ConfigState};
+use crate::lock::LockExt;
 use crate::models::{ProtonConfig, RunnerKind};
 
 /// One on/off option a Proton build's `proton` script reads from the
@@ -70,20 +70,22 @@ pub fn parse_proton_options(script: &str) -> Vec<ProtonOption> {
 /// literals (a variable passed instead, say) is skipped.
 fn parse_call_args(s: &str) -> Option<(&str, &str)> {
     let (env, s) = s.split_once('"')?;
-    let s = s.trim_start().strip_prefix(',')?.trim_start().strip_prefix('"')?;
+    let s = s
+        .trim_start()
+        .strip_prefix(',')?
+        .trim_start()
+        .strip_prefix('"')?;
     let (config, s) = s.split_once('"')?;
     s.trim_start().strip_prefix(')')?;
 
     let is_env_name = |v: &str| {
         !v.is_empty()
-            && v
-                .chars()
+            && v.chars()
                 .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
     };
     let is_config_name = |v: &str| {
         !v.is_empty()
-            && v
-                .chars()
+            && v.chars()
                 .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
     };
     (is_env_name(env) && is_config_name(config)).then_some((env, config))

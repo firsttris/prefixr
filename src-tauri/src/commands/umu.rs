@@ -46,7 +46,9 @@ fn version_file(dir: &Path) -> PathBuf {
 }
 
 fn release_zipapp_asset(assets: &[GitHubAsset]) -> Option<&GitHubAsset> {
-    assets.iter().find(|asset| asset.name.ends_with("-zipapp.tar"))
+    assets
+        .iter()
+        .find(|asset| asset.name.ends_with("-zipapp.tar"))
 }
 
 fn asset_sha256_hex(asset: &GitHubAsset) -> Option<&str> {
@@ -137,13 +139,16 @@ async fn install_latest(app: &AppHandle, token: Option<&str>) -> Result<UmuStatu
         .ok_or_else(|| format!("GitHub reported no SHA-256 digest for {}", asset.name))?
         .to_string();
 
-    let bytes = with_optional_auth(crate::http::client().get(&asset.browser_download_url), token)
-        .send()
-        .await
-        .map_err(|e| format!("Could not download {}: {e}", asset.name))?
-        .bytes()
-        .await
-        .map_err(|e| format!("Could not download {}: {e}", asset.name))?;
+    let bytes = with_optional_auth(
+        crate::http::client().get(&asset.browser_download_url),
+        token,
+    )
+    .send()
+    .await
+    .map_err(|e| format!("Could not download {}: {e}", asset.name))?
+    .bytes()
+    .await
+    .map_err(|e| format!("Could not download {}: {e}", asset.name))?;
 
     let actual = format!("{:x}", Sha256::digest(&bytes));
     if !actual.eq_ignore_ascii_case(&expected) {
@@ -272,7 +277,9 @@ pub async fn install_umu(
 ) -> Result<UmuStatus, AppError> {
     let token = read_token(&state);
     let _lock = INSTALL_LOCK.lock().await;
-    install_latest(&app, token.as_deref()).await.map_err(AppError::from)
+    install_latest(&app, token.as_deref())
+        .await
+        .map_err(AppError::from)
 }
 
 #[cfg(test)]

@@ -6,8 +6,8 @@ use tauri::{AppHandle, State};
 use tokio::process::Command;
 
 use crate::commands::umu::ensure_umu;
-use crate::lock::LockExt;
 use crate::config::ConfigState;
+use crate::lock::LockExt;
 use crate::models::{Runner, RunnerKind};
 
 /// Identifies a runner build by looking for known executables inside its folder.
@@ -186,7 +186,10 @@ pub fn list_runners(state: State<ConfigState>) -> Result<Vec<Runner>, AppError> 
 /// tool's folder (e.g. Steam's `compatibilitytools.d`) only loses the link.
 /// Async, since a runner is several hundred MB of files.
 #[tauri::command]
-pub async fn delete_runner(state: State<'_, ConfigState>, runner_id: String) -> Result<(), AppError> {
+pub async fn delete_runner(
+    state: State<'_, ConfigState>,
+    runner_id: String,
+) -> Result<(), AppError> {
     // The runners directory is scanned after the lock is released, so other
     // commands don't wait on the disk.
     let (runners_dir, users) = {

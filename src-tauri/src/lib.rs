@@ -3,8 +3,8 @@ mod config;
 mod env;
 mod error;
 mod http;
-mod lock;
 mod locale;
+mod lock;
 mod models;
 #[cfg(test)]
 mod test_util;
@@ -22,9 +22,9 @@ use commands::games::{
     PendingInstall, PendingLaunch, RunningGames,
 };
 use commands::github::{get_github_config, save_github_config};
-use commands::locale::set_ui_locale;
 use commands::graphics::{get_graphics_config, save_graphics_config};
 use commands::graphics_layers::{get_directx_layers_status, update_directx_layers};
+use commands::locale::set_ui_locale;
 use commands::mangohud::{get_mangohud_config, save_mangohud_config};
 use commands::performance::{
     check_max_map_count, fix_max_map_count, get_performance_config, save_performance_config,
@@ -186,7 +186,9 @@ pub fn run() {
             };
             app.manage(std::sync::Mutex::new(config));
             app.manage(PendingLaunch(std::sync::Mutex::new(find_launch_arg(&args))));
-            app.manage(PendingInstall(std::sync::Mutex::new(find_install_arg(&args))));
+            app.manage(PendingInstall(std::sync::Mutex::new(find_install_arg(
+                &args,
+            ))));
             app.manage(RunningGames::default());
             app.manage(LaunchingGames::default());
             app.manage(WindowVisible::new(true));

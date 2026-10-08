@@ -1,5 +1,5 @@
-use crate::test_util::TestDir;
 use super::{parse_link_info, read_ascii_cstr, read_utf16_cstr, resolve_windows_path};
+use crate::test_util::TestDir;
 use std::fs;
 use std::os::unix::fs::symlink;
 
@@ -60,7 +60,6 @@ fn resolves_windows_paths_through_dosdevices_symlinks() {
 
     let resolved = resolve_windows_path(&prefix, r"C:\Games/Foo\game.exe").unwrap();
     assert_eq!(resolved, drive_target.join("Games/Foo/game.exe"));
-
 }
 
 #[test]
@@ -101,7 +100,10 @@ fn resolves_windows_paths_ignoring_case() {
     symlink("../drive_c", prefix.join("dosdevices/c:")).unwrap();
 
     let resolved = resolve_windows_path(&prefix, r"C:\GAMES\foo\GAME.EXE").unwrap();
-    assert_eq!(resolved, drive.canonicalize().unwrap().join("Games/Foo/Game.exe"));
+    assert_eq!(
+        resolved,
+        drive.canonicalize().unwrap().join("Games/Foo/Game.exe")
+    );
     assert!(resolved.is_file());
     // A part that doesn't exist in any case stays as written.
     let missing = resolve_windows_path(&prefix, r"C:\Games\Bar\x.exe").unwrap();

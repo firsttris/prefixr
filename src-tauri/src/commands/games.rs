@@ -14,24 +14,24 @@ use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use uuid::Uuid;
 
 use crate::commands::github::read_token;
+use crate::commands::graphics::{ensure_vkbasalt_conf, vkbasalt_conf_path};
 use crate::commands::graphics_layers::{ensure_directx_layer_cache, ensure_wine_mono_msi};
 use crate::commands::icons::{exe_icon_path, extract_icon_png, save_exe_icon};
 use crate::commands::logs::{game_log_dir, new_log_file, prefix_log_dir};
-use crate::locale::LocaleState;
-use crate::commands::graphics::{ensure_vkbasalt_conf, vkbasalt_conf_path};
 use crate::commands::mangohud::{ensure_mangohud_conf, mangohud_conf_path};
+use crate::commands::prefixes::known_prefix;
 use crate::commands::runners::{
     find_runner, runner_command, umu_command, wine_binary, wineserver_binary,
 };
-use crate::commands::prefixes::known_prefix;
 use crate::commands::shell_link::{find_recently_created_shortcuts, DetectedShortcut};
 use crate::commands::steamgriddb::{
     artwork_dir, asset_cache_path, image_extension, remove_game_artwork_files,
 };
 use crate::commands::umu::{ensure_umu, runtime_present};
-use crate::lock::LockExt;
 use crate::config::{save_config, ConfigState};
 use crate::env::{self, Env};
+use crate::locale::LocaleState;
+use crate::lock::LockExt;
 use crate::models::{
     normalize_umu_id, normalize_umu_store, split_launch_args, Game, GameInput, Runner, RunnerKind,
 };
@@ -213,7 +213,11 @@ fn process_descendants(root: u32) -> Vec<u32> {
     };
     let mut children: HashMap<u32, Vec<u32>> = HashMap::new();
     for entry in entries.flatten() {
-        let Some(pid) = entry.file_name().to_str().and_then(|n| n.parse::<u32>().ok()) else {
+        let Some(pid) = entry
+            .file_name()
+            .to_str()
+            .and_then(|n| n.parse::<u32>().ok())
+        else {
             continue;
         };
         let Ok(status) = fs::read_to_string(entry.path().join("status")) else {
@@ -423,7 +427,9 @@ pub fn list_active_games(
 #[tauri::command]
 pub async fn kill_game(running: State<'_, RunningGames>, id: String) -> Result<(), AppError> {
     let game_id = Uuid::parse_str(&id).map_err(|e| format!("Invalid game id: {e}"))?;
-    kill_running_game(&running, game_id).await.map_err(AppError::from)
+    kill_running_game(&running, game_id)
+        .await
+        .map_err(AppError::from)
 }
 
 /// Holds a `--launch <game-id>` argument found at startup, or forwarded by
@@ -487,7 +493,10 @@ pub async fn run_installer(
 ) -> Result<InstallerResult, AppError> {
     let (runners_dir, prefix) = {
         let config = state.locked();
-        (config.runners_dir.clone(), known_prefix(&config, &prefix_path)?)
+        (
+            config.runners_dir.clone(),
+            known_prefix(&config, &prefix_path)?,
+        )
     };
     let token = read_token(&state);
 
@@ -616,7 +625,8 @@ pub fn update_game(
         let existing = &config.games[find(&config.games)?];
         existing.exe_path != game.exe_path || existing.icon.is_none()
     };
-    let icon = needs_icon.then(|| save_exe_icon(&app, game_id, extract_icon_png(&game.exe_path).as_deref()));
+    let icon = needs_icon
+        .then(|| save_exe_icon(&app, game_id, extract_icon_png(&game.exe_path).as_deref()));
 
     let mut config = state.locked();
     let index = find(&config.games)?;
@@ -771,7 +781,10 @@ const VKD3D_MODULES: &[&str] = &["d3d12", "d3d12core"];
 /// prefix imported from another tool, or last used with a Proton runner,
 /// may have these files pointing at a different build or be missing them
 /// entirely, so they're re-linked on every launch rather than once.
-fn sync_directx_overrides_from_cache(cache_dir: &Path, prefix_path: &Path) -> Result<String, String> {
+fn sync_directx_overrides_from_cache(
+    cache_dir: &Path,
+    prefix_path: &Path,
+) -> Result<String, String> {
     let windows_dir = prefix_path.join("drive_c/windows");
     let win32 = is_win32_prefix(prefix_path);
 
@@ -909,7 +922,13 @@ fn account_name() -> Option<OsString> {
     // SAFETY: every pointer is valid for the duration of the call, and
     // `buf.len()` is the buffer's real size; getuid(2) can't fail.
     let rc = unsafe {
-        libc::getpwuid_r(libc::getuid(), &mut pwd, buf.as_mut_ptr(), buf.len(), &mut result)
+        libc::getpwuid_r(
+            libc::getuid(),
+            &mut pwd,
+            buf.as_mut_ptr(),
+            buf.len(),
+            &mut result,
+        )
     };
     if rc != 0 || result.is_null() || pwd.pw_name.is_null() {
         return None;
@@ -988,8 +1007,16 @@ pub(crate) async fn prepare_prefix(
 
     let binary = match runner.kind {
         RunnerKind::Proton => {
-            prepare_proton(app, token, runner, prefix_path, log_path, on_initializing, &mut env)
-                .await?
+            prepare_proton(
+                app,
+                token,
+                runner,
+                prefix_path,
+                log_path,
+                on_initializing,
+                &mut env,
+            )
+            .await?
         }
         RunnerKind::Wine => {
             // Proton turns wine's debug channels off itself unless asked to
@@ -1203,7 +1230,8 @@ pub fn launch_game_headless(app: &AppHandle, id: String) {
                         .message(text)
                         .title(title)
                         .kind(MessageDialogKind::Error);
-                    let _ = tauri::async_runtime::spawn_blocking(move || dialog.blocking_show()).await;
+                    let _ =
+                        tauri::async_runtime::spawn_blocking(move || dialog.blocking_show()).await;
                 }
                 1
             }
@@ -1287,7 +1315,11 @@ async fn run_game(
             conf_path.display().to_string(),
         ));
         if !use_mangoapp {
-            let target = if use_gamescope { &mut game_only_env } else { &mut env };
+            let target = if use_gamescope {
+                &mut game_only_env
+            } else {
+                &mut env
+            };
             target.push(("MANGOHUD".to_string(), "1".to_string()));
         }
     }
@@ -1295,14 +1327,17 @@ async fn run_game(
     // competing auto-nice/scheduler daemon if one is running — so in that
     // case we skip the LD_PRELOAD and fall back to `power_profile` instead
     // (see `use_power_profile` below), which doesn't touch niceness at all.
-    let scheduler_conflict =
-        performance.gamemode_enabled && competing_scheduler_active().await;
+    let scheduler_conflict = performance.gamemode_enabled && competing_scheduler_active().await;
     if performance.gamemode_enabled && !scheduler_conflict {
         env.push(("LD_PRELOAD".to_string(), "libgamemodeauto.so.0".to_string()));
     }
     if graphics.vkbasalt.enabled {
         let vkbasalt_conf = ensure_vkbasalt_conf(app, id, &graphics.vkbasalt)?;
-        let target = if use_gamescope { &mut game_only_env } else { &mut env };
+        let target = if use_gamescope {
+            &mut game_only_env
+        } else {
+            &mut env
+        };
         target.push(("ENABLE_VKBASALT".to_string(), "1".to_string()));
         target.push((
             "VKBASALT_CONFIG_FILE".to_string(),
@@ -1400,7 +1435,11 @@ async fn run_game(
         wrapped.push("--".to_string());
         if !game_only_env.is_empty() {
             wrapped.push("env".to_string());
-            wrapped.extend(game_only_env.iter().map(|(key, value)| format!("{key}={value}")));
+            wrapped.extend(
+                game_only_env
+                    .iter()
+                    .map(|(key, value)| format!("{key}={value}")),
+            );
         }
         wrapped.append(&mut launch_chain);
         launch_chain = wrapped;
@@ -1712,7 +1751,10 @@ fn write_game_shortcut(
         game.id
     ));
     if let Some(icon_path) = &icon_path {
-        contents.push_str(&format!("Icon={}\n", desktop_string(&icon_path.to_string_lossy())));
+        contents.push_str(&format!(
+            "Icon={}\n",
+            desktop_string(&icon_path.to_string_lossy())
+        ));
     }
     contents.push_str("Terminal=false\n");
     contents.push_str("Categories=Game;\n");
@@ -1724,8 +1766,10 @@ fn write_game_shortcut(
         let _ = fs::remove_file(old);
     }
     let short_id = &game.id.simple().to_string()[..8];
-    let shortcut_path =
-        target_dir.join(format!("{}-{short_id}.desktop", sanitize_filename(&game.name)));
+    let shortcut_path = target_dir.join(format!(
+        "{}-{short_id}.desktop",
+        sanitize_filename(&game.name)
+    ));
     fs::write(&shortcut_path, contents)
         .map_err(|e| format!("Could not write shortcut file: {e}"))?;
 
@@ -1823,8 +1867,14 @@ pub fn ensure_install_desktop_entry(app: &AppHandle) -> Result<(), String> {
     // compose its own sentence around it, same as every other app's entry.
     contents.push_str("Name=Prefixr installieren\n");
     contents.push_str("Name[en]=Install Prefixr\n");
-    contents.push_str(&format!("Exec={} --install %f\n", desktop_exec_arg(&exe_path)));
-    contents.push_str(&format!("Icon={}\n", desktop_string(&icon_path.to_string_lossy())));
+    contents.push_str(&format!(
+        "Exec={} --install %f\n",
+        desktop_exec_arg(&exe_path)
+    ));
+    contents.push_str(&format!(
+        "Icon={}\n",
+        desktop_string(&icon_path.to_string_lossy())
+    ));
     contents.push_str("Terminal=false\n");
     contents.push_str("NoDisplay=true\n");
     contents.push_str(&format!("MimeType={EXE_MIME_TYPES}\n"));

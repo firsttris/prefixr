@@ -12,8 +12,8 @@ use tauri::{AppHandle, Emitter, State};
 use tokio::io::AsyncWriteExt;
 
 use crate::commands::github::read_token;
-use crate::lock::LockExt;
 use crate::config::ConfigState;
+use crate::lock::LockExt;
 use crate::models::RunnerKind;
 
 /// Adds a bearer `Authorization` header when a GitHub token is configured,
@@ -218,13 +218,10 @@ pub async fn list_runner_releases(
         runner_source.repo
     );
 
-    let response = with_optional_auth(
-        crate::http::client().get(&url),
-        token.as_deref(),
-    )
-    .send()
-    .await
-    .map_err(|e| format!("Could not reach GitHub: {e}"))?;
+    let response = with_optional_auth(crate::http::client().get(&url), token.as_deref())
+        .send()
+        .await
+        .map_err(|e| format!("Could not reach GitHub: {e}"))?;
 
     if !response.status().is_success() {
         let status = response.status();
@@ -320,10 +317,10 @@ pub(crate) fn replace_dir(new: &Path, target: &Path) -> Result<(), String> {
 
     let old = replaced_dir(target);
     if fs::symlink_metadata(&old).is_ok() {
-        fs::remove_dir_all(&old)
-            .map_err(|e| format!("Could not remove {}: {e}", old.display()))?;
+        fs::remove_dir_all(&old).map_err(|e| format!("Could not remove {}: {e}", old.display()))?;
     }
-    fs::rename(target, &old).map_err(|e| format!("Could not move {} aside: {e}", target.display()))?;
+    fs::rename(target, &old)
+        .map_err(|e| format!("Could not move {} aside: {e}", target.display()))?;
     if let Err(e) = fs::rename(new, target) {
         let _ = fs::rename(&old, target);
         return Err(moved(e));
@@ -426,13 +423,10 @@ async fn verify_checksum(
         .map(|prefix| format!("{prefix}{checksum_asset_name}"))
         .ok_or_else(|| "Could not derive checksum file URL".to_string())?;
 
-    let response = with_optional_auth(
-        crate::http::client().get(&checksum_url),
-        token,
-    )
-    .send()
-    .await
-    .map_err(|e| format!("Could not fetch checksum file: {e}"))?;
+    let response = with_optional_auth(crate::http::client().get(&checksum_url), token)
+        .send()
+        .await
+        .map_err(|e| format!("Could not fetch checksum file: {e}"))?;
     if !response.status().is_success() {
         return Err(format!(
             "Could not fetch checksum file (status {})",
@@ -478,7 +472,10 @@ struct DownloadRequest {
 /// token and the tag becomes a directory name inside the runners directory,
 /// so neither is taken on trust — only a release asset of this source's own
 /// repo, and only a plain name.
-fn parse_download_url(source: &RunnerSource, download_url: &str) -> Result<DownloadRequest, String> {
+fn parse_download_url(
+    source: &RunnerSource,
+    download_url: &str,
+) -> Result<DownloadRequest, String> {
     let not_a_download = || format!("Not a {} release download: {download_url}", source.label);
     let expected = format!("https://github.com/{}/releases/download/", source.repo);
     let rest = download_url
@@ -554,13 +551,10 @@ pub async fn download_runner(
 
     let is_xz = download_url.ends_with(".tar.xz");
 
-    let response = with_optional_auth(
-        crate::http::client().get(&download_url),
-        token.as_deref(),
-    )
-    .send()
-    .await
-    .map_err(|e| format!("Could not start download: {e}"))?;
+    let response = with_optional_auth(crate::http::client().get(&download_url), token.as_deref())
+        .send()
+        .await
+        .map_err(|e| format!("Could not start download: {e}"))?;
 
     if !response.status().is_success() {
         return Err(format!("Download failed with status {}", response.status()).into());

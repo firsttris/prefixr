@@ -177,7 +177,10 @@ fn score(entry: &IndexedEntry, query: &str) -> Option<u32> {
         Some(80)
     } else if title.contains(query) {
         Some(60)
-    } else if query.split(' ').all(|word| title.split(' ').any(|t| t == word)) {
+    } else if query
+        .split(' ')
+        .all(|word| title.split(' ').any(|t| t == word))
+    {
         Some(40)
     } else {
         None

@@ -232,7 +232,6 @@ pub struct GameInput {
     pub overrides: GameOverrides,
 }
 
-
 // Game settings come in four categories, each with a global config in
 // `AppConfig` and a matching block in `GameOverrides`:
 //
@@ -313,7 +312,9 @@ impl GameOverrides {
     ) -> EffectiveSettings {
         let perf = &self.performance;
         let performance = PerformanceConfig {
-            gamemode_enabled: perf.gamemode_enabled.unwrap_or(performance.gamemode_enabled),
+            gamemode_enabled: perf
+                .gamemode_enabled
+                .unwrap_or(performance.gamemode_enabled),
             power_profile_enabled: perf
                 .power_profile_enabled
                 .unwrap_or(performance.power_profile_enabled),

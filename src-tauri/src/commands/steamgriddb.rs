@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, State};
 use uuid::Uuid;
 
-use crate::lock::LockExt;
 use crate::config::{save_config, ConfigState};
+use crate::lock::LockExt;
 use crate::models::{ArtworkKind, Game, SteamGridDbConfig};
 
 const BASE_URL: &str = "https://www.steamgriddb.com/api/v2";
@@ -228,7 +228,10 @@ pub(crate) struct SteamApp {
 
 /// The Steam app ids SteamGridDB has on record for a game — usually one,
 /// none for games that were never on Steam.
-pub(crate) async fn steam_apps(api_key: &str, steamgriddb_id: i64) -> Result<Vec<SteamApp>, String> {
+pub(crate) async fn steam_apps(
+    api_key: &str,
+    steamgriddb_id: i64,
+) -> Result<Vec<SteamApp>, String> {
     let mut url = build_url(&["games", "id", &steamgriddb_id.to_string()])?;
     url.query_pairs_mut().append_pair("platformdata", "steam");
     let game: SgdbGame = sgdb_get(url, api_key).await?;
@@ -346,7 +349,10 @@ pub(crate) fn image_extension(url: &str) -> &'static str {
         .rsplit('/')
         .next()
         .unwrap_or(url);
-    match last_segment.rsplit_once('.').map(|(_, ext)| ext.to_ascii_lowercase()) {
+    match last_segment
+        .rsplit_once('.')
+        .map(|(_, ext)| ext.to_ascii_lowercase())
+    {
         Some(ext) if ext == "jpg" || ext == "jpeg" => "jpg",
         Some(ext) if ext == "webp" => "webp",
         _ => "png",
@@ -465,7 +471,10 @@ fn ico_to_png(bytes: Vec<u8>) -> Result<Vec<u8>, String> {
     Ok(png)
 }
 
-fn find_game<'a>(config: &'a mut crate::config::AppConfig, id: &str) -> Result<&'a mut Game, String> {
+fn find_game<'a>(
+    config: &'a mut crate::config::AppConfig,
+    id: &str,
+) -> Result<&'a mut Game, String> {
     let game_id = Uuid::parse_str(id).map_err(|e| format!("Invalid game id: {e}"))?;
     config
         .games
@@ -588,7 +597,12 @@ fn cached_asset(
             None => return Ok(None),
         }
     };
-    let path = asset_cache_path(&artwork_dir(app)?, game_uuid, slot.suffix(), image_extension(&url));
+    let path = asset_cache_path(
+        &artwork_dir(app)?,
+        game_uuid,
+        slot.suffix(),
+        image_extension(&url),
+    );
     Ok(path.exists().then(|| path.to_string_lossy().into_owned()))
 }
 
@@ -622,7 +636,16 @@ pub async fn set_game_cover(
     image_url: String,
 ) -> Result<Game, AppError> {
     let slot = Slot::Cover;
-    set_asset(&app, &state, &game_id, slot, steamgriddb_id, Some(cover_grid_id), image_url).await
+    set_asset(
+        &app,
+        &state,
+        &game_id,
+        slot,
+        steamgriddb_id,
+        Some(cover_grid_id),
+        image_url,
+    )
+    .await
 }
 
 #[tauri::command(async)]
@@ -655,7 +678,16 @@ pub async fn set_game_icon(
     image_url: String,
 ) -> Result<Game, AppError> {
     let slot = Slot::Icon;
-    set_asset(&app, &state, &game_id, slot, steamgriddb_id, Some(icon_grid_id), image_url).await
+    set_asset(
+        &app,
+        &state,
+        &game_id,
+        slot,
+        steamgriddb_id,
+        Some(icon_grid_id),
+        image_url,
+    )
+    .await
 }
 
 #[tauri::command(async)]
@@ -687,7 +719,16 @@ pub async fn set_game_artwork(
     image_url: String,
 ) -> Result<Game, AppError> {
     let slot = Slot::Artwork(kind);
-    set_asset(&app, &state, &game_id, slot, steamgriddb_id, None, image_url).await
+    set_asset(
+        &app,
+        &state,
+        &game_id,
+        slot,
+        steamgriddb_id,
+        None,
+        image_url,
+    )
+    .await
 }
 
 #[tauri::command(async)]

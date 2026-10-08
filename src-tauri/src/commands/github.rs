@@ -1,12 +1,13 @@
 use crate::error::AppError;
 use tauri::{AppHandle, State};
 
-use crate::lock::LockExt;
 use crate::config::{save_config, ConfigState};
+use crate::lock::LockExt;
 use crate::models::GitHubConfig;
 
 fn sanitized_token(token: Option<&str>) -> Option<String> {
-    token.map(str::trim)
+    token
+        .map(str::trim)
         .filter(|token| !token.is_empty())
         .map(str::to_string)
 }

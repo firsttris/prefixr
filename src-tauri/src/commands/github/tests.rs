@@ -2,7 +2,10 @@ use super::sanitized_token;
 
 #[test]
 fn trims_configured_tokens() {
-    assert_eq!(sanitized_token(Some("  secret-token  ")), Some("secret-token".to_string()));
+    assert_eq!(
+        sanitized_token(Some("  secret-token  ")),
+        Some("secret-token".to_string())
+    );
 }
 
 #[test]

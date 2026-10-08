@@ -15,9 +15,7 @@ fn set_executable(path: &Path) {
 fn write_prefix_arch(prefix_dir: &Path, arch: &str) {
     fs::write(
         prefix_dir.join("system.reg"),
-        format!(
-            "WINE REGISTRY Version 2\n;; All keys relative to \\\\Machine\n\n#arch={arch}\n\n"
-        ),
+        format!("WINE REGISTRY Version 2\n;; All keys relative to \\\\Machine\n\n#arch={arch}\n\n"),
     )
     .unwrap();
 }
@@ -29,7 +27,10 @@ fn normalizes_umu_fields_together() {
         (Some("umu-12345".to_string()), Some("gog".to_string()))
     );
     assert_eq!(umu_fields(None, Some("steam".to_string())), (None, None));
-    assert_eq!(umu_fields(Some("".to_string()), Some("none".to_string())), (None, None));
+    assert_eq!(
+        umu_fields(Some("".to_string()), Some("none".to_string())),
+        (None, None)
+    );
 }
 
 #[test]
@@ -47,7 +48,10 @@ fn command_on_path_uses_current_path_entries() {
 #[test]
 fn launch_lock_dir_prefers_xdg_runtime_dir() {
     let env = crate::env::fake(&[("XDG_RUNTIME_DIR", "/run/user/1000")]);
-    assert_eq!(launch_lock_dir(&env), PathBuf::from("/run/user/1000/prefixr"));
+    assert_eq!(
+        launch_lock_dir(&env),
+        PathBuf::from("/run/user/1000/prefixr")
+    );
 
     // SAFETY: getuid(2) can't fail and has no preconditions.
     let uid = unsafe { libc::getuid() };
@@ -56,10 +60,16 @@ fn launch_lock_dir_prefers_xdg_runtime_dir() {
 }
 #[test]
 fn sanitizes_shortcut_filenames() {
-    assert_eq!(sanitize_filename("Baldur's Gate 3: Deluxe/Edition"), "Baldur_s Gate 3_ Deluxe_Edition");
+    assert_eq!(
+        sanitize_filename("Baldur's Gate 3: Deluxe/Edition"),
+        "Baldur_s Gate 3_ Deluxe_Edition"
+    );
     assert_eq!(sanitize_filename(""), "game");
     assert_eq!(sanitize_filename("  \t\n  "), "__");
-    assert_eq!(sanitize_filename("Already_Good-Name 2"), "Already_Good-Name 2");
+    assert_eq!(
+        sanitize_filename("Already_Good-Name 2"),
+        "Already_Good-Name 2"
+    );
 }
 
 #[test]
@@ -94,7 +104,10 @@ fn steer_profile_to_steamuser_creates_missing_user_symlink() {
     let steamuser_dir = users_dir.join("steamuser");
     let user_dir = users_dir.join("tristan");
     assert!(steamuser_dir.is_dir());
-    assert_eq!(fs::read_link(&user_dir).unwrap(), PathBuf::from("steamuser"));
+    assert_eq!(
+        fs::read_link(&user_dir).unwrap(),
+        PathBuf::from("steamuser")
+    );
 }
 
 #[test]
@@ -105,7 +118,10 @@ fn steer_profile_to_steamuser_links_every_candidate_name() {
     steer_profiles_to_steamuser(&prefix, &["tristan".into(), "builder".into()]).unwrap();
 
     for name in ["tristan", "builder"] {
-        assert_eq!(fs::read_link(users_dir.join(name)).unwrap(), PathBuf::from("steamuser"));
+        assert_eq!(
+            fs::read_link(users_dir.join(name)).unwrap(),
+            PathBuf::from("steamuser")
+        );
     }
 }
 
@@ -117,7 +133,10 @@ fn steer_profile_to_steamuser_keeps_existing_user_dir() {
 
     steer_profiles_to_steamuser(&prefix, &["tristan".into()]).unwrap();
 
-    assert!(fs::symlink_metadata(&user_dir).unwrap().file_type().is_dir());
+    assert!(fs::symlink_metadata(&user_dir)
+        .unwrap()
+        .file_type()
+        .is_dir());
 }
 
 #[test]
@@ -128,7 +147,10 @@ fn account_name_is_found() {
 #[test]
 fn applications_directory_prefers_xdg_data_home() {
     let env = crate::env::fake(&[("HOME", "/home/u"), ("XDG_DATA_HOME", "/data")]);
-    assert_eq!(applications_directory(&env).unwrap(), PathBuf::from("/data/applications"));
+    assert_eq!(
+        applications_directory(&env).unwrap(),
+        PathBuf::from("/data/applications")
+    );
 }
 #[test]
 fn applications_directory_falls_back_to_local_share() {
@@ -141,7 +163,10 @@ fn applications_directory_falls_back_to_local_share() {
 #[test]
 fn own_executable_path_prefers_appimage_env() {
     let env = crate::env::fake(&[("APPIMAGE", "/opt/Prefixr.AppImage")]);
-    assert_eq!(own_executable_path(&env).unwrap(), PathBuf::from("/opt/Prefixr.AppImage"));
+    assert_eq!(
+        own_executable_path(&env).unwrap(),
+        PathBuf::from("/opt/Prefixr.AppImage")
+    );
     assert_eq!(
         own_executable_path(&crate::env::fake(&[])).unwrap(),
         std::env::current_exe().unwrap()
@@ -162,8 +187,10 @@ fn log_stdio_appends_stdout_and_stderr_to_the_same_file() {
         .unwrap();
 
     assert!(status.success());
-    assert_eq!(fs::read_to_string(&log_path).unwrap(), "existing\nout\nerr\n");
-
+    assert_eq!(
+        fs::read_to_string(&log_path).unwrap(),
+        "existing\nout\nerr\n"
+    );
 }
 
 #[test]
@@ -177,12 +204,17 @@ fn relink_if_needed_replaces_wrong_links_and_ignores_missing_sources() {
     std::os::unix::fs::symlink(&src_a, &dst).unwrap();
 
     relink_if_needed(&src_b, &dst).unwrap();
-    assert_eq!(fs::canonicalize(&dst).unwrap(), fs::canonicalize(&src_b).unwrap());
+    assert_eq!(
+        fs::canonicalize(&dst).unwrap(),
+        fs::canonicalize(&src_b).unwrap()
+    );
 
     let missing = dir.join("missing.dll");
     relink_if_needed(&missing, &dst).unwrap();
-    assert_eq!(fs::canonicalize(&dst).unwrap(), fs::canonicalize(&src_b).unwrap());
-
+    assert_eq!(
+        fs::canonicalize(&dst).unwrap(),
+        fs::canonicalize(&src_b).unwrap()
+    );
 }
 
 #[test]
@@ -230,7 +262,6 @@ fn syncs_directx_layers_into_a_64_bit_prefix() {
         overrides,
         "d3d8,d3d9,d3d10core,d3d11,dxgi,d3d12,d3d12core=n,b"
     );
-
 }
 
 #[test]
@@ -251,14 +282,18 @@ fn syncs_directx_layers_into_a_32_bit_prefix() {
         fs::canonicalize(system32.join("dxgi.dll")).unwrap(),
         fs::canonicalize(dxvk32.join("dxgi.dll")).unwrap()
     );
-    assert!(!prefix_dir.join("drive_c/windows/syswow64/dxgi.dll").exists());
-
+    assert!(!prefix_dir
+        .join("drive_c/windows/syswow64/dxgi.dll")
+        .exists());
 }
 
 #[test]
 fn game_env_merges_list_variables() {
     let mut env = vec![
-        ("WINEDLLOVERRIDES".to_string(), "winemenubuilder.exe=;d3d11=n".to_string()),
+        (
+            "WINEDLLOVERRIDES".to_string(),
+            "winemenubuilder.exe=;d3d11=n".to_string(),
+        ),
         ("LD_PRELOAD".to_string(), "libgamemodeauto.so.0".to_string()),
         ("DXVK_HUD".to_string(), "0".to_string()),
     ];
@@ -275,7 +310,10 @@ fn game_env_merges_list_variables() {
             .find(|(k, _)| k == key)
             .map(|(_, v)| v.as_str())
     };
-    assert_eq!(get("WINEDLLOVERRIDES"), Some("winemenubuilder.exe=;d3d11=n;dinput8=n,b"));
+    assert_eq!(
+        get("WINEDLLOVERRIDES"),
+        Some("winemenubuilder.exe=;d3d11=n;dinput8=n,b")
+    );
     assert_eq!(get("LD_PRELOAD"), Some("libgamemodeauto.so.0:libfoo.so"));
     assert_eq!(get("DXVK_HUD"), Some("fps"));
 }
@@ -333,7 +371,10 @@ fn desktop_entries_are_escaped() {
         desktop_exec_arg(Path::new("/Apps/100% \"Pre$fixr\"/a\\b.AppImage")),
         r#""/Apps/100%% \\"Pre\\$fixr\\"/a\\\\b.AppImage""#
     );
-    assert_eq!(desktop_exec_arg(Path::new("/opt/prefixr")), "\"/opt/prefixr\"");
+    assert_eq!(
+        desktop_exec_arg(Path::new("/opt/prefixr")),
+        "\"/opt/prefixr\""
+    );
 }
 
 #[test]
@@ -464,7 +505,11 @@ fn regex_self_match(pattern: &str) -> bool {
         .stdin(Stdio::piped())
         .spawn()
         .unwrap();
-    grep.stdin.take().unwrap().write_all(pattern.as_bytes()).unwrap();
+    grep.stdin
+        .take()
+        .unwrap()
+        .write_all(pattern.as_bytes())
+        .unwrap();
     grep.wait().unwrap().success()
 }
 

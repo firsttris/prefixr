@@ -26,7 +26,10 @@ pub enum Value {
     String(String),
     /// Stored as the raw 32 bits; Steam's app ids use the high bit.
     Int(u32),
-    Other { tag: u8, bytes: Vec<u8> },
+    Other {
+        tag: u8,
+        bytes: Vec<u8>,
+    },
 }
 
 /// Looks up a key the way Steam does: case-insensitively (older files use
@@ -94,7 +97,9 @@ fn parse_map(bytes: &[u8], pos: &mut usize, depth: usize) -> Result<Map, String>
         let value = match tag {
             MAP => Value::Map(parse_map(bytes, pos, depth + 1)?),
             STRING => Value::String(read_string(bytes, pos)?),
-            INT => Value::Int(u32::from_le_bytes(read_bytes(bytes, pos, 4)?.try_into().unwrap())),
+            INT => Value::Int(u32::from_le_bytes(
+                read_bytes(bytes, pos, 4)?.try_into().unwrap(),
+            )),
             _ => match fixed_size(tag) {
                 Some(len) => Value::Other {
                     tag,

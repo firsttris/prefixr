@@ -50,5 +50,7 @@ fn text_settings_cannot_add_lines() {
     let conf = render_conf(&layout);
     assert!(conf.contains("position=top-leftfps_limit=1\n"));
     assert!(conf.contains("text_color=fffffflog_duration=0\n"));
-    assert!(!conf.lines().any(|line| line.starts_with("fps_limit") || line.starts_with("log_duration")));
+    assert!(!conf
+        .lines()
+        .any(|line| line.starts_with("fps_limit") || line.starts_with("log_duration")));
 }

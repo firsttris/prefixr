@@ -6,10 +6,10 @@ use tauri::{AppHandle, State};
 use crate::commands::games::{env_pairs, log_stdio, prepare_prefix};
 use crate::commands::github::read_token;
 use crate::commands::logs::{new_log_file, prefix_log_dir};
-use crate::commands::runners::{find_runner, runner_command};
-use crate::lock::LockExt;
 use crate::commands::prefixes::known_prefix;
+use crate::commands::runners::{find_runner, runner_command};
 use crate::config::ConfigState;
+use crate::lock::LockExt;
 
 const BUILTIN_WINE_TOOLS: &[&str] = &[
     "winecfg",
@@ -58,7 +58,10 @@ pub async fn launch_wine_tool(
 
     let (runners_dir, prefix) = {
         let config = state.locked();
-        (config.runners_dir.clone(), known_prefix(&config, &prefix_path)?)
+        (
+            config.runners_dir.clone(),
+            known_prefix(&config, &prefix_path)?,
+        )
     };
     let token = read_token(&state);
 

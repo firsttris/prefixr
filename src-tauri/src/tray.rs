@@ -51,7 +51,9 @@ pub fn check_tray_host(app: &AppHandle) {
     app.manage(TrayAvailable(AtomicBool::new(true)));
     let app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        app.state::<TrayAvailable>().0.store(tray_host_available(), Ordering::SeqCst);
+        app.state::<TrayAvailable>()
+            .0
+            .store(tray_host_available(), Ordering::SeqCst);
     });
 }
 
@@ -94,7 +96,9 @@ fn tray_host_available() -> bool {
 }
 
 fn set_main_window_visible(app: &AppHandle, visible: bool) {
-    app.state::<WindowVisible>().0.store(visible, Ordering::SeqCst);
+    app.state::<WindowVisible>()
+        .0
+        .store(visible, Ordering::SeqCst);
 }
 
 fn is_main_window_visible(app: &AppHandle) -> bool {
@@ -154,7 +158,9 @@ fn toggle_main_window(app: &AppHandle) {
 }
 
 fn tray_locale(app: &AppHandle) -> Locale {
-    app.try_state::<LocaleState>().map(|s| s.get()).unwrap_or(Locale::En)
+    app.try_state::<LocaleState>()
+        .map(|s| s.get())
+        .unwrap_or(Locale::En)
 }
 
 fn toggle_label(visible: bool, locale: Locale) -> String {
@@ -183,10 +189,18 @@ fn quit_dialog_copy(active: usize, locale: Locale) -> (String, String, String, S
     let count = active.to_string();
     let running = match active {
         1 => text(locale, "native_quitDialog_oneRunning", &[]),
-        _ => text(locale, "native_quitDialog_manyRunning", &[("count", &count)]),
+        _ => text(
+            locale,
+            "native_quitDialog_manyRunning",
+            &[("count", &count)],
+        ),
     };
     (
-        text(locale, "native_quitDialog_message", &[("running", &running)]),
+        text(
+            locale,
+            "native_quitDialog_message",
+            &[("running", &running)],
+        ),
         text(locale, "native_quitDialog_title", &[]),
         text(locale, "native_quitDialog_confirm", &[]),
         text(locale, "common_cancel", &[]),
@@ -277,7 +291,10 @@ fn quit(app: &AppHandle) {
         .message(message)
         .title(title)
         .kind(MessageDialogKind::Warning)
-        .buttons(MessageDialogButtons::OkCancelCustom(confirm_label, cancel_label))
+        .buttons(MessageDialogButtons::OkCancelCustom(
+            confirm_label,
+            cancel_label,
+        ))
         .show(move |confirmed| {
             if !confirmed {
                 return;

@@ -4,8 +4,8 @@ use std::path::PathBuf;
 
 use tauri::{AppHandle, Manager, State};
 
-use crate::lock::LockExt;
 use crate::config::{save_config, ConfigState};
+use crate::lock::LockExt;
 use crate::models::{GraphicsConfig, VkBasaltSettings};
 
 /// One file per game, since vkBasalt settings can be overridden per game

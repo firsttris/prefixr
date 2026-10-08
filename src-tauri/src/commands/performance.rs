@@ -5,8 +5,8 @@ use serde::Serialize;
 use tauri::{AppHandle, State};
 
 use crate::commands::games::command_on_path;
-use crate::lock::LockExt;
 use crate::config::{save_config, ConfigState};
+use crate::lock::LockExt;
 use crate::models::PerformanceConfig;
 
 #[tauri::command]

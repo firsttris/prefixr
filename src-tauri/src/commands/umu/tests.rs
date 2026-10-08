@@ -46,7 +46,6 @@ fn read_status_requires_umu_run_and_trims_versions() {
 
     assert!(status.installed);
     assert_eq!(status.version.as_deref(), Some("v1.2.3"));
-
 }
 
 #[test]
@@ -59,15 +58,26 @@ fn read_status_ignores_empty_versions_and_missing_install() {
 
     assert!(!status.installed);
     assert_eq!(status.version, None);
-
 }
 
 #[test]
 fn required_runtime_name_maps_known_app_ids() {
-    assert_eq!(required_runtime_name("\"require_tool_appid\" \"4183110\""), Some("steamrt4"));
-    assert_eq!(required_runtime_name("\"require_tool_appid\" \"1628350\""), Some("steamrt3"));
-    assert_eq!(required_runtime_name("\"require_tool_appid\" \"1391110\""), Some("steamrt2"));
-    assert_eq!(required_runtime_name("\"require_tool_appid\" \"999\""), None);
+    assert_eq!(
+        required_runtime_name("\"require_tool_appid\" \"4183110\""),
+        Some("steamrt4")
+    );
+    assert_eq!(
+        required_runtime_name("\"require_tool_appid\" \"1628350\""),
+        Some("steamrt3")
+    );
+    assert_eq!(
+        required_runtime_name("\"require_tool_appid\" \"1391110\""),
+        Some("steamrt2")
+    );
+    assert_eq!(
+        required_runtime_name("\"require_tool_appid\" \"999\""),
+        None
+    );
     assert_eq!(required_runtime_name("\"other\" \"4183110\""), None);
 }
 
@@ -99,7 +109,10 @@ fn umu_local_dir_falls_back_to_xdg_data_home() {
 #[test]
 fn umu_local_dir_uses_home_when_xdg_data_home_is_missing() {
     let env = crate::env::fake(&[("HOME", "/home/u")]);
-    assert_eq!(umu_local_dir(&env), Some(PathBuf::from("/home/u/.local/share/umu")));
+    assert_eq!(
+        umu_local_dir(&env),
+        Some(PathBuf::from("/home/u/.local/share/umu"))
+    );
     assert_eq!(umu_local_dir(&crate::env::fake(&[])), None);
 }
 #[test]

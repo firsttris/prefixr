@@ -4,8 +4,8 @@ use std::path::PathBuf;
 
 use tauri::{AppHandle, Manager, State};
 
-use crate::lock::LockExt;
 use crate::config::{save_config, ConfigState};
+use crate::lock::LockExt;
 use crate::models::{MangoHudConfig, MangoHudLayout};
 
 /// Builds the contents of a `MangoHud.conf` (see

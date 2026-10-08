@@ -11,7 +11,13 @@ fn round_trips_a_shortcuts_file() {
                 ("AppName".into(), Value::String("Spiel ä".into())),
                 ("LastPlayTime".into(), Value::Int(0)),
                 ("tags".into(), Value::Map(vec![])),
-                ("x".into(), Value::Other { tag: 0x07, bytes: vec![1; 8] }),
+                (
+                    "x".into(),
+                    Value::Other {
+                        tag: 0x07,
+                        bytes: vec![1; 8],
+                    },
+                ),
             ]),
         )]),
     )];
