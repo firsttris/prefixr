@@ -76,17 +76,24 @@
     }
   });
 
+  // Every search and asset list request gets a number; a response that
+  // arrives after a newer request was made (a quick switch between kinds,
+  // say) is dropped instead of showing the wrong kind's options.
+  let request = 0;
+
   async function handleSearch() {
     if (!query.trim()) return;
+    const current = ++request;
     loading = true;
     error = null;
     matches = [];
     try {
-      matches = await searchSteamGridDbGames(query);
+      const result = await searchSteamGridDbGames(query);
+      if (current === request) matches = result;
     } catch (e) {
-      error = e;
+      if (current === request) error = e;
     } finally {
-      loading = false;
+      if (current === request) loading = false;
     }
   }
 
@@ -97,20 +104,22 @@
   }
 
   async function loadAssets(steamgriddbId: number) {
+    const current = ++request;
     loading = true;
     error = null;
     assetOptions = [];
     try {
-      assetOptions =
+      const result =
         kind === "cover"
           ? await listSteamGridDbGrids(steamgriddbId)
           : kind === "icon"
             ? await listSteamGridDbIcons(steamgriddbId)
             : await listSteamGridDbArtwork(steamgriddbId, kind);
+      if (current === request) assetOptions = result;
     } catch (e) {
-      error = e;
+      if (current === request) error = e;
     } finally {
-      loading = false;
+      if (current === request) loading = false;
     }
   }
 
@@ -160,6 +169,8 @@
   }
 
   function backToSearch() {
+    request++;
+    loading = false;
     stage = "search";
     selectedGame = null;
     assetOptions = [];
