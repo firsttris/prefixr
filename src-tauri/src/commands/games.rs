@@ -843,18 +843,11 @@ async fn install_wine_mono(
         .to_str()
         .ok_or_else(|| format!("Installer path is not valid UTF-8: {}", msi_path.display()))?;
 
-    let out = fs::OpenOptions::new()
-        .append(true)
-        .open(log_path)
-        .map_err(|e| format!("Could not open log file: {e}"))?;
-    let err = out
-        .try_clone()
-        .map_err(|e| format!("Could not open log file: {e}"))?;
-
+    let (out, err) = log_stdio(log_path)?;
     let status = runner_command(wine, [("WINEPREFIX", prefix_str)])
         .args(["msiexec", "/i", msi_str, "/qn"])
-        .stdout(Stdio::from(out))
-        .stderr(Stdio::from(err))
+        .stdout(out)
+        .stderr(err)
         .status()
         .await
         .map_err(|e| format!("Could not run wine-mono installer: {e}"))?;

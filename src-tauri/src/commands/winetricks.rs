@@ -2,13 +2,12 @@ use crate::error::AppError;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
-use std::process::Stdio;
 use std::time::{Duration, SystemTime};
 
 use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
 
-use crate::commands::games::{prepare_prefix, steer_profile_to_steamuser};
+use crate::commands::games::{log_stdio, prepare_prefix, steer_profile_to_steamuser};
 use crate::commands::github::read_token;
 use crate::commands::logs::{new_log_file, prefix_log_dir};
 use crate::commands::runners::{
@@ -218,13 +217,7 @@ pub async fn install_winetricks_verbs(
     let prefix = PathBuf::from(&prefix_path);
 
     let log_path = new_log_file(&prefix_log_dir(&app, &prefix)?)?;
-    let log_out = fs::OpenOptions::new()
-        .append(true)
-        .open(&log_path)
-        .map_err(|e| format!("Could not open log file: {e}"))?;
-    let log_err = log_out
-        .try_clone()
-        .map_err(|e| format!("Could not open log file: {e}"))?;
+    let (log_out, log_err) = log_stdio(&log_path)?;
 
     let mut command = if uses_umu_winetricks(&runner) {
         let mut command = umu_command(&app, token.as_deref(), &runner.path, &prefix_path).await?;
@@ -243,8 +236,8 @@ pub async fn install_winetricks_verbs(
     };
 
     let status = command
-        .stdout(Stdio::from(log_out))
-        .stderr(Stdio::from(log_err))
+        .stdout(log_out)
+        .stderr(log_err)
         .status()
         .await
         .map_err(|e| format!("Could not run winetricks: {e}"))?;
