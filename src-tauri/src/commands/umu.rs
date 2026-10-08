@@ -153,26 +153,36 @@ async fn install_latest(app: &AppHandle, token: Option<&str>) -> Result<UmuStatu
     }
 
     let dir = umu_dir(app)?;
-    let staging = dir.with_extension("new");
-    if staging.exists() {
-        fs::remove_dir_all(&staging)
-            .map_err(|e| format!("Could not clean up {}: {e}", staging.display()))?;
-    }
-    fs::create_dir_all(&staging)
-        .map_err(|e| format!("Could not create {}: {e}", staging.display()))?;
-    tar::Archive::new(bytes.as_ref())
-        .unpack(&staging)
-        .map_err(|e| format!("Could not extract {}: {e}", asset.name))?;
-    if !umu_run_path(&staging).is_file() {
-        return Err(format!("{} did not contain umu/umu-run", asset.name));
-    }
-    fs::write(version_file(&staging), &release.tag_name)
-        .map_err(|e| format!("Could not write umu version file: {e}"))?;
+    let asset_name = asset.name.clone();
+    let tag = release.tag_name.clone();
+    let target = dir.clone();
+    // Unpacking and deleting the old copy is blocking work, kept off the
+    // async runtime that a game launch waits on.
+    tauri::async_runtime::spawn_blocking(move || {
+        let dir = target;
+        let staging = dir.with_extension("new");
+        if staging.exists() {
+            fs::remove_dir_all(&staging)
+                .map_err(|e| format!("Could not clean up {}: {e}", staging.display()))?;
+        }
+        fs::create_dir_all(&staging)
+            .map_err(|e| format!("Could not create {}: {e}", staging.display()))?;
+        tar::Archive::new(bytes.as_ref())
+            .unpack(&staging)
+            .map_err(|e| format!("Could not extract {asset_name}: {e}"))?;
+        if !umu_run_path(&staging).is_file() {
+            return Err(format!("{asset_name} did not contain umu/umu-run"));
+        }
+        fs::write(version_file(&staging), &tag)
+            .map_err(|e| format!("Could not write umu version file: {e}"))?;
 
-    // The old copy stays usable until the new one is in its place, so a
-    // failed update — or a launch starting umu-run meanwhile — never finds
-    // no umu at all.
-    replace_dir(&staging, &dir)?;
+        // The old copy stays usable until the new one is in its place, so a
+        // failed update — or a launch starting umu-run meanwhile — never
+        // finds no umu at all.
+        replace_dir(&staging, &dir)
+    })
+    .await
+    .map_err(|e| format!("Extraction task failed: {e}"))??;
 
     Ok(read_status(&dir))
 }

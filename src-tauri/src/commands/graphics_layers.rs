@@ -142,20 +142,30 @@ async fn install_layer(
         .await
         .map_err(|e| format!("Could not download {}: {e}", asset.name))?;
 
-    let extract_dir = extraction_dir(cache);
-    if let Err(e) = extract_archive(&asset.name, &bytes, &extract_dir) {
-        let _ = fs::remove_dir_all(&extract_dir);
-        return Err(e);
-    }
-    let staging = extraction_dir(cache);
-    move_extracted_dir(&extract_dir, &staging)?;
-    let installed = fs::write(version_file(&staging), &release.tag_name)
-        .map_err(|e| format!("Could not write {} version file: {e}", layer.label))
-        .and_then(|()| replace_dir(&staging, &cache.join(layer.dir)));
-    if installed.is_err() {
-        let _ = fs::remove_dir_all(&staging);
-    }
-    installed
+    // Decompressing tens of MB and deleting the old copy is blocking work,
+    // kept off the async runtime that a game launch waits on.
+    let cache = cache.to_path_buf();
+    let label = layer.label;
+    let target = cache.join(layer.dir);
+    let tag = release.tag_name;
+    tauri::async_runtime::spawn_blocking(move || {
+        let extract_dir = extraction_dir(&cache);
+        if let Err(e) = extract_archive(&asset.name, &bytes, &extract_dir) {
+            let _ = fs::remove_dir_all(&extract_dir);
+            return Err(e);
+        }
+        let staging = extraction_dir(&cache);
+        move_extracted_dir(&extract_dir, &staging)?;
+        let installed = fs::write(version_file(&staging), &tag)
+            .map_err(|e| format!("Could not write {label} version file: {e}"))
+            .and_then(|()| replace_dir(&staging, &target));
+        if installed.is_err() {
+            let _ = fs::remove_dir_all(&staging);
+        }
+        installed
+    })
+    .await
+    .map_err(|e| format!("Extraction task failed: {e}"))?
 }
 
 /// Ensures DXVK and VKD3D-Proton are downloaded into the shared cache,
@@ -372,13 +382,19 @@ pub async fn ensure_wine_mono_msi(app: &AppHandle, runner_path: &Path) -> Result
         .await
         .map_err(|e| format!("Could not download {msi_name}: {e}"))?;
 
-    fs::create_dir_all(&cache).map_err(|e| format!("Could not create {}: {e}", cache.display()))?;
     // Written under another name and renamed, so an interrupted write never
-    // leaves a truncated `.msi` for the lookups above to pick up.
-    let partial = cache.join(format!("{msi_name}.part"));
-    fs::write(&partial, &bytes).map_err(|e| format!("Could not save {msi_name}: {e}"))?;
-    fs::rename(&partial, &msi_path).map_err(|e| format!("Could not save {msi_name}: {e}"))?;
-    Ok(msi_path)
+    // leaves a truncated `.msi` for the lookups above to pick up. Blocking
+    // (the installer is tens of MB), so off the async runtime.
+    tauri::async_runtime::spawn_blocking(move || {
+        fs::create_dir_all(&cache)
+            .map_err(|e| format!("Could not create {}: {e}", cache.display()))?;
+        let partial = cache.join(format!("{msi_name}.part"));
+        fs::write(&partial, &bytes).map_err(|e| format!("Could not save {msi_name}: {e}"))?;
+        fs::rename(&partial, &msi_path).map_err(|e| format!("Could not save {msi_name}: {e}"))?;
+        Ok(msi_path)
+    })
+    .await
+    .map_err(|e| format!("Saving wine-mono failed: {e}"))?
 }
 
 #[cfg(test)]
