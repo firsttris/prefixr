@@ -1,7 +1,6 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
   import type { Snippet } from "svelte";
-  
 
   let {
     open,
@@ -18,8 +17,53 @@
     children: Snippet;
   } = $props();
 
+  const titleId = $props.id();
+  let panel = $state<HTMLDivElement>();
+
+  // Focus moves into the dialog when it opens, and back to whatever had it
+  // (usually the button that opened it) when it closes.
+  $effect(() => {
+    if (!panel) return;
+    const opener = document.activeElement;
+    panel.focus();
+    return () => {
+      if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
+    };
+  });
+
+  const FOCUSABLE =
+    'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
+
+  function focusables(container: HTMLElement): HTMLElement[] {
+    return [...container.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
+      (el) => el.getClientRects().length > 0,
+    );
+  }
+
   function handleKeydown(event: KeyboardEvent) {
-    if (event.key === "Escape") onClose();
+    if (event.key === "Escape") {
+      onClose();
+      return;
+    }
+    // Tab cycles within the dialog instead of moving on to the page behind.
+    if (event.key !== "Tab" || !panel) return;
+    const items = focusables(panel);
+    const first = items[0];
+    const last = items[items.length - 1];
+    const active = document.activeElement;
+    if (!first) {
+      event.preventDefault();
+      panel.focus();
+    } else if (!panel.contains(active)) {
+      event.preventDefault();
+      (event.shiftKey ? last : first).focus();
+    } else if (event.shiftKey && (active === first || active === panel)) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus();
+    }
   }
 </script>
 
@@ -32,9 +76,17 @@
     onclick={(e) => e.target === e.currentTarget && onClose()}
     role="presentation"
   >
-    <div class="panel" class:wide role="dialog" aria-modal="true" aria-label={title} tabindex="-1">
+    <div
+      bind:this={panel}
+      class="panel"
+      class:wide
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      tabindex="-1"
+    >
       <header>
-        <h2>{title}</h2>
+        <h2 id={titleId}>{title}</h2>
         <button type="button" class="ghost" onclick={onClose} aria-label={m.common_close()}
           >✕</button
         >
@@ -59,6 +111,7 @@
   }
 
   .panel {
+    outline: none;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
