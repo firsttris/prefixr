@@ -67,10 +67,12 @@
   }
 </script>
 
-<div class="tabs">
+<div class="tabs" role="tablist">
   {#each $runnerSources as source (source.id)}
     <button
       type="button"
+      role="tab"
+      aria-selected={source.id === selectedSource}
       class="tab"
       class:active={source.id === selectedSource}
       onclick={() => selectSource(source.id)}

@@ -179,10 +179,12 @@
 </script>
 
 <div class="picker">
-  <div class="kind-tabs">
+  <div class="kind-tabs" role="tablist">
     {#each Object.keys(kindLabels) as k (k)}
       <button
         type="button"
+        role="tab"
+        aria-selected={kind === k}
         class="kind-tab"
         class:active={kind === k}
         onclick={() => switchKind(k as Kind)}
