@@ -32,6 +32,8 @@ jobs:
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
 
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
@@ -57,6 +59,12 @@ jobs:
 
       - name: Frontend tests
         run: bun run test
+
+      - name: Rust formatting
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+
+      - name: Rust lints
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
 
       - name: Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --locked

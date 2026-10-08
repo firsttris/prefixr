@@ -1197,7 +1197,7 @@ pub async fn launch_game(
             },
         );
     }
-    result.map_err(AppError::from)
+    result
 }
 
 /// Runs a game without any window and exits along with it: how Steam
