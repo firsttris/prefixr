@@ -199,12 +199,6 @@ struct RunnerDownloadProgressPayload<'a> {
 }
 
 #[derive(Clone, Serialize)]
-struct RunnerDownloadErrorPayload<'a> {
-    tag: &'a str,
-    message: AppError,
-}
-
-#[derive(Clone, Serialize)]
 struct RunnerDownloadDonePayload<'a> {
     tag: &'a str,
 }
@@ -495,8 +489,9 @@ const PROGRESS_INTERVAL: Duration = Duration::from_millis(100);
 
 /// Downloads a runner release into the runners directory and extracts it.
 /// Progress (bytes downloaded so far, and the total if known) is streamed via
-/// `runner-download-progress` events; the final outcome is reported both as
-/// the command's `Result` and as `runner-download-done` / `runner-download-error`.
+/// `runner-download-progress` events, a success also as
+/// `runner-download-done`; a failure is the command's `Err` alone, with the
+/// downloaded archive and anything extracted from it removed.
 #[tauri::command]
 pub async fn download_runner(
     app: AppHandle,
@@ -539,15 +534,7 @@ pub async fn download_runner(
     .map_err(|e| format!("Could not start download: {e}"))?;
 
     if !response.status().is_success() {
-        let message = format!("Download failed with status {}", response.status());
-        let _ = app.emit(
-            "runner-download-error",
-            RunnerDownloadErrorPayload {
-                tag: &tag,
-                message: message.clone().into(),
-            },
-        );
-        return Err(message.into());
+        return Err(format!("Download failed with status {}", response.status()).into());
     }
 
     let total = response.content_length();
@@ -595,13 +582,6 @@ pub async fn download_runner(
 
     if let Err(message) = download_result {
         let _ = tokio::fs::remove_file(&archive_path).await;
-        let _ = app.emit(
-            "runner-download-error",
-            RunnerDownloadErrorPayload {
-                tag: &tag,
-                message: message.clone().into(),
-            },
-        );
         return Err(message.into());
     }
 
@@ -615,13 +595,6 @@ pub async fn download_runner(
     .await
     {
         let _ = tokio::fs::remove_file(&archive_path).await;
-        let _ = app.emit(
-            "runner-download-error",
-            RunnerDownloadErrorPayload {
-                tag: &tag,
-                message: message.clone().into(),
-            },
-        );
         return Err(message.into());
     }
 
@@ -644,32 +617,16 @@ pub async fn download_runner(
         }
     })
     .await
-    .map_err(|e| format!("Extraction task panicked: {e}"))?;
+    .map_err(|e| format!("Extraction task failed: {e}"))
+    .and_then(|extracted| extracted);
 
     let _ = tokio::fs::remove_file(&archive_path).await;
 
     if let Err(message) = extraction {
         let _ = fs::remove_dir_all(&extract_dir);
-        let _ = app.emit(
-            "runner-download-error",
-            RunnerDownloadErrorPayload {
-                tag: &tag,
-                message: message.clone().into(),
-            },
-        );
         return Err(message.into());
     }
-
-    if let Err(message) = move_extracted_dir(&extract_dir, &target_dir) {
-        let _ = app.emit(
-            "runner-download-error",
-            RunnerDownloadErrorPayload {
-                tag: &tag,
-                message: message.clone().into(),
-            },
-        );
-        return Err(message.into());
-    }
+    move_extracted_dir(&extract_dir, &target_dir)?;
 
     let _ = app.emit(
         "runner-download-done",

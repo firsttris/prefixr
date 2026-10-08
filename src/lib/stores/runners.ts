@@ -63,13 +63,6 @@ interface DownloadProgressPayload {
   total: number | null;
 }
 
-interface DownloadErrorPayload {
-  tag: string;
-  // The backend's structured AppError (see src-tauri/src/error.rs) —
-  // pass it through backendError() to render it, same as a command's Err.
-  message: unknown;
-}
-
 interface DownloadDonePayload {
   tag: string;
 }
@@ -93,13 +86,6 @@ export function initRunnerDownloadEvents(): void {
     patchDownloadState(event.payload.tag, { done: true, error: undefined });
     refreshRunners();
   });
-
-  listen<DownloadErrorPayload>("runner-download-error", (event) => {
-    patchDownloadState(event.payload.tag, {
-      done: false,
-      error: event.payload.message,
-    });
-  });
 }
 
 export async function downloadRunner(
@@ -111,8 +97,6 @@ export async function downloadRunner(
   try {
     await invoke("download_runner", { source, tag, downloadUrl });
   } catch (e) {
-    // Usually already set via the runner-download-error event, which isn't
-    // sent for a failure before the download got going (e.g. no network).
-    patchDownloadState(tag, { error: e });
+    patchDownloadState(tag, { done: false, error: e });
   }
 }
