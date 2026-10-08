@@ -175,7 +175,7 @@ pub async fn list_all_winetricks_verbs(app: AppHandle) -> Result<Vec<WinetricksV
 /// frontend mark verbs already present in a prefix instead of leaving the
 /// user to guess or just click install again. Missing file (nothing
 /// installed in this prefix yet) is not an error — just an empty list.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_installed_winetricks_verbs(
     state: State<ConfigState>,
     prefix_path: String,

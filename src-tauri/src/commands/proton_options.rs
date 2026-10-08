@@ -91,7 +91,7 @@ fn parse_call_args(s: &str) -> Option<(&str, &str)> {
 
 /// Lists the switches the given runner's `proton` script understands, for
 /// the "Proton" settings, both global and per game. Wine runners have none.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_proton_options(
     state: State<ConfigState>,
     runner_id: String,
@@ -116,7 +116,7 @@ pub fn get_proton_config(state: State<ConfigState>) -> Result<ProtonConfig, AppE
     Ok(config.proton.clone())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn save_proton_config(
     app: AppHandle,
     state: State<ConfigState>,

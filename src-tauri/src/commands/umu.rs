@@ -250,7 +250,7 @@ fn runtime_present_in(runner_path: &Path, env: Env) -> bool {
     umu_local_dir(env).is_none_or(|dir| runtime_dir_complete(&dir.join(runtime)))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_umu_status(app: AppHandle) -> Result<UmuStatus, AppError> {
     Ok(read_status(&umu_dir(&app)?))
 }

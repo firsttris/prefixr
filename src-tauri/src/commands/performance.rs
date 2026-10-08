@@ -15,7 +15,7 @@ pub fn get_performance_config(state: State<ConfigState>) -> Result<PerformanceCo
     Ok(config.performance.clone())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn save_performance_config(
     app: AppHandle,
     state: State<ConfigState>,

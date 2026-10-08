@@ -172,7 +172,7 @@ pub async fn umu_command(
     ))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_runners(state: State<ConfigState>) -> Result<Vec<Runner>, AppError> {
     let runners_dir = {
         let config = state.locked();

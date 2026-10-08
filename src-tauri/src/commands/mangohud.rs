@@ -118,7 +118,7 @@ pub fn get_mangohud_config(state: State<ConfigState>) -> Result<MangoHudConfig, 
     Ok(config.mangohud.clone())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn save_mangohud_config(
     app: AppHandle,
     state: State<ConfigState>,

@@ -81,7 +81,7 @@ pub fn get_graphics_config(state: State<ConfigState>) -> Result<GraphicsConfig, 
     Ok(config.graphics.clone())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn save_graphics_config(
     app: AppHandle,
     state: State<ConfigState>,

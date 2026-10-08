@@ -50,7 +50,7 @@ pub(crate) fn known_prefix(config: &AppConfig, path: &str) -> Result<PathBuf, St
 /// decided per-game, via `Game::runner_id`. Returns the path registered,
 /// which for a Proton compat data folder is its `pfx/` (see
 /// `effective_prefix_path`).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn add_prefix(
     app: AppHandle,
     state: State<ConfigState>,

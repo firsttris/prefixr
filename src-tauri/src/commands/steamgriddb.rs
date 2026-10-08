@@ -168,7 +168,7 @@ pub fn get_steamgriddb_config(state: State<ConfigState>) -> Result<SteamGridDbCo
     Ok(config.steamgriddb.clone())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn save_steamgriddb_config(
     app: AppHandle,
     state: State<ConfigState>,
@@ -621,7 +621,7 @@ pub fn get_game_cover(
     cached_asset(&app, &state, &game_id, Slot::Cover)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn remove_game_cover(
     app: AppHandle,
     state: State<ConfigState>,
@@ -654,7 +654,7 @@ pub fn get_game_icon(
     cached_asset(&app, &state, &game_id, Slot::Icon)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn remove_game_icon(
     app: AppHandle,
     state: State<ConfigState>,
@@ -677,7 +677,7 @@ pub async fn set_game_artwork(
     set_asset(&app, &state, &game_id, slot, steamgriddb_id, None, image_url).await
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn remove_game_artwork(
     app: AppHandle,
     state: State<ConfigState>,

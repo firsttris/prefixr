@@ -26,7 +26,7 @@ pub fn get_github_config(state: State<ConfigState>) -> Result<GitHubConfig, AppE
     Ok(config.github.clone())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn save_github_config(
     app: AppHandle,
     state: State<ConfigState>,

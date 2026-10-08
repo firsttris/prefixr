@@ -418,7 +418,7 @@ pub async fn remove_from_steam(
 
 /// The ids of the games that have an entry in Steam. Empty without Steam,
 /// or if its shortcuts can't be read.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_steam_games(state: State<ConfigState>) -> Result<Vec<String>, AppError> {
     let Ok(user) = SteamUser::find() else {
         return Ok(Vec::new());
