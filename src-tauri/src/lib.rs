@@ -109,9 +109,19 @@ pub fn run() {
         // click or a desktop shortcut, while Prefixr is already running, hand
         // its `--install <path>` or `--launch <id>` off to this instance
         // instead of opening a second window.
+        //
+        // Either is stored before the event goes out: a webview that isn't
+        // listening yet (the first instance is still starting up) picks it
+        // up through `take_pending_*` once it is, and one that is listening
+        // takes it on the event, so it's handled exactly once either way.
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             if let Some(game_id) = find_launch_arg(&argv) {
-                let _ = app.emit("pending-launch", game_id);
+                if let Some(state) = app.try_state::<PendingLaunch>() {
+                    if let Ok(mut pending) = state.0.lock() {
+                        *pending = Some(game_id);
+                    }
+                }
+                let _ = app.emit("pending-launch", ());
                 return;
             }
             let Some(exe_path) = find_install_arg(&argv) else {
@@ -121,10 +131,10 @@ pub fn run() {
             };
             if let Some(state) = app.try_state::<PendingInstall>() {
                 if let Ok(mut pending) = state.0.lock() {
-                    *pending = Some(exe_path.clone());
+                    *pending = Some(exe_path);
                 }
             }
-            let _ = app.emit("pending-install", exe_path);
+            let _ = app.emit("pending-install", ());
             show_and_focus(app);
             rebuild_tray_menu(app);
         }));

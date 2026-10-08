@@ -429,10 +429,11 @@ pub async fn kill_game(running: State<'_, RunningGames>, id: String) -> Result<(
     kill_running_game(&running, game_id).await.map_err(AppError::from)
 }
 
-/// Holds a `--launch <game-id>` argument found at startup (see `run()` in
-/// `lib.rs`), so the frontend can pick it up once and start that game
-/// immediately — this is what a desktop shortcut created by
-/// `create_desktop_shortcut` invokes the app with.
+/// Holds a `--launch <game-id>` argument found at startup, or forwarded by
+/// a second app instance (see `run()` in `lib.rs`), so the frontend can pick
+/// it up once and start that game immediately — this is what a desktop
+/// shortcut created by `create_desktop_shortcut` invokes the app with. The
+/// frontend takes it on startup and again on every `pending-launch` event.
 pub struct PendingLaunch(pub Mutex<Option<String>>);
 
 #[tauri::command]
@@ -443,10 +444,10 @@ pub fn take_pending_launch(state: State<PendingLaunch>) -> Option<String> {
 /// Holds a `--install <exe-path>` argument found at startup, or forwarded by
 /// a second app instance (see `tauri_plugin_single_instance` in `lib.rs`) —
 /// the "Install with Prefixr" file-manager context menu entry launches
-/// Prefixr this way. The frontend picks it up once (either via
-/// `take_pending_install` on startup, or via the `pending-install` event a
-/// second instance triggers while the app is already running) and opens the
-/// installer dialog with this exe path pre-filled.
+/// Prefixr this way. The frontend picks it up once (via
+/// `take_pending_install`, on startup and again on every `pending-install`
+/// event a second instance triggers while the app is already running) and
+/// opens the installer dialog with this exe path pre-filled.
 pub struct PendingInstall(pub Mutex<Option<String>>);
 
 #[tauri::command]

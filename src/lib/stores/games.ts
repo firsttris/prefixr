@@ -153,9 +153,13 @@ export async function takePendingLaunch(): Promise<string | null> {
 
 // Listens for a `pending-launch` event, fired when a desktop shortcut is
 // used while Prefixr is already running: that second instance hands its
-// game id off to this one instead.
+// game id off to this one instead. The id waits in the backend until it's
+// taken, so a webview that wasn't listening yet still finds it on startup.
 export function listenForPendingLaunch(callback: (id: string) => void): Promise<UnlistenFn> {
-  return listen<string>("pending-launch", (event) => callback(event.payload));
+  return listen("pending-launch", async () => {
+    const id = await takePendingLaunch();
+    if (id) callback(id);
+  });
 }
 
 // Checks whether the app was started via the "Mit Prefixr installieren"
@@ -173,7 +177,10 @@ export async function takePendingInstall(): Promise<string | null> {
 export function listenForPendingInstall(
   callback: (exePath: string) => void,
 ): Promise<UnlistenFn> {
-  return listen<string>("pending-install", (event) => callback(event.payload));
+  return listen("pending-install", async () => {
+    const exePath = await takePendingInstall();
+    if (exePath) callback(exePath);
+  });
 }
 
 // Runs the installer exe under the given prefix/runner and waits for it to
