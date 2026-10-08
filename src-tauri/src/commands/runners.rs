@@ -202,17 +202,19 @@ pub fn list_runners(state: State<ConfigState>) -> Result<Vec<Runner>, AppError> 
 /// Async, since a runner is several hundred MB of files.
 #[tauri::command]
 pub async fn delete_runner(state: State<'_, ConfigState>, runner_id: String) -> Result<(), AppError> {
-    let (runner, users) = {
+    // The runners directory is scanned after the lock is released, so other
+    // commands don't wait on the disk.
+    let (runners_dir, users) = {
         let config = state.locked();
-        let runner = find_runner(&config.runners_dir, &runner_id)?;
         let users: Vec<String> = config
             .games
             .iter()
             .filter(|g| g.runner_id == runner_id)
             .map(|g| format!("„{}“", g.name))
             .collect();
-        (runner, users)
+        (config.runners_dir.clone(), users)
     };
+    let runner = find_runner(&runners_dir, &runner_id)?;
     if !users.is_empty() {
         return Err(AppError::RunnerInUse {
             runner_name: runner.name,
