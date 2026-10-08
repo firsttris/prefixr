@@ -7,6 +7,7 @@
     title,
     onClose,
     wide = false,
+    closable = true,
     children,
   }: {
     open: boolean;
@@ -14,8 +15,16 @@
     onClose: () => void;
     // For content with side-by-side layouts, like the game settings tabs.
     wide?: boolean;
+    // False while the content is in the middle of something it has to
+    // see through (e.g. a running installer): Escape, a backdrop click and
+    // the close button then do nothing.
+    closable?: boolean;
     children: Snippet;
   } = $props();
+
+  function close() {
+    if (closable) onClose();
+  }
 
   const titleId = $props.id();
   let panel = $state<HTMLDivElement>();
@@ -42,7 +51,7 @@
 
   function handleKeydown(event: KeyboardEvent) {
     if (event.key === "Escape") {
-      onClose();
+      close();
       return;
     }
     // Tab cycles within the dialog instead of moving on to the page behind.
@@ -73,7 +82,7 @@
   <!-- Only a click on the backdrop itself closes, not one inside the panel. -->
   <div
     class="backdrop"
-    onclick={(e) => e.target === e.currentTarget && onClose()}
+    onclick={(e) => e.target === e.currentTarget && close()}
     role="presentation"
   >
     <div
@@ -87,8 +96,12 @@
     >
       <header>
         <h2 id={titleId}>{title}</h2>
-        <button type="button" class="ghost" onclick={onClose} aria-label={m.common_close()}
-          >✕</button
+        <button
+          type="button"
+          class="ghost"
+          onclick={close}
+          disabled={!closable}
+          aria-label={m.common_close()}>✕</button
         >
       </header>
       <div class="body">

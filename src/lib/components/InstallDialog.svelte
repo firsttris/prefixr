@@ -11,13 +11,24 @@
   import type { DetectedShortcut } from "$lib/types";
   import { backendError } from "$lib/i18n/index.svelte";
 
-  let { exePath, onClose }: { exePath: string; onClose: () => void } = $props();
+  let {
+    exePath,
+    onClose,
+    onBusyChange,
+  }: {
+    exePath: string;
+    onClose: () => void;
+    // Told while the installer runs, so the surrounding modal stays open
+    // until its result (the shortcuts it created) is in.
+    onBusyChange?: (busy: boolean) => void;
+  } = $props();
 
   let exeName = $derived(exePath.split(/[/\\]/).pop() ?? exePath);
 
   let prefixPath = $state("");
   let runnerId = $state("");
   let busy = $state(false);
+  $effect(() => onBusyChange?.(busy));
   let creatingPrefix = $state(false);
   let error = $state<unknown>(null);
 

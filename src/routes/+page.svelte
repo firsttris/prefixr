@@ -47,6 +47,7 @@
   let editing = $state<Game | "new" | null>(null);
   let pickingArtworkFor = $state<Game | null>(null);
   let installingExePath = $state<string | null>(null);
+  let installerRunning = $state(false);
 
   let modalGame = $derived(editing && editing !== "new" ? editing : undefined);
   let modalTitle = $derived(
@@ -212,10 +213,15 @@
 <Modal
   open={installingExePath !== null}
   title={m.library_installTitle()}
+  closable={!installerRunning}
   onClose={() => (installingExePath = null)}
 >
   {#if installingExePath}
-    <InstallDialog exePath={installingExePath} onClose={() => (installingExePath = null)} />
+    <InstallDialog
+      exePath={installingExePath}
+      onClose={() => (installingExePath = null)}
+      onBusyChange={(busy) => (installerRunning = busy)}
+    />
   {/if}
 </Modal>
 
