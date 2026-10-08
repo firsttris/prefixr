@@ -60,19 +60,20 @@ const COMPETING_SCHEDULER_UNITS: &[&str] = &[
 /// Whether one of `COMPETING_SCHEDULER_UNITS` is currently active, in which
 /// case GameMode's own niceness/governor tweaks should be skipped in favor of
 /// `power_profile` (see `launch_game`).
+///
+/// One `systemctl is-active` call for all of them, which prints one state
+/// per unit, in order.
 async fn competing_scheduler_active() -> bool {
-    for unit in COMPETING_SCHEDULER_UNITS {
-        let active = tokio::process::Command::new("systemctl")
-            .args(["is-active", "--quiet", unit])
-            .status()
-            .await
-            .map(|status| status.success())
-            .unwrap_or(false);
-        if active {
-            return true;
-        }
-    }
-    false
+    tokio::process::Command::new("systemctl")
+        .arg("is-active")
+        .args(COMPETING_SCHEDULER_UNITS)
+        .output()
+        .await
+        .is_ok_and(|output| any_unit_active(&String::from_utf8_lossy(&output.stdout)))
+}
+
+fn any_unit_active(states: &str) -> bool {
+    states.lines().any(|state| state.trim() == "active")
 }
 
 /// A game process currently running under its runner, tracked so the tray

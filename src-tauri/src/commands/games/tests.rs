@@ -597,3 +597,11 @@ fn process_tree_helpers_see_real_processes() {
     }
     assert!(!process_running(descendants[0]));
 }
+
+#[test]
+fn any_unit_active_reads_systemctl_is_active_output() {
+    assert!(!any_unit_active("inactive\ninactive\nunknown\n"));
+    assert!(any_unit_active("inactive\nactive\ninactive\n"));
+    assert!(!any_unit_active("activating\nfailed\n"));
+    assert!(!any_unit_active(""));
+}
