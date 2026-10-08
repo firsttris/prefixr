@@ -7,6 +7,7 @@ use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Manager, State};
 
 use crate::commands::github::read_token;
+use crate::commands::runner_downloads::{replace_dir, restore_replaced_dir};
 use crate::config::ConfigState;
 
 /// umu-launcher (https://github.com/Open-Wine-Components/umu-launcher) is
@@ -130,9 +131,9 @@ async fn latest_release(token: Option<&str>) -> Result<GitHubRelease, String> {
 }
 
 /// Downloads the latest umu release's zipapp, verifies it and swaps it in
-/// place of whatever copy was there before. Unpacked into a staging
-/// directory first, so a failed or interrupted update never leaves a
-/// half-extracted copy behind in place of a working one.
+/// place of whatever copy was there before (see `replace_dir`). Unpacked
+/// into a staging directory first, so a failed or interrupted update never
+/// leaves a half-extracted copy behind in place of a working one.
 async fn install_latest(app: &AppHandle, token: Option<&str>) -> Result<UmuStatus, String> {
     let release = latest_release(token).await?;
 
@@ -175,12 +176,10 @@ async fn install_latest(app: &AppHandle, token: Option<&str>) -> Result<UmuStatu
     fs::write(version_file(&staging), &release.tag_name)
         .map_err(|e| format!("Could not write umu version file: {e}"))?;
 
-    if dir.exists() {
-        fs::remove_dir_all(&dir)
-            .map_err(|e| format!("Could not remove old {}: {e}", dir.display()))?;
-    }
-    fs::rename(&staging, &dir)
-        .map_err(|e| format!("Could not move umu into {}: {e}", dir.display()))?;
+    // The old copy stays usable until the new one is in its place, so a
+    // failed update — or a launch starting umu-run meanwhile — never finds
+    // no umu at all.
+    replace_dir(&staging, &dir)?;
 
     Ok(read_status(&dir))
 }
@@ -196,6 +195,9 @@ static INSTALL_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 pub async fn ensure_umu(app: &AppHandle, token: Option<&str>) -> Result<PathBuf, String> {
     let dir = umu_dir(app)?;
     let path = umu_run_path(&dir);
+    if !path.is_file() {
+        restore_replaced_dir(&dir);
+    }
     if !path.is_file() {
         let _lock = INSTALL_LOCK.lock().await;
         // Another launch may have installed it while this one waited.

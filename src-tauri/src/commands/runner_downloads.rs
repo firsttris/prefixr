@@ -305,6 +305,84 @@ pub(crate) fn move_extracted_dir(extract_dir: &Path, target: &Path) -> Result<()
     result
 }
 
+/// Puts the directory `new` in place of `target`, which may or may not exist
+/// yet. An existing `target` is swapped out atomically (renameat2's
+/// `RENAME_EXCHANGE`), so anything resolving a path inside it at the same
+/// time — a game launch starting umu-run, say — sees either the old or the
+/// new copy, never neither; the old copy is then deleted. Where the
+/// filesystem can't exchange, the old copy is moved aside to `<target>.old`
+/// first and moved back if the second rename fails (`restore_replaced_dir`
+/// covers being interrupted in between).
+pub(crate) fn replace_dir(new: &Path, target: &Path) -> Result<(), String> {
+    let moved = |e: std::io::Error| format!("Could not move {} into place: {e}", new.display());
+    if fs::symlink_metadata(target).is_err() {
+        return fs::rename(new, target).map_err(moved);
+    }
+    if exchange_paths(new, target).is_ok() {
+        // `new` now holds the old copy.
+        let _ = fs::remove_dir_all(new);
+        return Ok(());
+    }
+
+    let old = replaced_dir(target);
+    if fs::symlink_metadata(&old).is_ok() {
+        fs::remove_dir_all(&old)
+            .map_err(|e| format!("Could not remove {}: {e}", old.display()))?;
+    }
+    fs::rename(target, &old).map_err(|e| format!("Could not move {} aside: {e}", target.display()))?;
+    if let Err(e) = fs::rename(new, target) {
+        let _ = fs::rename(&old, target);
+        return Err(moved(e));
+    }
+    let _ = fs::remove_dir_all(&old);
+    Ok(())
+}
+
+/// Where `replace_dir` keeps the old copy while it can't exchange.
+fn replaced_dir(target: &Path) -> PathBuf {
+    let mut name = target.file_name().unwrap_or_default().to_os_string();
+    name.push(".old");
+    target.with_file_name(name)
+}
+
+/// Moves the old copy `replace_dir` set aside back into place, if it was
+/// interrupted after moving it aside and before the new copy was in.
+pub(crate) fn restore_replaced_dir(target: &Path) {
+    let old = replaced_dir(target);
+    if fs::symlink_metadata(target).is_err() && old.is_dir() {
+        let _ = fs::rename(&old, target);
+    }
+}
+
+/// Atomically swaps two paths, via renameat2(2) with `RENAME_EXCHANGE`
+/// (called as a raw syscall, so it doesn't depend on the glibc version).
+fn exchange_paths(a: &Path, b: &Path) -> std::io::Result<()> {
+    use std::ffi::CString;
+    use std::os::unix::ffi::OsStrExt;
+    let c_path = |path: &Path| {
+        CString::new(path.as_os_str().as_bytes())
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))
+    };
+    let (a, b) = (c_path(a)?, c_path(b)?);
+    // SAFETY: both strings are valid and NUL-terminated for the duration of
+    // the call; renameat2 takes no other pointers.
+    let rc = unsafe {
+        libc::syscall(
+            libc::SYS_renameat2,
+            libc::AT_FDCWD,
+            a.as_ptr(),
+            libc::AT_FDCWD,
+            b.as_ptr(),
+            libc::RENAME_EXCHANGE,
+        )
+    };
+    if rc == 0 {
+        Ok(())
+    } else {
+        Err(std::io::Error::last_os_error())
+    }
+}
+
 /// Hashes a file on disk with the given algorithm, returning its digest as a
 /// lowercase hex string. Run inside `spawn_blocking` by callers, since
 /// hashing a multi-hundred-MB archive is real CPU work.
