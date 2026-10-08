@@ -1,4 +1,5 @@
 use super::*;
+use crate::test_util::TestDir;
 
 #[test]
 fn checksum_asset_names_match_real_releases() {
@@ -109,7 +110,7 @@ fn download_requests_are_checked() {
 
 #[test]
 fn move_renames_the_extracted_dir_and_cleans_up() {
-    let dir = std::env::temp_dir().join(format!("prefixr-test-{}", uuid::Uuid::new_v4()));
+    let dir = TestDir::new("dir");
     fs::create_dir_all(&dir).unwrap();
 
     // An archive whose top-level folder name doesn't match the GitHub
@@ -127,12 +128,11 @@ fn move_renames_the_extracted_dir_and_cleans_up() {
     move_extracted_dir(&other, &dir.join("wine-11.18")).unwrap();
     assert!(dir.join("wine-11.18").is_dir());
 
-    fs::remove_dir_all(&dir).unwrap();
 }
 
 #[test]
 fn move_rejects_archives_without_a_single_dir() {
-    let dir = std::env::temp_dir().join(format!("prefixr-test-{}", uuid::Uuid::new_v4()));
+    let dir = TestDir::new("dir");
     let extract = extraction_dir(&dir);
     fs::create_dir_all(extract.join("a")).unwrap();
     fs::create_dir_all(extract.join("b")).unwrap();
@@ -141,11 +141,10 @@ fn move_rejects_archives_without_a_single_dir() {
     assert!(!extract.exists());
     assert!(!dir.join("target").exists());
 
-    fs::remove_dir_all(&dir).unwrap();
 }
 
-fn replace_dir_fixture(name: &str) -> (PathBuf, PathBuf, PathBuf) {
-    let root = std::env::temp_dir().join(format!("prefixr-test-{name}-{}", uuid::Uuid::new_v4()));
+fn replace_dir_fixture(name: &str) -> (TestDir, PathBuf, PathBuf) {
+    let root = TestDir::new(name);
     let new = root.join("app.new");
     let target = root.join("app");
     fs::create_dir_all(&new).unwrap();
@@ -155,18 +154,17 @@ fn replace_dir_fixture(name: &str) -> (PathBuf, PathBuf, PathBuf) {
 
 #[test]
 fn replace_dir_moves_into_a_missing_target() {
-    let (root, new, target) = replace_dir_fixture("replace-missing");
+    let (_root, new, target) = replace_dir_fixture("replace-missing");
 
     replace_dir(&new, &target).unwrap();
 
     assert_eq!(fs::read_to_string(target.join("file")).unwrap(), "new");
     assert!(!new.exists());
-    fs::remove_dir_all(root).unwrap();
 }
 
 #[test]
 fn replace_dir_swaps_out_an_existing_target() {
-    let (root, new, target) = replace_dir_fixture("replace-existing");
+    let (_root, new, target) = replace_dir_fixture("replace-existing");
     fs::create_dir_all(&target).unwrap();
     fs::write(target.join("file"), "old").unwrap();
     fs::write(target.join("only-old"), "").unwrap();
@@ -177,12 +175,11 @@ fn replace_dir_swaps_out_an_existing_target() {
     assert!(!target.join("only-old").exists());
     assert!(!new.exists());
     assert!(!replaced_dir(&target).exists());
-    fs::remove_dir_all(root).unwrap();
 }
 
 #[test]
 fn restore_replaced_dir_brings_back_an_interrupted_swap() {
-    let (root, _new, target) = replace_dir_fixture("replace-restore");
+    let (_root, _new, target) = replace_dir_fixture("replace-restore");
     let old = replaced_dir(&target);
     fs::create_dir_all(&old).unwrap();
     fs::write(old.join("file"), "old").unwrap();
@@ -191,5 +188,4 @@ fn restore_replaced_dir_brings_back_an_interrupted_swap() {
 
     assert_eq!(fs::read_to_string(target.join("file")).unwrap(), "old");
     assert!(!old.exists());
-    fs::remove_dir_all(root).unwrap();
 }

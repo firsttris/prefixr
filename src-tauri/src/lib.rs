@@ -1,10 +1,13 @@
 mod commands;
 mod config;
+mod env;
 mod error;
 mod http;
 mod lock;
 mod locale;
 mod models;
+#[cfg(test)]
+mod test_util;
 mod tray;
 
 use std::path::Path;

@@ -1,4 +1,5 @@
 use super::*;
+use crate::test_util::TestDir;
 
 fn utf16(text: &str) -> Vec<u8> {
     text.encode_utf16().flat_map(u16::to_le_bytes).collect()
@@ -17,7 +18,7 @@ fn reads_the_mono_version_from_utf16_strings() {
 
 #[test]
 fn layer_statuses_read_the_recorded_versions() {
-    let cache = std::env::temp_dir().join(format!("prefixr-test-layers-{}", uuid::Uuid::new_v4()));
+    let cache = TestDir::new("layers");
     fs::create_dir_all(cache.join("dxvk")).unwrap();
     fs::write(version_file(&cache.join("dxvk")), "v2.7.1\n").unwrap();
 
@@ -29,7 +30,6 @@ fn layer_statuses_read_the_recorded_versions() {
     assert_eq!(statuses[1].label, "VKD3D-Proton");
     assert!(!statuses[1].installed);
     assert_eq!(statuses[1].version, None);
-    fs::remove_dir_all(cache).unwrap();
 }
 
 #[test]

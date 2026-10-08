@@ -327,7 +327,7 @@ fn add_shortcut(app: &AppHandle, game: &Game, user: &SteamUser) -> Result<(), Ap
         None => None,
     };
 
-    upsert_shortcut(shortcuts, game, app_id, &own_executable_path()?, icon.as_deref());
+    upsert_shortcut(shortcuts, game, app_id, &own_executable_path(&crate::env::process)?, icon.as_deref());
     write_shortcuts_file(vdf_path, &file).map_err(AppError::from)
 }
 

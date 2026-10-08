@@ -9,6 +9,7 @@ use tauri::{AppHandle, Manager, State};
 use crate::commands::github::read_token;
 use crate::commands::runner_downloads::{replace_dir, restore_replaced_dir, with_optional_auth};
 use crate::config::ConfigState;
+use crate::env::{self, Env};
 
 /// umu-launcher (https://github.com/Open-Wine-Components/umu-launcher) is
 /// what every Proton runner is launched through — see `launch_game`. It runs
@@ -216,13 +217,13 @@ pub async fn ensure_umu(app: &AppHandle, token: Option<&str>) -> Result<PathBuf,
 /// downloads — shared with every other umu-based launcher on the system
 /// (Lutris, Heroic, ...), so a runtime any of them already fetched is reused
 /// as-is. Mirrors `UMU_LOCAL` in umu's `umu_consts.py`.
-fn umu_local_dir() -> Option<PathBuf> {
-    if let Some(folders) = std::env::var_os("UMU_FOLDERS_PATH") {
+fn umu_local_dir(env: Env) -> Option<PathBuf> {
+    if let Some(folders) = env("UMU_FOLDERS_PATH") {
         return Some(PathBuf::from(folders).join("umu"));
     }
-    let data_home = std::env::var_os("XDG_DATA_HOME")
+    let data_home = env("XDG_DATA_HOME")
         .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/share")))?;
+        .or_else(|| env("HOME").map(|h| PathBuf::from(h).join(".local/share")))?;
     Some(data_home.join("umu"))
 }
 
@@ -234,6 +235,10 @@ fn umu_local_dir() -> Option<PathBuf> {
 /// or unparsable manifests count as present: this is only a UI hint, umu
 /// itself is the authority on what gets downloaded.
 pub fn runtime_present(runner_path: &Path) -> bool {
+    runtime_present_in(runner_path, &env::process)
+}
+
+fn runtime_present_in(runner_path: &Path, env: Env) -> bool {
     let Ok(manifest) = fs::read_to_string(runner_path.join("toolmanifest.vdf")) else {
         return true;
     };
@@ -242,7 +247,7 @@ pub fn runtime_present(runner_path: &Path) -> bool {
     };
     // umu's own completeness check: an interrupted download leaves the
     // runtime's directory behind, but no `<name>_platform_<version>` inside.
-    umu_local_dir().is_none_or(|dir| runtime_dir_complete(&dir.join(runtime)))
+    umu_local_dir(env).is_none_or(|dir| runtime_dir_complete(&dir.join(runtime)))
 }
 
 #[tauri::command]

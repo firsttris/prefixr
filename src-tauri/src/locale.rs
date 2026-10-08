@@ -1,5 +1,6 @@
 use std::sync::{Mutex, OnceLock};
 
+use crate::env::{self, Env};
 use crate::lock::LockExt;
 
 /// The UI language for the handful of things Rust itself renders directly
@@ -27,12 +28,10 @@ impl Locale {
     /// Best-effort guess for the dialogs that can appear before the
     /// frontend — and its own locale detection/choice — exists at all,
     /// mirroring the frontend's own `navigator.language` fallback.
-    pub fn from_env() -> Self {
+    pub fn from_env(env: Env) -> Self {
         for var in ["LC_ALL", "LC_MESSAGES", "LANG"] {
-            if let Ok(val) = std::env::var(var) {
-                if !val.is_empty() {
-                    return Self::from_code(&val);
-                }
+            if let Some(val) = env(var).filter(|val| !val.is_empty()) {
+                return Self::from_code(&val.to_string_lossy());
             }
         }
         Locale::De
@@ -43,7 +42,7 @@ pub struct LocaleState(Mutex<Locale>);
 
 impl Default for LocaleState {
     fn default() -> Self {
-        Self(Mutex::new(Locale::from_env()))
+        Self(Mutex::new(Locale::from_env(&env::process)))
     }
 }
 

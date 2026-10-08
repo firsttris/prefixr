@@ -1,8 +1,9 @@
 use super::*;
+use crate::test_util::TestDir;
 
 #[test]
 fn keeps_only_the_newest_logs() {
-    let dir = std::env::temp_dir().join(format!("prefixr-test-{}", uuid::Uuid::new_v4()));
+    let dir = TestDir::new("dir");
     fs::create_dir_all(&dir).unwrap();
     // Seconds-named logs from older versions, then millisecond ones.
     for name in ["1790000000", "1790000001", "1790000002000", "1790000003000"] {
@@ -20,5 +21,4 @@ fn keeps_only_the_newest_logs() {
 
     let log = new_log_file(&dir).unwrap();
     assert!(log.is_file());
-    fs::remove_dir_all(&dir).unwrap();
 }

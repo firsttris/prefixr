@@ -1,16 +1,13 @@
+use crate::test_util::TestDir;
 use super::{
     is_verb_name, looks_like_winetricks, parse_verb_catalogue, read_installed_verbs,
     uses_umu_winetricks,
 };
 use crate::models::{Runner, RunnerKind};
 use std::fs;
-use std::path::PathBuf;
-use uuid::Uuid;
 
-fn temp_path(name: &str) -> PathBuf {
-    let path = std::env::temp_dir().join(format!("prefixr-{name}-{}", Uuid::new_v4()));
-    fs::create_dir_all(&path).unwrap();
-    path
+fn temp_path(name: &str) -> TestDir {
+    TestDir::new(name)
 }
 
 #[test]
@@ -78,7 +75,6 @@ fn reads_installed_winetricks_verbs_and_ignores_blank_lines() {
         ]
     );
 
-    let _ = fs::remove_dir_all(prefix);
 }
 
 #[test]
@@ -90,7 +86,6 @@ fn missing_winetricks_log_is_not_an_error() {
         Vec::<String>::new()
     );
 
-    let _ = fs::remove_dir_all(prefix);
 }
 
 #[test]
@@ -102,20 +97,19 @@ fn uses_umu_winetricks_only_for_proton_with_bundled_script() {
     let proton_runner = Runner {
         id: "proton".to_string(),
         name: "GE-Proton".to_string(),
-        path: proton_dir.clone(),
+        path: proton_dir.to_path_buf(),
         kind: RunnerKind::Proton,
     };
     let wine_runner = Runner {
         id: "wine".to_string(),
         name: "Wine".to_string(),
-        path: proton_dir.clone(),
+        path: proton_dir.to_path_buf(),
         kind: RunnerKind::Wine,
     };
 
     assert!(uses_umu_winetricks(&proton_runner));
     assert!(!uses_umu_winetricks(&wine_runner));
 
-    let _ = fs::remove_dir_all(proton_dir);
 }
 
 #[test]

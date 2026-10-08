@@ -1,13 +1,10 @@
+use crate::test_util::TestDir;
 use super::{parse_link_info, read_ascii_cstr, read_utf16_cstr, resolve_windows_path};
 use std::fs;
 use std::os::unix::fs::symlink;
-use std::path::PathBuf;
-use uuid::Uuid;
 
-fn temp_path(name: &str) -> PathBuf {
-    let path = std::env::temp_dir().join(format!("prefixr-{name}-{}", Uuid::new_v4()));
-    fs::create_dir_all(&path).unwrap();
-    path
+fn temp_path(name: &str) -> TestDir {
+    TestDir::new(name)
 }
 
 fn build_ascii_link_info(base: &str, suffix: &str) -> Vec<u8> {
@@ -64,7 +61,6 @@ fn resolves_windows_paths_through_dosdevices_symlinks() {
     let resolved = resolve_windows_path(&prefix, r"C:\Games/Foo\game.exe").unwrap();
     assert_eq!(resolved, drive_target.join("Games/Foo/game.exe"));
 
-    let _ = fs::remove_dir_all(prefix);
 }
 
 #[test]

@@ -31,6 +31,7 @@ use crate::commands::steamgriddb::{
 use crate::commands::umu::{ensure_umu, runtime_present};
 use crate::lock::LockExt;
 use crate::config::{save_config, ConfigState};
+use crate::env::{self, Env};
 use crate::models::{
     normalize_umu_id, normalize_umu_store, split_launch_args, Game, GameInput, Runner, RunnerKind,
 };
@@ -41,7 +42,11 @@ use crate::tray::rebuild_tray_menu;
 /// installed on every system. `pub(crate)` since `commands::performance` also
 /// needs it (to gate the `pkexec`-based max_map_count fix).
 pub(crate) fn command_on_path(name: &str) -> bool {
-    std::env::var_os("PATH")
+    command_on_path_in(name, &env::process)
+}
+
+fn command_on_path_in(name: &str, env: Env) -> bool {
+    env("PATH")
         .map(|paths| std::env::split_paths(&paths).any(|dir| dir.join(name).is_file()))
         .unwrap_or(false)
 }
@@ -163,8 +168,8 @@ pub(crate) struct LaunchGuard<'a> {
 /// Where the per-game lock files live: the user's runtime directory, which
 /// every Prefixr process of the same user shares, including one started by
 /// Steam.
-fn launch_lock_dir() -> PathBuf {
-    match std::env::var_os("XDG_RUNTIME_DIR") {
+fn launch_lock_dir(env: Env) -> PathBuf {
+    match env("XDG_RUNTIME_DIR") {
         Some(dir) => PathBuf::from(dir).join("prefixr"),
         // SAFETY: getuid(2) can't fail and has no preconditions.
         None => std::env::temp_dir().join(format!("prefixr-{}", unsafe { libc::getuid() })),
@@ -175,7 +180,7 @@ fn launch_lock_dir() -> PathBuf {
 /// that can't be created or locked for any other reason gives `Ok(None)`:
 /// the launch then goes ahead, guarded only within this process as before.
 fn lock_launch_file(id: Uuid) -> Result<Option<fs::File>, ()> {
-    let dir = launch_lock_dir();
+    let dir = launch_lock_dir(&env::process);
     if fs::create_dir_all(&dir).is_err() {
         return Ok(None);
     }
@@ -685,13 +690,13 @@ pub fn remove_game(
         let _ = fs::remove_dir_all(logs);
     }
 
-    let desktop_shortcuts = desktop_directory()
+    let desktop_shortcuts = desktop_directory(&env::process)
         .map(|dir| game_shortcuts(&dir, game_id))
         .unwrap_or_default();
     for shortcut in desktop_shortcuts {
         let _ = fs::remove_file(shortcut);
     }
-    if let Ok(applications_dir) = applications_directory() {
+    if let Ok(applications_dir) = applications_directory(&env::process) {
         let menu_entries = game_shortcuts(&applications_dir, game_id);
         for entry in &menu_entries {
             let _ = fs::remove_file(entry);
@@ -1527,8 +1532,8 @@ fn keep_inherited_preload(env: &mut [(String, String)], inherited: Option<String
 /// The user's Desktop folder, honoring a localized `XDG_DESKTOP_DIR` (e.g.
 /// "Schreibtisch" on a German system) if `~/.config/user-dirs.dirs` sets one,
 /// falling back to `~/Desktop`.
-fn desktop_directory() -> Result<PathBuf, String> {
-    let home = std::env::var_os("HOME")
+fn desktop_directory(env: Env) -> Result<PathBuf, String> {
+    let home = env("HOME")
         .map(PathBuf::from)
         .ok_or_else(|| "HOME is not set".to_string())?;
 
@@ -1550,11 +1555,11 @@ fn desktop_directory() -> Result<PathBuf, String> {
 /// falling back to `~/.local/share/applications`) — where a `.desktop` file
 /// needs to live for the desktop environment's start menu / app launcher to
 /// pick it up, as opposed to `desktop_directory` for an icon on the Desktop.
-fn applications_directory() -> Result<PathBuf, String> {
-    if let Some(data_home) = std::env::var_os("XDG_DATA_HOME") {
+fn applications_directory(env: Env) -> Result<PathBuf, String> {
+    if let Some(data_home) = env("XDG_DATA_HOME") {
         return Ok(PathBuf::from(data_home).join("applications"));
     }
-    let home = std::env::var_os("HOME")
+    let home = env("HOME")
         .map(PathBuf::from)
         .ok_or_else(|| "HOME is not set".to_string())?;
     Ok(home.join(".local/share/applications"))
@@ -1603,8 +1608,8 @@ pub(crate) fn write_shortcut_icon(app: &AppHandle, game: &Game) -> Result<Option
 /// re-randomized on every launch — useless for a persistent shortcut.
 /// AppImages set `APPIMAGE` to the real `.AppImage` file's path exactly for
 /// cases like this, so that's preferred when present.
-pub(crate) fn own_executable_path() -> Result<PathBuf, String> {
-    if let Some(appimage_path) = std::env::var_os("APPIMAGE") {
+pub(crate) fn own_executable_path(env: Env) -> Result<PathBuf, String> {
+    if let Some(appimage_path) = env("APPIMAGE") {
         return Ok(PathBuf::from(appimage_path));
     }
     std::env::current_exe().map_err(|e| format!("Could not resolve own executable path: {e}"))
@@ -1695,7 +1700,7 @@ fn write_game_shortcut(
         .map_err(|e| format!("Could not access {}: {e}", target_dir.display()))?;
 
     let icon_path = write_shortcut_icon(app, &game)?;
-    let exe_path = own_executable_path()?;
+    let exe_path = own_executable_path(&env::process)?;
 
     let mut contents = String::new();
     contents.push_str("[Desktop Entry]\n");
@@ -1746,7 +1751,7 @@ pub fn create_desktop_shortcut(
     state: State<ConfigState>,
     id: String,
 ) -> Result<(), AppError> {
-    let desktop_dir = desktop_directory()?;
+    let desktop_dir = desktop_directory(&env::process)?;
     write_game_shortcut(&app, &state, &id, &desktop_dir).map_err(AppError::from)
 }
 
@@ -1763,7 +1768,7 @@ pub fn create_menu_shortcut(
     state: State<ConfigState>,
     id: String,
 ) -> Result<(), AppError> {
-    let applications_dir = applications_directory()?;
+    let applications_dir = applications_directory(&env::process)?;
     write_game_shortcut(&app, &state, &id, &applications_dir)?;
     let _ = std::process::Command::new("update-desktop-database")
         .arg(&applications_dir)
@@ -1792,7 +1797,7 @@ const EXE_MIME_TYPES: &str = "application/x-ms-dos-executable;application/x-msdo
 /// sync with the app's own executable path (relevant for an AppImage, whose
 /// mount path can move between updates).
 pub fn ensure_install_desktop_entry(app: &AppHandle) -> Result<(), String> {
-    let applications_dir = applications_directory()?;
+    let applications_dir = applications_directory(&env::process)?;
     fs::create_dir_all(&applications_dir)
         .map_err(|e| format!("Could not access {}: {e}", applications_dir.display()))?;
 
@@ -1807,7 +1812,7 @@ pub fn ensure_install_desktop_entry(app: &AppHandle) -> Result<(), String> {
     fs::write(&icon_path, APP_ICON_PNG)
         .map_err(|e| format!("Could not write install icon: {e}"))?;
 
-    let exe_path = own_executable_path()?;
+    let exe_path = own_executable_path(&env::process)?;
     let mut contents = String::new();
     contents.push_str("[Desktop Entry]\n");
     contents.push_str("Type=Application\n");

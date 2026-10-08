@@ -1,13 +1,12 @@
 use super::*;
+use crate::test_util::TestDir;
 use std::fs;
 
 use crate::config::AppConfig;
 use crate::models::{GameOverrides, GitHubConfig, GraphicsConfig, MangoHudConfig, PerformanceConfig, PrefixInfo, ProtonConfig};
 
-fn temp_path(name: &str) -> PathBuf {
-    let path = std::env::temp_dir().join(format!("prefixr-{name}-{}", Uuid::new_v4()));
-    fs::create_dir_all(&path).unwrap();
-    path
+fn temp_path(name: &str) -> TestDir {
+    TestDir::new(name)
 }
 
 fn sample_game(id: Uuid, name: &str) -> Game {
@@ -111,7 +110,6 @@ fn removes_only_stale_files_for_the_requested_kind() {
     assert!(icon.exists());
     assert!(other_game.exists());
 
-    let _ = fs::remove_dir_all(dir);
 }
 
 #[test]
