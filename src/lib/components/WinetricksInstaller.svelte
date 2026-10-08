@@ -1,9 +1,11 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
+  import RunnerSelect from "$lib/components/RunnerSelect.svelte";
   import Message from "$lib/components/Message.svelte";
   import { msgGroup } from "$lib/i18n/msg-groups";
-  import { onMount } from "svelte";
-  import { runners, refreshRunners } from "$lib/stores/runners";
+  import { onMount, untrack } from "svelte";
+  import { prefixRunner, refreshRunners } from "$lib/stores/runners";
+  import { games } from "$lib/stores/games";
   import {
     WINETRICKS_VERBS,
     installWinetricksVerbs,
@@ -16,7 +18,8 @@
   let { prefixPath, onShowLog }: { prefixPath: string; onShowLog: (path: string) => void } =
     $props();
 
-  let runnerId = $state("");
+  // Started with the runner the prefix's games use, if they agree on one.
+  let runnerId = $state(untrack(() => prefixRunner($games, prefixPath)));
   let selected = $state<Set<string>>(new Set());
   let installing = $state(false);
   let error = $state<unknown>(null);
@@ -101,12 +104,7 @@
 
   <label>
     {m.winetricksInstaller_runnerLabel()}
-    <select bind:value={runnerId}>
-      <option value="" disabled selected>{m.gameForm_runnerChoose()}</option>
-      {#each $runners as runner (runner.id)}
-        <option value={runner.id}>{runner.name} ({runner.kind})</option>
-      {/each}
-    </select>
+    <RunnerSelect bind:value={runnerId} />
   </label>
 
   <div class="verb-list">

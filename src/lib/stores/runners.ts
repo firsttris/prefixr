@@ -1,9 +1,16 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { writable } from "svelte/store";
-import type { Runner, RunnerRelease, RunnerSourceInfo } from "$lib/types";
+import type { Game, Runner, RunnerRelease, RunnerSourceInfo } from "$lib/types";
 
 export const runners = writable<Runner[]>([]);
+
+// The runner every game in a prefix uses, to start the prefix tools with;
+// "" when the games disagree or none uses the prefix.
+export function prefixRunner(games: Game[], prefixPath: string): string {
+  const used = new Set(games.filter((g) => g.prefix_path === prefixPath).map((g) => g.runner_id));
+  return used.size === 1 ? [...used][0]! : "";
+}
 
 export async function refreshRunners(): Promise<void> {
   runners.set(await invoke<Runner[]>("list_runners"));

@@ -1,10 +1,11 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
+  import RunnerSelect from "$lib/components/RunnerSelect.svelte";
   import { onMount } from "svelte";
   import { loadAll } from "$lib/load";
   import { open } from "@tauri-apps/plugin-dialog";
   import { prefixes, refreshPrefixes, addPrefix } from "$lib/stores/prefixes";
-  import { runners, refreshRunners } from "$lib/stores/runners";
+  import { refreshRunners } from "$lib/stores/runners";
   import { runInstaller } from "$lib/stores/games";
   import { prettifyExeName } from "$lib/gameName";
   import { showLog } from "$lib/logViewer";
@@ -133,12 +134,7 @@
 
       <label>
         {m.gameForm_runnerLabel()}
-        <select bind:value={runnerId} disabled={busy}>
-          <option value="" disabled selected>{m.gameForm_runnerChoose()}</option>
-          {#each $runners as runner (runner.id)}
-            <option value={runner.id}>{runner.name} ({runner.kind})</option>
-          {/each}
-        </select>
+        <RunnerSelect bind:value={runnerId} disabled={busy} />
       </label>
 
       <button type="submit" class="primary" disabled={busy || !runnerId || !prefixPath}>

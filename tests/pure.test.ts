@@ -4,6 +4,8 @@ import { formatEnvVars, parseEnvVars } from "$lib/envVars";
 import { sameBlock, sameFields } from "$lib/settings";
 import { loadAll } from "$lib/load";
 import { backendError, setLocale } from "$lib/i18n/index.svelte";
+import { prefixRunner } from "$lib/stores/runners";
+import type { Game } from "$lib/types";
 
 describe("prettifyExeName", () => {
   it("turns exe file names into titles", () => {
@@ -72,5 +74,16 @@ describe("backendError", () => {
     );
     expect(backendError(null)).toBe("");
     expect(backendError(undefined)).toBe("");
+  });
+});
+
+describe("prefixRunner", () => {
+  const game = (prefix_path: string, runner_id: string) => ({ prefix_path, runner_id }) as Game;
+
+  it("picks the runner all of a prefix's games agree on", () => {
+    const games = [game("/a", "wine-11"), game("/a", "wine-11"), game("/b", "ge-proton")];
+    expect(prefixRunner(games, "/a")).toBe("wine-11");
+    expect(prefixRunner([...games, game("/a", "ge-proton")], "/a")).toBe("");
+    expect(prefixRunner(games, "/unused")).toBe("");
   });
 });

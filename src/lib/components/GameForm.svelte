@@ -1,5 +1,6 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
+  import RunnerSelect from "$lib/components/RunnerSelect.svelte";
   import Message from "$lib/components/Message.svelte";
   import { onMount, untrack } from "svelte";
   import { loadAll } from "$lib/load";
@@ -404,12 +405,7 @@
 
     <label>
       {m.gameForm_runnerLabel()}
-      <select bind:value={runnerId} aria-invalid={showMissing && missing.runner}>
-        <option value="" disabled selected>{m.gameForm_runnerChoose()}</option>
-        {#each $runners as runner (runner.id)}
-          <option value={runner.id}>{runner.name} ({runner.kind})</option>
-        {/each}
-      </select>
+      <RunnerSelect bind:value={runnerId} invalid={showMissing && missing.runner} />
       {#if isProton && !umuId}
         <span class="hint">
           <Message message={m.gameForm_runnerNoProtonfixesHint} parts={{ tab: protonTabLink }} />
