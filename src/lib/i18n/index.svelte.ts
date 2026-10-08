@@ -21,7 +21,7 @@ function detectLocale(): Locale {
     // browser-locale detection below.
   }
   const lang = typeof navigator !== "undefined" ? navigator.language : undefined;
-  if (!lang) return "de";
+  if (!lang) return "en";
   return lang.toLowerCase().startsWith("de") ? "de" : "en";
 }
 

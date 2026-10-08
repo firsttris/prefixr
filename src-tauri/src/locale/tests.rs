@@ -19,6 +19,8 @@ fn locale_from_env_uses_first_non_empty_locale_var() {
 
     let env = crate::env::fake(&[("LC_ALL", "de_DE.UTF-8"), ("LANG", "en_US.UTF-8")]);
     assert_eq!(Locale::from_env(&env), Locale::De);
+
+    assert_eq!(Locale::from_env(&crate::env::fake(&[])), Locale::En);
 }
 
 #[test]

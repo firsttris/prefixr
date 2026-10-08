@@ -27,14 +27,15 @@ impl Locale {
 
     /// Best-effort guess for the dialogs that can appear before the
     /// frontend — and its own locale detection/choice — exists at all,
-    /// mirroring the frontend's own `navigator.language` fallback.
+    /// mirroring the frontend's own `navigator.language` fallback. Without
+    /// any locale set, English, as on most Linux systems then.
     pub fn from_env(env: Env) -> Self {
         for var in ["LC_ALL", "LC_MESSAGES", "LANG"] {
             if let Some(val) = env(var).filter(|val| !val.is_empty()) {
                 return Self::from_code(&val.to_string_lossy());
             }
         }
-        Locale::De
+        Locale::En
     }
 }
 

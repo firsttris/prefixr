@@ -154,7 +154,7 @@ fn toggle_main_window(app: &AppHandle) {
 }
 
 fn tray_locale(app: &AppHandle) -> Locale {
-    app.try_state::<LocaleState>().map(|s| s.get()).unwrap_or(Locale::De)
+    app.try_state::<LocaleState>().map(|s| s.get()).unwrap_or(Locale::En)
 }
 
 fn toggle_label(visible: bool, locale: Locale) -> String {
