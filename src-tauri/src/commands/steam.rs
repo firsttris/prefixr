@@ -11,6 +11,7 @@ use uuid::Uuid;
 use crate::commands::binary_vdf::{self, Map, Value};
 use crate::commands::games::{command_on_path, own_executable_path, write_shortcut_icon};
 use crate::commands::steamgriddb::{artwork_dir, asset_cache_path, image_extension};
+use crate::lock::LockExt;
 use crate::config::ConfigState;
 use crate::models::{ArtworkKind, Game};
 
@@ -379,9 +380,7 @@ async fn change_steam(
 
 fn find_game(state: &State<ConfigState>, id: &str) -> Result<Game, String> {
     let game_id = Uuid::parse_str(id).map_err(|e| format!("Invalid game id: {e}"))?;
-    let config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let config = state.locked();
     config
         .games
         .iter()
@@ -428,9 +427,7 @@ pub fn list_steam_games(state: State<ConfigState>) -> Result<Vec<String>, AppErr
         return Ok(Vec::new());
     };
     let shortcuts = binary_vdf::map_entry(&mut file, "shortcuts");
-    let config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let config = state.locked();
     Ok(config
         .games
         .iter()

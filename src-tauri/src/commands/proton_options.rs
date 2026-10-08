@@ -5,6 +5,7 @@ use serde::Serialize;
 use tauri::{AppHandle, State};
 
 use crate::commands::runners::find_runner;
+use crate::lock::LockExt;
 use crate::config::{save_config, ConfigState};
 use crate::models::{ProtonConfig, RunnerKind};
 
@@ -96,9 +97,7 @@ pub fn list_proton_options(
     runner_id: String,
 ) -> Result<Vec<ProtonOption>, AppError> {
     let runners_dir = {
-        let config = state
-            .lock()
-            .map_err(|_| "Configuration is locked".to_string())?;
+        let config = state.locked();
         config.runners_dir.clone()
     };
     let runner = find_runner(&runners_dir, &runner_id)?;
@@ -113,9 +112,7 @@ pub fn list_proton_options(
 
 #[tauri::command]
 pub fn get_proton_config(state: State<ConfigState>) -> Result<ProtonConfig, AppError> {
-    let config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let config = state.locked();
     Ok(config.proton.clone())
 }
 
@@ -125,9 +122,7 @@ pub fn save_proton_config(
     state: State<ConfigState>,
     config: ProtonConfig,
 ) -> Result<ProtonConfig, AppError> {
-    let mut app_config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let mut app_config = state.locked();
     app_config.proton = config;
     save_config(&app, &app_config)?;
     Ok(app_config.proton.clone())

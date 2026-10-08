@@ -14,6 +14,7 @@ use crate::commands::logs::{new_log_file, prefix_log_dir};
 use crate::commands::runners::{
     find_runner, prefix_command, runner_command, wine_binary, wineserver_binary,
 };
+use crate::lock::LockExt;
 use crate::config::ConfigState;
 use crate::models::{Runner, RunnerKind};
 
@@ -208,12 +209,10 @@ pub async fn install_winetricks_verbs(
     }
 
     let runners_dir = {
-        let config = state
-            .lock()
-            .map_err(|_| "Configuration is locked".to_string())?;
+        let config = state.locked();
         config.runners_dir.clone()
     };
-    let token = read_token(&state)?;
+    let token = read_token(&state);
 
     let runner = find_runner(&runners_dir, &runner_id)?;
     let prefix = PathBuf::from(&prefix_path);

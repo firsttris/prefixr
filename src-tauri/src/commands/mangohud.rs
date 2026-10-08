@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use tauri::{AppHandle, Manager, State};
 
+use crate::lock::LockExt;
 use crate::config::{save_config, ConfigState};
 use crate::models::{MangoHudConfig, MangoHudLayout};
 
@@ -107,9 +108,7 @@ pub fn ensure_mangohud_conf(
 
 #[tauri::command]
 pub fn get_mangohud_config(state: State<ConfigState>) -> Result<MangoHudConfig, AppError> {
-    let config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let config = state.locked();
     Ok(config.mangohud.clone())
 }
 
@@ -119,9 +118,7 @@ pub fn save_mangohud_config(
     state: State<ConfigState>,
     config: MangoHudConfig,
 ) -> Result<MangoHudConfig, AppError> {
-    let mut app_config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let mut app_config = state.locked();
     app_config.mangohud = config;
     save_config(&app, &app_config)?;
     Ok(app_config.mangohud.clone())

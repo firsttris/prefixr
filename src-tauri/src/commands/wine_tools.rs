@@ -8,6 +8,7 @@ use crate::commands::games::{env_pairs, log_stdio, prepare_prefix};
 use crate::commands::github::read_token;
 use crate::commands::logs::{new_log_file, prefix_log_dir};
 use crate::commands::runners::{find_runner, runner_command};
+use crate::lock::LockExt;
 use crate::config::ConfigState;
 
 const BUILTIN_WINE_TOOLS: &[&str] = &[
@@ -56,12 +57,10 @@ pub async fn launch_wine_tool(
     let arg = tool_arg(&tool)?;
 
     let runners_dir = {
-        let config = state
-            .lock()
-            .map_err(|_| "Configuration is locked".to_string())?;
+        let config = state.locked();
         config.runners_dir.clone()
     };
-    let token = read_token(&state)?;
+    let token = read_token(&state);
 
     let runner = find_runner(&runners_dir, &runner_id)?;
     let prefix = PathBuf::from(&prefix_path);

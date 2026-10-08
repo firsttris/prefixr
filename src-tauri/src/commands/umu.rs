@@ -248,7 +248,7 @@ pub fn get_umu_status(app: AppHandle) -> Result<UmuStatus, AppError> {
 /// when it's newer than the installed `UmuStatus::version`.
 #[tauri::command]
 pub async fn latest_umu_version(state: State<'_, ConfigState>) -> Result<String, AppError> {
-    let token = read_token(&state)?;
+    let token = read_token(&state);
     Ok(latest_release(token.as_deref()).await?.tag_name)
 }
 
@@ -259,7 +259,7 @@ pub async fn install_umu(
     app: AppHandle,
     state: State<'_, ConfigState>,
 ) -> Result<UmuStatus, AppError> {
-    let token = read_token(&state)?;
+    let token = read_token(&state);
     let _lock = INSTALL_LOCK.lock().await;
     install_latest(&app, token.as_deref()).await.map_err(AppError::from)
 }

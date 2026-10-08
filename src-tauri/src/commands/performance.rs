@@ -5,14 +5,13 @@ use serde::Serialize;
 use tauri::{AppHandle, State};
 
 use crate::commands::games::command_on_path;
+use crate::lock::LockExt;
 use crate::config::{save_config, ConfigState};
 use crate::models::PerformanceConfig;
 
 #[tauri::command]
 pub fn get_performance_config(state: State<ConfigState>) -> Result<PerformanceConfig, AppError> {
-    let config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let config = state.locked();
     Ok(config.performance.clone())
 }
 
@@ -22,9 +21,7 @@ pub fn save_performance_config(
     state: State<ConfigState>,
     config: PerformanceConfig,
 ) -> Result<PerformanceConfig, AppError> {
-    let mut app_config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let mut app_config = state.locked();
     app_config.performance = config;
     save_config(&app, &app_config)?;
     Ok(app_config.performance.clone())

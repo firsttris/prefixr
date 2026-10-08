@@ -27,6 +27,7 @@ use crate::commands::steamgriddb::{
     artwork_dir, asset_cache_path, image_extension, remove_game_artwork_files,
 };
 use crate::commands::umu::{ensure_umu, runtime_present};
+use crate::lock::LockExt;
 use crate::config::{save_config, ConfigState};
 use crate::models::{
     normalize_umu_id, normalize_umu_store, split_launch_args, Game, GameInput, Runner, RunnerKind,
@@ -126,7 +127,7 @@ impl LaunchingGames {
         // The lock is released before a guard exists: dropping one locks
         // again (and must never happen for a refused claim, whose drop
         // would end the launch already in progress).
-        let inserted = self.0.lock().ok()?.insert(id);
+        let inserted = self.0.locked().insert(id);
         if !inserted {
             return None;
         }
@@ -143,10 +144,7 @@ impl LaunchingGames {
 
     /// The games launching or running in this process.
     pub(crate) fn ids(&self) -> Vec<Uuid> {
-        self.0
-            .lock()
-            .map(|launching| launching.iter().copied().collect())
-            .unwrap_or_default()
+        self.0.locked().iter().copied().collect()
     }
 }
 
@@ -195,9 +193,7 @@ fn lock_launch_file(id: Uuid) -> Result<Option<fs::File>, ()> {
 
 impl Drop for LaunchGuard<'_> {
     fn drop(&mut self) {
-        if let Ok(mut launching) = self.launching.0.lock() {
-            launching.remove(&self.id);
-        }
+        self.launching.0.locked().remove(&self.id);
     }
 }
 
@@ -342,16 +338,12 @@ fn pkill_pattern(text: &str) -> String {
 ///    tree, and a game started through `distrobox-host-exec`, where the tree
 ///    visible to us only contains the relay (see `RunningGame::wineserver`).
 pub async fn kill_running_game(running: &RunningGames, id: Uuid) -> Result<(), String> {
-    let game = {
-        let games = running
-            .0
-            .lock()
-            .map_err(|_| "Running games list is locked".to_string())?;
-        games
-            .get(&id)
-            .cloned()
-            .ok_or_else(|| "Game is not running".to_string())?
-    };
+    let game = running
+        .0
+        .locked()
+        .get(&id)
+        .cloned()
+        .ok_or_else(|| "Game is not running".to_string())?;
     game.killed.store(true, Ordering::SeqCst);
 
     if let Some(pid) = game.pid {
@@ -408,11 +400,7 @@ pub fn list_active_games(
     running: State<RunningGames>,
     launching: State<LaunchingGames>,
 ) -> Vec<ActiveGame> {
-    let running = running
-        .0
-        .lock()
-        .map(|games| games.keys().copied().collect::<HashSet<_>>())
-        .unwrap_or_default();
+    let running: HashSet<Uuid> = running.0.locked().keys().copied().collect();
     launching
         .ids()
         .into_iter()
@@ -438,7 +426,7 @@ pub struct PendingLaunch(pub Mutex<Option<String>>);
 
 #[tauri::command]
 pub fn take_pending_launch(state: State<PendingLaunch>) -> Option<String> {
-    state.0.lock().ok()?.take()
+    state.0.locked().take()
 }
 
 /// Holds a `--install <exe-path>` argument found at startup, or forwarded by
@@ -452,7 +440,7 @@ pub struct PendingInstall(pub Mutex<Option<String>>);
 
 #[tauri::command]
 pub fn take_pending_install(state: State<PendingInstall>) -> Option<String> {
-    state.0.lock().ok()?.take()
+    state.0.locked().take()
 }
 
 /// What `run_installer` reports back once the installer exited.
@@ -489,12 +477,10 @@ pub async fn run_installer(
     exe_path: String,
 ) -> Result<InstallerResult, AppError> {
     let runners_dir = {
-        let config = state
-            .lock()
-            .map_err(|_| "Configuration is locked".to_string())?;
+        let config = state.locked();
         config.runners_dir.clone()
     };
-    let token = read_token(&state)?;
+    let token = read_token(&state);
 
     let runner = find_runner(&runners_dir, &runner_id)?;
     let prefix = PathBuf::from(&prefix_path);
@@ -549,9 +535,7 @@ pub(crate) fn env_pairs(env: &[(String, String)]) -> Vec<(&str, &str)> {
 
 #[tauri::command]
 pub fn list_games(state: State<ConfigState>) -> Result<Vec<Game>, AppError> {
-    let config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let config = state.locked();
     Ok(config.games.clone())
 }
 
@@ -596,9 +580,7 @@ pub fn add_game(
         overrides: game.overrides,
     };
 
-    let mut config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let mut config = state.locked();
     config.games.push(new_game.clone());
     save_config(&app, &config)?;
     Ok(new_game)
@@ -623,9 +605,7 @@ pub fn update_game(
     // Parsing the exe for its icon means reading all of it, so that only
     // happens when there's something new to find — and outside the lock.
     let needs_icon = {
-        let config = state
-            .lock()
-            .map_err(|_| "Configuration is locked".to_string())?;
+        let config = state.locked();
         let existing = &config.games[find(&config.games)?];
         existing.exe_path != game.exe_path || existing.icon.is_none()
     };
@@ -634,9 +614,7 @@ pub fn update_game(
         let _ = store_exe_icon(&app, game_id, icon.as_deref());
     }
 
-    let mut config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let mut config = state.locked();
     let index = find(&config.games)?;
     let existing = &mut config.games[index];
 
@@ -665,9 +643,7 @@ pub fn update_game(
 #[tauri::command(async)]
 pub fn remove_game(app: AppHandle, state: State<ConfigState>, id: String) -> Result<(), AppError> {
     let game_id = Uuid::parse_str(&id).map_err(|e| format!("Invalid game id: {e}"))?;
-    let mut config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let mut config = state.locked();
 
     if !config.games.iter().any(|g| g.id == game_id) {
         return Err(format!("No game with id {id}").into());
@@ -1187,9 +1163,7 @@ async fn run_game(
     let game_id = Uuid::parse_str(id).map_err(|e| format!("Invalid game id: {e}"))?;
 
     let (game, runners_dir, settings) = {
-        let config = state
-            .lock()
-            .map_err(|_| "Configuration is locked".to_string())?;
+        let config = state.locked();
         let game = config
             .games
             .iter()
@@ -1207,7 +1181,7 @@ async fn run_game(
     let performance = &settings.performance;
     let graphics = &settings.graphics;
     let mangohud = &settings.mangohud;
-    let token = read_token(state)?;
+    let token = read_token(state);
 
     let runner = find_runner(&runners_dir, &game.runner_id)?;
     let log_path_string = log_path.display().to_string();
@@ -1408,19 +1382,17 @@ async fn run_game(
         .map_err(|e| format!("Could not start game: {e}"))?;
 
     let killed = Arc::new(AtomicBool::new(false));
-    if let Ok(mut running) = running.0.lock() {
-        running.insert(
-            game_id,
-            RunningGame {
-                name: game.name.clone(),
-                pid: child.id(),
-                wineserver: wineserver.clone(),
-                wineprefix: wineprefix.clone(),
-                exe_path: game.exe_path.clone(),
-                killed: killed.clone(),
-            },
-        );
-    }
+    running.0.locked().insert(
+        game_id,
+        RunningGame {
+            name: game.name.clone(),
+            pid: child.id(),
+            wineserver: wineserver.clone(),
+            wineprefix: wineprefix.clone(),
+            exe_path: game.exe_path.clone(),
+            killed: killed.clone(),
+        },
+    );
     rebuild_tray_menu(app);
 
     let _ = app.emit(
@@ -1433,9 +1405,7 @@ async fn run_game(
 
     let wait_result = child.wait().await;
 
-    if let Ok(mut running) = running.0.lock() {
-        running.remove(&game_id);
-    }
+    running.0.locked().remove(&game_id);
     rebuild_tray_menu(app);
 
     let status = wait_result.map_err(|e| format!("Game process failed: {e}"))?;
@@ -1658,9 +1628,7 @@ fn write_game_shortcut(
 ) -> Result<(), String> {
     let game_id = Uuid::parse_str(id).map_err(|e| format!("Invalid game id: {e}"))?;
     let game = {
-        let config = state
-            .lock()
-            .map_err(|_| "Configuration is locked".to_string())?;
+        let config = state.locked();
         config
             .games
             .iter()

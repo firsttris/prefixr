@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use tauri::{AppHandle, State};
 
 use crate::commands::games::LaunchingGames;
+use crate::lock::LockExt;
 use crate::config::{save_config, ConfigState};
 use crate::models::PrefixInfo;
 
@@ -41,9 +42,7 @@ pub fn add_prefix(
 ) -> Result<PathBuf, AppError> {
     let prefix_path = effective_prefix_path(Path::new(&path));
 
-    let mut config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let mut config = state.locked();
 
     if config.prefixes.iter().any(|p| p.path == prefix_path) {
         return Err(AppError::PrefixAlreadyExists {
@@ -93,9 +92,7 @@ pub async fn delete_prefix(
     // already runs is launching until it exits, so the claim is refused.
     let mut guards = Vec::new();
     {
-        let config = state
-            .lock()
-            .map_err(|_| "Configuration is locked".to_string())?;
+        let config = state.locked();
         if !config.prefixes.iter().any(|p| p.path == prefix_path) {
             return Err(format!("No prefix known at {path}").into());
         }
@@ -109,18 +106,14 @@ pub async fn delete_prefix(
         }
     }
 
-    let mut config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let mut config = state.locked();
     config.prefixes.retain(|p| p.path != prefix_path);
     save_config(&app, &config).map_err(AppError::from)
 }
 
 #[tauri::command]
 pub fn list_prefixes(state: State<ConfigState>) -> Result<Vec<PrefixInfo>, AppError> {
-    let config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let config = state.locked();
     Ok(config.prefixes.clone())
 }
 

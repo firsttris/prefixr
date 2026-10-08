@@ -9,6 +9,7 @@ use uuid::Uuid;
 
 use crate::commands::games::{kill_running_game, LaunchingGames, RunningGames};
 use crate::locale::{text, Locale, LocaleState};
+use crate::lock::LockExt;
 
 pub const TRAY_ID: &str = "main-tray";
 const MAIN_WINDOW: &str = "main";
@@ -187,9 +188,11 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let running_games = app
         .state::<RunningGames>()
         .0
-        .lock()
-        .map(|games| sorted_running_games(games.iter().map(|(id, g)| (*id, g.name.clone())).collect()))
-        .unwrap_or_default();
+        .locked()
+        .iter()
+        .map(|(id, g)| (*id, g.name.clone()))
+        .collect();
+    let running_games = sorted_running_games(running_games);
 
     let builder = if running_games.is_empty() {
         builder
@@ -263,11 +266,7 @@ fn quit(app: &AppHandle) {
             }
             tauri::async_runtime::spawn(async move {
                 let running = app.state::<RunningGames>();
-                let ids: Vec<Uuid> = running
-                    .0
-                    .lock()
-                    .map(|games| games.keys().copied().collect())
-                    .unwrap_or_default();
+                let ids: Vec<Uuid> = running.0.locked().keys().copied().collect();
                 join_all(ids.into_iter().map(|id| kill_running_game(&running, id))).await;
                 app.exit(0);
             });

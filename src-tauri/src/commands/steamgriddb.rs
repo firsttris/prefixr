@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, State};
 use uuid::Uuid;
 
+use crate::lock::LockExt;
 use crate::config::{save_config, ConfigState};
 use crate::models::{ArtworkKind, Game, SteamGridDbConfig};
 
@@ -117,15 +118,12 @@ fn sanitized_api_key(api_key: Option<&str>) -> Option<String> {
 
 /// Reads the configured API key, without holding the config lock across an
 /// `.await` point (a `std::sync::MutexGuard` isn't `Send`).
-pub(crate) fn read_api_key(state: &State<ConfigState>) -> Result<Option<String>, String> {
-    let config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
-    Ok(sanitized_api_key(config.steamgriddb.api_key.as_deref()))
+pub(crate) fn read_api_key(state: &State<ConfigState>) -> Option<String> {
+    sanitized_api_key(state.locked().steamgriddb.api_key.as_deref())
 }
 
 fn require_api_key(state: &State<ConfigState>) -> Result<String, String> {
-    read_api_key(state)?.ok_or_else(|| "No SteamGridDB API key configured".to_string())
+    read_api_key(state).ok_or_else(|| "No SteamGridDB API key configured".to_string())
 }
 
 /// Sends a GET request to a SteamGridDB API endpoint and unwraps its
@@ -166,9 +164,7 @@ async fn sgdb_get<T: for<'de> Deserialize<'de> + Default>(
 
 #[tauri::command]
 pub fn get_steamgriddb_config(state: State<ConfigState>) -> Result<SteamGridDbConfig, AppError> {
-    let config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let config = state.locked();
     Ok(config.steamgriddb.clone())
 }
 
@@ -178,9 +174,7 @@ pub fn save_steamgriddb_config(
     state: State<ConfigState>,
     config: SteamGridDbConfig,
 ) -> Result<SteamGridDbConfig, AppError> {
-    let mut app_config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let mut app_config = state.locked();
     app_config.steamgriddb = config;
     save_config(&app, &app_config)?;
     Ok(app_config.steamgriddb.clone())
@@ -456,9 +450,7 @@ pub async fn set_game_cover(
     fs::write(asset_cache_path(&dir, game_uuid, "", ext), &bytes)
         .map_err(|e| format!("Could not write cover file: {e}"))?;
 
-    let mut config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let mut config = state.locked();
     let game = find_game(&mut config, &game_id)?;
     game.steamgriddb_id = Some(steamgriddb_id);
     game.cover_grid_id = Some(cover_grid_id);
@@ -477,9 +469,7 @@ pub async fn set_game_cover(
 #[tauri::command(async)]
 pub fn get_game_cover(app: AppHandle, state: State<ConfigState>, game_id: String) -> Result<Option<String>, AppError> {
     let cover_url = {
-        let mut config = state
-            .lock()
-            .map_err(|_| "Configuration is locked".to_string())?;
+        let mut config = state.locked();
         let game = find_game(&mut config, &game_id)?;
         match &game.cover_url {
             Some(url) => url.clone(),
@@ -502,9 +492,7 @@ pub fn get_game_cover(app: AppHandle, state: State<ConfigState>, game_id: String
 /// grid list rather than making the user search again.
 #[tauri::command]
 pub fn remove_game_cover(app: AppHandle, state: State<ConfigState>, game_id: String) -> Result<Game, AppError> {
-    let mut config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let mut config = state.locked();
     let game = find_game(&mut config, &game_id)?;
     let game_uuid = game.id;
     game.cover_url = None;
@@ -539,9 +527,7 @@ pub async fn set_game_icon(
     fs::write(asset_cache_path(&dir, game_uuid, "_icon", ext), &bytes)
         .map_err(|e| format!("Could not write icon file: {e}"))?;
 
-    let mut config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let mut config = state.locked();
     let game = find_game(&mut config, &game_id)?;
     game.steamgriddb_id = Some(steamgriddb_id);
     game.steamgriddb_icon_grid_id = Some(icon_grid_id);
@@ -557,9 +543,7 @@ pub async fn set_game_icon(
 #[tauri::command(async)]
 pub fn get_game_icon(app: AppHandle, state: State<ConfigState>, game_id: String) -> Result<Option<String>, AppError> {
     let icon_url = {
-        let mut config = state
-            .lock()
-            .map_err(|_| "Configuration is locked".to_string())?;
+        let mut config = state.locked();
         let game = find_game(&mut config, &game_id)?;
         match &game.steamgriddb_icon_url {
             Some(url) => url.clone(),
@@ -581,9 +565,7 @@ pub fn get_game_icon(app: AppHandle, state: State<ConfigState>, game_id: String)
 /// `steamgriddb_id` for the same reason `remove_game_cover` does.
 #[tauri::command]
 pub fn remove_game_icon(app: AppHandle, state: State<ConfigState>, game_id: String) -> Result<Game, AppError> {
-    let mut config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let mut config = state.locked();
     let game = find_game(&mut config, &game_id)?;
     let game_uuid = game.id;
     game.steamgriddb_icon_url = None;
@@ -617,9 +599,7 @@ pub async fn set_game_artwork(
     fs::write(asset_cache_path(&dir, game_uuid, kind.cache_suffix(), ext), &bytes)
         .map_err(|e| format!("Could not write artwork file: {e}"))?;
 
-    let mut config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let mut config = state.locked();
     let game = find_game(&mut config, &game_id)?;
     game.steamgriddb_id = Some(steamgriddb_id);
     game.artwork.insert(kind, image_url);
@@ -636,9 +616,7 @@ pub fn remove_game_artwork(
     game_id: String,
     kind: ArtworkKind,
 ) -> Result<Game, AppError> {
-    let mut config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let mut config = state.locked();
     let game = find_game(&mut config, &game_id)?;
     let game_uuid = game.id;
     game.artwork.remove(&kind);

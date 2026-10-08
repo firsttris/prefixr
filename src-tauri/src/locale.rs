@@ -1,5 +1,7 @@
 use std::sync::{Mutex, OnceLock};
 
+use crate::lock::LockExt;
+
 /// The UI language for the handful of things Rust itself renders directly
 /// (the tray menu, and a few native dialogs shown before the frontend has
 /// loaded or without any window at all) — everything else is translated by
@@ -47,13 +49,11 @@ impl Default for LocaleState {
 
 impl LocaleState {
     pub fn get(&self) -> Locale {
-        self.0.lock().map(|guard| *guard).unwrap_or(Locale::De)
+        *self.0.locked()
     }
 
     pub fn set(&self, locale: Locale) {
-        if let Ok(mut guard) = self.0.lock() {
-            *guard = locale;
-        }
+        *self.0.locked() = locale;
     }
 }
 

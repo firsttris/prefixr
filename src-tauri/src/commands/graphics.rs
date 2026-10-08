@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use tauri::{AppHandle, Manager, State};
 
+use crate::lock::LockExt;
 use crate::config::{save_config, ConfigState};
 use crate::models::{GraphicsConfig, VkBasaltSettings};
 
@@ -76,9 +77,7 @@ pub fn ensure_vkbasalt_conf(
 
 #[tauri::command]
 pub fn get_graphics_config(state: State<ConfigState>) -> Result<GraphicsConfig, AppError> {
-    let config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let config = state.locked();
     Ok(config.graphics.clone())
 }
 
@@ -88,9 +87,7 @@ pub fn save_graphics_config(
     state: State<ConfigState>,
     config: GraphicsConfig,
 ) -> Result<GraphicsConfig, AppError> {
-    let mut app_config = state
-        .lock()
-        .map_err(|_| "Configuration is locked".to_string())?;
+    let mut app_config = state.locked();
     app_config.graphics = config;
     save_config(&app, &app_config)?;
     Ok(app_config.graphics.clone())

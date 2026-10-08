@@ -7,6 +7,7 @@ use tokio::process::Command;
 
 use crate::commands::games::steer_profile_to_steamuser;
 use crate::commands::umu::ensure_umu;
+use crate::lock::LockExt;
 use crate::config::ConfigState;
 use crate::models::{Runner, RunnerKind};
 
@@ -189,9 +190,7 @@ pub async fn prefix_command(
 #[tauri::command]
 pub fn list_runners(state: State<ConfigState>) -> Result<Vec<Runner>, AppError> {
     let runners_dir = {
-        let config = state
-            .lock()
-            .map_err(|_| "Configuration is locked".to_string())?;
+        let config = state.locked();
         config.runners_dir.clone()
     };
     scan_runners(&runners_dir).map_err(AppError::from)
@@ -204,9 +203,7 @@ pub fn list_runners(state: State<ConfigState>) -> Result<Vec<Runner>, AppError> 
 #[tauri::command]
 pub async fn delete_runner(state: State<'_, ConfigState>, runner_id: String) -> Result<(), AppError> {
     let (runner, users) = {
-        let config = state
-            .lock()
-            .map_err(|_| "Configuration is locked".to_string())?;
+        let config = state.locked();
         let runner = find_runner(&config.runners_dir, &runner_id)?;
         let users: Vec<String> = config
             .games

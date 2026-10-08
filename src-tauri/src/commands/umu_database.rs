@@ -203,7 +203,7 @@ pub async fn search_umu_ids(
     steamgriddb_id: Option<i64>,
 ) -> Result<Vec<UmuMatch>, AppError> {
     let query = query.trim();
-    let api_key = read_api_key(&state)?;
+    let api_key = read_api_key(&state);
 
     let steam = async {
         let Some(key) = api_key.as_deref() else {

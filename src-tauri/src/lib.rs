@@ -2,6 +2,7 @@ mod commands;
 mod config;
 mod error;
 mod http;
+mod lock;
 mod locale;
 mod models;
 mod tray;
@@ -43,6 +44,7 @@ use commands::winetricks::{
 };
 use config::load_config;
 use locale::LocaleState;
+use lock::LockExt;
 use tray::{
     hide_main_window, rebuild_tray_menu, setup_tray, show_and_focus, tray_host_available,
     TrayAvailable, WindowVisible,
@@ -117,9 +119,7 @@ pub fn run() {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             if let Some(game_id) = find_launch_arg(&argv) {
                 if let Some(state) = app.try_state::<PendingLaunch>() {
-                    if let Ok(mut pending) = state.0.lock() {
-                        *pending = Some(game_id);
-                    }
+                    *state.0.locked() = Some(game_id);
                 }
                 let _ = app.emit("pending-launch", ());
                 return;
@@ -130,9 +130,7 @@ pub fn run() {
                 return;
             };
             if let Some(state) = app.try_state::<PendingInstall>() {
-                if let Ok(mut pending) = state.0.lock() {
-                    *pending = Some(exe_path);
-                }
+                *state.0.locked() = Some(exe_path);
             }
             let _ = app.emit("pending-install", ());
             show_and_focus(app);

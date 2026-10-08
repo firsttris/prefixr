@@ -12,6 +12,7 @@ use tauri::{AppHandle, Emitter, State};
 use tokio::io::AsyncWriteExt;
 
 use crate::commands::github::read_token;
+use crate::lock::LockExt;
 use crate::config::ConfigState;
 use crate::models::RunnerKind;
 
@@ -217,7 +218,7 @@ pub async fn list_runner_releases(
     source: String,
 ) -> Result<Vec<RunnerRelease>, AppError> {
     let runner_source = find_source(&source)?;
-    let token = read_token(&state)?;
+    let token = read_token(&state);
     let url = format!(
         "https://api.github.com/repos/{}/releases?per_page=20",
         runner_source.repo
@@ -435,12 +436,10 @@ pub async fn download_runner(
         .to_string();
 
     let runners_dir = {
-        let config = state
-            .lock()
-            .map_err(|_| "Configuration is locked".to_string())?;
+        let config = state.locked();
         config.runners_dir.clone()
     };
-    let token = read_token(&state)?;
+    let token = read_token(&state);
 
     fs::create_dir_all(&runners_dir)
         .map_err(|e| format!("Could not create runners directory: {e}"))?;
