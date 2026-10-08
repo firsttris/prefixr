@@ -1,5 +1,6 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
+  import Message from "$lib/components/Message.svelte";
   import { onMount } from "svelte";
   import { loadAll } from "$lib/load";
   import { runners, refreshRunners, deleteRunner } from "$lib/stores/runners";
@@ -49,11 +50,12 @@
   });
 </script>
 
+{#snippet proton()}<strong>Proton</strong>{/snippet}
+{#snippet wine()}<strong>Wine</strong>{/snippet}
+
 <section class="panel">
   <p class="explainer">
-    {m.runnerList_explainerBefore()} <strong>{m.runnerList_explainerProton()}</strong>
-    {m.runnerList_explainerOr()} <strong>{m.runnerList_explainerWine()}</strong>.
-    {m.runnerList_explainerAfter()}
+    <Message message={m.runnerList_explainer} parts={{ proton, wine }} />
   </p>
 
   <div class="panel-header">

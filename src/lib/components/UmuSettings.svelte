@@ -1,5 +1,6 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
+  import Message from "$lib/components/Message.svelte";
   import { onMount } from "svelte";
   import {
     umuStatus,
@@ -43,6 +44,8 @@
   }
 </script>
 
+{#snippet options()}<code>PROTON_*</code>{/snippet}
+
 <details class="umu">
   <summary>
     umu-launcher
@@ -58,7 +61,7 @@
     {/if}
   </summary>
   <p class="hint">
-    {m.umuSettings_hintBefore()} <code>PROTON_*</code>{m.umuSettings_hintAfter()}
+    <Message message={m.umuSettings_hint} parts={{ options }} />
   </p>
 
   <div class="row">

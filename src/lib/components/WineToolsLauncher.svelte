@@ -1,5 +1,6 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
+  import Message from "$lib/components/Message.svelte";
   import { msgGroup } from "$lib/i18n/msg-groups";
   import { onMount } from "svelte";
   import { runners, refreshRunners } from "$lib/stores/runners";
@@ -30,9 +31,11 @@
   }
 </script>
 
+{#snippet prefix()}<code>{prefixPath}</code>{/snippet}
+
 <div class="wine-tools">
   <p class="hint">
-    {m.wineToolsLauncher_hintBefore()}<code>{prefixPath}</code>{m.wineToolsLauncher_hintAfter()}
+    <Message message={m.wineToolsLauncher_hint} parts={{ prefix }} />
   </p>
 
   <label>

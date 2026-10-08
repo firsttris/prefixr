@@ -1,5 +1,6 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
+  import Message from "$lib/components/Message.svelte";
   import { onMount, untrack } from "svelte";
   import { searchUmuIds } from "$lib/stores/umu";
   import { prettifyExeName } from "$lib/gameName";
@@ -80,6 +81,8 @@
   }
 </script>
 
+{#snippet defaultId()}<code>umu-default</code>{/snippet}
+
 <section class="umu-picker">
   <div>
     <span class="label">{m.umuPicker_label()}</span>
@@ -96,10 +99,7 @@
         >{m.common_remove()}</button
       >
     {:else}
-      <span class="hint"
-        >{m.umuPicker_noneSetHintBefore()} <code>umu-default</code>{m.umuPicker_noneSetHintAfter(
-        )}</span
-      >
+      <span class="hint"><Message message={m.umuPicker_noneSetHint} parts={{ id: defaultId }} /></span>
     {/if}
   </div>
 

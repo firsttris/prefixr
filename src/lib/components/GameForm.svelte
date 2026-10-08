@@ -1,5 +1,6 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
+  import Message from "$lib/components/Message.svelte";
   import { onMount, untrack } from "svelte";
   import { loadAll } from "$lib/load";
   import { open } from "@tauri-apps/plugin-dialog";
@@ -324,6 +325,10 @@
   }
 </script>
 
+{#snippet protonTabLink()}
+  <button type="button" class="link" onclick={() => (tab = "proton")}>{m.nav_proton()}</button>
+{/snippet}
+
 {#snippet requiredHint(isMissing: boolean)}
   {#if showMissing && isMissing}
     <span class="error required">{m.gameForm_required()}</span>
@@ -407,11 +412,7 @@
       </select>
       {#if isProton && !umuId}
         <span class="hint">
-          {m.gameForm_runnerNoProtonfixesHint()}
-          <button type="button" class="link" onclick={() => (tab = "proton")}
-            >{m.nav_proton()}</button
-          >
-          {m.gameForm_runnerNoProtonfixesHintSuffix()}
+          <Message message={m.gameForm_runnerNoProtonfixesHint} parts={{ tab: protonTabLink }} />
         </span>
       {/if}
       {@render requiredHint(missing.runner)}

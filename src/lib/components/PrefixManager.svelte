@@ -1,5 +1,6 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
+  import Message from "$lib/components/Message.svelte";
   import { onMount } from "svelte";
   import { loadAll } from "$lib/load";
   import { open } from "@tauri-apps/plugin-dialog";
@@ -90,11 +91,12 @@
   }
 </script>
 
+{#snippet drive()}<strong>{m.prefixManager_explainerDrive()}</strong>{/snippet}
+{#snippet gameNames()}<strong>{affectedGames.join(", ")}</strong>{/snippet}
+
 <section class="panel">
   <p class="explainer">
-    {m.prefixManager_explainerBefore()}
-    <strong>{m.prefixManager_explainerDrive()}</strong>
-    {m.prefixManager_explainerAfter()}
+    <Message message={m.prefixManager_explainer} parts={{ drive }} />
   </p>
 
   <p class="hint">{m.prefixManager_hint()}</p>
@@ -164,8 +166,7 @@
     <p class="path">{deleting}</p>
     {#if affectedGames.length > 0}
       <p>
-        {m.prefixManager_usedByBefore()}
-        <strong>{affectedGames.join(", ")}</strong>. {m.prefixManager_usedByAfter()}
+        <Message message={m.prefixManager_usedBy} parts={{ games: gameNames }} />
       </p>
     {/if}
     <p>{m.prefixManager_deleteExplain()}</p>
