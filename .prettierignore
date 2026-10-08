@@ -5,3 +5,4 @@ src/lib/paraglide/
 src-tauri/
 bun.lock
 *.md
+project.inlang/cache/

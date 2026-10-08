@@ -57,6 +57,9 @@ jobs:
       - name: Frontend type and Svelte checks
         run: bun run check
 
+      - name: Frontend formatting and lints
+        run: bun run lint
+
       - name: Frontend tests
         run: bun run test
 
