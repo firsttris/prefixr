@@ -34,9 +34,7 @@
 
   function usageLabel(count: number): string {
     if (count === 0) return m.prefixManager_unused();
-    return count === 1
-      ? m.prefixManager_usedByOne()
-      : m.prefixManager_usedByMany( { count });
+    return m.prefixManager_usedByCount({ count });
   }
 
   // The games that use the prefix about to be deleted, so the dialog can

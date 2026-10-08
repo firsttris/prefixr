@@ -157,8 +157,7 @@
           <h1>{m.library_heading()}</h1>
           {#if $games.length > 0}
             <p class="subtitle">
-              {$games.length}
-              {$games.length === 1 ? m.library_gameSingular() : m.library_gamePlural()}
+              {m.library_gameCount({ count: $games.length })}
             </p>
           {/if}
         </div>

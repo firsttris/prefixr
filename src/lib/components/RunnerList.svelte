@@ -30,7 +30,7 @@
 
   function usageLabel(count: number): string {
     if (count === 0) return m.runnerList_unused();
-    return count === 1 ? m.runnerList_usedByOne() : m.runnerList_usedByMany( { count });
+    return m.runnerList_usedByCount({ count });
   }
 
   async function confirmDelete() {

@@ -9,9 +9,18 @@ const de = read("de");
 const en = read("en");
 const keys = Object.keys(de).filter((k) => k !== "$schema");
 
+/** A message's texts: itself, or each of its variants (plural forms). */
+type Variant = { match: Record<string, string> };
+const texts = (v: unknown): unknown[] =>
+  Array.isArray(v) ? (v as Variant[]).flatMap((variant) => Object.values(variant.match ?? {})) : [v];
+
 /** Placeholders a message uses; escaped braces are text. */
 const placeholders = (v: unknown) =>
-  [...new Set([...String(v).matchAll(/(?<!\\)\{(\w+)\}/g)].map((m) => m[1]))].sort().join(",");
+  [
+    ...new Set(texts(v).flatMap((t) => [...String(t).matchAll(/(?<!\\)\{(\w+)\}/g)].map((m) => m[1]))),
+  ]
+    .sort()
+    .join(",");
 
 const files = (dir: string, ext: RegExp): string[] =>
   readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
@@ -22,7 +31,11 @@ const files = (dir: string, ext: RegExp): string[] =>
 describe("messages/*.json", () => {
   it("has every message in both languages, none empty, with the same placeholders", () => {
     expect(Object.keys(en).sort()).toEqual(Object.keys(de).sort());
-    expect(keys.filter((k) => ![de[k], en[k]].every((v) => typeof v === "string" && v.trim()))).toEqual([]);
+    const filled = (v: unknown) => {
+      const all = texts(v);
+      return all.length > 0 && all.every((t) => typeof t === "string" && t.trim());
+    };
+    expect(keys.filter((k) => ![de[k], en[k]].every(filled))).toEqual([]);
     expect(keys.filter((k) => placeholders(de[k]) !== placeholders(en[k]))).toEqual([]);
   });
 
