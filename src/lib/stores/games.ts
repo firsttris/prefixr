@@ -71,6 +71,7 @@ interface ActiveGame {
 }
 
 let eventsInitialized = false;
+let gameEventListeners: Promise<UnlistenFn>[] = [];
 
 // Registers the launch-status listeners once; must run client-side only
 // (call from onMount), since it touches the Tauri IPC bridge.
@@ -78,7 +79,7 @@ export function initGameEvents(): void {
   if (eventsInitialized) return;
   eventsInitialized = true;
 
-  const listeners = [
+  const listeners = (gameEventListeners = [
     listen<InitializingPayload>("game-initializing", (event) => {
       patchRunState(event.payload.id, { initializing: true, error: undefined });
     }),
@@ -104,7 +105,7 @@ export function initGameEvents(): void {
         logPath: event.payload.log_path ?? undefined,
       });
     }),
-  ];
+  ]);
 
   // Games launched before the webview (re)loaded sent their events to a
   // page that's gone; their current state comes from the backend instead,
@@ -219,4 +220,12 @@ export async function exportToSteam(id: string, shutdownSteam: boolean): Promise
 
 export async function removeFromSteam(id: string, shutdownSteam: boolean): Promise<SteamChange> {
   return await invoke<SteamChange>("remove_from_steam", { id, shutdownSteam });
+}
+
+// In development, a hot-reloaded copy of this module registers its own
+// listeners; the replaced copy's must go, or every event is handled twice.
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    for (const unlisten of gameEventListeners) unlisten.then((stop) => stop());
+  });
 }

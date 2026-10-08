@@ -1,6 +1,6 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import {
     games,
     gameRunState,
@@ -86,6 +86,7 @@
   let steamConfirm = $state<{ game: Game; action: SteamAction } | null>(null);
   let steamNotice = $state<{ text: string; kind: "busy" | "done" | "error" } | null>(null);
   let noticeTimer: ReturnType<typeof setTimeout> | undefined;
+  onDestroy(() => clearTimeout(noticeTimer));
 
   function notify(text: string, kind: "busy" | "done" | "error") {
     clearTimeout(noticeTimer);

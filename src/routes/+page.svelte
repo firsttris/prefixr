@@ -61,15 +61,21 @@
   // this already-running instance — open the install dialog instead.
   // The listeners go in first: a handoff arriving while the startup
   // arguments are still being read would otherwise be lost.
-  onMount(async () => {
-    await Promise.all([
+  onMount(() => {
+    const listeners = Promise.all([
       listenForPendingLaunch((gameId) => {
         initGameEvents();
         launchGame(gameId);
       }),
       listenForPendingInstall((exePath) => (installingExePath = exePath)),
     ]);
+    listeners.then(takePending);
+    return () => {
+      listeners.then((unlisten) => unlisten.forEach((stop) => stop()));
+    };
+  });
 
+  async function takePending() {
     // Each on its own, so one that fails doesn't skip the other.
     const [pendingGameId, pendingExePath] = await Promise.all([
       takePendingLaunch().catch(() => null),
@@ -83,7 +89,7 @@
     if (pendingExePath) {
       installingExePath = pendingExePath;
     }
-  });
+  }
 </script>
 
 <div class="shell">

@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { writable } from "svelte/store";
 import type { Runner, RunnerRelease, RunnerSourceInfo } from "$lib/types";
 
@@ -74,6 +74,7 @@ interface DownloadDonePayload {
 }
 
 let eventsInitialized = false;
+let downloadEventListeners: Promise<UnlistenFn>[] = [];
 
 // Registers the download-progress listeners once; must run client-side only
 // (call from onMount), since it touches the Tauri IPC bridge.
@@ -81,17 +82,27 @@ export function initRunnerDownloadEvents(): void {
   if (eventsInitialized) return;
   eventsInitialized = true;
 
-  listen<DownloadProgressPayload>("runner-download-progress", (event) => {
-    patchDownloadState(event.payload.tag, {
-      downloaded: event.payload.downloaded,
-      total: event.payload.total ?? undefined,
-    });
-  });
+  downloadEventListeners = [
+    listen<DownloadProgressPayload>("runner-download-progress", (event) => {
+      patchDownloadState(event.payload.tag, {
+        downloaded: event.payload.downloaded,
+        total: event.payload.total ?? undefined,
+      });
+    }),
 
-  listen<DownloadDonePayload>("runner-download-done", (event) => {
-    const { tag } = event.payload;
-    patchDownloadState(tag, { done: true, error: undefined });
-    refreshRunners().catch((e) => patchDownloadState(tag, { error: e }));
+    listen<DownloadDonePayload>("runner-download-done", (event) => {
+      const { tag } = event.payload;
+      patchDownloadState(tag, { done: true, error: undefined });
+      refreshRunners().catch((e) => patchDownloadState(tag, { error: e }));
+    }),
+  ];
+}
+
+// In development, a hot-reloaded copy of this module registers its own
+// listeners; the replaced copy's must go, or every event is handled twice.
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    for (const unlisten of downloadEventListeners) unlisten.then((stop) => stop());
   });
 }
 
