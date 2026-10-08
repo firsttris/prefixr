@@ -16,18 +16,21 @@
   let loading = $state(true);
   let loadError = $state<unknown>(null);
   let selectedSource = $state("");
+  let releases = $derived($runnerReleases[selectedSource] ?? []);
 
   onMount(async () => {
     initRunnerDownloadEvents();
     try {
       await refreshRunnerSources();
-      selectedSource = $runnerSources[0]?.id ?? "";
-      if (selectedSource) {
-        await refreshRunnerReleases(selectedSource);
-      }
     } catch (e) {
       loadError = e;
-    } finally {
+      loading = false;
+      return;
+    }
+    const first = $runnerSources[0]?.id;
+    if (first) {
+      await selectSource(first);
+    } else {
       loading = false;
     }
   });
@@ -40,9 +43,10 @@
     try {
       await refreshRunnerReleases(id);
     } catch (e) {
-      loadError = e;
+      // Only for the tab still shown: an earlier one's failure is no news.
+      if (id === selectedSource) loadError = e;
     } finally {
-      loading = false;
+      if (id === selectedSource) loading = false;
     }
   }
 
@@ -80,11 +84,11 @@
   <p class="hint">{m.runnerDownloads_loading()}</p>
 {:else if loadError}
   <p class="error">{backendError(loadError)}</p>
-{:else if $runnerReleases.length === 0}
+{:else if releases.length === 0}
   <p class="hint">{m.runnerDownloads_noReleases()}</p>
 {:else}
   <ul>
-    {#each $runnerReleases as release (release.tag)}
+    {#each releases as release (release.tag)}
       {@const state = $runnerDownloadState[release.tag]}
       {@const installed = isInstalled(release.tag)}
       <li class="release">
