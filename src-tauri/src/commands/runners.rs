@@ -5,7 +5,6 @@ use std::path::{Path, PathBuf};
 use tauri::{AppHandle, State};
 use tokio::process::Command;
 
-use crate::commands::games::steer_profile_to_steamuser;
 use crate::commands::umu::ensure_umu;
 use crate::lock::LockExt;
 use crate::config::ConfigState;
@@ -87,7 +86,7 @@ fn find_wine_tool(runner_path: &Path, name: &str) -> Result<PathBuf, String> {
 
 /// Locates the wine binary inside a runner folder, covering both plain Wine
 /// builds and Proton's bundled wine. Games and tools on a Proton runner are
-/// launched through umu instead (see `prefix_command`); this is only still
+/// launched through umu instead (see `umu_command`); this is only still
 /// used directly on a Proton runner for winetricks when that runner ships no
 /// protonfixes of its own (see `install_winetricks_verbs`).
 pub fn wine_binary(runner_path: &Path) -> Result<PathBuf, String> {
@@ -152,39 +151,25 @@ pub fn runner_command<'a>(
     }
 }
 
-/// Builds the command that runs something inside `prefix_path` under
-/// `runner` — callers append the exe (or builtin tool name, like `winecfg`)
-/// and its arguments. Both binaries take it the same way (`wine <exe> ...`,
-/// `umu-run <exe> ...`):
-///
-/// - A Proton runner goes through umu-run (see `commands::umu`), which
-///   creates and sets up the prefix itself on first use.
-/// - A Wine runner is driven by its own `wine` binary directly, with the
-///   prefix's user profile steered to `steamuser` first (see
-///   `steer_profile_to_steamuser`) in case this is what initializes it.
-pub async fn prefix_command(
+/// Builds the umu-run command (see `commands::umu`) that runs something
+/// inside `prefix_path` under the Proton runner at `proton_path` — callers
+/// append the exe or verb (`createprefix`, `winetricks`) and its arguments.
+/// umu creates and sets up the prefix itself on first use. A Wine runner
+/// goes through `prepare_prefix` and its own `wine` binary instead.
+pub async fn umu_command(
     app: &AppHandle,
     token: Option<&str>,
-    runner: &Runner,
+    proton_path: &Path,
     prefix_path: &str,
 ) -> Result<Command, String> {
-    match runner.kind {
-        RunnerKind::Proton => {
-            let umu_run = ensure_umu(app, token).await?;
-            let proton_path = runner.path.to_str().ok_or_else(|| {
-                format!("Runner path is not valid UTF-8: {}", runner.path.display())
-            })?;
-            Ok(runner_command(
-                &umu_run,
-                [("WINEPREFIX", prefix_path), ("PROTONPATH", proton_path)],
-            ))
-        }
-        RunnerKind::Wine => {
-            steer_profile_to_steamuser(Path::new(prefix_path))?;
-            let wine = wine_binary(&runner.path)?;
-            Ok(runner_command(&wine, [("WINEPREFIX", prefix_path)]))
-        }
-    }
+    let umu_run = ensure_umu(app, token).await?;
+    let proton_path = proton_path
+        .to_str()
+        .ok_or_else(|| format!("Runner path is not valid UTF-8: {}", proton_path.display()))?;
+    Ok(runner_command(
+        &umu_run,
+        [("WINEPREFIX", prefix_path), ("PROTONPATH", proton_path)],
+    ))
 }
 
 #[tauri::command]

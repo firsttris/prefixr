@@ -12,7 +12,7 @@ use crate::commands::games::{prepare_prefix, steer_profile_to_steamuser};
 use crate::commands::github::read_token;
 use crate::commands::logs::{new_log_file, prefix_log_dir};
 use crate::commands::runners::{
-    find_runner, prefix_command, runner_command, wine_binary, wineserver_binary,
+    find_runner, runner_command, umu_command, wine_binary, wineserver_binary,
 };
 use crate::lock::LockExt;
 use crate::config::ConfigState;
@@ -227,7 +227,7 @@ pub async fn install_winetricks_verbs(
         .map_err(|e| format!("Could not open log file: {e}"))?;
 
     let mut command = if uses_umu_winetricks(&runner) {
-        let mut command = prefix_command(&app, token.as_deref(), &runner, &prefix_path).await?;
+        let mut command = umu_command(&app, token.as_deref(), &runner.path, &prefix_path).await?;
         command.arg("winetricks").args(&verbs);
         command
     } else {

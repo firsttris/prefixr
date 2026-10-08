@@ -21,7 +21,7 @@ use crate::locale::LocaleState;
 use crate::commands::graphics::{ensure_vkbasalt_conf, vkbasalt_conf_path};
 use crate::commands::mangohud::{ensure_mangohud_conf, mangohud_conf_path};
 use crate::commands::runners::{
-    find_runner, prefix_command, runner_command, wine_binary, wineserver_binary,
+    find_runner, runner_command, umu_command, wine_binary, wineserver_binary,
 };
 use crate::commands::shell_link::{find_recently_created_shortcuts, DetectedShortcut};
 use crate::commands::steamgriddb::{
@@ -1040,7 +1040,7 @@ async fn prepare_proton(
         // Exit status deliberately not checked: after setting everything up,
         // GE-Proton still tries to launch the empty exe `createprefix` hands
         // it and exits 1 on "file not found", even on complete success.
-        prefix_command(app, token, runner, &prefix_path_str)
+        umu_command(app, token, &runner.path, &prefix_path_str)
             .await?
             .arg("createprefix")
             .stdout(out)
