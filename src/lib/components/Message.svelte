@@ -16,12 +16,12 @@
   } = $props();
 
   // Each placeholder is filled with a marker the text around it can't
-  // contain, then the message is split at the markers.
+  // contain (private-use characters), then the message is split at them.
   const segments = $derived.by(() => {
     const keys = Object.keys(parts) as K[];
-    const markers = Object.fromEntries(keys.map((key, i) => [key, `\u0001${i}\u0001`]));
+    const markers = Object.fromEntries(keys.map((key, i) => [key, `\uE000${i}\uE001`]));
     return message(markers as Record<K, string>)
-      .split(/\u0001(\d+)\u0001/)
+      .split(/\uE000(\d+)\uE001/)
       .map((piece, i) => (i % 2 === 1 ? { key: keys[Number(piece)] } : { text: piece }));
   });
 </script>

@@ -4,6 +4,7 @@
   import Message from "$lib/components/Message.svelte";
   import { msgGroup } from "$lib/i18n/msg-groups";
   import { onMount, untrack } from "svelte";
+  import { SvelteSet } from "svelte/reactivity";
   import { prefixRunner, refreshRunners } from "$lib/stores/runners";
   import { games } from "$lib/stores/games";
   import {
@@ -20,7 +21,7 @@
 
   // Started with the runner the prefix's games use, if they agree on one.
   let runnerId = $state(untrack(() => prefixRunner($games, prefixPath)));
-  let selected = $state<Set<string>>(new Set());
+  const selected = new SvelteSet<string>();
   let installing = $state(false);
   let error = $state<unknown>(null);
   let successLogPath = $state("");
@@ -70,13 +71,7 @@
   }
 
   function toggle(id: string) {
-    const next = new Set(selected);
-    if (next.has(id)) {
-      next.delete(id);
-    } else {
-      next.add(id);
-    }
-    selected = next;
+    if (!selected.delete(id)) selected.add(id);
   }
 
   async function handleInstall() {
