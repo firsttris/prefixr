@@ -50,7 +50,7 @@ use config::load_config;
 use locale::LocaleState;
 use lock::LockExt;
 use tray::{
-    hide_main_window, rebuild_tray_menu, setup_tray, show_and_focus, tray_host_available,
+    check_tray_host, hide_main_window, rebuild_tray_menu, setup_tray, show_and_focus,
     TrayAvailable, WindowVisible,
 };
 
@@ -201,7 +201,7 @@ pub fn run() {
             for window in app.config().app.windows.clone() {
                 WebviewWindowBuilder::from_config(app.handle(), &window)?.build()?;
             }
-            app.manage(TrayAvailable(tray_host_available()));
+            check_tray_host(app.handle());
             setup_tray(app.handle())?;
             // Best-effort: a file manager's "Öffnen mit" context menu working
             // is a nice-to-have, not something worth failing startup over —
@@ -229,7 +229,7 @@ pub fn run() {
             };
             let app = window.app_handle();
             api.prevent_close();
-            if app.state::<TrayAvailable>().0 {
+            if app.state::<TrayAvailable>().get() {
                 hide_main_window(app);
                 rebuild_tray_menu(app);
             } else if !app.state::<LaunchingGames>().ids().is_empty() {

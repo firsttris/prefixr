@@ -35,7 +35,25 @@ impl WindowVisible {
 /// AppIndicator extension has none: the icon then silently doesn't appear,
 /// and a window closed "into the tray" could only be brought back by
 /// starting Prefixr again. See `lib.rs`'s close handling.
-pub struct TrayAvailable(pub bool);
+///
+/// Assumed until `check_tray_host` has the answer, which can take a moment
+/// on a slow session bus, and startup doesn't wait for that.
+pub struct TrayAvailable(AtomicBool);
+
+impl TrayAvailable {
+    pub fn get(&self) -> bool {
+        self.0.load(Ordering::SeqCst)
+    }
+}
+
+/// Manages `TrayAvailable` and asks the session bus in the background.
+pub fn check_tray_host(app: &AppHandle) {
+    app.manage(TrayAvailable(AtomicBool::new(true)));
+    let app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        app.state::<TrayAvailable>().0.store(tray_host_available(), Ordering::SeqCst);
+    });
+}
 
 fn tray_host_available_from_gdbus(success: bool, stdout: &[u8]) -> bool {
     if success {
@@ -53,7 +71,7 @@ fn sorted_running_games(mut games: Vec<(Uuid, String)>) -> Vec<(Uuid, String)> {
 /// Asks the session bus whether a StatusNotifier host (what Tauri's tray
 /// icon registers with) is running. `gdbus` ships with GLib, which Prefixr
 /// needs anyway; if it can't answer, a tray is assumed as before.
-pub fn tray_host_available() -> bool {
+fn tray_host_available() -> bool {
     let output = std::process::Command::new("gdbus")
         .args([
             "call",
