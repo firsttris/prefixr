@@ -41,6 +41,7 @@ struct DatabaseEntry {
 
 /// Where a suggestion came from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "lowercase")]
 pub enum UmuMatchSource {
     /// The Steam app id SteamGridDB has on record for the game.
@@ -50,6 +51,7 @@ pub enum UmuMatchSource {
 
 /// A suggested UMU id for a game, as surfaced to the frontend.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct UmuMatch {
     pub umu_id: String,
     pub title: String,

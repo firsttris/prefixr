@@ -147,6 +147,7 @@ fn find_source(id: &str) -> Result<&'static RunnerSource, String> {
 /// A runner source as surfaced to the frontend, to drive the source picker
 /// without duplicating labels/kinds on the TypeScript side.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct RunnerSourceInfo {
     pub id: &'static str,
     pub label: &'static str,
@@ -182,6 +183,7 @@ struct GitHubRelease {
 
 /// A downloadable runner build, as surfaced to the frontend.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct RunnerRelease {
     pub source: String,
     pub tag: String,
@@ -192,6 +194,7 @@ pub struct RunnerRelease {
 }
 
 #[derive(Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 struct RunnerDownloadProgressPayload<'a> {
     tag: &'a str,
     downloaded: u64,
@@ -199,6 +202,7 @@ struct RunnerDownloadProgressPayload<'a> {
 }
 
 #[derive(Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 struct RunnerDownloadDonePayload<'a> {
     tag: &'a str,
 }

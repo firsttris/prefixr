@@ -1,7 +1,17 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { get, writable } from "svelte/store";
-import type { Game, GameInput, InstallerResult, SteamChange } from "$lib/types";
+import type {
+  ActiveGame,
+  Game,
+  GameExitedPayload,
+  GameInitializingPayload,
+  GameInput,
+  GameLaunchErrorPayload,
+  GameStartedPayload,
+  InstallerResult,
+  SteamChange,
+} from "$lib/types";
 
 export const games = writable<Game[]>([]);
 
@@ -43,33 +53,6 @@ export async function removeGame(id: string): Promise<void> {
   await refreshGames();
 }
 
-interface InitializingPayload {
-  id: string;
-}
-
-interface StartedPayload {
-  id: string;
-  log_path: string;
-}
-
-interface ExitedPayload {
-  id: string;
-  exit_code: number | null;
-}
-
-interface LaunchErrorPayload {
-  id: string;
-  // The backend's structured AppError (see src-tauri/src/error.rs) —
-  // pass it through backendError() to render it, same as a command's Err.
-  message: unknown;
-  log_path: string | null;
-}
-
-interface ActiveGame {
-  id: string;
-  running: boolean;
-}
-
 let eventsInitialized = false;
 let gameEventListeners: Promise<UnlistenFn>[] = [];
 
@@ -80,11 +63,11 @@ export function initGameEvents(): void {
   eventsInitialized = true;
 
   const listeners = (gameEventListeners = [
-    listen<InitializingPayload>("game-initializing", (event) => {
+    listen<GameInitializingPayload>("game-initializing", (event) => {
       patchRunState(event.payload.id, { initializing: true, error: undefined });
     }),
 
-    listen<StartedPayload>("game-started", (event) => {
+    listen<GameStartedPayload>("game-started", (event) => {
       patchRunState(event.payload.id, {
         initializing: false,
         running: true,
@@ -93,11 +76,11 @@ export function initGameEvents(): void {
       });
     }),
 
-    listen<ExitedPayload>("game-exited", (event) => {
+    listen<GameExitedPayload>("game-exited", (event) => {
       patchRunState(event.payload.id, { running: false });
     }),
 
-    listen<LaunchErrorPayload>("game-launch-error", (event) => {
+    listen<GameLaunchErrorPayload>("game-launch-error", (event) => {
       patchRunState(event.payload.id, {
         initializing: false,
         running: false,

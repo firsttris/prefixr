@@ -402,6 +402,7 @@ pub async fn kill_running_game(running: &RunningGames, id: Uuid) -> Result<(), S
 /// its state back up after the webview reloaded (the launch events it
 /// tracks that state from are gone by then).
 #[derive(Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct ActiveGame {
     id: String,
     /// The process runs; otherwise it's still being prepared.
@@ -460,6 +461,7 @@ pub fn take_pending_install(state: State<PendingInstall>) -> Option<String> {
 
 /// What `run_installer` reports back once the installer exited.
 #[derive(Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct InstallerResult {
     shortcuts: Vec<DetectedShortcut>,
     log_path: String,
@@ -721,23 +723,27 @@ pub fn remove_game(
 }
 
 #[derive(Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 struct GameInitializingPayload<'a> {
     id: &'a str,
 }
 
 #[derive(Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 struct GameStartedPayload<'a> {
     id: &'a str,
     log_path: String,
 }
 
 #[derive(Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 struct GameExitedPayload<'a> {
     id: &'a str,
     exit_code: Option<i32>,
 }
 
 #[derive(Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 struct GameLaunchErrorPayload<'a> {
     id: &'a str,
     message: AppError,

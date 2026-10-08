@@ -14,6 +14,7 @@ use crate::locale::Locale;
 /// leaving it to fall through to `Other`. `every_app_error_has_a_text`
 /// checks that the message exists.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 #[serde(tag = "code", rename_all = "snake_case")]
 pub enum AppError {
     Other {

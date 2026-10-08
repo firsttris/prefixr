@@ -68,6 +68,7 @@ struct SgdbAsset {
 
 /// A SteamGridDB game search match, as surfaced to the frontend.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct SteamGridDbGameMatch {
     pub id: i64,
     pub name: String,
@@ -77,6 +78,7 @@ pub struct SteamGridDbGameMatch {
 /// A SteamGridDB image asset option (a grid/cover or an icon), as surfaced
 /// to the frontend.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct SteamGridDbGrid {
     pub id: i64,
     pub url: String,

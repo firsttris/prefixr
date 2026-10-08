@@ -363,6 +363,7 @@ fn remove_shortcut(game_id: Uuid, user: &SteamUser) -> Result<(), AppError> {
 }
 
 #[derive(Debug, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 #[serde(tag = "status", rename_all = "snake_case")]
 pub enum SteamChange {
     /// `restarted_steam`: Steam was quit for the change and started again.

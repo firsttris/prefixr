@@ -6,3 +6,4 @@ src-tauri/
 bun.lock
 *.md
 project.inlang/cache/
+src/lib/bindings/

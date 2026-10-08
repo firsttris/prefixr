@@ -56,6 +56,7 @@ fn asset_sha256_hex(asset: &GitHubAsset) -> Option<&str> {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct UmuStatus {
     pub installed: bool,
     /// The GitHub release tag the installed copy came from.

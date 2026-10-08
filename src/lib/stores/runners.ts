@@ -1,7 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { writable } from "svelte/store";
-import type { Game, Runner, RunnerRelease, RunnerSourceInfo } from "$lib/types";
+import type {
+  Game,
+  Runner,
+  RunnerDownloadDonePayload,
+  RunnerDownloadProgressPayload,
+  RunnerRelease,
+  RunnerSourceInfo,
+} from "$lib/types";
 
 export const runners = writable<Runner[]>([]);
 
@@ -70,16 +77,6 @@ function patchDownloadState(tag: string, patch: Partial<RunnerDownloadState>) {
   });
 }
 
-interface DownloadProgressPayload {
-  tag: string;
-  downloaded: number;
-  total: number | null;
-}
-
-interface DownloadDonePayload {
-  tag: string;
-}
-
 let eventsInitialized = false;
 let downloadEventListeners: Promise<UnlistenFn>[] = [];
 
@@ -90,14 +87,14 @@ export function initRunnerDownloadEvents(): void {
   eventsInitialized = true;
 
   downloadEventListeners = [
-    listen<DownloadProgressPayload>("runner-download-progress", (event) => {
+    listen<RunnerDownloadProgressPayload>("runner-download-progress", (event) => {
       patchDownloadState(event.payload.tag, {
         downloaded: event.payload.downloaded,
         total: event.payload.total ?? undefined,
       });
     }),
 
-    listen<DownloadDonePayload>("runner-download-done", (event) => {
+    listen<RunnerDownloadDonePayload>("runner-download-done", (event) => {
       const { tag } = event.payload;
       patchDownloadState(tag, { done: true, error: undefined });
       refreshRunners().catch((e) => patchDownloadState(tag, { error: e }));

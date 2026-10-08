@@ -14,6 +14,7 @@ use crate::models::{ProtonConfig, RunnerKind};
 /// script accepts for the same `config` flag (e.g. `PROTON_USE_HDR` next to
 /// `PROTON_ENABLE_HDR`), listed so the UI can tell they're the same switch.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct ProtonOption {
     pub env: String,
     pub config: String,

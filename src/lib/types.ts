@@ -1,235 +1,49 @@
-export type RunnerKind = "proton" | "wine";
+// The shapes of what the backend sends and takes, generated from the Rust
+// types by ts-rs into ./bindings (see `#[derive(TS)]` and .cargo/config.toml)
+// whenever the Rust tests run — CI fails if they're out of date. Edit the
+// Rust types, not these.
+export type { ActiveGame } from "./bindings/ActiveGame";
+export type { AppError } from "./bindings/AppError";
+export type { ArtworkKind } from "./bindings/ArtworkKind";
+export type { DetectedShortcut } from "./bindings/DetectedShortcut";
+export type { DirectXLayerStatus } from "./bindings/DirectXLayerStatus";
+export type { Game } from "./bindings/Game";
+export type { GameExitedPayload } from "./bindings/GameExitedPayload";
+export type { GameInitializingPayload } from "./bindings/GameInitializingPayload";
+export type { GameInput } from "./bindings/GameInput";
+export type { GameLaunchErrorPayload } from "./bindings/GameLaunchErrorPayload";
+export type { GameOverrides } from "./bindings/GameOverrides";
+export type { GameStartedPayload } from "./bindings/GameStartedPayload";
+export type { GamescopeSettings } from "./bindings/GamescopeSettings";
+export type { GitHubConfig } from "./bindings/GitHubConfig";
+export type { GraphicsConfig } from "./bindings/GraphicsConfig";
+export type { GraphicsOverrides } from "./bindings/GraphicsOverrides";
+export type { InstallerResult } from "./bindings/InstallerResult";
+export type { MangoHudConfig } from "./bindings/MangoHudConfig";
+export type { MangoHudLayout } from "./bindings/MangoHudLayout";
+export type { MaxMapCountStatus } from "./bindings/MaxMapCountStatus";
+export type { OverlayOverrides } from "./bindings/OverlayOverrides";
+export type { PerformanceConfig } from "./bindings/PerformanceConfig";
+export type { PerformanceOverrides } from "./bindings/PerformanceOverrides";
+export type { PrefixInfo } from "./bindings/PrefixInfo";
+export type { ProtonConfig } from "./bindings/ProtonConfig";
+export type { ProtonOption } from "./bindings/ProtonOption";
+export type { Runner } from "./bindings/Runner";
+export type { RunnerDownloadDonePayload } from "./bindings/RunnerDownloadDonePayload";
+export type { RunnerDownloadProgressPayload } from "./bindings/RunnerDownloadProgressPayload";
+export type { RunnerKind } from "./bindings/RunnerKind";
+export type { RunnerRelease } from "./bindings/RunnerRelease";
+export type { RunnerSourceInfo } from "./bindings/RunnerSourceInfo";
+export type { SteamChange } from "./bindings/SteamChange";
+export type { SteamGridDbConfig } from "./bindings/SteamGridDbConfig";
+export type { SteamGridDbGameMatch } from "./bindings/SteamGridDbGameMatch";
+export type { SteamGridDbGrid } from "./bindings/SteamGridDbGrid";
+export type { UmuMatch } from "./bindings/UmuMatch";
+export type { UmuMatchSource } from "./bindings/UmuMatchSource";
+export type { UmuStatus } from "./bindings/UmuStatus";
+export type { VkBasaltSettings } from "./bindings/VkBasaltSettings";
+export type { WinetricksVerbMeta } from "./bindings/WinetricksVerbMeta";
 
-export interface Runner {
-  id: string;
-  name: string;
-  path: string;
-  kind: RunnerKind;
-}
+import type { MangoHudLayout } from "./bindings/MangoHudLayout";
 
-export interface PrefixInfo {
-  path: string;
-}
-
-export interface Game {
-  id: string;
-  name: string;
-  exe_path: string;
-  prefix_path: string;
-  runner_id: string;
-  env_vars: Record<string, string>;
-  launch_args: string;
-  // Path of the exe's own icon (a PNG); show it via exeIconUrl().
-  icon: string | null;
-  steamgriddb_id: number | null;
-  cover_grid_id: number | null;
-  cover_url: string | null;
-  steamgriddb_icon_grid_id: number | null;
-  steamgriddb_icon_url: string | null;
-  // Source URLs of the SteamGridDB images picked for Steam's other artwork
-  // slots — see `ArtworkKind` in models.rs.
-  artwork: Partial<Record<ArtworkKind, string>>;
-  umu_id: string | null;
-  umu_store: string | null;
-  overrides: GameOverrides;
-}
-
-// Steam's artwork slots besides the cover and icon: the wide grid image,
-// the banner on the game's page, and the logo laid over it.
-export type ArtworkKind = "wide" | "hero" | "logo";
-
-export interface GameInput {
-  name: string;
-  exe_path: string;
-  prefix_path: string;
-  runner_id: string;
-  env_vars: Record<string, string>;
-  launch_args: string;
-  umu_id: string | null;
-  umu_store: string | null;
-  overrides: GameOverrides;
-}
-
-// Per-game overrides, one block per settings category (Leistung, Bild,
-// Overlay, Proton); `null` or a missing key inherits the global value — see
-// `GameOverrides` in models.rs.
-export interface GameOverrides {
-  performance: PerformanceOverrides;
-  graphics: GraphicsOverrides;
-  overlay: OverlayOverrides;
-  proton: Record<string, boolean>;
-}
-
-export interface PerformanceOverrides {
-  gamemode_enabled: boolean | null;
-  power_profile_enabled: boolean | null;
-  inhibit_sleep_enabled: boolean | null;
-}
-
-export interface GraphicsOverrides {
-  gamescope: GamescopeSettings | null;
-  vkbasalt: VkBasaltSettings | null;
-}
-
-export interface OverlayOverrides {
-  enabled: boolean | null;
-  layout: MangoHudLayout | null;
-}
-
-// A switch found in a Proton runner's `proton` script — see
-// `list_proton_options` in proton_options.rs.
-export interface ProtonOption {
-  env: string;
-  config: string;
-  aliases: string[];
-}
-
-// An .exe shortcut found on the Desktop/Start Menu right after an
-// installer finished running inside a prefix — see `run_installer`.
-export interface DetectedShortcut {
-  name: string;
-  exe_path: string;
-}
-
-// What `run_installer` reports once the installer exited (games.rs).
-export interface InstallerResult {
-  shortcuts: DetectedShortcut[];
-  log_path: string;
-}
-
-// Outcome of `export_to_steam` / `remove_from_steam` (steam.rs).
-// `steam_running`: nothing was changed, since Steam would overwrite it —
-// ask before quitting Steam.
-export type SteamChange =
-  { status: "done"; restarted_steam: boolean } | { status: "steam_running" };
-
-export interface RunnerSourceInfo {
-  id: string;
-  label: string;
-  kind: RunnerKind;
-}
-
-export interface RunnerRelease {
-  source: string;
-  tag: string;
-  name: string;
-  published_at: string;
-  download_url: string;
-  size: number;
-}
-
-export type MangoHudPosition = "top-left" | "top-right" | "bottom-left" | "bottom-right";
-
-// Overlay. Stored as one flat object; `layout` is everything but `enabled`.
-export interface MangoHudLayout {
-  preset: string;
-  position: MangoHudPosition;
-  theme_color: string;
-  background_alpha: number;
-  round_corners: boolean;
-  show_fps: boolean;
-  show_frametime: boolean;
-  show_cpu: boolean;
-  show_gpu: boolean;
-  show_ram: boolean;
-  show_vram: boolean;
-  show_temps: boolean;
-  show_gamemode: boolean;
-  show_vkbasalt: boolean;
-  show_hdr: boolean;
-  show_driver: boolean;
-  show_engine_version: boolean;
-  show_wine: boolean;
-  show_gpu_name: boolean;
-  show_resolution: boolean;
-  horizontal: boolean;
-}
-
-export interface MangoHudConfig extends MangoHudLayout {
-  enabled: boolean;
-}
-
-// Leistung.
-export interface PerformanceConfig {
-  gamemode_enabled: boolean;
-  power_profile_enabled: boolean;
-  inhibit_sleep_enabled: boolean;
-}
-
-// Bild.
-export interface GraphicsConfig {
-  gamescope: GamescopeSettings;
-  vkbasalt: VkBasaltSettings;
-}
-
-export interface VkBasaltSettings {
-  enabled: boolean;
-  sharpen: boolean;
-  sharpness: number;
-  smaa: boolean;
-}
-
-export interface GamescopeSettings {
-  enabled: boolean;
-  width: number | null;
-  height: number | null;
-  fps_limit: number | null;
-  fullscreen: boolean;
-}
-
-// Proton: `PROTON_*` variable → on/off; a missing key keeps Proton's default.
-export interface ProtonConfig {
-  options: Record<string, boolean>;
-}
-
-export interface SteamGridDbConfig {
-  api_key: string | null;
-}
-
-export interface GitHubConfig {
-  token: string | null;
-}
-
-export interface SteamGridDbGameMatch {
-  id: number;
-  name: string;
-  verified: boolean;
-}
-
-export interface SteamGridDbGrid {
-  id: number;
-  url: string;
-  thumb: string;
-  width: number;
-  height: number;
-}
-
-export interface MaxMapCountStatus {
-  current: number;
-  recommended: number;
-  sufficient: boolean;
-  can_fix: boolean;
-}
-
-// Our managed copy of umu-launcher, which every Proton runner is launched
-// through — see `commands::umu`.
-export interface UmuStatus {
-  installed: boolean;
-  version: string | null;
-}
-
-// DXVK or VKD3D-Proton as cached for Wine runners — see graphics_layers.rs.
-export interface DirectXLayerStatus {
-  label: string;
-  installed: boolean;
-  version: string | null;
-}
-
-// A suggested UMU id (`GAMEID`) for a game — see `search_umu_ids` in
-// umu_database.rs. `store` is null for Steam and standalone releases.
-export interface UmuMatch {
-  umu_id: string;
-  title: string;
-  store: string | null;
-  source: "steam" | "database";
-}
+export type MangoHudPosition = MangoHudLayout["position"];

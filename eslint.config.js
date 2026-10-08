@@ -26,6 +26,6 @@ export default ts.config(
     },
   },
   {
-    ignores: ["build/", ".svelte-kit/", "src/lib/paraglide/", "src-tauri/"],
+    ignores: ["build/", ".svelte-kit/", "src/lib/paraglide/", "src/lib/bindings/", "src-tauri/"],
   },
 );

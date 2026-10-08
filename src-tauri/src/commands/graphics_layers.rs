@@ -192,6 +192,7 @@ pub async fn ensure_directx_layer_cache(
 
 /// A cached layer, as shown in the runner settings.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct DirectXLayerStatus {
     pub label: &'static str,
     pub installed: bool,

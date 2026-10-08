@@ -92,6 +92,7 @@ fn finalize_max_map_count_fix(
 }
 
 #[derive(Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "snake_case")]
 pub struct MaxMapCountStatus {
     pub current: u64,

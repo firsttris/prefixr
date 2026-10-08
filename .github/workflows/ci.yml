@@ -72,6 +72,12 @@ jobs:
       - name: Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --locked
 
+      # The Rust tests regenerate the frontend's types (src/lib/types.ts).
+      - name: TypeScript bindings are up to date
+        run: |
+          git diff --exit-code -- src/lib/bindings
+          test -z "$(git status --porcelain -- src/lib/bindings)"
+
       - name: Frontend production build
         run: bun run build
 

@@ -11,6 +11,7 @@ use serde::Serialize;
 /// the actual game once its installer has finished (see `run_installer` in
 /// `commands::games`).
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct DetectedShortcut {
     /// The shortcut's own file name, without the `.lnk` extension — e.g.
     /// "Baldur's Gate 3".

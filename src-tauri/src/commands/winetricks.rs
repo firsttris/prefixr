@@ -119,6 +119,7 @@ async fn download_script(path: &Path) -> Result<(), String> {
 }
 
 #[derive(Serialize, Clone)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 #[serde(rename_all = "snake_case")]
 pub struct WinetricksVerbMeta {
     pub id: String,
