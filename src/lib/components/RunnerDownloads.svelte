@@ -59,7 +59,7 @@
   }
 
   function formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString(getLocale() === "de" ? "de-DE" : "en-US", {
+    return new Date(iso).toLocaleDateString(getLocale(), {
       year: "numeric",
       month: "short",
       day: "numeric",

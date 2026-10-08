@@ -64,12 +64,8 @@
         <strong>{m.performanceSettings_mapCountWarningTitle()}</strong>
         <p>
           {m.performanceSettings_mapCountWarningBody( {
-            current: $maxMapCountStatus.current.toLocaleString(
-              getLocale() === "de" ? "de-DE" : "en-US",
-            ),
-            recommended: $maxMapCountStatus.recommended.toLocaleString(
-              getLocale() === "de" ? "de-DE" : "en-US",
-            ),
+            current: $maxMapCountStatus.current.toLocaleString(getLocale()),
+            recommended: $maxMapCountStatus.recommended.toLocaleString(getLocale()),
           })}
         </p>
         {#if mapCountFixError}
