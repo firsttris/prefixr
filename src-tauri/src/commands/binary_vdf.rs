@@ -61,12 +61,21 @@ pub fn map_entry<'a>(map: &'a mut Map, key: &str) -> &'a mut Map {
     }
 }
 
+/// How deep maps may nest. `shortcuts.vdf` needs three levels (root,
+/// `shortcuts`, one per shortcut, its `tags`); without a limit, a broken
+/// file of nested empty maps would overflow the stack.
+const MAX_DEPTH: usize = 32;
+
 pub fn parse(bytes: &[u8]) -> Result<Map, String> {
     let mut pos = 0;
-    parse_map(bytes, &mut pos, true)
+    parse_map(bytes, &mut pos, 0)
 }
 
-fn parse_map(bytes: &[u8], pos: &mut usize, root: bool) -> Result<Map, String> {
+fn parse_map(bytes: &[u8], pos: &mut usize, depth: usize) -> Result<Map, String> {
+    if depth > MAX_DEPTH {
+        return Err("Maps nested too deeply".to_string());
+    }
+    let root = depth == 0;
     let mut map = Map::new();
     loop {
         let Some(&tag) = bytes.get(*pos) else {
@@ -83,7 +92,7 @@ fn parse_map(bytes: &[u8], pos: &mut usize, root: bool) -> Result<Map, String> {
         }
         let key = read_string(bytes, pos)?;
         let value = match tag {
-            MAP => Value::Map(parse_map(bytes, pos, false)?),
+            MAP => Value::Map(parse_map(bytes, pos, depth + 1)?),
             STRING => Value::String(read_string(bytes, pos)?),
             INT => Value::Int(u32::from_le_bytes(read_bytes(bytes, pos, 4)?.try_into().unwrap())),
             _ => match fixed_size(tag) {

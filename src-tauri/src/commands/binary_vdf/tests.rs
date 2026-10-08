@@ -39,3 +39,13 @@ fn keys_are_case_insensitive() {
     assert_eq!(map, vec![("exe".to_string(), Value::String("b".into()))]);
     assert_eq!(get(&map, "EXE"), Some(&Value::String("b".into())));
 }
+
+#[test]
+fn deeply_nested_maps_are_rejected_instead_of_overflowing_the_stack() {
+    let bytes = [MAP, 0].repeat(100_000);
+    assert!(parse(&bytes).is_err());
+
+    let mut nested = [MAP, b'a', 0].repeat(MAX_DEPTH);
+    nested.extend(std::iter::repeat_n(END, MAX_DEPTH + 1));
+    assert!(parse(&nested).is_ok());
+}
