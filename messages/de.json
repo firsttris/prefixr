@@ -23,7 +23,13 @@
   "nav_steamgriddb": "SteamGridDB",
   "nav_languageSwitcher": "Sprache",
   "library_heading": "Bibliothek",
-  "library_gameCount": [{"declarations": ["input count", "local countPlural = count: plural"], "selectors": ["countPlural"], "match": {"countPlural=one": "{count} Spiel", "countPlural=other": "{count} Spiele"}}],
+  "library_gameCount": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": { "countPlural=one": "{count} Spiel", "countPlural=other": "{count} Spiele" }
+    }
+  ],
   "library_addGame": "+ Spiel hinzufügen",
   "library_addGameTitle": "Spiel hinzufügen",
   "library_editGameTitle": "Spiel bearbeiten",
@@ -167,7 +173,16 @@
   "prefixManager_remove": "Entfernen",
   "prefixManager_removeTitle": "Prefix entfernen",
   "prefixManager_unused": "Nicht verwendet",
-  "prefixManager_usedByCount": [{"declarations": ["input count", "local countPlural = count: plural"], "selectors": ["countPlural"], "match": {"countPlural=one": "Von {count} Spiel verwendet", "countPlural=other": "Von {count} Spielen verwendet"}}],
+  "prefixManager_usedByCount": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Von {count} Spiel verwendet",
+        "countPlural=other": "Von {count} Spielen verwendet"
+      }
+    }
+  ],
   "prefixManager_usedBy": "Verwendet von: {games}. Diese Spiele behalten den Prefix, auch wenn er nur aus Prefixr entfernt wird.",
   "prefixManager_deleteExplain": "Der Prefix wird nur aus Prefixr entfernt. Der Ordner auf der Festplatte, installierte Programme und Spielstände darin bleiben unverändert.",
   "prefixManager_removeFromAppOnly": "Aus Prefixr entfernen",
@@ -178,7 +193,16 @@
   "runnerList_downloadRunner": "Runner herunterladen",
   "runnerList_empty": "Keine Runner gefunden. Lege Proton- oder Wine-Builds im Runner-Verzeichnis ab.",
   "runnerList_unused": "Nicht verwendet",
-  "runnerList_usedByCount": [{"declarations": ["input count", "local countPlural = count: plural"], "selectors": ["countPlural"], "match": {"countPlural=one": "Von {count} Spiel verwendet", "countPlural=other": "Von {count} Spielen verwendet"}}],
+  "runnerList_usedByCount": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Von {count} Spiel verwendet",
+        "countPlural=other": "Von {count} Spielen verwendet"
+      }
+    }
+  ],
   "runnerList_delete": "Löschen",
   "runnerList_deleteConfirmTitle": "Runner löschen",
   "runnerList_deleteConfirmMessage": "„{name}“ wird von keinem Spiel verwendet. Den Runner-Ordner endgültig löschen?",

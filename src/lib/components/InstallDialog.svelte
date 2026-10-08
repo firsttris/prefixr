@@ -171,8 +171,7 @@
         >
           {m.installDialog_continueButton()}
         </button>
-        <button type="button" onclick={pickExeManually}>{m.installDialog_pickOtherFile()}</button
-        >
+        <button type="button" onclick={pickExeManually}>{m.installDialog_pickOtherFile()}</button>
       </div>
     {:else}
       <p class="hint">{m.installDialog_noCandidatesHint()}</p>

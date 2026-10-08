@@ -9,7 +9,11 @@ export default defineConfig(() => ({
   plugins: [
     // messages/{de,en}.json → src/lib/paraglide (typed message functions); the language comes from
     // src/lib/i18n/index.svelte.ts
-    paraglideVitePlugin({ project: "./project.inlang", outdir: "./src/lib/paraglide", strategy: ["baseLocale"] }),
+    paraglideVitePlugin({
+      project: "./project.inlang",
+      outdir: "./src/lib/paraglide",
+      strategy: ["baseLocale"],
+    }),
     sveltekit(),
   ],
 

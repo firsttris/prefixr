@@ -164,7 +164,6 @@
     image-rendering: -webkit-optimize-contrast;
   }
 
-
   .status-badge {
     position: absolute;
     top: 0.6em;
@@ -261,7 +260,6 @@
     border-radius: 999px;
   }
 
-
   .menu-corner :global(.menu-trigger) {
     font-size: 1.1em;
     font-weight: 700;
@@ -281,15 +279,6 @@
     border-color: var(--accent);
     color: var(--accent);
   }
-
-
-
-
-
-
-
-
-
 
   .menu-corner {
     position: absolute;
@@ -359,5 +348,4 @@
       transform: rotate(360deg);
     }
   }
-
 </style>

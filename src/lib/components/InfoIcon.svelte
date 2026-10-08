@@ -1,6 +1,5 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
-  
 
   let { text }: { text: string } = $props();
 

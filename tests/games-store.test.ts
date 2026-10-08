@@ -28,13 +28,19 @@ describe("game run state", () => {
   it("follows a launch from start to exit", async () => {
     let finish!: () => void;
     invoke.mockImplementation((cmd: string) =>
-      cmd === "launch_game" ? new Promise<void>((resolve) => (finish = resolve)) : Promise.resolve([]),
+      cmd === "launch_game"
+        ? new Promise<void>((resolve) => (finish = resolve))
+        : Promise.resolve([]),
     );
     const launch = launchGame("a");
     expect(state("a")).toMatchObject({ initializing: true, running: false });
 
     emit("game-started", { id: "a", log_path: "/logs/a.log" });
-    expect(state("a")).toMatchObject({ initializing: false, running: true, logPath: "/logs/a.log" });
+    expect(state("a")).toMatchObject({
+      initializing: false,
+      running: true,
+      logPath: "/logs/a.log",
+    });
 
     emit("game-exited", { id: "a", exit_code: 0 });
     finish();
@@ -56,7 +62,11 @@ describe("game run state", () => {
       throw "Game exited with status 1";
     });
     await launchGame("c");
-    expect(state("c")).toMatchObject({ initializing: false, error: { code: "x" }, logPath: "/logs/c.log" });
+    expect(state("c")).toMatchObject({
+      initializing: false,
+      error: { code: "x" },
+      logPath: "/logs/c.log",
+    });
   });
 
   it("shows a refused launch, which sends no event", async () => {
@@ -65,6 +75,9 @@ describe("game run state", () => {
       return [];
     });
     await launchGame("d");
-    expect(state("d")).toMatchObject({ initializing: false, error: { code: "game_already_running" } });
+    expect(state("d")).toMatchObject({
+      initializing: false,
+      error: { code: "game_already_running" },
+    });
   });
 });

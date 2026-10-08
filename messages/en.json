@@ -23,7 +23,13 @@
   "nav_steamgriddb": "SteamGridDB",
   "nav_languageSwitcher": "Language",
   "library_heading": "Library",
-  "library_gameCount": [{"declarations": ["input count", "local countPlural = count: plural"], "selectors": ["countPlural"], "match": {"countPlural=one": "{count} game", "countPlural=other": "{count} games"}}],
+  "library_gameCount": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": { "countPlural=one": "{count} game", "countPlural=other": "{count} games" }
+    }
+  ],
   "library_addGame": "+ Add game",
   "library_addGameTitle": "Add game",
   "library_editGameTitle": "Edit game",
@@ -167,7 +173,16 @@
   "prefixManager_remove": "Remove",
   "prefixManager_removeTitle": "Remove prefix",
   "prefixManager_unused": "Unused",
-  "prefixManager_usedByCount": [{"declarations": ["input count", "local countPlural = count: plural"], "selectors": ["countPlural"], "match": {"countPlural=one": "Used by {count} game", "countPlural=other": "Used by {count} games"}}],
+  "prefixManager_usedByCount": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Used by {count} game",
+        "countPlural=other": "Used by {count} games"
+      }
+    }
+  ],
   "prefixManager_usedBy": "Used by: {games}. These games keep the prefix even if it's only removed from Prefixr.",
   "prefixManager_deleteExplain": "The prefix is only removed from Prefixr. The directory on disk, installed programs, and saves inside it stay untouched.",
   "prefixManager_removeFromAppOnly": "Remove from Prefixr",
@@ -178,7 +193,16 @@
   "runnerList_downloadRunner": "Download runner",
   "runnerList_empty": "No runners found. Place Proton or Wine builds in the runner directory.",
   "runnerList_unused": "Unused",
-  "runnerList_usedByCount": [{"declarations": ["input count", "local countPlural = count: plural"], "selectors": ["countPlural"], "match": {"countPlural=one": "Used by {count} game", "countPlural=other": "Used by {count} games"}}],
+  "runnerList_usedByCount": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Used by {count} game",
+        "countPlural=other": "Used by {count} games"
+      }
+    }
+  ],
   "runnerList_delete": "Delete",
   "runnerList_deleteConfirmTitle": "Delete runner",
   "runnerList_deleteConfirmMessage": "“{name}” isn't used by any game. Permanently delete the runner folder?",

@@ -105,11 +105,7 @@
   <div class="verb-list">
     {#each WINETRICKS_VERBS as verb (verb.id)}
       <label class="verb-row">
-        <input
-          type="checkbox"
-          checked={selected.has(verb.id)}
-          onchange={() => toggle(verb.id)}
-        />
+        <input type="checkbox" checked={selected.has(verb.id)} onchange={() => toggle(verb.id)} />
         <div>
           <span class="verb-label">
             {pickMsg(msgGroup.winetricksVerbs_label, verb.id)}
@@ -188,7 +184,7 @@
   >
     {installing
       ? m.winetricksInstaller_installing()
-      : m.winetricksInstaller_installButton( { count: selected.size })}
+      : m.winetricksInstaller_installButton({ count: selected.size })}
   </button>
 </div>
 

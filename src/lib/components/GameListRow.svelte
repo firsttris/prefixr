@@ -99,7 +99,9 @@
     </button>
 
     {#if runState?.running}
-      <button type="button" class="kill-sm" onclick={() => killGame(game.id)}>{m.gameCard_kill()}</button>
+      <button type="button" class="kill-sm" onclick={() => killGame(game.id)}
+        >{m.gameCard_kill()}</button
+      >
     {:else}
       <button
         type="button"
@@ -242,12 +244,6 @@
     gap: 0.4em;
   }
 
-
-
-
-
-
-
   .divider {
     flex-shrink: 0;
     width: 1px;
@@ -272,5 +268,4 @@
   .kill-sm:hover:not(:disabled) {
     border-color: var(--danger);
   }
-
 </style>

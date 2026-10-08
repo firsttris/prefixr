@@ -91,10 +91,7 @@
   {:else}
     <label class="runner">
       {m.protonSettings_availableSwitches()}
-      <select
-        value={runnerId}
-        onchange={(e) => (pickedRunnerId = e.currentTarget.value)}
-      >
+      <select value={runnerId} onchange={(e) => (pickedRunnerId = e.currentTarget.value)}>
         {#each protonRunners as runner (runner.id)}
           <option value={runner.id}>{runner.name}</option>
         {/each}

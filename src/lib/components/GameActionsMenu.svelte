@@ -52,12 +52,7 @@
   </svg>
 {/snippet}
 
-<Menu
-  {label}
-  {triggerClass}
-  disabled={!full && item.shortcutState === "creating"}
-  {trigger}
->
+<Menu {label} {triggerClass} disabled={!full && item.shortcutState === "creating"} {trigger}>
   {#snippet items(close)}
     {#if full}
       <button
@@ -69,7 +64,15 @@
         }}
       >
         <svg class="menu-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-          <rect x="3" y="4" width="14" height="12" rx="2" stroke="currentColor" stroke-width="1.5" />
+          <rect
+            x="3"
+            y="4"
+            width="14"
+            height="12"
+            rx="2"
+            stroke="currentColor"
+            stroke-width="1.5"
+          />
           <circle cx="7.5" cy="8.5" r="1.4" stroke="currentColor" stroke-width="1.5" />
           <path
             d="M4 14.5l4-4 3 3 2-2 3.5 3.5"
@@ -135,7 +138,12 @@
     >
       <svg class="menu-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
         <rect x="3" y="3" width="14" height="14" rx="3" stroke="currentColor" stroke-width="1.5" />
-        <path d="M10 6.5v7M6.5 10h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+        <path
+          d="M10 6.5v7M6.5 10h7"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+        />
       </svg>
       {inSteam ? m.gameCard_menuUpdateInSteam() : m.gameCard_menuAddToSteam()}
     </button>
@@ -149,7 +157,15 @@
         }}
       >
         <svg class="menu-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-          <rect x="3" y="3" width="14" height="14" rx="3" stroke="currentColor" stroke-width="1.5" />
+          <rect
+            x="3"
+            y="3"
+            width="14"
+            height="14"
+            rx="3"
+            stroke="currentColor"
+            stroke-width="1.5"
+          />
           <path d="M6.5 10h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
         </svg>
         {m.gameCard_menuRemoveFromSteam()}

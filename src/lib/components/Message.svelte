@@ -26,4 +26,6 @@
   });
 </script>
 
-{#each segments as segment, i (i)}{#if segment.key !== undefined}{@render parts[segment.key]()}{:else}{segment.text}{/if}{/each}
+{#each segments as segment, i (i)}{#if segment.key !== undefined}{@render parts[
+      segment.key
+    ]()}{:else}{segment.text}{/if}{/each}

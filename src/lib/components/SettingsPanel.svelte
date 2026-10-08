@@ -1,7 +1,6 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
   import type { Snippet } from "svelte";
-  
 
   // Frame for a global settings page: heading, intro, the category's
   // editor, and a save button for the page's draft.

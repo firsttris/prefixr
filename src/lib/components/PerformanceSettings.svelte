@@ -63,7 +63,7 @@
       <div>
         <strong>{m.performanceSettings_mapCountWarningTitle()}</strong>
         <p>
-          {m.performanceSettings_mapCountWarningBody( {
+          {m.performanceSettings_mapCountWarningBody({
             current: $maxMapCountStatus.current.toLocaleString(getLocale()),
             recommended: $maxMapCountStatus.recommended.toLocaleString(getLocale()),
           })}
@@ -79,18 +79,12 @@
         {/if}
       </div>
       {#if $maxMapCountStatus.can_fix}
-        <button
-          type="button"
-          class="primary"
-          disabled={fixingMapCount}
-          onclick={handleFixMapCount}
-        >
+        <button type="button" class="primary" disabled={fixingMapCount} onclick={handleFixMapCount}>
           {fixingMapCount ? m.performanceSettings_fixing() : m.performanceSettings_fixNow()}
         </button>
       {/if}
     </div>
   {/if}
-
 
   <SettingsPanel
     title={m.performanceSettings_title()}

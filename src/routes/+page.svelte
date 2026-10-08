@@ -337,5 +337,4 @@
     font-size: 0.9em;
     margin-top: 0.2em;
   }
-
 </style>

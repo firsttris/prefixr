@@ -101,8 +101,7 @@ export interface InstallerResult {
 // `steam_running`: nothing was changed, since Steam would overwrite it —
 // ask before quitting Steam.
 export type SteamChange =
-  | { status: "done"; restarted_steam: boolean }
-  | { status: "steam_running" };
+  { status: "done"; restarted_steam: boolean } | { status: "steam_running" };
 
 export interface RunnerSourceInfo {
   id: string;

@@ -66,7 +66,10 @@ export function exeIconUrl(game: Game): string | null {
   return game.icon ? `${convertFileSrc(game.icon)}?v=${encodeURIComponent(game.exe_path)}` : null;
 }
 
-export async function getGameCover(gameId: string, version: number | null = null): Promise<string | null> {
+export async function getGameCover(
+  gameId: string,
+  version: number | null = null,
+): Promise<string | null> {
   return artworkUrl(await invoke<string | null>("get_game_cover", { gameId }), version);
 }
 
@@ -85,7 +88,10 @@ export async function removeGameIcon(gameId: string): Promise<void> {
   await refreshGames();
 }
 
-export async function getGameIcon(gameId: string, version: number | null = null): Promise<string | null> {
+export async function getGameIcon(
+  gameId: string,
+  version: number | null = null,
+): Promise<string | null> {
   return artworkUrl(await invoke<string | null>("get_game_icon", { gameId }), version);
 }
 

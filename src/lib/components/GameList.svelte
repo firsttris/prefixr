@@ -61,9 +61,7 @@
     } else if (sortBy === "name-desc") {
       list.sort((a, b) => b.name.localeCompare(a.name));
     } else {
-      list.sort(
-        (a, b) => a.runner_id.localeCompare(b.runner_id) || a.name.localeCompare(b.name),
-      );
+      list.sort((a, b) => a.runner_id.localeCompare(b.runner_id) || a.name.localeCompare(b.name));
     }
     return list;
   });
@@ -102,8 +100,8 @@
       shutdownSteam
         ? m.gameList_steam_busyQuitting()
         : action === "export"
-          ? m.gameList_steam_busyExporting( { name: game.name })
-          : m.gameList_steam_busyRemoving( { name: game.name }),
+          ? m.gameList_steam_busyExporting({ name: game.name })
+          : m.gameList_steam_busyRemoving({ name: game.name }),
       "busy",
     );
     try {
@@ -120,12 +118,12 @@
       const restarted = result.restarted_steam ? m.gameList_steam_restartedSuffix() : "";
       if (action === "remove-game") {
         await removeGame(game.id);
-        notify(m.gameList_steam_doneRemovedBoth( { name: game.name, restarted }), "done");
+        notify(m.gameList_steam_doneRemovedBoth({ name: game.name, restarted }), "done");
       } else if (action === "remove") {
-        notify(m.gameList_steam_doneRemoved( { name: game.name, restarted }), "done");
+        notify(m.gameList_steam_doneRemoved({ name: game.name, restarted }), "done");
       } else {
         notify(
-          m.gameList_steam_doneAdded( {
+          m.gameList_steam_doneAdded({
             name: game.name,
             restarted: restarted || m.gameList_steam_doneAddedNextStartSuffix(),
           }),
@@ -133,7 +131,7 @@
         );
       }
     } catch (e) {
-      notify(m.gameList_steam_errorPrefix( { error: backendError(e) }), "error");
+      notify(m.gameList_steam_errorPrefix({ error: backendError(e) }), "error");
     }
   }
 
@@ -142,7 +140,7 @@
       runSteamAction(game, "remove-game");
     } else {
       removeGame(game.id).catch((e) =>
-        notify(m.gameList_steam_removeFailed( { name: game.name, error: backendError(e) }), "error"),
+        notify(m.gameList_steam_removeFailed({ name: game.name, error: backendError(e) }), "error"),
       );
     }
   }
@@ -201,7 +199,7 @@
   <div class="empty">
     <span class="empty-icon">🔍</span>
     <h3>{m.gameList_emptySearch_title()}</h3>
-    <p>{m.gameList_emptySearch_hint( { query })}</p>
+    <p>{m.gameList_emptySearch_hint({ query })}</p>
   </div>
 {:else if viewMode === "grid"}
   <div class="grid">
@@ -243,11 +241,11 @@
   open={steamConfirm !== null}
   title={m.gameList_steam_confirmTitle()}
   message={steamConfirm
-    ? m.gameList_steam_confirmMessage( {
+    ? m.gameList_steam_confirmMessage({
         action:
           steamConfirm.action === "export"
-            ? m.gameList_steam_confirmActionExport( { name: steamConfirm.game.name })
-            : m.gameList_steam_confirmActionRemove( { name: steamConfirm.game.name }),
+            ? m.gameList_steam_confirmActionExport({ name: steamConfirm.game.name })
+            : m.gameList_steam_confirmActionRemove({ name: steamConfirm.game.name }),
       })
     : ""}
   confirmLabel={m.gameList_steam_confirmButton()}

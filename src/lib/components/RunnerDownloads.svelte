@@ -97,7 +97,8 @@
         <div class="row">
           <div class="info">
             <span class="name">{release.name}</span>
-            <span class="meta">{formatDate(release.published_at)} · {formatSize(release.size)}</span>
+            <span class="meta">{formatDate(release.published_at)} · {formatSize(release.size)}</span
+            >
           </div>
 
           {#if installed || state?.done}

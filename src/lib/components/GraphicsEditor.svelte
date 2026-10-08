@@ -4,7 +4,6 @@
   import SettingToggle from "$lib/components/SettingToggle.svelte";
   import type { OverrideHooks } from "$lib/settings";
   import type { GamescopeSettings, GraphicsConfig, VkBasaltSettings } from "$lib/types";
-  
 
   // Bild — see settings.ts for how the editors are shared between the global
   // page and the game dialog. gamescope and vkBasalt are each overridden as
@@ -82,8 +81,7 @@
             min="0"
             placeholder={m.graphicsEditor_fpsLimitPlaceholder()}
             value={value.gamescope.fps_limit ?? ""}
-            oninput={(e) =>
-              onchange({ gamescope: { fps_limit: numberOrNull(e.currentTarget) } })}
+            oninput={(e) => onchange({ gamescope: { fps_limit: numberOrNull(e.currentTarget) } })}
           />
         </label>
       </div>
@@ -132,7 +130,7 @@
           </div>
           {#if value.vkbasalt.sharpen}
             <label class="sharpness">
-              {m.graphicsEditor_sharpnessLabel( { value: value.vkbasalt.sharpness.toFixed(2) })}
+              {m.graphicsEditor_sharpnessLabel({ value: value.vkbasalt.sharpness.toFixed(2) })}
               <input
                 type="range"
                 min="0"

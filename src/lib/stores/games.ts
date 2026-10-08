@@ -175,9 +175,7 @@ export async function takePendingInstall(): Promise<string | null> {
 // Listens for a `pending-install` event, fired when a second "Mit Prefixr
 // installieren" click hands its exe path off to this already-running
 // instance instead of opening a new one.
-export function listenForPendingInstall(
-  callback: (exePath: string) => void,
-): Promise<UnlistenFn> {
+export function listenForPendingInstall(callback: (exePath: string) => void): Promise<UnlistenFn> {
   return listen("pending-install", async () => {
     const exePath = await takePendingInstall();
     if (exePath) callback(exePath);

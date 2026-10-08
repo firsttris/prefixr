@@ -103,7 +103,7 @@
 <ConfirmDialog
   open={deleting !== null}
   title={m.runnerList_deleteConfirmTitle()}
-  message={m.runnerList_deleteConfirmMessage( { name: deleting?.name ?? "" })}
+  message={m.runnerList_deleteConfirmMessage({ name: deleting?.name ?? "" })}
   confirmLabel={m.runnerList_delete()}
   onConfirm={confirmDelete}
   onCancel={() => (deleting = null)}

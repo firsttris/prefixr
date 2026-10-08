@@ -40,7 +40,9 @@ describe("override folding", () => {
   it("treats two disabled blocks as the same whatever their values", () => {
     const gamescope = { enabled: false, width: 1920, fullscreen: true };
     expect(sameBlock(gamescope, { enabled: false, width: 1280, fullscreen: false })).toBe(true);
-    expect(sameBlock({ ...gamescope, enabled: true }, { enabled: true, width: 1280, fullscreen: true })).toBe(false);
+    expect(
+      sameBlock({ ...gamescope, enabled: true }, { enabled: true, width: 1280, fullscreen: true }),
+    ).toBe(false);
     expect(sameBlock({ ...gamescope, enabled: true }, { ...gamescope, enabled: true })).toBe(true);
   });
 });
@@ -49,7 +51,9 @@ describe("loadAll", () => {
   it("waits for every load and rejects with the first failure", async () => {
     let finished = false;
     const slow = new Promise((resolve) => setTimeout(() => resolve((finished = true)), 10));
-    await expect(loadAll(Promise.reject("first"), slow, Promise.reject("second"))).rejects.toBe("first");
+    await expect(loadAll(Promise.reject("first"), slow, Promise.reject("second"))).rejects.toBe(
+      "first",
+    );
     expect(finished).toBe(true);
     await expect(loadAll(Promise.resolve(1))).resolves.toBeUndefined();
   });

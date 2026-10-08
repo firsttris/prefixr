@@ -140,7 +140,7 @@
   const perfHooks: OverrideHooks<keyof PerformanceConfig> = {
     isOverridden: (key) => perf[key] !== null,
     reset: (key) => (perf[key] = null),
-    resetTitle: (key) => m.gameForm_resetToGlobal( { state: onOff(globalPerf[key]) }),
+    resetTitle: (key) => m.gameForm_resetToGlobal({ state: onOff(globalPerf[key]) }),
   };
 
   // --- Bild ---
@@ -174,7 +174,7 @@
   const gfxHooks: OverrideHooks<keyof GraphicsConfig> = {
     isOverridden: (key) => gfx[key] !== null,
     reset: (key) => (gfx[key] = null),
-    resetTitle: (key) => m.gameForm_resetToGlobal( { state: onOff(globalGfx[key].enabled) }),
+    resetTitle: (key) => m.gameForm_resetToGlobal({ state: onOff(globalGfx[key].enabled) }),
   };
 
   // --- Overlay ---
@@ -193,9 +193,7 @@
     ...(overlay.layout ?? layoutOf(globalOverlay)),
     enabled: overlay.enabled ?? globalOverlay.enabled,
   });
-  const overlayCount = $derived(
-    [overlay.enabled, overlay.layout].filter((o) => o !== null).length,
-  );
+  const overlayCount = $derived([overlay.enabled, overlay.layout].filter((o) => o !== null).length);
 
   function changeOverlay(patch: Partial<MangoHudConfig>) {
     const { enabled, ...layoutPatch } = patch;
@@ -206,10 +204,7 @@
       const next = { ...layoutOf(overlayShown), ...layoutPatch };
       // The preset name alone ("custom" after a manual tweak) is no reason
       // to keep an override whose values match the global look.
-      const same = sameFields(
-        { ...next, preset: "" },
-        { ...layoutOf(globalOverlay), preset: "" },
-      );
+      const same = sameFields({ ...next, preset: "" }, { ...layoutOf(globalOverlay), preset: "" });
       overlay.layout = same ? null : next;
     }
   }
@@ -219,7 +214,7 @@
     reset: (key) => (overlay[key] = null),
     resetTitle: (key) =>
       key === "enabled"
-        ? m.gameForm_resetToGlobal( { state: onOff(globalOverlay.enabled) })
+        ? m.gameForm_resetToGlobal({ state: onOff(globalOverlay.enabled) })
         : m.gameForm_resetOverlayLook(),
   };
 
@@ -337,7 +332,7 @@
 {/snippet}
 
 {#snippet inheritHint(page: string)}
-  <p class="hint">{m.gameForm_inheritHint( { page })}</p>
+  <p class="hint">{m.gameForm_inheritHint({ page })}</p>
 {/snippet}
 
 <form onsubmit={handleSubmit}>
@@ -352,7 +347,7 @@
       >
         {tabItem.label}
         {#if tabItem.count > 0}
-          <span class="count" title={m.gameForm_tabCount( { count: tabItem.count })}
+          <span class="count" title={m.gameForm_tabCount({ count: tabItem.count })}
             >{tabItem.count}</span
           >
         {/if}
@@ -416,8 +411,7 @@
 
     <label>
       {m.gameForm_envVarsLabel()}
-      <textarea placeholder={m.gameForm_envVarsPlaceholder()} bind:value={envVarsText}
-      ></textarea>
+      <textarea placeholder={m.gameForm_envVarsPlaceholder()} bind:value={envVarsText}></textarea>
       <span class="hint">{m.gameForm_envVarsHint()}</span>
     </label>
 

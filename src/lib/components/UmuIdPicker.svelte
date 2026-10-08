@@ -99,7 +99,9 @@
         >{m.common_remove()}</button
       >
     {:else}
-      <span class="hint"><Message message={m.umuPicker_noneSetHint} parts={{ id: defaultId }} /></span>
+      <span class="hint"
+        ><Message message={m.umuPicker_noneSetHint} parts={{ id: defaultId }} /></span
+      >
     {/if}
   </div>
 
@@ -126,7 +128,7 @@
   {:else if error}
     <p class="error">{backendError(error)}</p>
   {:else if searched && matches.length === 0}
-    <p class="hint">{m.umuPicker_noMatches( { query })}</p>
+    <p class="hint">{m.umuPicker_noMatches({ query })}</p>
   {:else if matches.length > 0}
     <ul class="matches">
       {#each matches as match (`${match.umu_id}:${match.store}`)}

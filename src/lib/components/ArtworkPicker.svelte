@@ -229,7 +229,7 @@
     {:else if error}
       <p class="error">{backendError(error)}</p>
     {:else if matches.length === 0}
-      <p class="hint">{m.artworkPicker_noMatches( { query })}</p>
+      <p class="hint">{m.artworkPicker_noMatches({ query })}</p>
     {:else}
       <ul class="matches">
         {#each matches as match (match.id)}
@@ -248,13 +248,16 @@
     >
 
     {#if loading}
-      <p class="hint">{m.artworkPicker_loadingKind( { kind: kindLabels[kind] })}</p>
+      <p class="hint">{m.artworkPicker_loadingKind({ kind: kindLabels[kind] })}</p>
     {:else if error}
       <p class="error">{backendError(error)}</p>
     {:else if assetOptions.length === 0}
-      <p class="hint">{m.artworkPicker_noKindOptions( { kind: kindLabels[kind] })}</p>
+      <p class="hint">{m.artworkPicker_noKindOptions({ kind: kindLabels[kind] })}</p>
     {:else}
-      <div class="grid-options" class:landscape={kind === "wide" || kind === "hero" || kind === "logo"}>
+      <div
+        class="grid-options"
+        class:landscape={kind === "wide" || kind === "hero" || kind === "logo"}
+      >
         {#each assetOptions as asset (asset.id)}
           <button
             type="button"
