@@ -640,9 +640,21 @@ pub fn update_game(
 /// shortcuts, which would otherwise launch a game that no longer exists.
 /// Its prefix stays, which other games may share. Best-effort past the
 /// config itself: a leftover file is no reason to keep the game.
+///
+/// Refused while the game is launching or running (here or in a Prefixr
+/// Steam started), which still writes to its logs; the claim also keeps it
+/// from being started while it's removed.
 #[tauri::command(async)]
-pub fn remove_game(app: AppHandle, state: State<ConfigState>, id: String) -> Result<(), AppError> {
+pub fn remove_game(
+    app: AppHandle,
+    state: State<ConfigState>,
+    launching: State<LaunchingGames>,
+    id: String,
+) -> Result<(), AppError> {
     let game_id = Uuid::parse_str(&id).map_err(|e| format!("Invalid game id: {e}"))?;
+    let Some(_guard) = launching.claim(game_id) else {
+        return Err(AppError::GameRunning);
+    };
     let mut config = state.locked();
 
     if !config.games.iter().any(|g| g.id == game_id) {

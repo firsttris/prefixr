@@ -396,6 +396,7 @@
   "umuSettings_installedHint": "umu {version} is installed.",
   "backendErrors_other": "{message}",
   "backendErrors_game_already_running": "The game is already starting or running",
+  "backendErrors_game_running": "The game is still running. Close it first.",
   "backendErrors_prefix_in_use": "“{game_name}” is still running in this prefix. Close the game first.",
   "backendErrors_steam_command_not_found": "Steam is running. Please quit Steam and try again.",
   "backendErrors_steam_shutdown_timed_out": "Steam didn't quit within 30 seconds.",

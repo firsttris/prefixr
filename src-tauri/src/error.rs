@@ -19,6 +19,8 @@ pub enum AppError {
     Other { message: String },
     /// games::launch_game — the game is already starting or running.
     GameAlreadyRunning,
+    /// games::remove_game — the game is still starting or running.
+    GameRunning,
     /// prefixes::delete_prefix — a game using this prefix is still running.
     PrefixInUse { game_name: String },
     /// steam::stop_steam — the `steam` binary isn't on PATH, so Prefixr
