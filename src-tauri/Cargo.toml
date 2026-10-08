@@ -3,7 +3,7 @@ name = "prefixr"
 version = "0.1.1"
 description = "A native Linux app for managing Wine and Proton prefixes to run Windows games"
 authors = ["Tristan Teufel"]
-license = "MIT"
+license = "GPL-3.0-only"
 edition = "2021"
 # `File::try_lock` (see `lock_launch_file`) is stable since 1.89.
 rust-version = "1.89"

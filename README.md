@@ -14,7 +14,7 @@
     <a href="https://github.com/firsttris/prefixr/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/firsttris/prefixr?style=for-the-badge&color=0f766e"></a>
     <a href="https://github.com/firsttris/prefixr/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/firsttris/prefixr/ci.yml?branch=main&style=for-the-badge&label=CI"></a>
     <a href="#-requirements"><img alt="Platform: Linux" src="https://img.shields.io/badge/platform-linux-1f2937?style=for-the-badge&logo=linux&logoColor=white"></a>
-    <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-1f2937?style=for-the-badge"></a>
+    <a href="LICENSE"><img alt="License: GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-1f2937?style=for-the-badge"></a>
   </p>
 
   <p>
@@ -107,7 +107,8 @@ and how texts and translations work.
 ⭐ Like Prefixr? A [star on GitHub](https://github.com/firsttris/prefixr) helps others find it.<br>
 🐛 [Report a bug](https://github.com/firsttris/prefixr/issues/new) · 💡 [Request a feature](https://github.com/firsttris/prefixr/issues/new)
 
-<sub>License: <a href="LICENSE">MIT</a> · © Tristan Teufel and contributors<br>
+<sub>License: <a href="LICENSE">GPL-3.0</a> (MIT up to v0.1.1) · © Tristan Teufel and contributors<br>
+Changed versions you pass on must stay under the GPL and come with their source code; a commercial license without these obligations is available via <a href="https://teufel-it.de">teufel-it.de</a>.<br>
 Prefixr is not affiliated with Valve, Steam, WineHQ, CodeWeavers or SteamGridDB.</sub>
 
 </div>
