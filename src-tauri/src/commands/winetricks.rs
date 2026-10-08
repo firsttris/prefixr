@@ -68,7 +68,16 @@ async fn ensure_winetricks_script(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(path)
 }
 
+/// Whether `bytes` is the winetricks script, rather than whatever else came
+/// back with a success status (a captive portal's login page, say) — it's
+/// made executable and run as is.
+fn looks_like_winetricks(bytes: &[u8]) -> bool {
+    let text = String::from_utf8_lossy(bytes);
+    text.starts_with("#!/bin/sh") && text.lines().any(|line| line.starts_with("WINETRICKS_VERSION="))
+}
+
 /// Downloads the current winetricks from its `master` branch to `path`.
+/// `master` rather than a release on purpose: see `SCRIPT_MAX_AGE`.
 async fn download_script(path: &Path) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
@@ -85,6 +94,9 @@ async fn download_script(path: &Path) -> Result<(), String> {
         .bytes()
         .await
         .map_err(|e| format!("Could not download winetricks: {e}"))?;
+    if !looks_like_winetricks(&bytes) {
+        return Err("Could not download winetricks: the response is not the winetricks script".to_string());
+    }
 
     // Made executable under another name first and renamed into place, so
     // `path` only ever exists as the complete script.

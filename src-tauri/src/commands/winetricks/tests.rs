@@ -1,4 +1,6 @@
-use super::{list_installed_winetricks_verbs, parse_verb_catalogue, uses_umu_winetricks};
+use super::{
+    list_installed_winetricks_verbs, looks_like_winetricks, parse_verb_catalogue, uses_umu_winetricks,
+};
 use crate::models::{Runner, RunnerKind};
 use std::fs;
 use std::path::PathBuf;
@@ -113,4 +115,13 @@ fn uses_umu_winetricks_only_for_proton_with_bundled_script() {
     assert!(!uses_umu_winetricks(&wine_runner));
 
     let _ = fs::remove_dir_all(proton_dir);
+}
+
+#[test]
+fn only_the_winetricks_script_is_accepted() {
+    assert!(looks_like_winetricks(
+        b"#!/bin/sh\n# comment\nWINETRICKS_VERSION=20260125-next\nw_metadata vcrun2022 dlls \\\n"
+    ));
+    assert!(!looks_like_winetricks(b"<!DOCTYPE html><html>Sign in to the network</html>"));
+    assert!(!looks_like_winetricks(b"#!/bin/sh\necho no version here\n"));
 }
