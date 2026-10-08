@@ -19,7 +19,7 @@
 
   <p>
     <a href="#-installation"><strong>Install</strong></a> ·
-    <a href="docs/README.md"><strong>Documentation</strong></a> ·
+    <a href="https://firsttris.github.io/prefixr/"><strong>Documentation</strong></a> ·
     <a href="docs/troubleshooting.md"><strong>Troubleshooting</strong></a> ·
     <a href="https://github.com/firsttris/prefixr/issues"><strong>Report a bug</strong></a>
   </p>
@@ -84,6 +84,9 @@ they're first needed. The [getting started guide](docs/getting-started.md) walks
 game.
 
 ## 📚 Documentation
+
+The documentation is also available as a website:
+**[firsttris.github.io/prefixr](https://firsttris.github.io/prefixr/)**.
 
 | Guide | What's in it |
 | --- | --- |
