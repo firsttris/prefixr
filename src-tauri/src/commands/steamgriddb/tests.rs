@@ -191,3 +191,30 @@ fn only_steamgriddb_images_are_downloaded() {
         assert!(!is_steamgriddb_image_url(url), "{url}");
     }
 }
+
+#[test]
+fn slots_record_and_clear_their_image() {
+    let mut game: Game = serde_json::from_value(serde_json::json!({
+        "id": Uuid::new_v4(),
+        "name": "Game",
+        "exe_path": "/g.exe",
+        "prefix_path": "/p",
+        "runner_id": "r",
+    }))
+    .unwrap();
+
+    for (slot, grid_id) in [(Slot::Cover, Some(1)), (Slot::Icon, Some(2)), (Slot::Artwork(ArtworkKind::Hero), None)] {
+        let url = format!("https://cdn2.steamgriddb.com/{}.png", slot.suffix());
+        slot.set(&mut game, Some((url.clone(), grid_id)));
+        assert_eq!(slot.url(&game), Some(&url));
+    }
+    assert_eq!(game.cover_grid_id, Some(1));
+    assert_eq!(game.steamgriddb_icon_grid_id, Some(2));
+
+    for slot in [Slot::Cover, Slot::Icon, Slot::Artwork(ArtworkKind::Hero)] {
+        slot.set(&mut game, None);
+        assert_eq!(slot.url(&game), None);
+    }
+    assert_eq!(game.cover_grid_id, None);
+    assert!(game.artwork.is_empty());
+}

@@ -461,9 +461,144 @@ fn find_game<'a>(config: &'a mut crate::config::AppConfig, id: &str) -> Result<&
         .ok_or_else(|| format!("No game with id {id}"))
 }
 
-/// Downloads the chosen grid image, caches it to disk, and records the
-/// SteamGridDB match on the game so the picker can reopen without
-/// re-searching.
+/// Which of a game's images a cached artwork file holds.
+#[derive(Clone, Copy)]
+enum Slot {
+    Cover,
+    Icon,
+    Artwork(ArtworkKind),
+}
+
+impl Slot {
+    /// The cached file's suffix after the game id — none for the cover,
+    /// which predates the others (see `asset_cache_path`).
+    fn suffix(self) -> &'static str {
+        match self {
+            Slot::Cover => "",
+            Slot::Icon => "_icon",
+            Slot::Artwork(kind) => kind.cache_suffix(),
+        }
+    }
+
+    /// The source URL of the image chosen for this slot, if any.
+    fn url(self, game: &Game) -> Option<&String> {
+        match self {
+            Slot::Cover => game.cover_url.as_ref(),
+            Slot::Icon => game.steamgriddb_icon_url.as_ref(),
+            Slot::Artwork(kind) => game.artwork.get(&kind),
+        }
+    }
+
+    /// Records the chosen image on the game, or clears it with `None`.
+    fn set(self, game: &mut Game, choice: Option<(String, Option<i64>)>) {
+        let (url, grid_id) = choice.unzip();
+        match self {
+            Slot::Cover => {
+                game.cover_url = url;
+                game.cover_grid_id = grid_id.flatten();
+            }
+            Slot::Icon => {
+                game.steamgriddb_icon_url = url;
+                game.steamgriddb_icon_grid_id = grid_id.flatten();
+            }
+            Slot::Artwork(kind) => match url {
+                Some(url) => {
+                    game.artwork.insert(kind, url);
+                }
+                None => {
+                    game.artwork.remove(&kind);
+                }
+            },
+        }
+    }
+}
+
+/// Downloads the chosen image for one of a game's slots, caches it to disk,
+/// and records it with the SteamGridDB match on the game, so the picker can
+/// reopen without searching again. The game is looked up first: an unknown
+/// id would otherwise cost a download and leave a cached file nothing
+/// removes.
+async fn set_asset(
+    app: &AppHandle,
+    state: &State<'_, ConfigState>,
+    game_id: &str,
+    slot: Slot,
+    steamgriddb_id: i64,
+    grid_id: Option<i64>,
+    image_url: String,
+) -> Result<Game, AppError> {
+    let game_uuid = find_game(&mut state.locked(), game_id)?.id;
+
+    let mut bytes = download_image(&image_url).await?;
+    if let Slot::Icon = slot {
+        bytes = ico_to_png(bytes)?;
+    }
+    let dir = artwork_dir(app)?;
+    fs::create_dir_all(&dir).map_err(|e| format!("Could not create artwork directory: {e}"))?;
+    remove_stale_asset_files(&dir, game_uuid, slot.suffix())?;
+    let path = asset_cache_path(&dir, game_uuid, slot.suffix(), image_extension(&image_url));
+    fs::write(&path, &bytes).map_err(|e| format!("Could not write artwork file: {e}"))?;
+
+    let mut config = state.locked();
+    // Removed while the image was downloading: its file goes too.
+    let game = match find_game(&mut config, game_id) {
+        Ok(game) => game,
+        Err(e) => {
+            let _ = fs::remove_file(&path);
+            return Err(e.into());
+        }
+    };
+    game.steamgriddb_id = Some(steamgriddb_id);
+    slot.set(game, Some((image_url, grid_id)));
+    let updated = game.clone();
+    save_config(app, &config)?;
+    Ok(updated)
+}
+
+/// The path of a game's cached image for a slot, if any. The frontend loads
+/// the file through the asset protocol (scoped to the artwork directory in
+/// tauri.conf.json) instead of receiving its bytes base64-encoded over IPC.
+/// `Ok(None)` (rather than an error) both when nothing is chosen and when
+/// the cache file is unexpectedly missing, since either case just means the
+/// card should fall back to showing none.
+fn cached_asset(
+    app: &AppHandle,
+    state: &State<ConfigState>,
+    game_id: &str,
+    slot: Slot,
+) -> Result<Option<String>, AppError> {
+    let (game_uuid, url) = {
+        let mut config = state.locked();
+        let game = find_game(&mut config, game_id)?;
+        match slot.url(game) {
+            Some(url) => (game.id, url.clone()),
+            None => return Ok(None),
+        }
+    };
+    let path = asset_cache_path(&artwork_dir(app)?, game_uuid, slot.suffix(), image_extension(&url));
+    Ok(path.exists().then(|| path.to_string_lossy().into_owned()))
+}
+
+/// Clears a game's image for a slot and deletes its cached file.
+/// Deliberately keeps `steamgriddb_id`, so the picker can jump straight back
+/// to that game's images rather than making the user search again.
+fn remove_asset(
+    app: &AppHandle,
+    state: &State<ConfigState>,
+    game_id: &str,
+    slot: Slot,
+) -> Result<Game, AppError> {
+    let mut config = state.locked();
+    let game = find_game(&mut config, game_id)?;
+    let game_uuid = game.id;
+    slot.set(game, None);
+    let updated = game.clone();
+
+    remove_stale_asset_files(&artwork_dir(app)?, game_uuid, slot.suffix())?;
+    save_config(app, &config)?;
+    Ok(updated)
+}
+
 #[tauri::command]
 pub async fn set_game_cover(
     app: AppHandle,
@@ -473,74 +608,30 @@ pub async fn set_game_cover(
     cover_grid_id: i64,
     image_url: String,
 ) -> Result<Game, AppError> {
-    let bytes = download_image(&image_url).await?;
-
-    let dir = artwork_dir(&app)?;
-    fs::create_dir_all(&dir).map_err(|e| format!("Could not create artwork directory: {e}"))?;
-
-    let game_uuid = Uuid::parse_str(&game_id).map_err(|e| format!("Invalid game id: {e}"))?;
-    remove_stale_asset_files(&dir, game_uuid, "")?;
-    let ext = image_extension(&image_url);
-    fs::write(asset_cache_path(&dir, game_uuid, "", ext), &bytes)
-        .map_err(|e| format!("Could not write cover file: {e}"))?;
-
-    let mut config = state.locked();
-    let game = find_game(&mut config, &game_id)?;
-    game.steamgriddb_id = Some(steamgriddb_id);
-    game.cover_grid_id = Some(cover_grid_id);
-    game.cover_url = Some(image_url);
-    let updated = game.clone();
-    save_config(&app, &config)?;
-    Ok(updated)
+    let slot = Slot::Cover;
+    set_asset(&app, &state, &game_id, slot, steamgriddb_id, Some(cover_grid_id), image_url).await
 }
 
-/// The path of a game's cached cover, if any. The frontend loads the file
-/// through the asset protocol (scoped to the artwork directory in
-/// tauri.conf.json) instead of receiving its bytes base64-encoded over IPC.
-/// Returns `Ok(None)` (rather than an error) both when the game has no
-/// cover set and when the cache file is unexpectedly missing, since either
-/// case just means the card should fall back to showing no cover.
 #[tauri::command(async)]
-pub fn get_game_cover(app: AppHandle, state: State<ConfigState>, game_id: String) -> Result<Option<String>, AppError> {
-    let cover_url = {
-        let mut config = state.locked();
-        let game = find_game(&mut config, &game_id)?;
-        match &game.cover_url {
-            Some(url) => url.clone(),
-            None => return Ok(None),
-        }
-    };
-
-    let game_uuid = Uuid::parse_str(&game_id).map_err(|e| format!("Invalid game id: {e}"))?;
-    let ext = image_extension(&cover_url);
-    let path = asset_cache_path(&artwork_dir(&app)?, game_uuid, "", ext);
-    if !path.exists() {
-        return Ok(None);
-    }
-
-    Ok(Some(path.to_string_lossy().into_owned()))
+pub fn get_game_cover(
+    app: AppHandle,
+    state: State<ConfigState>,
+    game_id: String,
+) -> Result<Option<String>, AppError> {
+    cached_asset(&app, &state, &game_id, Slot::Cover)
 }
 
-/// Clears a game's cover and deletes its cached file. Deliberately keeps
-/// `steamgriddb_id` so the picker can jump straight back to that game's
-/// grid list rather than making the user search again.
 #[tauri::command]
-pub fn remove_game_cover(app: AppHandle, state: State<ConfigState>, game_id: String) -> Result<Game, AppError> {
-    let mut config = state.locked();
-    let game = find_game(&mut config, &game_id)?;
-    let game_uuid = game.id;
-    game.cover_url = None;
-    game.cover_grid_id = None;
-    let updated = game.clone();
-
-    remove_stale_asset_files(&artwork_dir(&app)?, game_uuid, "")?;
-    save_config(&app, &config)?;
-    Ok(updated)
+pub fn remove_game_cover(
+    app: AppHandle,
+    state: State<ConfigState>,
+    game_id: String,
+) -> Result<Game, AppError> {
+    remove_asset(&app, &state, &game_id, Slot::Cover)
 }
 
-/// Downloads the chosen icon image, caches it to disk, and records the
-/// SteamGridDB match on the game so the picker can reopen without
-/// re-searching.
+/// SteamGridDB serves some icons as `.ico`, which is converted to PNG (see
+/// `ico_to_png`).
 #[tauri::command]
 pub async fn set_game_icon(
     app: AppHandle,
@@ -550,69 +641,29 @@ pub async fn set_game_icon(
     icon_grid_id: i64,
     image_url: String,
 ) -> Result<Game, AppError> {
-    let bytes = ico_to_png(download_image(&image_url).await?)?;
-
-    let dir = artwork_dir(&app)?;
-    fs::create_dir_all(&dir).map_err(|e| format!("Could not create artwork directory: {e}"))?;
-
-    let game_uuid = Uuid::parse_str(&game_id).map_err(|e| format!("Invalid game id: {e}"))?;
-    remove_stale_asset_files(&dir, game_uuid, "_icon")?;
-    let ext = image_extension(&image_url);
-    fs::write(asset_cache_path(&dir, game_uuid, "_icon", ext), &bytes)
-        .map_err(|e| format!("Could not write icon file: {e}"))?;
-
-    let mut config = state.locked();
-    let game = find_game(&mut config, &game_id)?;
-    game.steamgriddb_id = Some(steamgriddb_id);
-    game.steamgriddb_icon_grid_id = Some(icon_grid_id);
-    game.steamgriddb_icon_url = Some(image_url);
-    let updated = game.clone();
-    save_config(&app, &config)?;
-    Ok(updated)
+    let slot = Slot::Icon;
+    set_asset(&app, &state, &game_id, slot, steamgriddb_id, Some(icon_grid_id), image_url).await
 }
 
-/// The path of a game's cached icon, if any, for the asset protocol like
-/// `get_game_cover`. Returns `Ok(None)` both when the game has no icon set
-/// and when the cache file is unexpectedly missing.
 #[tauri::command(async)]
-pub fn get_game_icon(app: AppHandle, state: State<ConfigState>, game_id: String) -> Result<Option<String>, AppError> {
-    let icon_url = {
-        let mut config = state.locked();
-        let game = find_game(&mut config, &game_id)?;
-        match &game.steamgriddb_icon_url {
-            Some(url) => url.clone(),
-            None => return Ok(None),
-        }
-    };
-
-    let game_uuid = Uuid::parse_str(&game_id).map_err(|e| format!("Invalid game id: {e}"))?;
-    let ext = image_extension(&icon_url);
-    let path = asset_cache_path(&artwork_dir(&app)?, game_uuid, "_icon", ext);
-    if !path.exists() {
-        return Ok(None);
-    }
-
-    Ok(Some(path.to_string_lossy().into_owned()))
+pub fn get_game_icon(
+    app: AppHandle,
+    state: State<ConfigState>,
+    game_id: String,
+) -> Result<Option<String>, AppError> {
+    cached_asset(&app, &state, &game_id, Slot::Icon)
 }
 
-/// Clears a game's SteamGridDB icon and deletes its cached file. Keeps
-/// `steamgriddb_id` for the same reason `remove_game_cover` does.
 #[tauri::command]
-pub fn remove_game_icon(app: AppHandle, state: State<ConfigState>, game_id: String) -> Result<Game, AppError> {
-    let mut config = state.locked();
-    let game = find_game(&mut config, &game_id)?;
-    let game_uuid = game.id;
-    game.steamgriddb_icon_url = None;
-    game.steamgriddb_icon_grid_id = None;
-    let updated = game.clone();
-
-    remove_stale_asset_files(&artwork_dir(&app)?, game_uuid, "_icon")?;
-    save_config(&app, &config)?;
-    Ok(updated)
+pub fn remove_game_icon(
+    app: AppHandle,
+    state: State<ConfigState>,
+    game_id: String,
+) -> Result<Game, AppError> {
+    remove_asset(&app, &state, &game_id, Slot::Icon)
 }
 
-/// Downloads the chosen image for one of Steam's other artwork slots,
-/// caches it and records it on the game, like `set_game_cover`.
+/// One of Steam's other artwork slots (see `ArtworkKind`).
 #[tauri::command]
 pub async fn set_game_artwork(
     app: AppHandle,
@@ -622,27 +673,10 @@ pub async fn set_game_artwork(
     steamgriddb_id: i64,
     image_url: String,
 ) -> Result<Game, AppError> {
-    let bytes = download_image(&image_url).await?;
-
-    let dir = artwork_dir(&app)?;
-    fs::create_dir_all(&dir).map_err(|e| format!("Could not create artwork directory: {e}"))?;
-
-    let game_uuid = Uuid::parse_str(&game_id).map_err(|e| format!("Invalid game id: {e}"))?;
-    remove_stale_asset_files(&dir, game_uuid, kind.cache_suffix())?;
-    let ext = image_extension(&image_url);
-    fs::write(asset_cache_path(&dir, game_uuid, kind.cache_suffix(), ext), &bytes)
-        .map_err(|e| format!("Could not write artwork file: {e}"))?;
-
-    let mut config = state.locked();
-    let game = find_game(&mut config, &game_id)?;
-    game.steamgriddb_id = Some(steamgriddb_id);
-    game.artwork.insert(kind, image_url);
-    let updated = game.clone();
-    save_config(&app, &config)?;
-    Ok(updated)
+    let slot = Slot::Artwork(kind);
+    set_asset(&app, &state, &game_id, slot, steamgriddb_id, None, image_url).await
 }
 
-/// Clears one of a game's Steam artwork slots and deletes its cached file.
 #[tauri::command]
 pub fn remove_game_artwork(
     app: AppHandle,
@@ -650,15 +684,7 @@ pub fn remove_game_artwork(
     game_id: String,
     kind: ArtworkKind,
 ) -> Result<Game, AppError> {
-    let mut config = state.locked();
-    let game = find_game(&mut config, &game_id)?;
-    let game_uuid = game.id;
-    game.artwork.remove(&kind);
-    let updated = game.clone();
-
-    remove_stale_asset_files(&artwork_dir(&app)?, game_uuid, kind.cache_suffix())?;
-    save_config(&app, &config)?;
-    Ok(updated)
+    remove_asset(&app, &state, &game_id, Slot::Artwork(kind))
 }
 
 #[cfg(test)]
