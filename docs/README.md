@@ -24,4 +24,4 @@ everything from the first launch to how the code is put together.
 
 - [Download the latest release](https://github.com/firsttris/prefixr/releases/latest)
 - [Report a bug or request a feature](https://github.com/firsttris/prefixr/issues)
-- [Back to the README](../README.md)
+- [Prefixr on GitHub](https://github.com/firsttris/prefixr)
