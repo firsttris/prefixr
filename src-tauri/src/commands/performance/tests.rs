@@ -1,7 +1,7 @@
 use super::{
     build_max_map_count_status, finalize_max_map_count_fix, manual_fix_command,
     parse_max_map_count, sysctl_fix_script, MaxMapCountStatus, RECOMMENDED_MAX_MAP_COUNT,
-    SYSCTL_DROPIN_PATH,
+    SUFFICIENT_MAX_MAP_COUNT, SYSCTL_DROPIN_PATH,
 };
 use crate::error::AppError;
 
@@ -21,10 +21,19 @@ fn parses_max_map_count_or_falls_back_to_zero() {
 
 #[test]
 fn builds_status_with_threshold_and_fix_availability() {
+    // The old kernel default.
+    assert_status(build_max_map_count_status(65530, false), 65530, false, false);
     assert_status(
-        build_max_map_count_status(RECOMMENDED_MAX_MAP_COUNT - 1, false),
-        RECOMMENDED_MAX_MAP_COUNT - 1,
+        build_max_map_count_status(SUFFICIENT_MAX_MAP_COUNT - 1, true),
+        SUFFICIENT_MAX_MAP_COUNT - 1,
         false,
+        true,
+    );
+    // Today's distro default.
+    assert_status(
+        build_max_map_count_status(SUFFICIENT_MAX_MAP_COUNT, false),
+        SUFFICIENT_MAX_MAP_COUNT,
+        true,
         false,
     );
     assert_status(

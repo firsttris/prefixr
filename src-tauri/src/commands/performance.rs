@@ -27,13 +27,17 @@ pub fn save_performance_config(
     Ok(app_config.performance.clone())
 }
 
-/// The value Steam's own client applies system-wide since ~2023. Several
-/// modern titles and anti-cheat runtimes (EAC-backed games, Baldur's Gate 3,
-/// Elden Ring, Diablo IV, ...) fail to start or crash on launch below this,
-/// and most distros still ship a default several orders of magnitude lower.
-/// Games launched outside Steam — this app's whole point — never get Steam's
-/// own bump, so nothing raises this unless the user (or we) do.
+/// The value Steam's own client applies system-wide since ~2023, which the
+/// fix sets. Several modern titles and anti-cheat runtimes (EAC-backed
+/// games, Baldur's Gate 3, Elden Ring, Diablo IV, ...) fail to start or
+/// crash on launch with the kernel's old default of 65530. Games launched
+/// outside Steam — this app's whole point — never get Steam's own bump.
 const RECOMMENDED_MAX_MAP_COUNT: u64 = 2_147_483_642;
+
+/// Enough for those games: 1048576 (2^20) is what Fedora, Arch, Ubuntu
+/// 24.04+ and SteamOS set by default these days, and no game is known to
+/// need more. Below it, the fix offers Steam's value.
+const SUFFICIENT_MAX_MAP_COUNT: u64 = 1_048_576;
 
 const MAX_MAP_COUNT_PATH: &str = "/proc/sys/vm/max_map_count";
 
@@ -65,7 +69,7 @@ fn build_max_map_count_status(current: u64, can_fix: bool) -> MaxMapCountStatus 
     MaxMapCountStatus {
         current,
         recommended: RECOMMENDED_MAX_MAP_COUNT,
-        sufficient: current >= RECOMMENDED_MAX_MAP_COUNT,
+        sufficient: current >= SUFFICIENT_MAX_MAP_COUNT,
         can_fix,
     }
 }
