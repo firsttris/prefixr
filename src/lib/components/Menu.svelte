@@ -1,7 +1,11 @@
 <!--
-  A dropdown menu behind a trigger button. It opens downward, or upward when
-  there's no room below. `items` renders the entries; call the `close` it
-  gets before acting on one.
+  A dropdown menu behind a trigger button, with the keyboard behavior the
+  menu role promises: it opens with focus on its first entry, the arrow
+  keys, Home and End move between entries, Escape closes it (back to the
+  trigger), and Tab or a click anywhere else closes it without being
+  swallowed. It opens downward, or upward when there's no room below.
+  `items` renders the entries (role="menuitem"); call the `close` it gets
+  before acting on one.
 -->
 <script lang="ts">
   import type { Snippet } from "svelte";
@@ -22,9 +26,18 @@
 
   let open = $state(false);
   let upward = $state(false);
+  let anchorEl: HTMLDivElement;
+  let triggerEl: HTMLButtonElement;
   let menuEl = $state<HTMLDivElement>();
 
+  function entries(): HTMLElement[] {
+    return [...(menuEl?.querySelectorAll<HTMLElement>('[role="menuitem"]:not(:disabled)') ?? [])];
+  }
+
+  // Focus goes back to the trigger when it was in the menu, so a dialog an
+  // entry opens returns it there too.
   function close() {
+    if (menuEl?.contains(document.activeElement)) triggerEl.focus();
     open = false;
   }
 
@@ -32,14 +45,47 @@
     if (!menuEl) return;
     upward = false;
     upward = menuEl.getBoundingClientRect().bottom > window.innerHeight;
+    entries()[0]?.focus();
   });
+
+  function handleMenuKeydown(event: KeyboardEvent) {
+    const list = entries();
+    const index = list.indexOf(document.activeElement as HTMLElement);
+    const move = (to: number) => {
+      event.preventDefault();
+      list[(to + list.length) % list.length]?.focus();
+    };
+    switch (event.key) {
+      case "ArrowDown":
+        return move(index + 1);
+      case "ArrowUp":
+        return move(index - 1);
+      case "Home":
+        return move(0);
+      case "End":
+        return move(list.length - 1);
+      case "Escape":
+        event.preventDefault();
+        event.stopPropagation();
+        return close();
+      case "Tab":
+        open = false;
+    }
+  }
+
+  function handleWindowPointerdown(event: PointerEvent) {
+    if (!anchorEl.contains(event.target as Node)) open = false;
+  }
 </script>
 
-<div class="menu-anchor">
+<svelte:window onpointerdown={open ? handleWindowPointerdown : undefined} />
+
+<div class="menu-anchor" bind:this={anchorEl}>
   <button
+    bind:this={triggerEl}
     type="button"
     class={triggerClass}
-    onclick={() => (open = !open)}
+    onclick={() => (open ? close() : (open = true))}
     {disabled}
     aria-haspopup="menu"
     aria-expanded={open}
@@ -49,8 +95,15 @@
     {@render trigger()}
   </button>
   {#if open}
-    <div class="menu-backdrop" onclick={close} role="presentation"></div>
-    <div bind:this={menuEl} class="menu" class:menu-up={upward} role="menu">
+    <div
+      bind:this={menuEl}
+      class="menu"
+      class:menu-up={upward}
+      role="menu"
+      tabindex="-1"
+      aria-label={label}
+      onkeydown={handleMenuKeydown}
+    >
       {@render items(close)}
     </div>
   {/if}
@@ -60,12 +113,6 @@
   .menu-anchor {
     position: relative;
     display: flex;
-  }
-
-  .menu-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 10;
   }
 
   .menu {
