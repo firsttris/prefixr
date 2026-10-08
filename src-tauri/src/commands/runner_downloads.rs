@@ -415,7 +415,8 @@ fn compute_digest(path: &Path, algorithm: ChecksumAlgorithm) -> Result<String, S
 
 /// Fetches the checksum file this source publishes for `asset_name` and
 /// verifies the just-downloaded `archive_path` against it, before it's ever
-/// extracted. A source that doesn't publish checksums (none currently, but
+/// extracted. Both come from the same release, so this proves the download
+/// complete and intact, not who made it. A source that doesn't publish checksums (none currently, but
 /// `ChecksumInfo` is per-source so this stays possible) would need an
 /// `Option` here instead — as it stands, every listed source is checked.
 async fn verify_checksum(
@@ -464,7 +465,7 @@ async fn verify_checksum(
     } else {
         Err(format!(
             "Checksum mismatch for {asset_name}: expected {expected}, got {actual} — \
-             the download may be corrupted or tampered with"
+             the download is corrupted or incomplete"
         ))
     }
 }
