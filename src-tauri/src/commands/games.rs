@@ -224,10 +224,11 @@ fn process_descendants(root: u32) -> Vec<u32> {
     }
 
     let mut descendants = Vec::new();
+    let mut seen = HashSet::new();
     let mut queue = vec![root];
     while let Some(pid) = queue.pop() {
         for &child in children.get(&pid).into_iter().flatten() {
-            if !descendants.contains(&child) {
+            if seen.insert(child) {
                 descendants.push(child);
                 queue.push(child);
             }
