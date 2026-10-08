@@ -100,8 +100,14 @@ Bug reports, ideas and pull requests are welcome. Please open an
 [development guide](docs/development.md) explains how to set up the project, which checks CI runs,
 and how texts and translations work.
 
-## License
+---
 
-Prefixr is released under the [MIT License](LICENSE).
+<div align="center">
 
-<sub>Prefixr is not affiliated with Valve, Steam, WineHQ, CodeWeavers or SteamGridDB.</sub>
+⭐ Like Prefixr? A [star on GitHub](https://github.com/firsttris/prefixr) helps others find it.<br>
+🐛 [Report a bug](https://github.com/firsttris/prefixr/issues/new) · 💡 [Request a feature](https://github.com/firsttris/prefixr/issues/new)
+
+<sub>License: <a href="LICENSE">MIT</a> · © Tristan Teufel and contributors<br>
+Prefixr is not affiliated with Valve, Steam, WineHQ, CodeWeavers or SteamGridDB.</sub>
+
+</div>
