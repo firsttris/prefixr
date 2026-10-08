@@ -89,6 +89,8 @@
   "gameForm_tabCount": "{count} customized for this game",
   "gameForm_resetToGlobal": "Use global setting ({state})",
   "gameForm_resetOverlayLook": "Use global look",
+  "gameForm_required": "Required",
+  "gameForm_missingFields": "Please fill in the name, exe, prefix and runner.",
   "gameForm_nameLabel": "Name",
   "gameForm_namePlaceholder": "e.g. Baldur's Gate 3",
   "gameForm_exeLabel": "Program (.exe)",

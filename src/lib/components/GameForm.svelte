@@ -298,9 +298,19 @@
     return result;
   }
 
+  // The required fields still empty; marked once a save was tried.
+  const missing = $derived({
+    name: !name.trim(),
+    exe: !exePath,
+    prefix: !prefixPath,
+    runner: !runnerId,
+  });
+  let showMissing = $state(false);
+
   async function handleSubmit(event: Event) {
     event.preventDefault();
-    if (!name || !exePath || !prefixPath || !runnerId) {
+    if (Object.values(missing).some(Boolean)) {
+      showMissing = true;
       tab = "general";
       return;
     }
@@ -332,6 +342,12 @@
   }
 </script>
 
+{#snippet requiredHint(isMissing: boolean)}
+  {#if showMissing && isMissing}
+    <span class="error required">{m.gameForm_required()}</span>
+  {/if}
+{/snippet}
+
 {#snippet inheritHint(page: string)}
   <p class="hint">{m.gameForm_inheritHint( { page })}</p>
 {/snippet}
@@ -359,20 +375,31 @@
   {#if activeTab === "general"}
     <label>
       {m.gameForm_nameLabel()}
-      <input bind:value={name} placeholder={m.gameForm_namePlaceholder()} />
+      <input
+        bind:value={name}
+        placeholder={m.gameForm_namePlaceholder()}
+        aria-invalid={showMissing && missing.name}
+      />
+      {@render requiredHint(missing.name)}
     </label>
 
     <label>
       {m.gameForm_exeLabel()}
       <div class="row">
-        <input bind:value={exePath} readonly placeholder={m.gameForm_exePlaceholder()} />
+        <input
+          bind:value={exePath}
+          readonly
+          placeholder={m.gameForm_exePlaceholder()}
+          aria-invalid={showMissing && missing.exe}
+        />
         <button type="button" onclick={pickExe}>{m.gameForm_exeChoose()}</button>
       </div>
+      {@render requiredHint(missing.exe)}
     </label>
 
     <label>
       {m.gameForm_prefixLabel()}
-      <select bind:value={prefixPath}>
+      <select bind:value={prefixPath} aria-invalid={showMissing && missing.prefix}>
         <option value="" disabled selected>{m.gameForm_prefixChoose()}</option>
         {#each $prefixes as prefix (prefix.path)}
           <option value={prefix.path}>{prefix.path}</option>
@@ -385,11 +412,12 @@
       {#if $prefixes.length === 0}
         <span class="hint">{m.gameForm_prefixEmptyHint()}</span>
       {/if}
+      {@render requiredHint(missing.prefix)}
     </label>
 
     <label>
       {m.gameForm_runnerLabel()}
-      <select bind:value={runnerId}>
+      <select bind:value={runnerId} aria-invalid={showMissing && missing.runner}>
         <option value="" disabled selected>{m.gameForm_runnerChoose()}</option>
         {#each $runners as runner (runner.id)}
           <option value={runner.id}>{runner.name} ({runner.kind})</option>
@@ -404,6 +432,7 @@
           {m.gameForm_runnerNoProtonfixesHintSuffix()}
         </span>
       {/if}
+      {@render requiredHint(missing.runner)}
     </label>
 
     <label>
@@ -447,6 +476,9 @@
     />
   {/if}
 
+  {#if showMissing && Object.values(missing).some(Boolean)}
+    <p class="error" role="alert">{m.gameForm_missingFields()}</p>
+  {/if}
   {#if error}
     <p class="error">{backendError(error)}</p>
   {/if}
@@ -523,6 +555,14 @@
 
   .error {
     color: var(--danger);
+  }
+
+  .required {
+    font-size: 0.85em;
+  }
+
+  [aria-invalid="true"] {
+    border-color: var(--danger);
   }
 
   .hint {

@@ -89,6 +89,8 @@
   "gameForm_tabCount": "{count} für dieses Spiel angepasst",
   "gameForm_resetToGlobal": "Globale Einstellung übernehmen ({state})",
   "gameForm_resetOverlayLook": "Globales Aussehen übernehmen",
+  "gameForm_required": "Pflichtfeld",
+  "gameForm_missingFields": "Bitte Name, Exe, Prefix und Runner angeben.",
   "gameForm_nameLabel": "Name",
   "gameForm_namePlaceholder": "z. B. Baldur's Gate 3",
   "gameForm_exeLabel": "Programm (.exe)",
