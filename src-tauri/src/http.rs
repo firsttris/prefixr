@@ -16,7 +16,11 @@ pub fn client() -> reqwest::Client {
                 .connect_timeout(Duration::from_secs(15))
                 .read_timeout(Duration::from_secs(60))
                 .build()
-                .unwrap_or_default()
+                // Only fails for a TLS backend that can't initialize, which
+                // rustls (built in) can't; falling back to a default client
+                // would silently lose the user agent GitHub requires and
+                // the timeouts.
+                .expect("HTTP client builds")
         })
         .clone()
 }
