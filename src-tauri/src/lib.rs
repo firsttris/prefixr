@@ -21,6 +21,7 @@ use commands::games::{
 use commands::github::{get_github_config, save_github_config};
 use commands::locale::set_ui_locale;
 use commands::graphics::{get_graphics_config, save_graphics_config};
+use commands::graphics_layers::{get_directx_layers_status, update_directx_layers};
 use commands::mangohud::{get_mangohud_config, save_mangohud_config};
 use commands::performance::{
     check_max_map_count, fix_max_map_count, get_performance_config, save_performance_config,
@@ -265,6 +266,8 @@ pub fn run() {
             save_performance_config,
             get_graphics_config,
             save_graphics_config,
+            get_directx_layers_status,
+            update_directx_layers,
             get_proton_config,
             save_proton_config,
             check_max_map_count,

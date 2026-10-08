@@ -218,6 +218,13 @@ export interface UmuStatus {
   version: string | null;
 }
 
+// DXVK or VKD3D-Proton as cached for Wine runners — see graphics_layers.rs.
+export interface DirectXLayerStatus {
+  label: string;
+  installed: boolean;
+  version: string | null;
+}
+
 // A suggested UMU id (`GAMEID`) for a game — see `search_umu_ids` in
 // umu_database.rs. `store` is null for Steam and standalone releases.
 export interface UmuMatch {

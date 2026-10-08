@@ -14,3 +14,29 @@ fn reads_the_mono_version_from_utf16_strings() {
     assert_eq!(mono_version_in(&utf16("wine-mono-.msi")), None);
     assert_eq!(mono_version_in(b"nothing here"), None);
 }
+
+#[test]
+fn layer_statuses_read_the_recorded_versions() {
+    let cache = std::env::temp_dir().join(format!("prefixr-test-layers-{}", uuid::Uuid::new_v4()));
+    fs::create_dir_all(cache.join("dxvk")).unwrap();
+    fs::write(version_file(&cache.join("dxvk")), "v2.7.1\n").unwrap();
+
+    let statuses = layer_statuses(&cache);
+
+    assert_eq!(statuses[0].label, "DXVK");
+    assert!(statuses[0].installed);
+    assert_eq!(statuses[0].version.as_deref(), Some("v2.7.1"));
+    assert_eq!(statuses[1].label, "VKD3D-Proton");
+    assert!(!statuses[1].installed);
+    assert_eq!(statuses[1].version, None);
+    fs::remove_dir_all(cache).unwrap();
+}
+
+#[test]
+fn layer_assets_match_real_release_names() {
+    let dxvk = LAYERS[0].matches_asset;
+    assert!(dxvk("dxvk-2.7.1.tar.gz"));
+    assert!(!dxvk("dxvk-native-2.7.1-steamrt-sniper.tar.gz"));
+    let vkd3d = LAYERS[1].matches_asset;
+    assert!(vkd3d("vkd3d-proton-2.14.1.tar.zst"));
+}

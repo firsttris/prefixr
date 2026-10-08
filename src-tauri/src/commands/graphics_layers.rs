@@ -1,17 +1,24 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use serde::Deserialize;
-use tauri::{AppHandle, Manager};
+use serde::{Deserialize, Serialize};
+use tauri::{AppHandle, Manager, State};
 
-use crate::commands::runner_downloads::{extraction_dir, move_extracted_dir, with_optional_auth};
+use crate::commands::github::read_token;
+use crate::commands::runner_downloads::{
+    extraction_dir, move_extracted_dir, replace_dir, with_optional_auth,
+};
+use crate::config::ConfigState;
+use crate::error::AppError;
 
 /// A plain Wine build (unlike Proton) has no DXVK/VKD3D of its own — see
 /// `sync_directx_overrides_from_cache` in `games.rs`. This downloads and
 /// caches the latest release of each from the same upstream projects
 /// PortProton itself packages (`doitsujin/dxvk`, `HansKristian-Work/vkd3d-proton`),
 /// shared by every Wine-kind runner since the DXVK/VKD3D build needed
-/// doesn't depend on which Wine build is running it.
+/// doesn't depend on which Wine build is running it. Fetched on first use,
+/// and only replaced by a newer release when the user asks for it (see
+/// `update_directx_layers`).
 
 #[derive(Deserialize)]
 struct GitHubAsset {
@@ -21,8 +28,36 @@ struct GitHubAsset {
 
 #[derive(Deserialize)]
 struct GitHubRelease {
+    tag_name: String,
     assets: Vec<GitHubAsset>,
 }
+
+/// One of the cached layers.
+struct Layer {
+    /// Its directory in the cache.
+    dir: &'static str,
+    label: &'static str,
+    repo: &'static str,
+    /// Picks the release asset with the Windows DLLs.
+    matches_asset: fn(&str) -> bool,
+}
+
+const LAYERS: &[Layer] = &[
+    Layer {
+        dir: "dxvk",
+        label: "DXVK",
+        repo: "doitsujin/dxvk",
+        matches_asset: |name| {
+            name.starts_with("dxvk-") && name.ends_with(".tar.gz") && !name.contains("native")
+        },
+    },
+    Layer {
+        dir: "vkd3d-proton",
+        label: "VKD3D-Proton",
+        repo: "HansKristian-Work/vkd3d-proton",
+        matches_asset: |name| name.ends_with(".tar.zst"),
+    },
+];
 
 /// Held while filling the cache, so two games launched at once don't both
 /// download and extract the same thing into the same place.
@@ -48,30 +83,25 @@ fn cache_dir(app: &AppHandle) -> Result<PathBuf, String> {
         .join("directx-layers"))
 }
 
-async fn download_latest_asset(
-    repo: &str,
-    token: Option<&str>,
-    matches_asset: impl Fn(&str) -> bool,
-) -> Result<(String, Vec<u8>), String> {
-    let url = format!("https://api.github.com/repos/{repo}/releases/latest");
-    let release: GitHubRelease = get(&url, token)
+/// The release tag a cached layer came from, kept next to its DLLs.
+fn version_file(layer_dir: &Path) -> PathBuf {
+    layer_dir.join("version")
+}
+
+fn read_version(layer_dir: &Path) -> Option<String> {
+    fs::read_to_string(version_file(layer_dir))
+        .ok()
+        .map(|version| version.trim().to_string())
+        .filter(|version| !version.is_empty())
+}
+
+async fn latest_release(layer: &Layer, token: Option<&str>) -> Result<GitHubRelease, String> {
+    let url = format!("https://api.github.com/repos/{}/releases/latest", layer.repo);
+    get(&url, token)
         .await?
         .json()
         .await
-        .map_err(|e| format!("Could not parse GitHub response: {e}"))?;
-    let asset = release
-        .assets
-        .into_iter()
-        .find(|a| matches_asset(&a.name))
-        .ok_or_else(|| format!("No matching release asset found in {repo}"))?;
-
-    let bytes = get(&asset.browser_download_url, token)
-        .await?
-        .bytes()
-        .await
-        .map_err(|e| format!("Could not download {}: {e}", asset.name))?;
-
-    Ok((asset.name, bytes.to_vec()))
+        .map_err(|e| format!("Could not parse GitHub response: {e}"))
 }
 
 fn extract_archive(name: &str, bytes: &[u8], dest_dir: &Path) -> Result<(), String> {
@@ -93,28 +123,39 @@ fn extract_archive(name: &str, bytes: &[u8], dest_dir: &Path) -> Result<(), Stri
     }
 }
 
-async fn ensure_layer(
-    app: &AppHandle,
+/// Downloads `release` of `layer` and puts it in place of the cached copy,
+/// if any (see `replace_dir`), with its tag as the version.
+async fn install_layer(
+    cache: &Path,
+    layer: &Layer,
+    release: GitHubRelease,
     token: Option<&str>,
-    dir_name: &str,
-    repo: &str,
-    matches_asset: impl Fn(&str) -> bool,
-) -> Result<PathBuf, String> {
-    let target = cache_dir(app)?.join(dir_name);
-    if target.is_dir() {
-        return Ok(target);
-    }
+) -> Result<(), String> {
+    let asset = release
+        .assets
+        .into_iter()
+        .find(|a| (layer.matches_asset)(&a.name))
+        .ok_or_else(|| format!("No matching release asset found in {}", layer.repo))?;
+    let bytes = get(&asset.browser_download_url, token)
+        .await?
+        .bytes()
+        .await
+        .map_err(|e| format!("Could not download {}: {e}", asset.name))?;
 
-    let (asset_name, bytes) = download_latest_asset(repo, token, matches_asset).await?;
-
-    let extract_dir = extraction_dir(&cache_dir(app)?);
-    if let Err(e) = extract_archive(&asset_name, &bytes, &extract_dir) {
+    let extract_dir = extraction_dir(cache);
+    if let Err(e) = extract_archive(&asset.name, &bytes, &extract_dir) {
         let _ = fs::remove_dir_all(&extract_dir);
         return Err(e);
     }
-    move_extracted_dir(&extract_dir, &target)?;
-
-    Ok(target)
+    let staging = extraction_dir(cache);
+    move_extracted_dir(&extract_dir, &staging)?;
+    let installed = fs::write(version_file(&staging), &release.tag_name)
+        .map_err(|e| format!("Could not write {} version file: {e}", layer.label))
+        .and_then(|()| replace_dir(&staging, &cache.join(layer.dir)));
+    if installed.is_err() {
+        let _ = fs::remove_dir_all(&staging);
+    }
+    installed
 }
 
 /// Ensures DXVK and VKD3D-Proton are downloaded into the shared cache,
@@ -126,19 +167,68 @@ pub async fn ensure_directx_layer_cache(
     token: Option<&str>,
 ) -> Result<PathBuf, String> {
     let _lock = CACHE_LOCK.lock().await;
-    ensure_layer(app, token, "dxvk", "doitsujin/dxvk", |name| {
-        name.starts_with("dxvk-") && name.ends_with(".tar.gz") && !name.contains("native")
-    })
-    .await?;
-    ensure_layer(
-        app,
-        token,
-        "vkd3d-proton",
-        "HansKristian-Work/vkd3d-proton",
-        |name| name.ends_with(".tar.zst"),
-    )
-    .await?;
-    cache_dir(app)
+    let cache = cache_dir(app)?;
+    for layer in LAYERS {
+        if !cache.join(layer.dir).is_dir() {
+            let release = latest_release(layer, token).await?;
+            install_layer(&cache, layer, release, token).await?;
+        }
+    }
+    Ok(cache)
+}
+
+/// A cached layer, as shown in the runner settings.
+#[derive(Debug, Clone, Serialize)]
+pub struct DirectXLayerStatus {
+    pub label: &'static str,
+    pub installed: bool,
+    /// The release tag it came from; `None` for a copy cached before the
+    /// tag was recorded.
+    pub version: Option<String>,
+}
+
+fn layer_statuses(cache: &Path) -> Vec<DirectXLayerStatus> {
+    LAYERS
+        .iter()
+        .map(|layer| {
+            let dir = cache.join(layer.dir);
+            DirectXLayerStatus {
+                label: layer.label,
+                installed: dir.is_dir(),
+                version: read_version(&dir),
+            }
+        })
+        .collect()
+}
+
+#[tauri::command(async)]
+pub fn get_directx_layers_status(app: AppHandle) -> Result<Vec<DirectXLayerStatus>, AppError> {
+    Ok(layer_statuses(&cache_dir(&app)?))
+}
+
+/// Replaces each cached layer whose release isn't the latest one anymore.
+/// Prefixes keep working throughout: their DLLs are links into the cache,
+/// whose paths stay the same. A layer not cached yet stays that way, as
+/// it's fetched on the first Wine launch anyway.
+#[tauri::command]
+pub async fn update_directx_layers(
+    app: AppHandle,
+    state: State<'_, ConfigState>,
+) -> Result<Vec<DirectXLayerStatus>, AppError> {
+    let token = read_token(&state);
+    let _lock = CACHE_LOCK.lock().await;
+    let cache = cache_dir(&app)?;
+    for layer in LAYERS {
+        let dir = cache.join(layer.dir);
+        if !dir.is_dir() {
+            continue;
+        }
+        let release = latest_release(layer, token.as_deref()).await?;
+        if read_version(&dir).as_deref() != Some(release.tag_name.as_str()) {
+            install_layer(&cache, layer, release, token.as_deref()).await?;
+        }
+    }
+    Ok(layer_statuses(&cache))
 }
 
 /// Every `href="..."` attribute value in an HTML page, in document order —

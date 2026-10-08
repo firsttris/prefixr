@@ -9,6 +9,7 @@
   import RunnerDownloads from "./RunnerDownloads.svelte";
   import GitHubSettings from "./GitHubSettings.svelte";
   import UmuSettings from "./UmuSettings.svelte";
+  import DirectXLayerSettings from "./DirectXLayerSettings.svelte";
   import { backendError } from "$lib/i18n/index.svelte";
 
   let showDownloads = $state(false);
@@ -66,6 +67,7 @@
 
   <GitHubSettings />
   <UmuSettings />
+  <DirectXLayerSettings />
 
   {#if $runners.length === 0}
     <p class="hint">{m.runnerList_empty()}</p>
