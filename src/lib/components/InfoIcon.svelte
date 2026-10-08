@@ -12,7 +12,7 @@
   }
 
   function handleWindowClick(e: MouseEvent) {
-    if (open && root && !root.contains(e.target as Node)) {
+    if (root && !root.contains(e.target as Node)) {
       open = false;
     }
   }
@@ -22,7 +22,11 @@
   }
 </script>
 
-<svelte:window onclick={handleWindowClick} onkeydown={handleKeydown} />
+<!-- Only listening while open: a settings page has dozens of these. -->
+<svelte:window
+  onclick={open ? handleWindowClick : undefined}
+  onkeydown={open ? handleKeydown : undefined}
+/>
 
 <span class="info-wrap" bind:this={root}>
   <button
