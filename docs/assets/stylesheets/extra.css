@@ -1,0 +1,19 @@
+/* The app's colors (src/app.css): accent blue, and its dark surfaces */
+:root {
+  --md-primary-fg-color: #4576f0;
+  --md-primary-fg-color--light: #5b8cff;
+  --md-primary-fg-color--dark: #3a63d0;
+  --md-accent-fg-color: #4576f0;
+}
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #171a21;
+  --md-accent-fg-color: #5b8cff;
+  --md-default-bg-color: #0e0f13;
+  --md-typeset-a-color: #5b8cff;
+}
+/* Images never wider than the text, with rounded corners */
+.md-typeset img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}

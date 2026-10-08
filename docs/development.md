@@ -10,6 +10,7 @@ How to build Prefixr, how the code is organized, and what CI checks before a cha
 - [Generated TypeScript types](#generated-typescript-types)
 - [Tests and CI](#tests-and-ci)
 - [Releases](#releases)
+- [Documentation website](#documentation-website)
 
 ## Building from source
 
@@ -218,3 +219,24 @@ Releases are built by CI from a tag `vX.Y.Z`, with the shared workflows from
 The AppImage is published as `*-ubuntu-compat.AppImage`. It bundles WebKitGTK from its build
 environment, which can clash with very new graphics drivers; see
 [Troubleshooting](troubleshooting.md#appimage-crashes-egl_bad_parameter-or-shows-a-blank-window).
+
+## Documentation website
+
+These pages are published at [firsttris.github.io/prefixr](https://firsttris.github.io/prefixr/),
+built from `docs/` with [MkDocs Material](https://squidfunk.github.io/mkdocs-material/). The
+navigation and theme are in `mkdocs.yml`.
+
+`.github/workflows/docs.yml` builds the site with `mkdocs build --strict` for every pull request that
+changes the docs, which fails on broken links and anchors, and publishes it to GitHub Pages on every
+push to `main`. Changes to the docs alone don't run the main CI.
+
+To preview the site locally:
+
+```bash
+python3 -m venv .venv && . .venv/bin/activate
+pip install -r requirements-docs.txt
+mkdocs serve   # http://127.0.0.1:8000, reloads on every change
+```
+
+Links between pages stay plain relative Markdown links (`user-guide.md#artwork`), so the docs read the
+same on GitHub and on the website.

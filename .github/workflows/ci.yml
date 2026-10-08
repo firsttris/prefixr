@@ -1,6 +1,6 @@
 name: CI
 
-# Changes to documentation alone don't build.
+# Changes to documentation (and its website, see docs.yml) alone don't build.
 on:
   push:
     branches:
@@ -9,6 +9,9 @@ on:
       - "**.md"
       - "docs/**"
       - "LICENSE"
+      - "mkdocs.yml"
+      - "requirements-docs.txt"
+      - ".github/workflows/docs.yml"
   pull_request:
     branches:
       - main
@@ -17,6 +20,9 @@ on:
       - "**.md"
       - "docs/**"
       - "LICENSE"
+      - "mkdocs.yml"
+      - "requirements-docs.txt"
+      - ".github/workflows/docs.yml"
 
 permissions:
   contents: read

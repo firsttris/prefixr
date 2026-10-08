@@ -1,0 +1,111 @@
+# The documentation as a website: https://firsttris.github.io/prefixr/
+# Source is docs/, built with MkDocs Material (.github/workflows/docs.yml).
+# Locally: pip install -r requirements-docs.txt && mkdocs serve
+site_name: Prefixr
+site_description: >-
+  Prefixr runs Windows games on Linux: a native Wine and Proton prefix manager
+  and game launcher with Proton-GE downloads, umu-launcher, MangoHud, Gamescope
+  and Steam integration.
+site_url: https://firsttris.github.io/prefixr/
+repo_url: https://github.com/firsttris/prefixr
+repo_name: firsttris/prefixr
+edit_uri: edit/main/docs/
+copyright: >-
+  MIT License · Prefixr is not affiliated with Valve, Steam, WineHQ,
+  CodeWeavers or SteamGridDB.
+
+docs_dir: docs
+# Pages as user-guide.html rather than user-guide/, so relative links and
+# images work the same as on GitHub
+use_directory_urls: false
+
+nav:
+  - Overview: README.md
+  - For players:
+      - Getting started: getting-started.md
+      - User guide: user-guide.md
+      - Configuration & files: configuration.md
+      - Troubleshooting & FAQ: troubleshooting.md
+  - For contributors:
+      - Development: development.md
+      - Rust test coverage: rust-test-coverage.md
+
+theme:
+  name: material
+  language: en
+  logo: assets/logo.png
+  favicon: assets/favicon.png
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    # Dark first, like the app; follows the system setting, switchable
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Dark mode
+  features:
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.tracking
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - toc.follow
+    - content.code.copy
+    - content.action.edit
+
+extra_css:
+  - assets/stylesheets/extra.css
+
+plugins:
+  - search
+  - git-revision-date-localized:
+      type: date
+      fallback_to_build_date: true
+
+validation:
+  links:
+    anchors: warn
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      permalink_title: Link to this section
+      # The same anchors as on GitHub, so links work in both places
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/firsttris/prefixr
+      name: Source code on GitHub
+    - icon: material/download
+      link: https://github.com/firsttris/prefixr/releases/latest
+      name: Download the latest release

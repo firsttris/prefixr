@@ -11,3 +11,6 @@ vite.config.ts.timestamp-*
 
 # Paraglide (generated from messages/*.json)
 /src/lib/paraglide
+
+# MkDocs output (mkdocs build)
+/site
