@@ -311,10 +311,27 @@ fn cached_mono_msi(cache: &Path) -> Option<PathBuf> {
     })
 }
 
+/// The highest version among a listing's `X.Y.Z/` directory entries,
+/// compared as numbers: an index sorted by name puts `9.4.0/` after
+/// `10.0.0/`.
+fn latest_version_dir(hrefs: &[&str]) -> Option<String> {
+    hrefs
+        .iter()
+        .filter_map(|href| {
+            let version = href.strip_suffix('/')?;
+            let parts = version
+                .split('.')
+                .map(|part| part.parse::<u32>().ok())
+                .collect::<Option<Vec<u32>>>()?;
+            Some((parts, version))
+        })
+        .max_by(|(a, _), (b, _)| a.cmp(b))
+        .map(|(_, version)| version.to_string())
+}
+
 /// The latest wine-mono release's version and installer file name. There's
-/// no GitHub-releases API here, just a plain Apache directory listing per
-/// version; the index lists them in ascending version order, so the last
-/// `X.Y.Z/` entry is the latest.
+/// no GitHub-releases API here, just a plain Apache directory listing with
+/// one `X.Y.Z/` directory per version.
 async fn latest_mono_release() -> Result<(String, String), String> {
     let index = get(MONO_BASE_URL, None)
         .await?
@@ -322,17 +339,7 @@ async fn latest_mono_release() -> Result<(String, String), String> {
         .await
         .map_err(|e| format!("Could not read wine-mono index: {e}"))?;
 
-    let version = hrefs(&index)
-        .into_iter()
-        .rfind(|href| {
-            href.ends_with('/')
-                && href
-                    .chars()
-                    .next()
-                    .map(|c| c.is_ascii_digit())
-                    .unwrap_or(false)
-        })
-        .map(|href| href.trim_end_matches('/').to_string())
+    let version = latest_version_dir(&hrefs(&index))
         .ok_or_else(|| "Could not find a wine-mono version in the listing".to_string())?;
 
     let version_index = get(&format!("{MONO_BASE_URL}{version}/"), None)

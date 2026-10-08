@@ -40,3 +40,10 @@ fn layer_assets_match_real_release_names() {
     let vkd3d = LAYERS[1].matches_asset;
     assert!(vkd3d("vkd3d-proton-2.14.1.tar.zst"));
 }
+
+#[test]
+fn latest_version_dir_compares_versions_numerically() {
+    let listing = ["../", "10.0.0/", "10.1.0/", "9.4.0/", "README", "?C=M;O=A"];
+    assert_eq!(latest_version_dir(&listing).as_deref(), Some("10.1.0"));
+    assert_eq!(latest_version_dir(&["../", "notes/"]), None);
+}
