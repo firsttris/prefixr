@@ -126,47 +126,47 @@ fn desktop_directory_falls_back_to_home_desktop() {
 
 #[test]
 fn steer_profile_to_steamuser_creates_missing_user_symlink() {
-    let _guard = env_lock().lock().unwrap();
     let prefix = temp_path("steamuser-link");
     let users_dir = prefix.join("drive_c/users");
     fs::create_dir_all(&users_dir).unwrap();
 
-    let old_user = std::env::var_os("USER");
-    std::env::set_var("USER", "tristan");
-
-    steer_profile_to_steamuser(&prefix).unwrap();
+    steer_profiles_to_steamuser(&prefix, &["tristan".into(), "steamuser".into()]).unwrap();
 
     let steamuser_dir = users_dir.join("steamuser");
     let user_dir = users_dir.join("tristan");
     assert!(steamuser_dir.is_dir());
     assert_eq!(fs::read_link(&user_dir).unwrap(), PathBuf::from("steamuser"));
+    fs::remove_dir_all(prefix).unwrap();
+}
 
-    match old_user {
-        Some(value) => std::env::set_var("USER", value),
-        None => std::env::remove_var("USER"),
+#[test]
+fn steer_profile_to_steamuser_links_every_candidate_name() {
+    let prefix = temp_path("steamuser-names");
+    let users_dir = prefix.join("drive_c/users");
+
+    steer_profiles_to_steamuser(&prefix, &["tristan".into(), "builder".into()]).unwrap();
+
+    for name in ["tristan", "builder"] {
+        assert_eq!(fs::read_link(users_dir.join(name)).unwrap(), PathBuf::from("steamuser"));
     }
     fs::remove_dir_all(prefix).unwrap();
 }
 
 #[test]
 fn steer_profile_to_steamuser_keeps_existing_user_dir() {
-    let _guard = env_lock().lock().unwrap();
     let prefix = temp_path("steamuser-existing");
     let user_dir = prefix.join("drive_c/users/tristan");
     fs::create_dir_all(&user_dir).unwrap();
 
-    let old_user = std::env::var_os("USER");
-    std::env::set_var("USER", "tristan");
-
-    steer_profile_to_steamuser(&prefix).unwrap();
+    steer_profiles_to_steamuser(&prefix, &["tristan".into()]).unwrap();
 
     assert!(fs::symlink_metadata(&user_dir).unwrap().file_type().is_dir());
-
-    match old_user {
-        Some(value) => std::env::set_var("USER", value),
-        None => std::env::remove_var("USER"),
-    }
     fs::remove_dir_all(prefix).unwrap();
+}
+
+#[test]
+fn account_name_is_found() {
+    assert!(account_name().is_some_and(|name| !name.is_empty()));
 }
 
 #[test]

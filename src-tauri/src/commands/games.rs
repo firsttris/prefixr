@@ -1,5 +1,6 @@
 use crate::error::AppError;
 use std::collections::{HashMap, HashSet};
+use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -883,20 +884,61 @@ async fn install_wine_mono(
 /// be the very first thing to touch a fresh prefix (installing dependencies
 /// before ever launching the game once) and implicitly runs wineboot itself.
 pub(crate) fn steer_profile_to_steamuser(prefix_path: &Path) -> Result<(), String> {
+    steer_profiles_to_steamuser(prefix_path, &profile_user_names())
+}
+
+/// The names Wine may pick for the prefix's user profile: the account name
+/// from the password database, which is what Wine asks, and `$USER`, which
+/// differs from it under `sudo -u`, in some containers or when set by hand.
+fn profile_user_names() -> Vec<OsString> {
+    let mut names: Vec<OsString> = account_name().into_iter().collect();
+    if let Some(user) = std::env::var_os("USER").filter(|user| !user.is_empty()) {
+        if !names.contains(&user) {
+            names.push(user);
+        }
+    }
+    names
+}
+
+/// The name of the account this process runs as, via getpwuid_r(3).
+fn account_name() -> Option<OsString> {
+    use std::ffi::CStr;
+    use std::os::unix::ffi::OsStrExt;
+
+    let mut buf = vec![0 as libc::c_char; 4096];
+    // SAFETY: an all-zero passwd is a valid value (null pointers, zero ids)
+    // for getpwuid_r to fill in.
+    let mut pwd: libc::passwd = unsafe { std::mem::zeroed() };
+    let mut result: *mut libc::passwd = std::ptr::null_mut();
+    // SAFETY: every pointer is valid for the duration of the call, and
+    // `buf.len()` is the buffer's real size; getuid(2) can't fail.
+    let rc = unsafe {
+        libc::getpwuid_r(libc::getuid(), &mut pwd, buf.as_mut_ptr(), buf.len(), &mut result)
+    };
+    if rc != 0 || result.is_null() || pwd.pw_name.is_null() {
+        return None;
+    }
+    // SAFETY: on success `pw_name` points to a NUL-terminated string inside
+    // `buf`, which is still alive here.
+    let name = unsafe { CStr::from_ptr(pwd.pw_name) };
+    (!name.is_empty()).then(|| std::ffi::OsStr::from_bytes(name.to_bytes()).to_owned())
+}
+
+fn steer_profiles_to_steamuser(prefix_path: &Path, usernames: &[OsString]) -> Result<(), String> {
     let users_dir = prefix_path.join("drive_c/users");
     let steamuser_dir = users_dir.join("steamuser");
     fs::create_dir_all(&steamuser_dir)
         .map_err(|e| format!("Could not create {}: {e}", steamuser_dir.display()))?;
 
-    let Some(username) = std::env::var_os("USER").filter(|u| u != "steamuser") else {
-        return Ok(());
-    };
-    let user_dir = users_dir.join(&username);
-    if fs::symlink_metadata(&user_dir).is_ok() {
-        return Ok(());
+    for username in usernames.iter().filter(|name| *name != "steamuser") {
+        let user_dir = users_dir.join(username);
+        if fs::symlink_metadata(&user_dir).is_ok() {
+            continue;
+        }
+        std::os::unix::fs::symlink("steamuser", &user_dir)
+            .map_err(|e| format!("Could not link {}: {e}", user_dir.display()))?;
     }
-    std::os::unix::fs::symlink("steamuser", &user_dir)
-        .map_err(|e| format!("Could not link {}: {e}", user_dir.display()))
+    Ok(())
 }
 
 /// Opens a launch's log file for appending, as a stdout/stderr pair for a
