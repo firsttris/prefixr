@@ -13,7 +13,7 @@
   let saved = $state(false);
 
   onMount(() => {
-    refreshMangoHudConfig();
+    refreshMangoHudConfig().catch((e) => (error = e));
   });
 
   $effect(() => {

@@ -1,6 +1,7 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
   import { onMount } from "svelte";
+  import { loadAll } from "$lib/load";
   import { runners, refreshRunners, deleteRunner } from "$lib/stores/runners";
   import { games, refreshGames } from "$lib/stores/games";
   import type { Runner } from "$lib/types";
@@ -15,6 +16,7 @@
   let showDownloads = $state(false);
   let deleting = $state<Runner | null>(null);
   let error = $state<unknown>(null);
+  let loadError = $state<unknown>(null);
 
   // How many games use each runner. The library may not have been loaded
   // yet when this view opens first, hence the refresh below.
@@ -43,8 +45,7 @@
   }
 
   onMount(() => {
-    refreshRunners();
-    refreshGames();
+    loadAll(refreshRunners(), refreshGames()).catch((e) => (loadError = e));
   });
 </script>
 
@@ -69,7 +70,9 @@
   <UmuSettings />
   <DirectXLayerSettings />
 
-  {#if $runners.length === 0}
+  {#if loadError}
+    <p class="error">{backendError(loadError)}</p>
+  {:else if $runners.length === 0}
     <p class="hint">{m.runnerList_empty()}</p>
   {:else}
     <ul>

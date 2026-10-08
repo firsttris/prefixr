@@ -42,6 +42,7 @@
   "gameList_toolbar_viewToggleLabel": "Ansicht wechseln",
   "gameList_toolbar_gridView": "Kachelansicht",
   "gameList_toolbar_listView": "Listenansicht",
+  "gameList_loadFailed": "Die Bibliothek konnte nicht geladen werden: {error}",
   "gameList_emptyLibrary_title": "Noch keine Spiele in deiner Bibliothek",
   "gameList_emptyLibrary_hint": "Füge dein erstes Spiel hinzu, um loszulegen.",
   "gameList_emptySearch_title": "Keine Treffer",

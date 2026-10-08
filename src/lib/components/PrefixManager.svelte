@@ -1,6 +1,7 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
   import { onMount } from "svelte";
+  import { loadAll } from "$lib/load";
   import { open } from "@tauri-apps/plugin-dialog";
   import { prefixes, refreshPrefixes, addPrefix, deletePrefix } from "$lib/stores/prefixes";
   import { games, refreshGames } from "$lib/stores/games";
@@ -13,6 +14,7 @@
   let path = $state("");
   let busy = $state(false);
   let error = $state<unknown>(null);
+  let loadError = $state<unknown>(null);
   let winetricksFor = $state<string | null>(null);
   let wineToolsFor = $state<string | null>(null);
   let deleting = $state<string | null>(null);
@@ -43,8 +45,7 @@
   );
 
   onMount(() => {
-    refreshPrefixes();
-    refreshGames();
+    loadAll(refreshPrefixes(), refreshGames()).catch((e) => (loadError = e));
   });
 
   async function pickFolder() {
@@ -116,7 +117,9 @@
     <p class="error">{backendError(error)}</p>
   {/if}
 
-  {#if $prefixes.length > 0}
+  {#if loadError}
+    <p class="error">{backendError(loadError)}</p>
+  {:else if $prefixes.length > 0}
     <ul>
       {#each $prefixes as prefix (prefix.path)}
         {@const count = usage[prefix.path] ?? 0}

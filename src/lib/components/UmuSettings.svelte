@@ -24,7 +24,7 @@
   );
 
   onMount(() => {
-    refreshUmuStatus();
+    refreshUmuStatus().catch((e) => (error = e));
     checkUmuUpdate();
   });
 

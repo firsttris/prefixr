@@ -89,8 +89,9 @@ export function initRunnerDownloadEvents(): void {
   });
 
   listen<DownloadDonePayload>("runner-download-done", (event) => {
-    patchDownloadState(event.payload.tag, { done: true, error: undefined });
-    refreshRunners();
+    const { tag } = event.payload;
+    patchDownloadState(tag, { done: true, error: undefined });
+    refreshRunners().catch((e) => patchDownloadState(tag, { error: e }));
   });
 }
 

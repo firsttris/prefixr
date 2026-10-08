@@ -16,7 +16,7 @@
   let saved = $state(false);
 
   onMount(() => {
-    refreshGitHubConfig();
+    refreshGitHubConfig().catch((e) => (error = e));
   });
 
   $effect(() => {

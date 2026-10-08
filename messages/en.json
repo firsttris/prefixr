@@ -42,6 +42,7 @@
   "gameList_toolbar_viewToggleLabel": "Switch view",
   "gameList_toolbar_gridView": "Grid view",
   "gameList_toolbar_listView": "List view",
+  "gameList_loadFailed": "Could not load the library: {error}",
   "gameList_emptyLibrary_title": "No games in your library yet",
   "gameList_emptyLibrary_hint": "Add your first game to get started.",
   "gameList_emptySearch_title": "No matches",

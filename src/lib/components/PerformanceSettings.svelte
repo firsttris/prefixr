@@ -1,6 +1,7 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
   import { onMount } from "svelte";
+  import { loadAll } from "$lib/load";
   import PerformanceEditor from "$lib/components/PerformanceEditor.svelte";
   import SettingsPanel from "$lib/components/SettingsPanel.svelte";
   import {
@@ -21,8 +22,7 @@
   let mapCountFixError = $state<unknown>(null);
 
   onMount(() => {
-    refreshPerformanceConfig();
-    refreshMaxMapCountStatus();
+    loadAll(refreshPerformanceConfig(), refreshMaxMapCountStatus()).catch((e) => (error = e));
   });
 
   $effect(() => {

@@ -13,7 +13,7 @@
   let error = $state<unknown>(null);
 
   onMount(() => {
-    refreshRunners();
+    refreshRunners().catch((e) => (error = e));
   });
 
   async function handleLaunch(tool: string) {

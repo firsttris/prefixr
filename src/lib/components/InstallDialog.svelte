@@ -1,6 +1,7 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
   import { onMount } from "svelte";
+  import { loadAll } from "$lib/load";
   import { open } from "@tauri-apps/plugin-dialog";
   import { prefixes, refreshPrefixes, addPrefix } from "$lib/stores/prefixes";
   import { runners, refreshRunners } from "$lib/stores/runners";
@@ -43,8 +44,7 @@
   let logPath = $state("");
 
   onMount(() => {
-    refreshPrefixes();
-    refreshRunners();
+    loadAll(refreshPrefixes(), refreshRunners()).catch((e) => (error = e));
   });
 
   async function createNewPrefix() {

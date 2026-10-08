@@ -1,6 +1,7 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
   import { onMount, untrack } from "svelte";
+  import { loadAll } from "$lib/load";
   import { open } from "@tauri-apps/plugin-dialog";
   import { runners, refreshRunners } from "$lib/stores/runners";
   import { prefixes, refreshPrefixes } from "$lib/stores/prefixes";
@@ -105,12 +106,14 @@
   let proton = $state<Record<string, boolean>>({ ...(saved?.proton ?? {}) });
 
   onMount(() => {
-    refreshRunners();
-    refreshPrefixes();
-    refreshPerformanceConfig();
-    refreshGraphicsConfig();
-    refreshMangoHudConfig();
-    refreshProtonConfig();
+    loadAll(
+      refreshRunners(),
+      refreshPrefixes(),
+      refreshPerformanceConfig(),
+      refreshGraphicsConfig(),
+      refreshMangoHudConfig(),
+      refreshProtonConfig(),
+    ).catch((e) => (error = e));
   });
 
   // --- Leistung ---

@@ -38,7 +38,7 @@
   });
 
   onMount(() => {
-    refreshRunners();
+    refreshRunners().catch((e) => (error = e));
     refreshInstalled();
   });
 

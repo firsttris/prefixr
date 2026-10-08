@@ -73,9 +73,13 @@
     return list;
   });
 
+  // A library that failed to load must not look like an empty one.
+  let loadError = $state<unknown>(null);
+
   onMount(() => {
     initGameEvents();
-    refreshGames();
+    refreshGames().catch((e) => (loadError = e));
+    // Only marks which games are in Steam; without it, none are.
     refreshSteamGames().catch(() => {});
   });
 
@@ -186,7 +190,9 @@
   </div>
 {/if}
 
-{#if $games.length === 0}
+{#if loadError && $games.length === 0}
+  <p class="load-error">{m.gameList_loadFailed({ error: backendError(loadError) })}</p>
+{:else if $games.length === 0}
   <div class="empty">
     <span class="empty-icon">🎮</span>
     <h3>{m.gameList_emptyLibrary_title()}</h3>
@@ -284,6 +290,10 @@
     background: var(--success-bg);
     color: var(--success);
     border-color: transparent;
+  }
+
+  .load-error {
+    color: var(--danger);
   }
 
   .notice.error {

@@ -70,14 +70,16 @@
       listenForPendingInstall((exePath) => (installingExePath = exePath)),
     ]);
 
-    const pendingGameId = await takePendingLaunch();
+    // Each on its own, so one that fails doesn't skip the other.
+    const [pendingGameId, pendingExePath] = await Promise.all([
+      takePendingLaunch().catch(() => null),
+      takePendingInstall().catch(() => null),
+    ]);
     if (pendingGameId) {
       view = "library";
       initGameEvents();
       launchGame(pendingGameId);
     }
-
-    const pendingExePath = await takePendingInstall();
     if (pendingExePath) {
       installingExePath = pendingExePath;
     }
