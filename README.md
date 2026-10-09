@@ -20,7 +20,7 @@
   <p>
     <a href="#-installation"><strong>Install</strong></a> ·
     <a href="https://firsttris.github.io/prefixr/"><strong>Documentation</strong></a> ·
-    <a href="docs/troubleshooting.md"><strong>Troubleshooting</strong></a> ·
+    <a href="https://firsttris.github.io/prefixr/troubleshooting.html"><strong>Troubleshooting</strong></a> ·
     <a href="https://github.com/firsttris/prefixr/issues"><strong>Report a bug</strong></a>
   </p>
 </div>
@@ -54,7 +54,7 @@ you can reuse an existing prefix from any of them as it is.
 | 🖼️ **Artwork & Steam** | Covers, icons, heroes and logos from [SteamGridDB](https://www.steamgriddb.com/). Add any game to Steam as a non-Steam game, artwork included, so it shows up in Big Picture and Game Mode on the Steam Deck. |
 | 🧰 **Everyday comfort** | Tray icon with the running games and a way to stop a hung one, logs of the last 10 runs per game and prefix, a `vm.max_map_count` check, English and German UI. |
 
-See the [user guide](docs/user-guide.md) for a tour of every feature.
+See the [user guide](https://firsttris.github.io/prefixr/user-guide.html) for a tour of every feature.
 
 ## 📦 Installation
 
@@ -68,9 +68,9 @@ Download the latest build from the [releases page](https://github.com/firsttris/
 
 On immutable distributions such as Bazzite or SteamOS, use the AppImage. If the AppImage shows a
 blank window or crashes with `EGL_BAD_PARAMETER`, see
-[Troubleshooting](docs/troubleshooting.md#appimage-crashes-egl_bad_parameter-or-shows-a-blank-window).
+[Troubleshooting](https://firsttris.github.io/prefixr/troubleshooting.html#appimage-crashes-egl_bad_parameter-or-shows-a-blank-window).
 
-To build Prefixr yourself, follow [Building from source](docs/development.md#building-from-source).
+To build Prefixr yourself, follow [Building from source](https://firsttris.github.io/prefixr/development.html#building-from-source).
 
 ## ✅ Requirements
 
@@ -80,7 +80,7 @@ To build Prefixr yourself, follow [Building from source](docs/development.md#bui
   power-profiles-daemon, Gamescope and vkBasalt for the matching settings
 
 Prefixr downloads umu-launcher, runners, DXVK, VKD3D-Proton, wine-mono and winetricks itself when
-they're first needed. The [getting started guide](docs/getting-started.md) walks through the first
+they're first needed. The [getting started guide](https://firsttris.github.io/prefixr/getting-started.html) walks through the first
 game.
 
 ## 📚 Documentation
@@ -90,17 +90,17 @@ The documentation is also available as a website:
 
 | Guide | What's in it |
 | --- | --- |
-| [Getting started](docs/getting-started.md) | Install Prefixr and get your first game running |
-| [User guide](docs/user-guide.md) | The library, prefixes, runners, per-game settings, artwork and Steam |
-| [Configuration & files](docs/configuration.md) | Where Prefixr keeps its data, command-line options, API keys |
-| [Troubleshooting & FAQ](docs/troubleshooting.md) | Common problems and how to fix them |
-| [Development](docs/development.md) | Building from source, architecture, tests and releases |
+| [Getting started](https://firsttris.github.io/prefixr/getting-started.html) | Install Prefixr and get your first game running |
+| [User guide](https://firsttris.github.io/prefixr/user-guide.html) | The library, prefixes, runners, per-game settings, artwork and Steam |
+| [Configuration & files](https://firsttris.github.io/prefixr/configuration.html) | Where Prefixr keeps its data, command-line options, API keys |
+| [Troubleshooting & FAQ](https://firsttris.github.io/prefixr/troubleshooting.html) | Common problems and how to fix them |
+| [Development](https://firsttris.github.io/prefixr/development.html) | Building from source, architecture, tests and releases |
 
 ## 🤝 Contributing
 
 Bug reports, ideas and pull requests are welcome. Please open an
 [issue](https://github.com/firsttris/prefixr/issues) first for larger changes. The
-[development guide](docs/development.md) explains how to set up the project, which checks CI runs,
+[development guide](https://firsttris.github.io/prefixr/development.html) explains how to set up the project, which checks CI runs,
 and how texts and translations work.
 
 ---

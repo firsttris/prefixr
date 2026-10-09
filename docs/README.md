@@ -2,6 +2,7 @@
 
 Prefixr is a native Linux app for running Windows games with Wine and Proton. These pages cover
 everything from the first launch to how the code is put together.
+Also as a website with search: **https://firsttris.github.io/prefixr/**
 
 ## For players
 
