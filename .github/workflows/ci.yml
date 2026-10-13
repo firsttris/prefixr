@@ -55,15 +55,17 @@ jobs:
         with:
           workspaces: src-tauri
 
+      # The packages come from the Actions cache: the Ubuntu mirror is sometimes very slow (this
+      # step once took 12 minutes)
       - name: Install Linux system dependencies for Tauri
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libxdo-dev \
-            libssl-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
+        uses: firsttris/workflows/actions/apt-install@ccr-161f105b-9ns022
+        with:
+          packages: |
+            libwebkit2gtk-4.1-dev
+            libxdo-dev
+            libssl-dev
+            libayatana-appindicator3-dev
+            librsvg2-dev
             patchelf
 
       - name: Install frontend dependencies

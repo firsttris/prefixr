@@ -4,7 +4,8 @@ name: Release
 # bundles (AppImage, deb, rpm), then the shared GitHub release from firsttris/workflows, which
 # checks the tag against package.json and attaches the bundles. bump.yml keeps package.json,
 # src-tauri/tauri.conf.json and src-tauri/Cargo.toml on the same version. Run by hand on main: only
-# the build, nothing is released.
+# the build, nothing is released. When main's CI already passed for the code (a release commit
+# from bump.yml changes only versions), the checks and tests are skipped and only the bundles build.
 on:
   push:
     tags: ["v*"]
@@ -18,8 +19,15 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  tested:
+    uses: firsttris/workflows/.github/workflows/tested-on-main.yml@ccr-161f105b-9ns022
+    permissions:
+      actions: read
+      contents: read
+
   build:
     name: Build release bundles
+    needs: tested
     runs-on: ubuntu-24.04
 
     steps:
@@ -37,27 +45,33 @@ jobs:
         with:
           workspaces: src-tauri
 
+      # The packages come from the Actions cache: the Ubuntu mirror is sometimes very slow (this
+      # step once took 12 minutes)
       - name: Install Linux system dependencies for Tauri
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libxdo-dev \
-            libssl-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
+        uses: firsttris/workflows/actions/apt-install@ccr-161f105b-9ns022
+        with:
+          packages: |
+            libwebkit2gtk-4.1-dev
+            libxdo-dev
+            libssl-dev
+            libayatana-appindicator3-dev
+            librsvg2-dev
             patchelf
 
       - name: Install frontend dependencies
         run: bun install --frozen-lockfile
 
+      # Already run by main's CI when tested is true
       - name: Frontend type and Svelte checks
+        if: needs.tested.outputs.tested != 'true'
         run: bun run check
 
       - name: Frontend tests
+        if: needs.tested.outputs.tested != 'true'
         run: bun run test
 
       - name: Rust tests
+        if: needs.tested.outputs.tested != 'true'
         run: cargo test --manifest-path src-tauri/Cargo.toml --locked
 
       - name: Build Tauri release bundles
