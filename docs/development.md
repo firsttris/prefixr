@@ -202,6 +202,10 @@ CI (`.github/workflows/ci.yml`) runs on every pull request to `main` that isn't 
 6. `cargo test`, then a check that `src/lib/bindings` is up to date
 7. `bun run build` and `cargo build --release`
 
+The Tauri system packages come from the Actions cache (`apt-install` from
+[firsttris/workflows](https://github.com/firsttris/workflows)), because the Ubuntu mirror is
+sometimes very slow.
+
 CI uses the latest stable Rust, so a new Clippy lint can turn a pull request red even if nothing
 else changed.
 
@@ -213,8 +217,9 @@ Releases are built by CI from a tag `vX.Y.Z`, with the shared workflows from
 1. *Actions → Bump version → Run workflow*, choosing patch, minor or major.
 2. That raises the version in `package.json`, `src-tauri/tauri.conf.json` and
    `src-tauri/Cargo.toml` (and `Cargo.lock`), commits, tags, and starts `release.yml`.
-3. `release.yml` runs the checks and tests, builds the AppImage, `.deb` and `.rpm` on Ubuntu 24.04,
-   and attaches them to a GitHub release.
+3. `release.yml` runs the checks and tests (skipped when `main`'s CI already passed for the code,
+   since the release commit only changes versions), builds the AppImage, `.deb` and `.rpm` on
+   Ubuntu 24.04, and attaches them to a GitHub release.
 
 The AppImage is published as `*-ubuntu-compat.AppImage`. It bundles WebKitGTK from its build
 environment, which can clash with very new graphics drivers; see
