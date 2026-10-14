@@ -15,6 +15,7 @@
     <a href="https://github.com/firsttris/prefixr/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/firsttris/prefixr/ci.yml?branch=main&style=for-the-badge&label=CI"></a>
     <a href="#-requirements"><img alt="Platform: Linux" src="https://img.shields.io/badge/platform-linux-1f2937?style=for-the-badge&logo=linux&logoColor=white"></a>
     <a href="LICENSE"><img alt="License: GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-1f2937?style=for-the-badge"></a>
+    <a href="https://firsttris.github.io/prefixr/"><img alt="Docs" src="https://img.shields.io/badge/docs-firsttris.github.io%2Fprefixr-1f2937?style=for-the-badge&logo=materialformkdocs&logoColor=white"></a>
   </p>
 
   <p>
