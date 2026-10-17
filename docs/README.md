@@ -22,6 +22,8 @@ Also as a website with search: **https://firsttris.github.io/prefixr/**
 - **[Development](development.md)**: building from source, the architecture, translations, the
   generated TypeScript types, tests, CI and releases.
 - **[Rust test coverage notes](rust-test-coverage.md)**: a snapshot of the backend's test coverage.
+- **[Ideas: upscaling](roadmap.md)**: features that could come next: Gamescope upscaling, the
+  FSR 4 upgrade in Proton, and OptiScaler.
 
 ## Quick links
 
