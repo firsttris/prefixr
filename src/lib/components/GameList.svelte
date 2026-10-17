@@ -18,13 +18,14 @@
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import NotesDialog from "./NotesDialog.svelte";
   import type { Game } from "$lib/types";
+  import type { GameFormTab } from "./GameForm.svelte";
 
   let {
     onEdit,
     onEditArtwork,
     onAddNew,
   }: {
-    onEdit: (game: Game) => void;
+    onEdit: (game: Game, tab?: GameFormTab) => void;
     onEditArtwork: (game: Game) => void;
     onAddNew?: () => void;
   } = $props();
@@ -247,7 +248,7 @@
   onClose={() => (showingNotes = null)}
   onEdit={(game) => {
     showingNotes = null;
-    onEdit(game);
+    onEdit(game, "notes");
   }}
 />
 

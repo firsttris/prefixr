@@ -63,14 +63,15 @@
     <GameActionsMenu
       {item}
       {inSteam}
-      label={m.gameCard_shortcutMenuLabel()}
+      label={m.gameCard_moreOptions()}
+      triggerClass="icon-btn"
       {onEdit}
       {onEditArtwork}
       {onExportToSteam}
       {onRemoveFromSteam}
       onShowNotes={game.notes ? onShowNotes : undefined}
     >
-      {#snippet trigger()}{item.shortcutState === "done" ? "✓" : "🔗"}{/snippet}
+      {#snippet trigger()}⋮{/snippet}
     </GameActionsMenu>
     <button
       type="button"

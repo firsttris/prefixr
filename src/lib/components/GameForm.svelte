@@ -1,3 +1,7 @@
+<script lang="ts" module>
+  export type GameFormTab = "general" | "performance" | "graphics" | "overlay" | "proton" | "notes";
+</script>
+
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
   import RunnerSelect from "$lib/components/RunnerSelect.svelte";
@@ -43,6 +47,7 @@
     initialExePath,
     initialPrefixPath,
     initialRunnerId,
+    initialTab,
     onSuccess,
   }: {
     existingGame?: Game;
@@ -52,6 +57,8 @@
     initialExePath?: string;
     initialPrefixPath?: string;
     initialRunnerId?: string;
+    // The tab to open on, e.g. "notes" from the notes dialog's Edit.
+    initialTab?: GameFormTab;
     onSuccess?: () => void;
   } = $props();
 
@@ -253,8 +260,8 @@
 
   // --- Tabs ---
 
-  type Tab = "general" | "performance" | "graphics" | "overlay" | "proton";
-  let tab = $state<Tab>("general");
+  type Tab = GameFormTab;
+  let tab = $state<Tab>(untrack(() => initialTab ?? "general"));
   const tabs = $derived(
     [
       { id: "general" as Tab, label: m.gameForm_tabGeneral(), count: 0 },
@@ -262,6 +269,7 @@
       { id: "graphics" as Tab, label: m.nav_graphics(), count: gfxCount },
       { id: "overlay" as Tab, label: m.nav_overlay(), count: overlayCount },
       { id: "proton" as Tab, label: m.nav_proton(), count: protonCount },
+      { id: "notes" as Tab, label: m.gameForm_tabNotes(), count: 0 },
     ].filter((tabItem) => tabItem.id !== "proton" || isProton),
   );
   const activeTab = $derived(tabs.some((t) => t.id === tab) ? tab : "general");
@@ -422,10 +430,12 @@
       {m.gameForm_launchArgsLabel()}
       <input placeholder={m.gameForm_launchArgsPlaceholder()} bind:value={launchArgs} />
     </label>
-
+  {:else if activeTab === "notes"}
     <label>
       {m.gameForm_notesLabel()}
-      <textarea placeholder={m.gameForm_notesPlaceholder()} bind:value={notes}></textarea>
+      <textarea class="notes" placeholder={m.gameForm_notesPlaceholder()} bind:value={notes}
+      ></textarea>
+      <span class="hint">{m.gameForm_notesFormatHint()}</span>
       <span class="hint">{m.gameForm_notesHint()}</span>
     </label>
   {:else if activeTab === "performance"}
@@ -533,6 +543,11 @@
   textarea {
     min-height: 4em;
     resize: vertical;
+  }
+
+  textarea.notes {
+    min-height: 22em;
+    line-height: 1.5;
   }
 
   .error {
