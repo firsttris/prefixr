@@ -7,6 +7,7 @@ use tokio::process::Command;
 
 use crate::commands::umu::ensure_umu;
 use crate::config::ConfigState;
+use crate::host_env::host_command;
 use crate::lock::LockExt;
 use crate::models::{Runner, RunnerKind};
 
@@ -135,7 +136,7 @@ pub fn runner_command<'a>(
     env_vars: impl IntoIterator<Item = (&'a str, &'a str)>,
 ) -> Command {
     if host_exec_available() {
-        let mut cmd = Command::new("distrobox-host-exec");
+        let mut cmd = host_command("distrobox-host-exec");
         cmd.arg("env");
         for (key, value) in env_vars {
             cmd.arg(format!("{key}={value}"));
@@ -143,7 +144,7 @@ pub fn runner_command<'a>(
         cmd.arg(binary);
         cmd
     } else {
-        let mut cmd = Command::new(binary);
+        let mut cmd = host_command(binary);
         for (key, value) in env_vars {
             cmd.env(key, value);
         }

@@ -74,7 +74,7 @@ fn sorted_running_games(mut games: Vec<(Uuid, String)>) -> Vec<(Uuid, String)> {
 /// icon registers with) is running. `gdbus` ships with GLib, which Prefixr
 /// needs anyway; if it can't answer, a tray is assumed as before.
 fn tray_host_available() -> bool {
-    let output = std::process::Command::new("gdbus")
+    let output = crate::host_env::host_std_command("gdbus")
         .args([
             "call",
             "--session",

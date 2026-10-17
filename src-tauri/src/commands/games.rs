@@ -30,6 +30,7 @@ use crate::commands::steamgriddb::{
 use crate::commands::umu::{ensure_umu, runtime_present};
 use crate::config::{save_config, ConfigState};
 use crate::env::{self, Env};
+use crate::host_env::{host_command, host_std_command};
 use crate::locale::LocaleState;
 use crate::lock::LockExt;
 use crate::models::{
@@ -70,7 +71,7 @@ const COMPETING_SCHEDULER_UNITS: &[&str] = &[
 /// One `systemctl is-active` call for all of them, which prints one state
 /// per unit, in order.
 async fn competing_scheduler_active() -> bool {
-    tokio::process::Command::new("systemctl")
+    host_command("systemctl")
         .arg("is-active")
         .args(COMPETING_SCHEDULER_UNITS)
         .output()
@@ -752,7 +753,7 @@ pub fn remove_game(
             let _ = fs::remove_file(entry);
         }
         if !menu_entries.is_empty() {
-            let _ = std::process::Command::new("update-desktop-database")
+            let _ = host_std_command("update-desktop-database")
                 .arg(&applications_dir)
                 .status();
         }
@@ -1414,7 +1415,7 @@ async fn run_game(
     let use_power_profile = (performance.power_profile_enabled || scheduler_conflict)
         && command_on_path("powerprofilesctl")
         && Path::new("/run/dbus/system_bus_socket").exists()
-        && tokio::process::Command::new("powerprofilesctl")
+        && host_command("powerprofilesctl")
             .arg("get")
             .output()
             .await
@@ -1858,7 +1859,7 @@ pub fn create_menu_shortcut(
 ) -> Result<(), AppError> {
     let applications_dir = applications_directory(&env::process)?;
     write_game_shortcut(&app, &state, &id, &applications_dir)?;
-    let _ = std::process::Command::new("update-desktop-database")
+    let _ = host_std_command("update-desktop-database")
         .arg(&applications_dir)
         .status();
     Ok(())
@@ -1938,7 +1939,7 @@ pub fn ensure_install_desktop_entry(app: &AppHandle) -> Result<(), String> {
             .map_err(|e| format!("Could not set desktop entry permissions: {e}"))?;
     }
 
-    let _ = std::process::Command::new("update-desktop-database")
+    let _ = host_std_command("update-desktop-database")
         .arg(&applications_dir)
         .status();
 
