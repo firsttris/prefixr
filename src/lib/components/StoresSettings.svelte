@@ -27,6 +27,15 @@
   let codes = $state<Partial<Record<StoreKind, string>>>({});
   let confirmingDisconnect = $state<StoreAccount | null>(null);
 
+  const logos: Record<StoreKind, string> = { epic: "EG", gog: "GOG", amazon: "AG" };
+  // Each store's login ends somewhere else: Epic on a JSON page, GOG and
+  // Amazon on an address that carries the code.
+  const loginTexts: Record<StoreKind, { step: () => string; placeholder: () => string }> = {
+    epic: { step: m.stores_loginStepCode, placeholder: m.stores_codePlaceholder },
+    gog: { step: m.stores_loginStepCodeGog, placeholder: m.stores_codePlaceholderGog },
+    amazon: { step: m.stores_loginStepCodeAmazon, placeholder: m.stores_codePlaceholderAmazon },
+  };
+
   onMount(() => {
     refreshStoreAccounts()
       .catch((e) => (loadError = e))
@@ -80,7 +89,7 @@
     <section class="store" class:connected={account.connected}>
       <div class="head">
         <div class="identity">
-          <div class="logo" aria-hidden="true">{store === "epic" ? "EG" : "GOG"}</div>
+          <div class="logo" aria-hidden="true">{logos[store]}</div>
           <div>
             <div class="title-row">
               <h2>{storeName(store)}</h2>
@@ -139,18 +148,14 @@
                 {busy[store] === "login" ? m.stores_loginPreparing() : m.stores_loginOpenAgain()}
               </button>
             </li>
-            <li>
-              {store === "gog" ? m.stores_loginStepCodeGog() : m.stores_loginStepCode()}
-            </li>
+            <li>{loginTexts[store].step()}</li>
           </ol>
           <div class="code-row">
             <input
               type="text"
               autocomplete="off"
               spellcheck="false"
-              placeholder={store === "gog"
-                ? m.stores_codePlaceholderGog()
-                : m.stores_codePlaceholder()}
+              placeholder={loginTexts[store].placeholder()}
               aria-label={m.stores_codeLabel()}
               bind:value={codes[store]}
             />
@@ -173,13 +178,13 @@
       {/if}
 
       <p class="tool">
-        {m.stores_toolLine({ tool: account.tool_name, version: account.tool_version })}
+        {account.tool_needs_python
+          ? m.stores_toolLine({ tool: account.tool_name, version: account.tool_version })
+          : m.stores_toolLineStandalone({ tool: account.tool_name, version: account.tool_version })}
       </p>
     </section>
   {/each}
 </div>
-
-<p class="muted later">{m.stores_moreLater()}</p>
 
 <ConfirmDialog
   open={confirmingDisconnect !== null}
@@ -346,10 +351,6 @@
   .muted {
     font-size: 0.8em;
     color: var(--text-muted);
-  }
-
-  .later {
-    margin-top: 1.2em;
   }
 
   .error {

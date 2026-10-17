@@ -36,7 +36,7 @@ prefix, launches the game through [umu-launcher](https://github.com/Open-Wine-Co
 the way Steam launches Proton, applies [protonfixes](https://github.com/Open-Wine-Components/umu-protonfixes),
 installs DXVK and VKD3D-Proton for plain Wine builds, and lets you tune every game on its own.
 
-It is built for people who want their GOG, Epic, itch.io or standalone games next to their Steam
+It is built for people who want their GOG, Epic, Amazon, itch.io or standalone games next to their Steam
 library, without editing launch scripts. If you know [Lutris](https://lutris.net/),
 [Bottles](https://usebottles.com/), [Heroic](https://heroicgameslauncher.com/) or
 [PortProton](https://linux-gaming.ru/), Prefixr covers the same ground with a focus on prefixes:
@@ -52,7 +52,7 @@ you can reuse an existing prefix from any of them as it is.
 | ⬇️ **Runners** | Download Proton-GE, Proton-CachyOS and Wine (Kron4ek) from their GitHub releases, checksum-verified. Any Proton or Wine build you place or symlink in the runners folder shows up as well. |
 | 🚀 **Launching** | Proton games run through umu-launcher in the Steam Linux Runtime, with an automatic UMU ID lookup for protonfixes. Wine games get DXVK, VKD3D-Proton and wine-mono set up automatically. |
 | 🎛️ **Per-game tuning** | [MangoHud](https://github.com/flightlessmango/MangoHud) with presets, [GameMode](https://github.com/FeralInteractive/gamemode), power profiles, [Gamescope](https://github.com/ValveSoftware/gamescope), [vkBasalt](https://github.com/DadSchoorse/vkBasalt) and every `PROTON_*` switch your runner supports. Set them once globally, override them per game. |
-| 🛒 **Stores** | Connect your Epic Games and GOG accounts and their games show up in the library, ready to install with one click: a prefix of their own, your newest Proton, the store's cover. Epic's online games start with their login tokens. Powered by Heroic's [Legendary](https://github.com/Heroic-Games-Launcher/legendary) and [gogdl](https://github.com/Heroic-Games-Launcher/heroic-gogdl), downloaded on connect at pinned, checksum-verified versions. Amazon is planned. |
+| 🛒 **Stores** | Connect your Epic Games, GOG and Amazon Games accounts and their games show up in the library, ready to install with one click: a prefix of their own, your newest Proton, the store's cover. Epic's online games start with their login tokens. Powered by Heroic's [Legendary](https://github.com/Heroic-Games-Launcher/legendary) and [gogdl](https://github.com/Heroic-Games-Launcher/heroic-gogdl) and [Nile](https://github.com/imLinguin/nile), downloaded on connect at pinned, checksum-verified versions. |
 | 🖼️ **Artwork & Steam** | Covers, icons, heroes and logos from [SteamGridDB](https://www.steamgriddb.com/). Add any game to Steam as a non-Steam game, artwork included, so it shows up in Big Picture and Game Mode on the Steam Deck. |
 | ⌨️ **Command line** | Everything the window does is also a command: `prefixr game add`, `prefixr prefix winetricks`, `prefixr runner download` and more, with JSON output for scripts. An open window shows the changes right away. |
 | 🧰 **Everyday comfort** | Tray icon with the running games and a way to stop a hung one, logs of the last 10 runs per game and prefix, a `vm.max_map_count` check, English and German UI. |

@@ -1,0 +1,9 @@
+WARNING [CLI]:	 There was an error getting sdk
+INFO [CLI]:	 Found: Example Quest
+INFO [PROGRESS]:	 = Progress: 0.00 0/4194304000, Running for: 00:00:00, ETA: 00:00:00
+INFO [PROGRESS]:	 = Downloaded: 0.00 MiB, Written: 0.00 MiB
+INFO [PROGRESS]:	  + Download	- 0.00 MiB/s
+INFO [PROGRESS]:	  + Disk	- 0.00 MiB/s
+INFO [PROGRESS]:	 = Progress: 42.17 1768720000/4194304000, Running for: 00:01:12, ETA: 00:01:39
+INFO [PROGRESS]:	 = Downloaded: 1686.78 MiB, Written: 1686.78 MiB
+INFO [CLI]:	 Download complete

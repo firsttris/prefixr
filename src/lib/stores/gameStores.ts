@@ -38,6 +38,8 @@ export function storeName(store: StoreKind): string {
       return "Epic Games";
     case "gog":
       return "GOG";
+    case "amazon":
+      return "Amazon Games";
   }
 }
 

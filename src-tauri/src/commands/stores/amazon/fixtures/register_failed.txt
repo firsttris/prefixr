@@ -1,0 +1,12 @@
+WARNING [CLI]:	 There was an error getting sdk
+INFO [AUTH_MANAGER]:	 Registerring a device. ID: 3135363139433438434133373131463141414643303246433030303030303031234132554d56484f58375550345637
+ERROR [AUTH_MANAGER]:	 Failed to register a device
+INFO [LIBRARY]:	 Synchronizing library
+Traceback (most recent call last):
+  File "cli.py", line 364, in <module>
+  File "cli.py", line 341, in main
+  File "cli.py", line 101, in handle_register
+  File "nile/api/authorization.py", line 212, in handle_login
+  File "nile/api/library.py", line 83, in sync
+AttributeError: 'NoneType' object has no attribute 'encode'
+[PYI-20417:ERROR] Failed to execute script 'cli' due to unhandled exception!

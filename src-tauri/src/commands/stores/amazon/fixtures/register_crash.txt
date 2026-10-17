@@ -1,0 +1,35 @@
+WARNING [CLI]:	 There was an error getting sdk
+INFO [AUTH_MANAGER]:	 Registerring a device. ID: x
+Traceback (most recent call last):
+  File "urllib3/connectionpool.py", line 775, in urlopen
+  File "urllib3/connectionpool.py", line 1044, in _prepare_proxy
+  File "urllib3/connection.py", line 710, in connect
+  File "urllib3/connection.py", line 262, in _tunnel
+OSError: Tunnel connection failed: 403 Forbidden
+
+The above exception was the direct cause of the following exception:
+
+urllib3.exceptions.ProxyError: ('Unable to connect to proxy', OSError('Tunnel connection failed: 403 Forbidden'))
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "requests/adapters.py", line 667, in send
+  File "urllib3/connectionpool.py", line 843, in urlopen
+  File "urllib3/util/retry.py", line 519, in increment
+urllib3.exceptions.MaxRetryError: HTTPSConnectionPool(host='api.amazon.com', port=443): Max retries exceeded with url: /auth/register (Caused by ProxyError('Unable to connect to proxy', OSError('Tunnel connection failed: 403 Forbidden')))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "cli.py", line 364, in <module>
+  File "cli.py", line 341, in main
+  File "cli.py", line 101, in handle_register
+  File "nile/api/authorization.py", line 208, in handle_login
+  File "nile/api/authorization.py", line 100, in register_device
+  File "requests/sessions.py", line 637, in post
+  File "requests/sessions.py", line 589, in request
+  File "requests/sessions.py", line 703, in send
+  File "requests/adapters.py", line 694, in send
+requests.exceptions.ProxyError: HTTPSConnectionPool(host='api.amazon.com', port=443): Max retries exceeded with url: /auth/register (Caused by ProxyError('Unable to connect to proxy', OSError('Tunnel connection failed: 403 Forbidden')))
+[PYI-14975:ERROR] Failed to execute script 'cli' due to unhandled exception!

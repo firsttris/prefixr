@@ -1,0 +1,55 @@
+[
+  {
+    "id": "7f3c2a10-8b4e-4d6f-a1c2-3e4f5a6b7c8d",
+    "product": {
+      "id": "amzn1.adg.product.5a2e1f4c-0000-4b3a-9e8f-2c1d0e9f8a7b",
+      "title": "Example Quest",
+      "sku": "EXAMPLE_QUEST_SKU",
+      "productDetail": {
+        "iconUrl": "https://m.media-amazon.com/images/I/example-quest-icon.png",
+        "details": {
+          "backgroundUrl1": "https://m.media-amazon.com/images/I/example-quest-bg1.jpg",
+          "backgroundUrl2": "https://m.media-amazon.com/images/I/example-quest-bg2.jpg",
+          "developer": "Example Studio",
+          "genres": ["Adventure"],
+          "logoUrl": "https://m.media-amazon.com/images/I/example-quest-logo.png"
+        }
+      }
+    }
+  },
+  {
+    "id": "0b1c2d3e-4f5a-4b6c-8d7e-9f0a1b2c3d4e",
+    "product": {
+      "id": "amzn1.adg.product.11111111-2222-4333-8444-555555555555",
+      "sku": "UNTITLED_SKU",
+      "productDetail": {
+        "iconUrl": "https://images-na.ssl-images-amazon.com/images/I/untitled-icon.png",
+        "details": {
+          "backgroundUrl2": "http://m.media-amazon.com/images/I/plain-http.jpg"
+        }
+      }
+    }
+  },
+  {
+    "id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+    "product": {
+      "id": "amzn1.adg.product.99999999-8888-4777-8666-555555555555",
+      "title": "  alpha Racer ",
+      "sku": "ALPHA_SKU",
+      "productDetail": {
+        "iconUrl": "https://evil.example.com/media-amazon.com/icon.png",
+        "details": {}
+      }
+    }
+  },
+  {
+    "id": "duplicate-entitlement",
+    "product": {
+      "id": "amzn1.adg.product.5a2e1f4c-0000-4b3a-9e8f-2c1d0e9f8a7b",
+      "title": "Example Quest",
+      "sku": "EXAMPLE_QUEST_SKU",
+      "productDetail": { "details": {} }
+    }
+  },
+  { "id": "broken-entry" }
+]

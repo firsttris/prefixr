@@ -1,0 +1,22 @@
+{
+  // Written by Amazon's packaging tool, JSON5 at times.
+  "SchemaVersion": "2",
+  "Main": {
+    "Command": "Binaries\\Win64\\ExampleQuest.exe",
+    "Args": ["-EpicPortal", "--lang=en"],
+    "WorkingSubdirOverride": "Binaries\\Win64",
+  },
+  /* Run once after the install. */
+  "PostInstall": [
+    {
+      "Command": "Prereqs\\vc_redist.x64.exe",
+      "Args": ["/install", "/quiet", "/norestart"],
+      "ValidReturns": [0, 1638, 3010],
+    },
+    {
+      "Command": "Prereqs\\DirectX\\DXSETUP.exe",
+      "Args": ["/silent", "/path:C:\\Program Files\\Example"],
+    },
+    { "Command": "  ", "Args": [] },
+  ],
+}

@@ -1,0 +1,5 @@
+WARNING [CLI]:	 There was an error getting sdk
+INFO [AUTH_MANAGER]:	 Registerring a device. ID: 3135
+INFO [AUTH_MANAGER]:	 Succesfully registered a device
+INFO [AUTH_MANAGER]:	 Written data to the config
+INFO [LIBRARY]:	 Syncing library

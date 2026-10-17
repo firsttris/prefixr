@@ -5,11 +5,10 @@
 //! — and leaves the store's own protocol to a command line tool that's made
 //! for it (`helpers`): logging in, listing the account's games, downloading
 //! and installing them, and the account's arguments every launch of an
-//! online game needs. Each store is a module of its own (`epic`); what the
-//! frontend sees is the same for all of them.
-//!
-//! Only Epic is supported so far. GOG (gogdl) and Amazon (Nile) would add a
-//! `StoreKind` variant, a module next to `epic` and their pinned tool.
+//! online game needs. Each store is a module of its own (`epic`, `gog`,
+//! `amazon`); what the frontend sees is the same for all of them. Another
+//! store would add a `StoreKind` variant, a module next to these and its
+//! pinned tool.
 
 use std::collections::HashMap;
 use std::fs;
@@ -38,10 +37,12 @@ use crate::host_env::xdg_open;
 use crate::lock::LockExt;
 use crate::models::{Game, PrefixInfo, StoreKind, StoreLink};
 
+pub mod amazon;
 pub mod epic;
 pub mod gog;
 pub mod helpers;
 
+use amazon::Nile;
 use epic::Legendary;
 use gog::Gogdl;
 
@@ -84,6 +85,8 @@ pub struct StoreAccount {
     pub tool_version: String,
     /// Where the tool's source is (it's GPL-3.0, like Prefixr).
     pub tool_source_url: String,
+    /// Whether the tool runs on the system's Python 3.
+    pub tool_needs_python: bool,
 }
 
 /// Sizes in bytes, as far as the store tells them.
@@ -177,6 +180,7 @@ fn tool(store: StoreKind) -> &'static helpers::Helper {
     match store {
         StoreKind::Epic => &helpers::LEGENDARY,
         StoreKind::Gog => &helpers::GOGDL,
+        StoreKind::Amazon => &helpers::NILE,
     }
 }
 
@@ -208,6 +212,26 @@ async fn gogdl(app: &AppHandle) -> Result<Gogdl, AppError> {
         binary,
         config_dir: store_dir(app, StoreKind::Gog)?.join("gogdl"),
     })
+}
+
+/// Nile's config folder, apart from any Nile or Heroic of the user's.
+fn nile_config_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(store_dir(app, StoreKind::Amazon)?.join("nile-config"))
+}
+
+/// Nile, downloaded first if needed.
+async fn nile(app: &AppHandle) -> Result<Nile, AppError> {
+    let binary = helpers::ensure(app, &helpers::NILE).await?;
+    Ok(Nile {
+        binary,
+        config_dir: nile_config_dir(app)?,
+    })
+}
+
+/// The login Nile prepared in `open_store_login`, until `connect_store`
+/// finishes it.
+fn amazon_login_request_file(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(store_dir(app, StoreKind::Amazon)?.join("login-request.json"))
 }
 
 /// The GOG login's access token, refreshed by gogdl when it expired.
@@ -257,6 +281,7 @@ fn command_failed(store: StoreKind, message: String) -> AppError {
     let needs_login = match store {
         StoreKind::Epic => epic::needs_login(&message),
         StoreKind::Gog => false,
+        StoreKind::Amazon => amazon::needs_login(&message),
     };
     if needs_login {
         return AppError::StoreNotConnected {
@@ -405,6 +430,14 @@ async fn account_name(app: &AppHandle, store: StoreKind) -> Result<Option<String
                 .unwrap_or_else(|| store.display_name().to_string());
             Ok(Some(name))
         }
+        StoreKind::Amazon => {
+            // Read without Nile: after an update to a newer Nile, the login
+            // stays valid while the new version isn't downloaded yet.
+            let path = amazon::files_dir(&nile_config_dir(app)?).join("current_user.json");
+            Ok(fs::read_to_string(path)
+                .ok()
+                .and_then(|raw| amazon::parse_current_user(&raw)))
+        }
     }
 }
 
@@ -419,6 +452,7 @@ async fn store_account(app: &AppHandle, store: StoreKind) -> Result<StoreAccount
         tool_name: tool.display_name.to_string(),
         tool_version: tool.version.to_string(),
         tool_source_url: tool.source_url.to_string(),
+        tool_needs_python: tool.needs_python,
     })
 }
 
@@ -444,6 +478,24 @@ pub async fn open_store_login(app: AppHandle, store: StoreKind) -> Result<(), Ap
         StoreKind::Gog => {
             gogdl(&app).await?;
             xdg_open(gog::LOGIN_URL).await?;
+        }
+        // Amazon's login address is made for this one login (it carries a
+        // code challenge), so Nile prepares it, and what `register` needs
+        // to finish it later is kept until then.
+        StoreKind::Amazon => {
+            let nile = nile(&app).await?;
+            let (json, stderr) = nile
+                .output(["auth", "--login", "--non-interactive"])
+                .await
+                .map_err(|e| command_failed(store, e))?;
+            let request = amazon::parse_login_request(&json)
+                .map_err(|e| command_failed(store, amazon::error_message(&stderr).unwrap_or(e)))?;
+            let path = amazon_login_request_file(&app)?;
+            write_private(
+                &path,
+                &serde_json::to_vec(&request).map_err(|e| e.to_string())?,
+            )?;
+            xdg_open(&request.url).await?;
         }
     }
     Ok(())
@@ -481,6 +533,48 @@ pub async fn connect_store(
             let profile = format!("https://users.gog.com/users/{}", credentials.user_id);
             if let Ok(json) = gog_get(&profile, &credentials.access_token).await {
                 let _ = fs::write(gog_account_file(&app)?, json);
+            }
+        }
+        StoreKind::Amazon => {
+            let code = amazon::auth_code(&code).ok_or(AppError::StoreInvalidAuthCode)?;
+            let request_path = amazon_login_request_file(&app)?;
+            // Without the request the code was made for, it's of no use:
+            // the login has to start over from the button.
+            let request = fs::read(&request_path)
+                .ok()
+                .and_then(|raw| serde_json::from_slice::<amazon::LoginRequest>(&raw).ok())
+                .ok_or(AppError::StoreLoginFailed)?;
+            let nile = nile(&app).await?;
+            // Nile's exit code says little here: a refused code still runs
+            // its library sync, which then crashes (exit 1), and a sync
+            // failing after a good login crashes too. Whether the login
+            // files exist afterwards is what counts.
+            let output = nile
+                .command(amazon::register_args(&request, &code))
+                .output()
+                .await
+                .map_err(|e| format!("Could not run Nile: {e}"))?;
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let logged_in = fs::read_to_string(nile.files_dir().join("current_user.json"))
+                .ok()
+                .and_then(|raw| amazon::parse_current_user(&raw))
+                .is_some();
+            match amazon::register_outcome(logged_in, &stderr) {
+                amazon::RegisterOutcome::Connected => {
+                    let _ = fs::remove_file(&request_path);
+                }
+                // A refused code is used up; the next try needs a new login.
+                amazon::RegisterOutcome::Refused => {
+                    let _ = fs::remove_file(&request_path);
+                    return Err(AppError::StoreLoginFailed);
+                }
+                // Amazon not reached: the same code may still work.
+                amazon::RegisterOutcome::Failed(message) => {
+                    return Err(command_failed(
+                        store,
+                        message.unwrap_or_else(|| format!("Nile exited with {}", output.status)),
+                    ));
+                }
             }
         }
     }
@@ -530,6 +624,22 @@ pub async fn disconnect_store(
             let dir = store_dir(&app, store)?;
             let _ = fs::remove_file(dir.join("gogdl").join("auth.json"));
             let _ = fs::remove_file(gog_account_file(&app)?);
+        }
+        StoreKind::Amazon => {
+            // Deregistering the device is a courtesy to Amazon; the login is
+            // gone either way, as its files are deleted after.
+            let config_dir = nile_config_dir(&app)?;
+            if let Some(binary) = helpers::installed(&app, &helpers::NILE) {
+                let nile = Nile {
+                    binary,
+                    config_dir: config_dir.clone(),
+                };
+                let _ = nile.output(["auth", "--logout"]).await;
+            }
+            for path in amazon::login_files(&amazon::files_dir(&config_dir)) {
+                let _ = fs::remove_file(path);
+            }
+            let _ = fs::remove_file(amazon_login_request_file(&app)?);
         }
     }
     let entries = read_library(&app, store);
@@ -594,6 +704,7 @@ fn cover_url_allowed(store: StoreKind, url: &str) -> bool {
     match store {
         StoreKind::Epic => epic::is_epic_image_url(url),
         StoreKind::Gog => gog::is_gog_image_url(url),
+        StoreKind::Amazon => amazon::is_amazon_image_url(url),
     }
 }
 
@@ -615,6 +726,21 @@ pub async fn sync_store_library(
             epic::parse_library(&json)?
         }
         StoreKind::Gog => gog_library(&app).await?,
+        StoreKind::Amazon => {
+            let nile = nile(&app).await?;
+            let (_, stderr) = nile
+                .output(amazon::library_sync_args())
+                .await
+                .map_err(|e| command_failed(store, e))?;
+            match fs::read_to_string(nile.files_dir().join("library.json")) {
+                Ok(json) => amazon::parse_library(&json)?,
+                // Nile logs a failed sync but exits with 0.
+                Err(_) => match amazon::error_message(&stderr) {
+                    Some(message) => return Err(command_failed(store, message)),
+                    None => Vec::new(),
+                },
+            }
+        }
     };
     write_library(&app, store, &entries)?;
     cache_covers(&app, store, &entries).await;
@@ -673,12 +799,14 @@ async fn gog_library(app: &AppHandle) -> Result<Vec<StoreLibraryEntry>, AppError
     Ok(entries)
 }
 
-/// `~/Games/Epic` or `~/Games/GOG`, for a store's first install.
+/// `~/Games/Epic`, `~/Games/GOG` or `~/Games/Amazon`, for a store's first
+/// install.
 fn default_install_dir(store: StoreKind) -> Option<PathBuf> {
     let home = std::env::var_os("HOME")?;
     let folder = match store {
         StoreKind::Epic => "Epic",
         StoreKind::Gog => "GOG",
+        StoreKind::Amazon => "Amazon",
     };
     Some(PathBuf::from(home).join("Games").join(folder))
 }
@@ -718,6 +846,14 @@ pub async fn get_store_install_defaults(
                 .ok()
                 .and_then(|json| gog::parse_info(&json).ok())
                 .map(|plan| plan.sizes)
+                .unwrap_or_default()
+        }
+        StoreKind::Amazon => {
+            let nile = nile(&app).await?;
+            nile.output(["install", "--info", "--json", app_name.as_str()])
+                .await
+                .ok()
+                .and_then(|(json, _)| amazon::parse_install_info(&json).ok())
                 .unwrap_or_default()
         }
     };
@@ -979,6 +1115,7 @@ async fn install(
             // (not enough disk space, say), having logged why.
             epic::parse_installed(&json, &app_name)?.ok_or_else(|| {
                 install_failed(
+                    store,
                     &log_path,
                     format!("{app_name} is not installed after the install finished"),
                 )
@@ -986,6 +1123,18 @@ async fn install(
         }
         StoreKind::Gog => {
             install_gog(
+                app,
+                &app_name,
+                &install_dir,
+                &log_path,
+                installs,
+                &key,
+                &emit,
+            )
+            .await?
+        }
+        StoreKind::Amazon => {
+            install_amazon(
                 app,
                 &app_name,
                 &install_dir,
@@ -1081,6 +1230,7 @@ async fn install_gog(
     // outside, say); a finished install has the game's info file.
     let info = fs::read_to_string(&info_path).map_err(|_| {
         install_failed(
+            StoreKind::Gog,
             log_path,
             format!("{} is missing after the install", info_path.display()),
         )
@@ -1130,6 +1280,52 @@ async fn install_gog(
         install_path: game_dir,
         exe_path: launch.exe_path,
         prerequisites,
+    })
+}
+
+/// Installs an Amazon game; what it starts and what to install first are in
+/// its `fuel.json`.
+async fn install_amazon(
+    app: &AppHandle,
+    app_name: &str,
+    install_dir: &Path,
+    log_path: &Path,
+    installs: &StoreInstalls,
+    key: &(StoreKind, String),
+    emit: &(dyn Fn(f64) + Sync),
+) -> Result<epic::InstalledGame, AppError> {
+    let nile = nile(app).await?;
+    run_install(
+        nile.command(amazon::install_args(app_name, install_dir)),
+        "Nile",
+        log_path,
+        installs,
+        key,
+        emit,
+    )
+    .await?;
+    // Nile also exits with 0 when it gave up (not enough disk space, say);
+    // a finished install is listed in its `installed.json`.
+    let installed = fs::read_to_string(nile.files_dir().join("installed.json"))
+        .ok()
+        .and_then(|json| amazon::parse_installed(&json, app_name).ok().flatten());
+    let Some(game_dir) = installed else {
+        return Err(install_failed(
+            StoreKind::Amazon,
+            log_path,
+            format!("{app_name} is not installed after the install finished"),
+        ));
+    };
+    let fuel_path = game_dir.join("fuel.json");
+    let fuel = fs::read_to_string(&fuel_path)
+        .map_err(|e| format!("Could not read {}: {e}", fuel_path.display()))
+        .and_then(|raw| amazon::parse_fuel(&raw))?;
+    let exe_path = amazon::fuel_exe(&fuel, &game_dir)
+        .ok_or_else(|| format!("{} names no executable", fuel_path.display()))?;
+    Ok(epic::InstalledGame {
+        install_path: game_dir,
+        exe_path,
+        prerequisites: amazon::post_install(&fuel),
     })
 }
 
@@ -1196,6 +1392,7 @@ async fn run_install(
     ensure_not_cancelled(installs, key)?;
     if !status.success() {
         return Err(install_failed(
+            key.0,
             log_path,
             format!("{tool_name} exited with {status}"),
         ));
@@ -1217,10 +1414,15 @@ fn ensure_not_cancelled(
 
 /// An install that failed, with the error the tool logged (or `fallback`)
 /// and the log to read the rest in.
-fn install_failed(log_path: &Path, fallback: String) -> AppError {
+fn install_failed(store: StoreKind, log_path: &Path, fallback: String) -> AppError {
     let log_text = fs::read_to_string(log_path).unwrap_or_default();
+    // Legendary and gogdl log `[cli] ERROR: …`, Nile `ERROR [CLI]: …`.
+    let logged = match store {
+        StoreKind::Epic | StoreKind::Gog => epic::error_message(&log_text),
+        StoreKind::Amazon => amazon::error_message(&log_text),
+    };
     AppError::StoreInstallFailed {
-        message: epic::error_message(&log_text).unwrap_or(fallback),
+        message: logged.unwrap_or(fallback),
         log_path: log_path.display().to_string(),
     }
 }
@@ -1295,6 +1497,25 @@ pub async fn uninstall_store_game(
                     let _ = fs::remove_file(manifests.join(file_safe(&link.app_name)));
                 }
             }
+            StoreKind::Amazon => {
+                let nile = nile(&app).await?;
+                // Nile deletes the files its manifest lists. A game it no
+                // longer knows (removed by hand) just leaves the library.
+                let known = fs::read_to_string(nile.files_dir().join("installed.json"))
+                    .ok()
+                    .and_then(|json| amazon::parse_installed(&json, &link.app_name).ok())
+                    .flatten()
+                    .is_some();
+                if known {
+                    let (_, stderr) = nile
+                        .output(["uninstall", link.app_name.as_str()])
+                        .await
+                        .map_err(|e| command_failed(link.store, e))?;
+                    if let Some(message) = amazon::error_message(&stderr) {
+                        return Err(command_failed(link.store, message));
+                    }
+                }
+            }
         }
     }
     remove_game(app.clone(), state, launching, id)
@@ -1331,7 +1552,43 @@ pub async fn launch_command(app: &AppHandle, link: &StoreLink) -> Result<StoreLa
                 .map_err(|e| format!("Could not read {}: {e}", path.display()))?;
             Ok(gog::parse_play_task(&info, dir)?)
         }
+        // No tokens either; the game reads its entitlement from the Amazon
+        // Games SDK's environment, which Nile names.
+        StoreKind::Amazon => {
+            let nile = nile(app).await?;
+            let (json, stderr) = nile
+                .output(amazon::launch_args(&link.app_name))
+                .await
+                .map_err(|e| command_failed(link.store, e))?;
+            let fuel = link
+                .install_path
+                .as_ref()
+                .and_then(|dir| fs::read_to_string(dir.join("fuel.json")).ok())
+                .and_then(|raw| amazon::parse_fuel(&raw).ok());
+            // A game Nile can't start (not installed, no fuel.json) gets no
+            // JSON, only the error it logged.
+            amazon::parse_launch(&json, fuel.as_ref()).map_err(|e| {
+                command_failed(link.store, amazon::error_message(&stderr).unwrap_or(e))
+            })
+        }
     }
+}
+
+/// Writes a file only its owner may read (a login in progress).
+fn write_private(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir).map_err(|e| format!("Could not create {}: {e}", dir.display()))?;
+    }
+    fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(path)
+        .and_then(|mut file| file.write_all(bytes))
+        .map_err(|e| format!("Could not save {}: {e}", path.display()))
 }
 
 /// Records that a store game's prerequisites ran, so later launches skip
