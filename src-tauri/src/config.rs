@@ -1,15 +1,17 @@
 use std::collections::HashSet;
 use std::fs;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use std::time::{Duration, SystemTime};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 use crate::commands::icons;
 use crate::commands::prefixes::effective_prefix_path;
+use crate::lock::LockExt;
 use crate::models::{
     Game, GitHubConfig, GraphicsConfig, MangoHudConfig, PerformanceConfig, PrefixInfo,
     ProtonConfig, SteamGridDbConfig,
@@ -207,7 +209,87 @@ pub fn save_config(app: &AppHandle, config: &AppConfig) -> Result<(), String> {
         file.sync_all()
     };
     write(&tmp).map_err(|e| format!("Could not write config file: {e}"))?;
-    fs::rename(&tmp, &path).map_err(|e| format!("Could not write config file: {e}"))
+    fs::rename(&tmp, &path).map_err(|e| format!("Could not write config file: {e}"))?;
+    if let Some(known) = app.try_state::<ConfigFileStamp>() {
+        known.set(FileStamp::of(&path));
+    }
+    Ok(())
+}
+
+/// When and how big `config.json` was, to tell a change by another process
+/// (the command line, a `--run` Prefixr) from this process's own writes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FileStamp {
+    modified: SystemTime,
+    len: u64,
+}
+
+impl FileStamp {
+    pub(crate) fn of(path: &Path) -> Option<Self> {
+        let metadata = fs::metadata(path).ok()?;
+        Some(Self {
+            modified: metadata.modified().ok()?,
+            len: metadata.len(),
+        })
+    }
+}
+
+/// `config.json` as this process last read or wrote it.
+#[derive(Default)]
+pub struct ConfigFileStamp(Mutex<Option<FileStamp>>);
+
+impl ConfigFileStamp {
+    fn get(&self) -> Option<FileStamp> {
+        *self.0.locked()
+    }
+
+    fn set(&self, stamp: Option<FileStamp>) {
+        *self.0.locked() = stamp;
+    }
+}
+
+/// How often the window's process looks for changes to `config.json`.
+const WATCH_INTERVAL: Duration = Duration::from_millis(500);
+
+/// Picks up changes another process makes to `config.json` — the command
+/// line adding a game, say — while the window is open, and tells the
+/// frontend with `config-changed`. Without this, the window's next save would
+/// write its older copy over them.
+///
+/// A file that can't be read (a hand edit in progress) is skipped until it
+/// changes again; the window keeps what it has.
+pub fn watch_config_file(app: &AppHandle) {
+    let Ok(path) = config_file_path(app) else {
+        return;
+    };
+    app.state::<ConfigFileStamp>().set(FileStamp::of(&path));
+    let app = app.clone();
+    std::thread::spawn(move || loop {
+        std::thread::sleep(WATCH_INTERVAL);
+        let known = app.state::<ConfigFileStamp>();
+        let current = FileStamp::of(&path);
+        if current == known.get() {
+            continue;
+        }
+        let loaded = load_config(&app);
+        // In the same order as `save_config` takes them: the config, then
+        // the stamp.
+        let state = app.state::<ConfigState>();
+        let mut config = state.locked();
+        // Checked again while no save of this process's own can happen: one
+        // since the check above already took the file as it is now, and a
+        // file that changed once more is read again on the next round.
+        let now = FileStamp::of(&path);
+        if now == known.get() || now != current {
+            continue;
+        }
+        known.set(current);
+        if let Ok(loaded) = loaded {
+            *config = loaded;
+            drop(config);
+            let _ = app.emit("config-changed", ());
+        }
+    });
 }
 
 #[cfg(test)]

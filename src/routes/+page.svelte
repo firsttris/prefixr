@@ -23,6 +23,7 @@
     takePendingLaunch,
     listenForPendingLaunch,
   } from "$lib/stores/games";
+  import { listenForConfigChanges } from "$lib/stores/library";
   import type { Game } from "$lib/types";
 
   type View =
@@ -68,6 +69,7 @@
         launchGame(gameId);
       }),
       listenForPendingInstall((exePath) => (installingExePath = exePath)),
+      listenForConfigChanges(),
     ]);
     listeners.then(takePending);
     return () => {

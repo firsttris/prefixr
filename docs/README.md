@@ -12,6 +12,8 @@ Also as a website with search: **https://firsttris.github.io/prefixr/**
   installers, prefixes, runners, the per-game settings, artwork, Steam and the tray.
 - **[Configuration & files](configuration.md)**: where Prefixr keeps its data, the command-line
   options, the API keys it can use, and what a launch sets up.
+- **[Command line & AI agents](cli.md)**: manage the library, prefixes and runners from a
+  terminal or a script, and let an AI agent such as Claude Code set up your games.
 - **[Troubleshooting & FAQ](troubleshooting.md)**: what to do when a game doesn't start or the app
   misbehaves, plus answers to common questions.
 

@@ -362,8 +362,18 @@ pub async fn kill_running_game(running: &RunningGames, id: Uuid) -> Result<(), S
     if let Some(pid) = game.pid {
         kill_process_tree(pid).await;
     }
+    end_game_session(&game.wineserver, &game.wineprefix, &game.exe_path).await
+}
 
-    let exe_path = game.exe_path.to_string_lossy();
+/// Steps 2 and 3 of `kill_running_game`, which need nothing from the process
+/// that started the game: also how `prefixr game stop` ends a game another
+/// Prefixr process launched.
+pub async fn end_game_session(
+    wineserver: &Path,
+    wineprefix: &str,
+    exe_path: &Path,
+) -> Result<(), String> {
+    let exe_path = exe_path.to_string_lossy();
     // umu-run's command line is `<python> .../umu/umu-run <exe> <args...>`.
     let umu_signalled = runner_command(Path::new("pkill"), [])
         .args(["-TERM", "-f"])
@@ -375,11 +385,10 @@ pub async fn kill_running_game(running: &RunningGames, id: Uuid) -> Result<(), S
         tokio::time::sleep(KILL_GRACE_PERIOD).await;
     }
 
-    let wineserver_result =
-        runner_command(&game.wineserver, [("WINEPREFIX", game.wineprefix.as_str())])
-            .arg("-k9")
-            .status()
-            .await;
+    let wineserver_result = runner_command(wineserver, [("WINEPREFIX", wineprefix)])
+        .arg("-k9")
+        .status()
+        .await;
 
     let pkill_result = runner_command(Path::new("pkill"), [])
         .args(["-9", "-f"])
@@ -493,34 +502,6 @@ pub async fn run_installer(
     runner_id: String,
     exe_path: String,
 ) -> Result<InstallerResult, AppError> {
-    let (runners_dir, prefix) = {
-        let config = state.locked();
-        (
-            config.runners_dir.clone(),
-            known_prefix(&config, &prefix_path)?,
-        )
-    };
-    let token = read_token(&state);
-
-    let runner = find_runner(&runners_dir, &runner_id)?;
-    let log_path = new_log_file(&prefix_log_dir(&app, &prefix)?)?;
-    let log_path_string = log_path.display().to_string();
-
-    let prepared = prepare_prefix(&app, token.as_deref(), &runner, &prefix, &log_path, &|| {})
-        .await
-        .map_err(|e| AppError::WithLogDetails {
-            message: e,
-            log_path: log_path_string.clone(),
-        })?;
-    let exe = PathBuf::from(&exe_path);
-    let mut command = runner_command(&prepared.binary, env_pairs(&prepared.env));
-    command.arg(&exe);
-    // Installers commonly expect to run from their own directory (sibling
-    // data files, relative paths) — mirrors how a user would run it by hand.
-    if let Some(parent) = exe.parent() {
-        command.current_dir(parent);
-    }
-
     // Captured before the installer runs, so the shortcut scan below only
     // picks up files it actually created (or touched) just now, not
     // pre-existing shortcuts from an earlier install into the same prefix.
@@ -529,8 +510,64 @@ pub async fn run_installer(
     // non-zero code on perfectly successful installs (e.g. "reboot
     // recommended"), so a shortcut having appeared is a more reliable
     // success signal than the process's own exit code.
+    let ran = run_in_prefix(&app, &state, &prefix_path, &runner_id, &exe_path, &[]).await?;
+    Ok(InstallerResult {
+        shortcuts: find_recently_created_shortcuts(&ran.prefix, started_at),
+        log_path: ran.log_path.display().to_string(),
+    })
+}
+
+/// A program `run_in_prefix` ran to its end.
+pub(crate) struct PrefixRun {
+    pub prefix: PathBuf,
+    pub log_path: PathBuf,
+    pub status: std::process::ExitStatus,
+}
+
+/// Runs `program` with `args` in a known prefix under a runner and waits for
+/// it, its output going to a log of the prefix. `program` is an exe's path,
+/// or the name of one of Wine's builtin programs (`regedit`, `cmd`, …). The
+/// prefix is readied first exactly as for a game (see `prepare_prefix`),
+/// since an installer is often the first thing to run in a fresh one.
+pub(crate) async fn run_in_prefix(
+    app: &AppHandle,
+    state: &State<'_, ConfigState>,
+    prefix_path: &str,
+    runner_id: &str,
+    program: &str,
+    args: &[String],
+) -> Result<PrefixRun, AppError> {
+    let (runners_dir, prefix) = {
+        let config = state.locked();
+        (
+            config.runners_dir.clone(),
+            known_prefix(&config, prefix_path)?,
+        )
+    };
+    let token = read_token(state);
+
+    let runner = find_runner(&runners_dir, runner_id)?;
+    let log_path = new_log_file(&prefix_log_dir(app, &prefix)?)?;
+    let log_path_string = log_path.display().to_string();
+
+    let prepared = prepare_prefix(app, token.as_deref(), &runner, &prefix, &log_path, &|| {})
+        .await
+        .map_err(|e| AppError::WithLogDetails {
+            message: e,
+            log_path: log_path_string.clone(),
+        })?;
+    let exe = PathBuf::from(program);
+    let mut command = runner_command(&prepared.binary, env_pairs(&prepared.env));
+    command.arg(&exe).args(args);
+    // Installers commonly expect to run from their own directory (sibling
+    // data files, relative paths) — mirrors how a user would run it by hand.
+    // A builtin's bare name has no directory.
+    if let Some(parent) = exe.parent().filter(|parent| parent.is_dir()) {
+        command.current_dir(parent);
+    }
+
     let (out, err) = log_stdio(&log_path)?;
-    command
+    let status = command
         .stdin(Stdio::null())
         .stdout(out)
         .stderr(err)
@@ -538,12 +575,13 @@ pub async fn run_installer(
         .await
         .map_err(|e| AppError::SetupLaunchFailed {
             error: e.to_string(),
-            log_path: log_path_string.clone(),
+            log_path: log_path_string,
         })?;
 
-    Ok(InstallerResult {
-        shortcuts: find_recently_created_shortcuts(&prefix, started_at),
-        log_path: log_path.display().to_string(),
+    Ok(PrefixRun {
+        prefix,
+        log_path,
+        status,
     })
 }
 

@@ -1,3 +1,4 @@
+mod cli;
 mod commands;
 mod config;
 mod env;
@@ -46,7 +47,7 @@ use commands::wine_tools::launch_wine_tool;
 use commands::winetricks::{
     install_winetricks_verbs, list_all_winetricks_verbs, list_installed_winetricks_verbs,
 };
-use config::load_config;
+use config::{load_config, watch_config_file, ConfigFileStamp};
 use locale::LocaleState;
 use lock::LockExt;
 use tray::{
@@ -104,6 +105,12 @@ fn find_flag_arg(args: &[String], flag: &str) -> Option<String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let args: Vec<String> = std::env::args().collect();
+    // Generated once: it embeds the frontend, which a second expansion would
+    // put into the binary twice.
+    let context = tauri::generate_context!();
+    if cli::is_cli(&args) {
+        cli::run(&args, context);
+    }
     let run_game_id = find_run_arg(&args);
 
     let mut builder = tauri::Builder::default();
@@ -185,6 +192,7 @@ pub fn run() {
                 }
             };
             app.manage(std::sync::Mutex::new(config));
+            app.manage(ConfigFileStamp::default());
             app.manage(PendingLaunch(std::sync::Mutex::new(find_launch_arg(&args))));
             app.manage(PendingInstall(std::sync::Mutex::new(find_install_arg(
                 &args,
@@ -203,6 +211,7 @@ pub fn run() {
             for window in app.config().app.windows.clone() {
                 WebviewWindowBuilder::from_config(app.handle(), &window)?.build()?;
             }
+            watch_config_file(app.handle());
             check_tray_host(app.handle());
             setup_tray(app.handle())?;
             // Best-effort: a file manager's "Öffnen mit" context menu working
@@ -303,7 +312,7 @@ pub fn run() {
             search_umu_ids,
             set_ui_locale
         ])
-        .run(tauri::generate_context!())
+        .run(context)
         .expect("error while running tauri application");
 }
 
