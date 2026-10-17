@@ -69,7 +69,7 @@
   "gameList_steam_confirmActionRemove": "remove “{name}”",
   "gameList_steam_confirmButton": "Restart Steam",
   "gameCard_running": "Running",
-  "gameCard_notes": "Notes",
+  "gameCard_menuShowNotes": "Show notes",
   "notesDialog_title": "Notes – {name}",
   "notesDialog_edit": "Edit",
   "gameCard_initializing": "Starting…",
