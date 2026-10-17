@@ -37,7 +37,7 @@ Each game shows its SteamGridDB cover if you picked one, otherwise the icon from
 the Wine session for a Wine game. Use it when a game hangs. It is the same as closing a game the
 hard way, so unsaved progress is lost.
 
-The **⋮** menu on a card (in the list view, the 🔗 button plus the buttons next to it) has:
+The **⋮** menu on a card or in a list row (where editing, artwork and removing also have buttons of their own) has:
 
 - **Show notes**: only for a game with notes; see [Adding and editing games](#adding-and-editing-games).
 - **Select artwork**: see [Artwork](#artwork).
@@ -60,7 +60,7 @@ The **⋮** menu on a card (in the list view, the 🔗 button plus the buttons n
 | **Runner** | Proton or Wine build to run it with. See [Runners](#runners). |
 | **Environment variables** | `KEY=VALUE`, one per line. These win over every switch in the other tabs. `WINEDLLOVERRIDES` and `LD_PRELOAD` are added to what Prefixr sets, not replaced. |
 | **Launch arguments** | Passed to the game's `.exe`, for example `--launcher-skip -dx11`. Quote arguments with spaces: `-path "C:\My Game"`. |
-| **Notes** | Anything worth remembering about the game: an offline login, why a setting is needed, where its config file lives. **Show notes** in the game's **⋮** menu opens them to read in full, copy from, or go on to edit. They're stored as plain text in `config.json`, so keep real passwords out. |
+| **Notes** (own tab) | Anything worth remembering about the game: an offline login, why a setting is needed, where its config file lives. **Show notes** in the game's **⋮** menu opens them to read in full, copy from, or go on to edit. A line ending in `:` shows as a heading, lines starting with `- ` as a list. They're stored as plain text in `config.json`, so keep real passwords out. |
 
 The other tabs (**Performance**, **Graphics**, **Overlay**, and **Proton** for a Proton runner)
 override the global settings for this game only. See [Game settings](#game-settings).

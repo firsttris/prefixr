@@ -1,5 +1,6 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
+  import { parseNotes } from "$lib/notes";
   import type { Game } from "$lib/types";
   import Modal from "./Modal.svelte";
 
@@ -13,11 +14,32 @@
     onClose: () => void;
     onEdit: (game: Game) => void;
   } = $props();
+
+  let blocks = $derived(game ? parseNotes(game.notes) : []);
 </script>
 
-<Modal open={game !== null} title={game ? m.notesDialog_title({ name: game.name }) : ""} {onClose}>
+<Modal
+  open={game !== null}
+  title={game ? m.notesDialog_title({ name: game.name }) : ""}
+  wide
+  {onClose}
+>
   {#if game}
-    <p class="notes">{game.notes}</p>
+    <div class="notes">
+      {#each blocks as block, i (i)}
+        {#if block.kind === "heading"}
+          <h4>{block.text}</h4>
+        {:else if block.kind === "list"}
+          <ul>
+            {#each block.items as item, j (j)}
+              <li>{item}</li>
+            {/each}
+          </ul>
+        {:else}
+          <p>{block.text}</p>
+        {/if}
+      {/each}
+    </div>
     <div class="actions">
       <button type="button" class="ghost" onclick={onClose}>{m.common_close()}</button>
       <button type="button" class="primary" onclick={() => onEdit(game)}>
@@ -28,17 +50,43 @@
 </Modal>
 
 <style>
-  /* Kept as written, line breaks included, and selectable, so a login in
-     the notes can be copied. */
+  /* Selectable, so a login in the notes can be copied. */
   .notes {
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
     user-select: text;
     -webkit-user-select: text;
-    line-height: 1.5;
-    margin-bottom: 1.2em;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
     max-height: 60vh;
     overflow-y: auto;
+    margin-bottom: 1.2em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6em;
+  }
+
+  .notes p {
+    white-space: pre-wrap;
+  }
+
+  .notes h4 {
+    margin-top: 0.6em;
+    font-size: 0.8em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+  }
+
+  .notes h4:first-child {
+    margin-top: 0;
+  }
+
+  .notes ul {
+    margin: 0;
+    padding-left: 1.2em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35em;
   }
 
   .actions {

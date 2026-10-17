@@ -2,7 +2,7 @@
   import * as m from "$lib/paraglide/messages";
   import { onMount } from "svelte";
   import GameList from "$lib/components/GameList.svelte";
-  import GameForm from "$lib/components/GameForm.svelte";
+  import GameForm, { type GameFormTab } from "$lib/components/GameForm.svelte";
   import RunnerList from "$lib/components/RunnerList.svelte";
   import PrefixManager from "$lib/components/PrefixManager.svelte";
   import PerformanceSettings from "$lib/components/PerformanceSettings.svelte";
@@ -47,6 +47,7 @@
     { view: "proton", label: () => m.nav_proton() },
   ];
   let editing = $state<Game | "new" | null>(null);
+  let editingTab = $state<GameFormTab | undefined>(undefined);
   let pickingArtworkFor = $state<Game | null>(null);
   let installingExePath = $state<string | null>(null);
   let installerRunning = $state(false);
@@ -181,14 +182,27 @@
             </p>
           {/if}
         </div>
-        <button type="button" class="primary" onclick={() => (editing = "new")}>
+        <button
+          type="button"
+          class="primary"
+          onclick={() => {
+            editingTab = undefined;
+            editing = "new";
+          }}
+        >
           {m.library_addGame()}
         </button>
       </div>
       <GameList
-        onEdit={(game) => (editing = game)}
+        onEdit={(game, tab) => {
+          editingTab = tab;
+          editing = game;
+        }}
         onEditArtwork={(game) => (pickingArtworkFor = game)}
-        onAddNew={() => (editing = "new")}
+        onAddNew={() => {
+          editingTab = undefined;
+          editing = "new";
+        }}
       />
     {:else if view === "prefixes"}
       <div class="page-header">
@@ -218,7 +232,7 @@
 </div>
 
 <Modal open={editing !== null} title={modalTitle} wide onClose={() => (editing = null)}>
-  <GameForm existingGame={modalGame} onSuccess={() => (editing = null)} />
+  <GameForm existingGame={modalGame} initialTab={editingTab} onSuccess={() => (editing = null)} />
 </Modal>
 
 <Modal
