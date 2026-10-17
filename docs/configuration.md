@@ -68,6 +68,7 @@ Your prefixes live wherever you created or found them; Prefixr only remembers th
 | `prefixr --launch <game-id>` | Starts the game. If Prefixr is already open, that window starts it instead. Desktop and menu shortcuts use this. |
 | `prefixr --run <game-id>` | Starts the game without any window and exits when the game does. A failure before the game starts is shown in a dialog. Steam uses this for games added to it. |
 | `prefixr --install <path/to/setup.exe>` | Opens the install dialog for that setup program. The *Install Prefixr* file-manager entry uses this. |
+| `prefixr game …`, `prefix …`, `runner …`, `umu …` | The command line: everything the window does, from a terminal or a script. See [Command line & AI agents](cli.md). |
 
 A game's ID is the `id` of its entry in `config.json`. It also appears in the `Exec=` line of the
 game's shortcuts.

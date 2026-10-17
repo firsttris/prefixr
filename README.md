@@ -53,9 +53,33 @@ you can reuse an existing prefix from any of them as it is.
 | 🚀 **Launching** | Proton games run through umu-launcher in the Steam Linux Runtime, with an automatic UMU ID lookup for protonfixes. Wine games get DXVK, VKD3D-Proton and wine-mono set up automatically. |
 | 🎛️ **Per-game tuning** | [MangoHud](https://github.com/flightlessmango/MangoHud) with presets, [GameMode](https://github.com/FeralInteractive/gamemode), power profiles, [Gamescope](https://github.com/ValveSoftware/gamescope), [vkBasalt](https://github.com/DadSchoorse/vkBasalt) and every `PROTON_*` switch your runner supports. Set them once globally, override them per game. |
 | 🖼️ **Artwork & Steam** | Covers, icons, heroes and logos from [SteamGridDB](https://www.steamgriddb.com/). Add any game to Steam as a non-Steam game, artwork included, so it shows up in Big Picture and Game Mode on the Steam Deck. |
+| ⌨️ **Command line** | Everything the window does is also a command: `prefixr game add`, `prefixr prefix winetricks`, `prefixr runner download` and more, with JSON output for scripts. An open window shows the changes right away. |
 | 🧰 **Everyday comfort** | Tray icon with the running games and a way to stop a hung one, logs of the last 10 runs per game and prefix, a `vm.max_map_count` check, English and German UI. |
 
 See the [user guide](https://firsttris.github.io/prefixr/user-guide.html) for a tour of every feature.
+
+## 🤖 Set up your games with an AI agent
+
+Prefixr's [command line](https://firsttris.github.io/prefixr/cli.html) lets an AI coding agent such
+as [Claude Code](https://claude.com/claude-code) do the tedious part for you. It can look at your
+game folders, add each game with the right runner and prefix, find its
+[protonfixes](https://github.com/Open-Wine-Components/umu-protonfixes) match, install winetricks
+packages, carry over the fixes from old launch scripts or other launchers, copy your save games and
+pick the artwork, while you start each game from the window and say whether it works.
+
+```text
+You:   Add all games under /mnt/games/LinuxRuleZ to Prefixr. Each one has its own Wine and a
+       start script; give them Proton-GE instead and keep the fixes from the scripts.
+Agent: prefixr runner download proton-ge
+       prefixr umu search "Fallout 4"
+       prefixr game add --name "Fallout 4" --exe ".../Fallout4.exe" --prefix ~/Games/prefixes/fallout4 \
+         --runner GE-Proton10-30 --umu-id 377160 --env DXVK_FRAME_RATE=58
+       prefixr game artwork "Fallout 4"
+       …
+```
+
+When a game doesn't start, the agent reads its log with `prefixr game log <game> --print` and fixes
+the setup. See [Setting up games with an AI agent](https://firsttris.github.io/prefixr/cli.html#setting-up-games-with-an-ai-agent).
 
 ## 📦 Installation
 
@@ -94,6 +118,7 @@ The documentation is also available as a website:
 | [Getting started](https://firsttris.github.io/prefixr/getting-started.html) | Install Prefixr and get your first game running |
 | [User guide](https://firsttris.github.io/prefixr/user-guide.html) | The library, prefixes, runners, per-game settings, artwork and Steam |
 | [Configuration & files](https://firsttris.github.io/prefixr/configuration.html) | Where Prefixr keeps its data, command-line options, API keys |
+| [Command line & AI agents](https://firsttris.github.io/prefixr/cli.html) | Every command, JSON output, and setting up games with an AI agent |
 | [Troubleshooting & FAQ](https://firsttris.github.io/prefixr/troubleshooting.html) | Common problems and how to fix them |
 | [Development](https://firsttris.github.io/prefixr/development.html) | Building from source, architecture, tests and releases |
 

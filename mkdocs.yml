@@ -25,6 +25,7 @@ nav:
       - Getting started: getting-started.md
       - User guide: user-guide.md
       - Configuration & files: configuration.md
+      - Command line & AI agents: cli.md
       - Troubleshooting & FAQ: troubleshooting.md
   - For contributors:
       - Development: development.md

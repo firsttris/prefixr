@@ -84,6 +84,7 @@ tests/                  Vitest tests
 src-tauri/
   src/
     lib.rs              App setup, single-instance handoff, command registration
+    cli.rs              The command line (`prefixr game …`), with its tests in cli/tests.rs
     commands/           One module per area, each with its tests in commands/<name>/tests.rs
     config.rs           Loading, migrating and atomically saving config.json
     models.rs           The persisted data model (games, settings)
@@ -117,12 +118,22 @@ src-tauri/
 `LockExt::locked()`, which also accepts a poisoned lock, and never hold it across an `.await`.
 Every change is saved to `config.json` with a write to a temporary file and a rename.
 
+**Command line.** `prefixr game …`, `prefix …`, `runner …` and `umu …` are parsed with
+[clap](https://docs.rs/clap) in `cli.rs`. They start the app without a window, as `--run` does, and
+call the same Tauri command functions the frontend invokes, passing `app.state()` for their
+`State` parameters, so there is no second implementation to keep in sync. Progress comes from the
+same events the frontend listens to. To add a command, add a variant to the matching subcommand
+enum and call the existing command function. The window's process watches `config.json`
+(`watch_config_file`): when another process changed it, the config is reloaded and the frontend gets
+`config-changed` and refreshes the library.
+
 **Errors.** Every command returns `AppError`, serialized as `{ code, ...fields }`. The frontend turns
 it into text with `backendError()`, so an error stays in the chosen language even after switching.
 `AppError::Other` carries text that stays untranslated, for technical failures.
 
 **Events.** Long-running work reports through events: `game-initializing`, `game-started`,
-`game-exited` and `game-launch-error` for launches, `runner-download-progress` and
+`game-exited` and `game-launch-error` for launches, `config-changed` when another process changed
+`config.json`, `runner-download-progress` and
 `runner-download-done` for downloads, and `pending-launch` and `pending-install` when a second
 instance hands its arguments over (see `tauri_plugin_single_instance` in `lib.rs`). The handed-over
 value waits in the backend until the frontend takes it, so it isn't lost before the page listens.
