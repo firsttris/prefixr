@@ -625,6 +625,7 @@ pub fn add_game(
         runner_id: game.runner_id,
         env_vars: game.env_vars,
         launch_args: game.launch_args,
+        notes: game.notes,
         icon,
         steamgriddb_id: None,
         cover_grid_id: None,
@@ -682,6 +683,7 @@ pub fn update_game(
     existing.runner_id = game.runner_id;
     existing.env_vars = game.env_vars;
     existing.launch_args = game.launch_args;
+    existing.notes = game.notes;
     (existing.umu_id, existing.umu_store) = umu_fields(game.umu_id, game.umu_store);
     existing.overrides = game.overrides;
     let updated = existing.clone();

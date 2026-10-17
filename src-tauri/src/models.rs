@@ -52,6 +52,11 @@ pub struct Game {
     /// launch time by `split_launch_args`.
     #[serde(default)]
     pub launch_args: String,
+    /// Free text the user (or an agent setting the game up) keeps with the
+    /// game: a crack's offline login, why an override is set, where a
+    /// setting lives. Only shown, never used for a launch.
+    #[serde(default)]
+    pub notes: String,
     /// The path of the exe's embedded icon, saved as a PNG (see
     /// `icons::exe_icon_path`), which the frontend loads through the asset
     /// protocol. Extracted once when the game is added/updated; `None` if
@@ -230,6 +235,8 @@ pub struct GameInput {
     pub env_vars: HashMap<String, String>,
     #[serde(default)]
     pub launch_args: String,
+    #[serde(default)]
+    pub notes: String,
     #[serde(default)]
     pub umu_id: Option<String>,
     #[serde(default)]
