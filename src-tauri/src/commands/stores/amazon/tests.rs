@@ -83,28 +83,41 @@ fn registers_with_what_the_login_request_carried() {
 }
 
 #[test]
-fn tells_whether_the_device_was_registered() {
-    // Nile exits with 0 whether or not Amazon took the code; only its log
-    // says (and spells it "Succesfully").
-    assert!(registered(include_str!("fixtures/register_ok.txt")));
-    let failed = include_str!("fixtures/register_failed.txt");
-    assert!(!registered(failed));
+fn a_login_counts_once_nile_wrote_it() {
+    // Registered; the library sync after it may still have failed.
     assert_eq!(
-        error_message(failed).as_deref(),
-        Some("Failed to register a device")
+        register_outcome(true, include_str!("fixtures/register_ok.txt")),
+        RegisterOutcome::Connected
+    );
+    assert_eq!(
+        register_outcome(true, include_str!("fixtures/register_crash.txt")),
+        RegisterOutcome::Connected
     );
 }
 
 #[test]
-fn reads_the_error_of_a_crash() {
+fn a_refused_code_is_a_failed_login() {
+    // What Nile prints when Amazon refuses the code: the error, then a
+    // crash of the library sync it runs anyway (exit code 1).
+    assert_eq!(
+        register_outcome(false, include_str!("fixtures/register_failed.txt")),
+        RegisterOutcome::Refused
+    );
+}
+
+#[test]
+fn amazon_out_of_reach_shows_why() {
     // The real output of Nile not reaching Amazon.
-    let crash = include_str!("fixtures/register_crash.txt");
-    assert!(!registered(crash));
-    let message = error_message(crash).unwrap();
+    let RegisterOutcome::Failed(Some(message)) =
+        register_outcome(false, include_str!("fixtures/register_crash.txt"))
+    else {
+        panic!("not a failure with a message");
+    };
     assert!(
         message.starts_with("HTTPSConnectionPool(host='api.amazon.com'"),
         "{message}"
     );
+    assert_eq!(register_outcome(false, ""), RegisterOutcome::Failed(None));
 }
 
 #[test]

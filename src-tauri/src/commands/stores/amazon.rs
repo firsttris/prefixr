@@ -169,11 +169,28 @@ pub fn register_args(request: &LoginRequest, code: &str) -> Vec<String> {
     ]
 }
 
-/// Whether `register` worked: Nile logs it (and exits with 0 when Amazon
-/// refused the code).
-pub fn registered(stderr: &str) -> bool {
-    stderr.contains("Succesfully registered a device")
-        || stderr.contains("Successfully registered a device")
+/// How a `register` ended.
+#[derive(Debug, PartialEq)]
+pub enum RegisterOutcome {
+    Connected,
+    /// Amazon refused the code (expired, used, or from another login).
+    Refused,
+    /// Amazon wasn't reached, or Nile failed otherwise; the error it logged.
+    Failed(Option<String>),
+}
+
+/// The outcome of `register` from whether Nile's login files exist after it
+/// (`logged_in`) and what it logged. A logged-in Nile counts as connected
+/// even when the library sync after the login crashed: the next sync
+/// catches up.
+pub fn register_outcome(logged_in: bool, stderr: &str) -> RegisterOutcome {
+    if logged_in {
+        RegisterOutcome::Connected
+    } else if stderr.contains("Failed to register a device") {
+        RegisterOutcome::Refused
+    } else {
+        RegisterOutcome::Failed(error_message(stderr))
+    }
 }
 
 /// Whether Nile failed for want of a login (`library sync` without one).

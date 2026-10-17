@@ -431,9 +431,8 @@ async fn account_name(app: &AppHandle, store: StoreKind) -> Result<Option<String
             Ok(Some(name))
         }
         StoreKind::Amazon => {
-            if helpers::installed(app, &helpers::NILE).is_none() {
-                return Ok(None);
-            }
+            // Read without Nile: after an update to a newer Nile, the login
+            // stays valid while the new version isn't downloaded yet.
             let path = amazon::files_dir(&nile_config_dir(app)?).join("current_user.json");
             Ok(fs::read_to_string(path)
                 .ok()
@@ -546,17 +545,36 @@ pub async fn connect_store(
                 .and_then(|raw| serde_json::from_slice::<amazon::LoginRequest>(&raw).ok())
                 .ok_or(AppError::StoreLoginFailed)?;
             let nile = nile(&app).await?;
-            let (_, stderr) = nile
-                .output(amazon::register_args(&request, &code))
+            // Nile's exit code says little here: a refused code still runs
+            // its library sync, which then crashes (exit 1), and a sync
+            // failing after a good login crashes too. Whether the login
+            // files exist afterwards is what counts.
+            let output = nile
+                .command(amazon::register_args(&request, &code))
+                .output()
                 .await
-                .map_err(|e| command_failed(store, e))?;
-            // A code is good for one try, right or wrong.
-            let _ = fs::remove_file(&request_path);
-            if !amazon::registered(&stderr) {
-                return Err(match amazon::error_message(&stderr) {
-                    Some(message) => command_failed(store, message),
-                    None => AppError::StoreLoginFailed,
-                });
+                .map_err(|e| format!("Could not run Nile: {e}"))?;
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let logged_in = fs::read_to_string(nile.files_dir().join("current_user.json"))
+                .ok()
+                .and_then(|raw| amazon::parse_current_user(&raw))
+                .is_some();
+            match amazon::register_outcome(logged_in, &stderr) {
+                amazon::RegisterOutcome::Connected => {
+                    let _ = fs::remove_file(&request_path);
+                }
+                // A refused code is used up; the next try needs a new login.
+                amazon::RegisterOutcome::Refused => {
+                    let _ = fs::remove_file(&request_path);
+                    return Err(AppError::StoreLoginFailed);
+                }
+                // Amazon not reached: the same code may still work.
+                amazon::RegisterOutcome::Failed(message) => {
+                    return Err(command_failed(
+                        store,
+                        message.unwrap_or_else(|| format!("Nile exited with {}", output.status)),
+                    ));
+                }
             }
         }
     }
@@ -610,15 +628,16 @@ pub async fn disconnect_store(
         StoreKind::Amazon => {
             // Deregistering the device is a courtesy to Amazon; the login is
             // gone either way, as its files are deleted after.
-            if let (Some(binary), Ok(config_dir)) = (
-                helpers::installed(&app, &helpers::NILE),
-                nile_config_dir(&app),
-            ) {
-                let nile = Nile { binary, config_dir };
+            let config_dir = nile_config_dir(&app)?;
+            if let Some(binary) = helpers::installed(&app, &helpers::NILE) {
+                let nile = Nile {
+                    binary,
+                    config_dir: config_dir.clone(),
+                };
                 let _ = nile.output(["auth", "--logout"]).await;
-                for path in amazon::login_files(&nile.files_dir()) {
-                    let _ = fs::remove_file(path);
-                }
+            }
+            for path in amazon::login_files(&amazon::files_dir(&config_dir)) {
+                let _ = fs::remove_file(path);
             }
             let _ = fs::remove_file(amazon_login_request_file(&app)?);
         }
