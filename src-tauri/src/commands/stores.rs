@@ -39,9 +39,11 @@ use crate::lock::LockExt;
 use crate::models::{Game, PrefixInfo, StoreKind, StoreLink};
 
 pub mod epic;
+pub mod gog;
 pub mod helpers;
 
 use epic::Legendary;
+use gog::Gogdl;
 
 /// A game of a store account, as listed by the store's tool.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -174,6 +176,7 @@ fn library_cache_path(dir: &Path) -> PathBuf {
 fn tool(store: StoreKind) -> &'static helpers::Helper {
     match store {
         StoreKind::Epic => &helpers::LEGENDARY,
+        StoreKind::Gog => &helpers::GOGDL,
     }
 }
 
@@ -198,9 +201,62 @@ fn legendary_if_installed(app: &AppHandle) -> Result<Option<Legendary>, String> 
     }))
 }
 
+/// gogdl, downloaded first if needed.
+async fn gogdl(app: &AppHandle) -> Result<Gogdl, AppError> {
+    let binary = helpers::ensure(app, &helpers::GOGDL).await?;
+    Ok(Gogdl {
+        binary,
+        config_dir: store_dir(app, StoreKind::Gog)?.join("gogdl"),
+    })
+}
+
+/// The GOG login's access token, refreshed by gogdl when it expired.
+async fn gog_credentials(gogdl: &Gogdl) -> Result<gog::Credentials, AppError> {
+    let json = gogdl
+        .output(["auth"])
+        .await
+        .map_err(|e| command_failed(StoreKind::Gog, e))?;
+    gog::parse_credentials(&json)?.ok_or(AppError::StoreNotConnected {
+        store: StoreKind::Gog.display_name().to_string(),
+    })
+}
+
+/// The GOG account's name, kept from the login so the settings page needn't
+/// reach GOG to show it.
+fn gog_account_file(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(store_dir(app, StoreKind::Gog)?.join("account.json"))
+}
+
+/// A GOG API's JSON, with the login's token.
+async fn gog_get(url: &str, token: &str) -> Result<String, AppError> {
+    let response = crate::http::client()
+        .get(url)
+        .bearer_auth(token)
+        .send()
+        .await
+        .map_err(|e| command_failed(StoreKind::Gog, format!("Could not reach GOG: {e}")))?;
+    let status = response.status();
+    if status == reqwest::StatusCode::UNAUTHORIZED {
+        return Err(AppError::StoreNotConnected {
+            store: StoreKind::Gog.display_name().to_string(),
+        });
+    }
+    if !status.is_success() {
+        return Err(command_failed(
+            StoreKind::Gog,
+            format!("{url} answered {status}"),
+        ));
+    }
+    response
+        .text()
+        .await
+        .map_err(|e| command_failed(StoreKind::Gog, format!("Could not read GOG's answer: {e}")))
+}
+
 fn command_failed(store: StoreKind, message: String) -> AppError {
     let needs_login = match store {
         StoreKind::Epic => epic::needs_login(&message),
+        StoreKind::Gog => false,
     };
     if needs_login {
         return AppError::StoreNotConnected {
@@ -335,6 +391,20 @@ async fn account_name(app: &AppHandle, store: StoreKind) -> Result<Option<String
                 .map_err(|e| command_failed(store, e))?;
             Ok(epic::account_name(&json)?)
         }
+        StoreKind::Gog => {
+            let dir = store_dir(app, store)?.join("gogdl");
+            let logged_in = helpers::installed(app, &helpers::GOGDL).is_some()
+                && fs::read_to_string(dir.join("auth.json")).is_ok_and(|raw| gog::has_login(&raw));
+            if !logged_in {
+                return Ok(None);
+            }
+            // The name as GOG had it at the login; the login itself counts.
+            let name = fs::read_to_string(gog_account_file(app)?)
+                .ok()
+                .and_then(|raw| gog::parse_username(&raw))
+                .unwrap_or_else(|| store.display_name().to_string());
+            Ok(Some(name))
+        }
     }
 }
 
@@ -371,6 +441,10 @@ pub async fn open_store_login(app: AppHandle, store: StoreKind) -> Result<(), Ap
             legendary(&app).await?;
             xdg_open(epic::LOGIN_URL).await?;
         }
+        StoreKind::Gog => {
+            gogdl(&app).await?;
+            xdg_open(gog::LOGIN_URL).await?;
+        }
     }
     Ok(())
 }
@@ -392,6 +466,22 @@ pub async fn connect_store(
                 .output(["auth", "--code", code.as_str()])
                 .await
                 .map_err(|e| command_failed(store, e))?;
+        }
+        StoreKind::Gog => {
+            let code = gog::auth_code(&code).ok_or(AppError::StoreInvalidAuthCode)?;
+            let gogdl = gogdl(&app).await?;
+            fs::create_dir_all(&gogdl.config_dir)
+                .map_err(|e| format!("Could not create {}: {e}", gogdl.config_dir.display()))?;
+            let json = gogdl
+                .output(["auth", "--code", code.as_str()])
+                .await
+                .map_err(|e| command_failed(store, e))?;
+            let credentials = gog::parse_credentials(&json)?.ok_or(AppError::StoreLoginFailed)?;
+            // Only for showing the name: a login without it still works.
+            let profile = format!("https://users.gog.com/users/{}", credentials.user_id);
+            if let Ok(json) = gog_get(&profile, &credentials.access_token).await {
+                let _ = fs::write(gog_account_file(&app)?, json);
+            }
         }
     }
     let account = store_account(&app, store).await?;
@@ -434,6 +524,12 @@ pub async fn disconnect_store(
                     .await
                     .map_err(|e| command_failed(store, e))?;
             }
+        }
+        StoreKind::Gog => {
+            // gogdl has no logout; its login is just this file.
+            let dir = store_dir(&app, store)?;
+            let _ = fs::remove_file(dir.join("gogdl").join("auth.json"));
+            let _ = fs::remove_file(gog_account_file(&app)?);
         }
     }
     let entries = read_library(&app, store);
@@ -497,6 +593,7 @@ async fn cache_covers(app: &AppHandle, store: StoreKind, entries: &[StoreLibrary
 fn cover_url_allowed(store: StoreKind, url: &str) -> bool {
     match store {
         StoreKind::Epic => epic::is_epic_image_url(url),
+        StoreKind::Gog => gog::is_gog_image_url(url),
     }
 }
 
@@ -517,6 +614,7 @@ pub async fn sync_store_library(
                 .map_err(|e| command_failed(store, e))?;
             epic::parse_library(&json)?
         }
+        StoreKind::Gog => gog_library(&app).await?,
     };
     write_library(&app, store, &entries)?;
     cache_covers(&app, store, &entries).await;
@@ -529,11 +627,58 @@ pub async fn sync_store_library(
     ))
 }
 
-/// `~/Games/Epic`, for a first install.
+/// How many games' details are fetched from GOG at once during a sync.
+const GOG_LOOKUPS: usize = 8;
+
+/// The GOG account's games: the ids from Galaxy's library, page by page,
+/// then each one's title and cover from GOG's game database. A game whose
+/// details can't be had is left out until the next sync.
+async fn gog_library(app: &AppHandle) -> Result<Vec<StoreLibraryEntry>, AppError> {
+    let gogdl = gogdl(app).await?;
+    let credentials = gog_credentials(&gogdl).await?;
+    let mut ids = Vec::new();
+    let mut page_token: Option<String> = None;
+    loop {
+        let mut url = reqwest::Url::parse(&format!(
+            "https://galaxy-library.gog.com/users/{}/releases",
+            credentials.user_id
+        ))
+        .map_err(|e| e.to_string())?;
+        if let Some(token) = &page_token {
+            url.query_pairs_mut().append_pair("page_token", token);
+        }
+        let json = gog_get(url.as_str(), &credentials.access_token).await?;
+        let (page_ids, next) = gog::parse_library_page(&json)?;
+        ids.extend(page_ids);
+        match next {
+            // A token that comes back again would loop forever.
+            Some(next) if page_token.as_ref() != Some(&next) => page_token = Some(next),
+            _ => break,
+        }
+    }
+    ids.sort();
+    ids.dedup();
+    let token = credentials.access_token.as_str();
+    let mut entries: Vec<StoreLibraryEntry> = stream::iter(ids)
+        .map(|id| async move {
+            let url = format!("https://gamesdb.gog.com/platforms/gog/external_releases/{id}");
+            let json = gog_get(&url, token).await.ok()?;
+            gog::parse_gamesdb(&json)
+        })
+        .buffer_unordered(GOG_LOOKUPS)
+        .filter_map(|entry| async move { entry })
+        .collect()
+        .await;
+    entries.sort_by_key(|entry| entry.title.to_lowercase());
+    Ok(entries)
+}
+
+/// `~/Games/Epic` or `~/Games/GOG`, for a store's first install.
 fn default_install_dir(store: StoreKind) -> Option<PathBuf> {
     let home = std::env::var_os("HOME")?;
     let folder = match store {
         StoreKind::Epic => "Epic",
+        StoreKind::Gog => "GOG",
     };
     Some(PathBuf::from(home).join("Games").join(folder))
 }
@@ -565,12 +710,23 @@ pub async fn get_store_install_defaults(
                 .and_then(|json| epic::parse_install_info(&json).ok())
                 .unwrap_or_default()
         }
+        StoreKind::Gog => {
+            let gogdl = gogdl(&app).await?;
+            gogdl
+                .output(gog::info_args(&app_name))
+                .await
+                .ok()
+                .and_then(|json| gog::parse_info(&json).ok())
+                .map(|plan| plan.sizes)
+                .unwrap_or_default()
+        }
     };
     let install_dir = state
         .locked()
         .stores
-        .install_dir
-        .clone()
+        .install_dirs
+        .get(&store)
+        .cloned()
         .or_else(|| default_install_dir(store))
         .unwrap_or_default();
     Ok(StoreInstallDefaults {
@@ -781,8 +937,11 @@ async fn install(
         .map_err(|e| format!("Could not create {}: {e}", install_dir.display()))?;
     {
         let mut config = state.locked();
-        if config.stores.install_dir.as_ref() != Some(&install_dir) {
-            config.stores.install_dir = Some(install_dir.clone());
+        if config.stores.install_dirs.get(&store) != Some(&install_dir) {
+            config
+                .stores
+                .install_dirs
+                .insert(store, install_dir.clone());
             save_config(app, &config)?;
         }
     }
@@ -804,8 +963,8 @@ async fn install(
         StoreKind::Epic => {
             let legendary = legendary(app).await?;
             run_install(
-                &legendary,
-                epic::install_args(&app_name, &install_dir),
+                legendary.command(epic::install_args(&app_name, &install_dir)),
+                "Legendary",
                 &log_path,
                 installs,
                 &key,
@@ -825,11 +984,23 @@ async fn install(
                 )
             })?
         }
+        StoreKind::Gog => {
+            install_gog(
+                app,
+                &app_name,
+                &install_dir,
+                &log_path,
+                installs,
+                &key,
+                &emit,
+            )
+            .await?
+        }
     };
 
     let prefix_path = install_prefix(app, state, store, &app_name, options.prefix_path.as_deref())?;
     let id = Uuid::new_v4();
-    let exe_path = installed.exe_path();
+    let exe_path = installed.exe_path.clone();
     let icon = save_exe_icon(app, id, extract_icon_png(&exe_path).as_deref());
     let mut game = Game {
         id,
@@ -853,7 +1024,12 @@ async fn install(
         store: Some(StoreLink {
             store,
             app_name: app_name.clone(),
-            prerequisites: installed.prerequisites.filter(|prereq| !prereq.installed),
+            install_path: Some(installed.install_path.clone()),
+            prerequisites: installed
+                .prerequisites
+                .into_iter()
+                .filter(|prereq| !prereq.installed)
+                .collect(),
         }),
     };
     adopt_cover(app, store, &entry, &mut game);
@@ -865,11 +1041,100 @@ async fn install(
     Ok(game)
 }
 
+/// Installs a GOG game: what it needs is looked up first (its folder, its
+/// redistributables), then gogdl downloads the game and the
+/// redistributables, whose installers run in the prefix on the first start.
+async fn install_gog(
+    app: &AppHandle,
+    app_name: &str,
+    install_dir: &Path,
+    log_path: &Path,
+    installs: &StoreInstalls,
+    key: &(StoreKind, String),
+    emit: &(dyn Fn(f64) + Sync),
+) -> Result<epic::InstalledGame, AppError> {
+    let gogdl = gogdl(app).await?;
+    let plan = gog::parse_info(
+        &gogdl
+            .output(gog::info_args(app_name))
+            .await
+            .map_err(|e| command_failed(StoreKind::Gog, e))?,
+    )?;
+    if plan.folder_name.trim().is_empty() {
+        return Err(command_failed(
+            StoreKind::Gog,
+            format!("gogdl named no install folder for {app_name}"),
+        ));
+    }
+    run_install(
+        gogdl.command(gog::download_args(app_name, install_dir)),
+        "gogdl",
+        log_path,
+        installs,
+        key,
+        emit,
+    )
+    .await?;
+    let game_dir = install_dir.join(&plan.folder_name);
+    let info_path = gog::info_file(&game_dir, app_name);
+    // gogdl also ends with 0 when it stopped early (cancelled from the
+    // outside, say); a finished install has the game's info file.
+    let info = fs::read_to_string(&info_path).map_err(|_| {
+        install_failed(
+            log_path,
+            format!("{} is missing after the install", info_path.display()),
+        )
+    })?;
+    let launch = gog::parse_play_task(&info, &game_dir)?;
+
+    // The shared redistributables (Visual C++, DirectX, …) go into one folder
+    // for every GOG game; their installers run in each game's prefix.
+    let mut prerequisites = Vec::new();
+    if !plan.dependencies.is_empty() {
+        let redist_dir = store_dir(app, StoreKind::Gog)?.join("redist");
+        // gogdl deletes what it downloaded before for ids it isn't asked
+        // for again, so it gets every id any installed game needed.
+        let ids_file = redist_dir.join("prefixr-ids.json");
+        let mut ids: Vec<String> = fs::read(&ids_file)
+            .ok()
+            .and_then(|raw| serde_json::from_slice(&raw).ok())
+            .unwrap_or_default();
+        ids.extend(plan.dependencies.iter().cloned());
+        ids.sort();
+        ids.dedup();
+        let result = gogdl.output(gog::redist_args(&ids, &redist_dir)).await;
+        if result.is_ok() {
+            let _ = fs::create_dir_all(&redist_dir);
+            let _ = fs::write(&ids_file, serde_json::to_vec(&ids).unwrap_or_default());
+        }
+        let manifest = fs::read_to_string(redist_dir.join(gog::REDIST_MANIFEST));
+        match (result, manifest) {
+            (Ok(_), Ok(manifest)) => {
+                prerequisites = gog::redist_installers(&manifest, &plan.dependencies, &redist_dir)?;
+            }
+            // The game is installed; without them it often runs all the
+            // same, and the log says what's missing.
+            (result, _) => {
+                use std::io::Write;
+                let reason = result.err().unwrap_or_else(|| "no manifest".to_string());
+                if let Ok(mut log) = fs::OpenOptions::new().append(true).open(log_path) {
+                    let _ = writeln!(log, "[prefixr] Redistributables not downloaded: {reason}");
+                }
+            }
+        }
+    }
+    Ok(epic::InstalledGame {
+        install_path: game_dir,
+        exe_path: launch.exe_path,
+        prerequisites,
+    })
+}
+
 /// Runs a store tool's install, its output into the log and its progress
 /// to `emit`.
 async fn run_install(
-    legendary: &Legendary,
-    args: Vec<std::ffi::OsString>,
+    mut command: tokio::process::Command,
+    tool_name: &str,
     log_path: &Path,
     installs: &StoreInstalls,
     key: &(StoreKind, String),
@@ -880,8 +1145,7 @@ async fn run_install(
         .open(log_path)
         .map_err(|e| format!("Could not open log file: {e}"))?;
     let log = Arc::new(Mutex::new(log));
-    let mut child = legendary
-        .command(args)
+    let mut child = command
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         // Its own process group, so cancelling stops its download workers
@@ -889,7 +1153,7 @@ async fn run_install(
         .process_group(0)
         .kill_on_drop(true)
         .spawn()
-        .map_err(|e| format!("Could not start Legendary: {e}"))?;
+        .map_err(|e| format!("Could not start {tool_name}: {e}"))?;
     if let Some(install) = installs.0.locked().get_mut(key) {
         install.pid = child.id();
     }
@@ -915,7 +1179,7 @@ async fn run_install(
     let status = child
         .wait()
         .await
-        .map_err(|e| format!("Legendary failed: {e}"))?;
+        .map_err(|e| format!("{tool_name} failed: {e}"))?;
 
     let cancelled = installs.0.locked().get(key).is_some_and(|i| i.cancelled);
     if cancelled {
@@ -924,7 +1188,7 @@ async fn run_install(
     if !status.success() {
         return Err(install_failed(
             log_path,
-            format!("Legendary exited with {status}"),
+            format!("{tool_name} exited with {status}"),
         ));
     }
     Ok(())
@@ -996,6 +1260,20 @@ pub async fn uninstall_store_game(
                     return Err(command_failed(link.store, message));
                 }
             }
+            StoreKind::Gog => {
+                // gogdl has no uninstall: the game's folder goes, once it's
+                // certain to be that game's (its info file is in it).
+                if let Some(dir) = &link.install_path {
+                    if gog::info_file(dir, &link.app_name).is_file() {
+                        fs::remove_dir_all(dir)
+                            .map_err(|e| format!("Could not delete {}: {e}", dir.display()))?;
+                    }
+                }
+                if let Ok(dir) = store_dir(&app, StoreKind::Gog) {
+                    let manifests = gog::manifests_dir(&dir.join("gogdl"));
+                    let _ = fs::remove_file(manifests.join(file_safe(&link.app_name)));
+                }
+            }
         }
     }
     remove_game(app.clone(), state, launching, id)
@@ -1020,6 +1298,18 @@ pub async fn launch_command(app: &AppHandle, link: &StoreLink) -> Result<StoreLa
             };
             Ok(epic::parse_launch(&json)?)
         }
+        // No tokens: GOG games are DRM-free. The play task comes from the
+        // game's own info file, as the Galaxy client reads it.
+        StoreKind::Gog => {
+            let dir = link
+                .install_path
+                .as_ref()
+                .ok_or_else(|| format!("No install folder known for {}", link.app_name))?;
+            let path = gog::info_file(dir, &link.app_name);
+            let info = fs::read_to_string(&path)
+                .map_err(|e| format!("Could not read {}: {e}", path.display()))?;
+            Ok(gog::parse_play_task(&info, dir)?)
+        }
     }
 }
 
@@ -1031,12 +1321,10 @@ pub fn mark_prerequisites_installed(app: &AppHandle, game_id: Uuid) -> Result<()
     let Some(game) = config.games.iter_mut().find(|game| game.id == game_id) else {
         return Ok(());
     };
-    if let Some(prereq) = game
-        .store
-        .as_mut()
-        .and_then(|link| link.prerequisites.as_mut())
-    {
-        prereq.installed = true;
+    if let Some(link) = game.store.as_mut() {
+        for prereq in &mut link.prerequisites {
+            prereq.installed = true;
+        }
     }
     save_config(app, &config)
 }

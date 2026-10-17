@@ -6,4 +6,4 @@
  * `commands::stores::helpers`); a new store is a new variant here plus a
  * module of its own under `commands::stores`.
  */
-export type StoreKind = "epic";
+export type StoreKind = "epic" | "gog";

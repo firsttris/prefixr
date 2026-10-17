@@ -36,15 +36,16 @@ before editing the file.
 | `umu-launcher/` | Prefixr's own copy of umu-launcher, with its version. |
 | `directx-layers/` | DXVK and VKD3D-Proton for Wine runners, with their versions, and the cached wine-mono installers. |
 | `winetricks/` | The winetricks script, refreshed weekly. |
-| `artwork/` | Images chosen from SteamGridDB, named after the game's ID, and the covers of store games (`store-epic-<app>.jpg`). |
-| `helpers/` | The store tools (Legendary), one file per pinned version. Removed when you disconnect the store. |
+| `artwork/` | Images chosen from SteamGridDB, named after the game's ID, and the covers of store games (`store-epic-<app>.jpg`, `store-gog-<id>.jpg`). |
+| `helpers/` | The store tools (Legendary, gogdl), one file per pinned version. Removed when you disconnect the store. |
 | `stores/epic/` | Legendary's own config (`legendary/`, including your Epic login) and the cached game list (`library.json`). |
-| `prefixes/` | The prefixes created for store games, one per game (`epic-<app>`). |
+| `stores/gog/` | gogdl's login and manifests (`gogdl/`), your account name (`account.json`), the cached game list (`library.json`) and GOG's shared redistributables (`redist/`). |
+| `prefixes/` | The prefixes created for store games, one per game (`epic-<app>`, `gog-<id>`). |
 | `exe-icons/` | Icons extracted from the games' `.exe` files. |
 | `mangohud/`, `vkbasalt/` | The MangoHud and vkBasalt config of each game, written on every launch. |
 | `logs/<game-id>/` | The last 10 launch logs of each game. |
 | `logs/prefixes/<prefix>/` | The last 10 logs of setup programs, winetricks and Wine tools run in a prefix. |
-| `logs/stores/epic/<app>/` | The last 10 install logs of each store game. |
+| `logs/stores/<store>/<app>/` | The last 10 install logs of each store game. |
 | `shortcut-icons/` | The icon of the *Install Prefixr* file-manager entry. |
 | `WebKitCache/`, `storage/`, `localstorage/` | The window's own browser data (see [Troubleshooting](troubleshooting.md#clearing-the-webkit-cache)). |
 

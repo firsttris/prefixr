@@ -7,12 +7,17 @@ import type { StorePrerequisites } from "./StorePrerequisites";
  */
 export type StoreLink = { store: StoreKind, 
 /**
- * The store's own id for the game (Epic: the app name, e.g. `Fortnite`).
+ * The store's own id for the game (Epic: the app name, e.g. `Fortnite`;
+ * GOG: the product id, e.g. `1207658924`).
  */
 app_name: string, 
 /**
- * What the game wants installed in its prefix before it first runs
- * (Visual C++ runtimes, DirectX, …), as the store lists it. Run once by
- * the first launch, then marked as installed.
+ * The folder the store installed the game in.
  */
-prerequisites: StorePrerequisites | null, };
+install_path: string | null, 
+/**
+ * What the game wants installed in its prefix before it first runs
+ * (Visual C++ runtimes, DirectX, …), as the store lists it. Each runs
+ * once, on the first launch, and is then marked as installed.
+ */
+prerequisites: Array<StorePrerequisites>, };

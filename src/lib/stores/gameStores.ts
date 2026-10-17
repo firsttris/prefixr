@@ -36,6 +36,8 @@ export function storeName(store: StoreKind): string {
   switch (store) {
     case "epic":
       return "Epic Games";
+    case "gog":
+      return "GOG";
   }
 }
 

@@ -80,7 +80,7 @@
     <section class="store" class:connected={account.connected}>
       <div class="head">
         <div class="identity">
-          <div class="logo" aria-hidden="true">{store === "epic" ? "EG" : store}</div>
+          <div class="logo" aria-hidden="true">{store === "epic" ? "EG" : "GOG"}</div>
           <div>
             <div class="title-row">
               <h2>{storeName(store)}</h2>
@@ -139,14 +139,18 @@
                 {busy[store] === "login" ? m.stores_loginPreparing() : m.stores_loginOpenAgain()}
               </button>
             </li>
-            <li>{m.stores_loginStepCode()}</li>
+            <li>
+              {store === "gog" ? m.stores_loginStepCodeGog() : m.stores_loginStepCode()}
+            </li>
           </ol>
           <div class="code-row">
             <input
               type="text"
               autocomplete="off"
               spellcheck="false"
-              placeholder={m.stores_codePlaceholder()}
+              placeholder={store === "gog"
+                ? m.stores_codePlaceholderGog()
+                : m.stores_codePlaceholder()}
               aria-label={m.stores_codeLabel()}
               bind:value={codes[store]}
             />

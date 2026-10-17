@@ -1,0 +1,6 @@
+{"depots": [
+ {"compressedSize": 15000000, "dependencyId": "MSVC2017", "executable": {"arguments": "/install /quiet /norestart", "path": "__redist\\MSVC2017\\VC_redist.x86.exe"}, "internal": false, "languages": ["*"], "readableName": "Microsoft Visual C++ 2017 Redistributable (x86)", "manifest": "aa11", "signature": "", "size": 15000000},
+ {"compressedSize": 1000000, "dependencyId": "ISI", "executable": {"arguments": "", "path": ""}, "internal": true, "languages": ["*"], "readableName": "ISI", "manifest": "bb22", "signature": "", "size": 1000000},
+ {"compressedSize": 100000000, "dependencyId": "DXSETUP", "executable": {"arguments": "/silent", "path": "__redist/DirectX/DXSETUP.exe"}, "internal": false, "languages": ["*"], "readableName": "", "manifest": "cc33", "signature": "", "size": 100000000},
+ {"compressedSize": 1, "dependencyId": "OTHER", "executable": {"arguments": "", "path": "__redist/Other/setup.exe"}, "internal": false, "readableName": "Other", "manifest": "dd44", "signature": "", "size": 1}
+], "build_id": "123"}

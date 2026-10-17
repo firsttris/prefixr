@@ -95,23 +95,23 @@ fn an_empty_or_broken_list_is_handled() {
 fn reads_the_installed_game_and_its_prerequisites() {
     let lantern = parse_installed(LIST_INSTALLED, "Lantern").unwrap().unwrap();
     assert_eq!(
-        lantern.exe_path(),
+        lantern.exe_path,
         PathBuf::from("/home/user/Games/Epic/HollowLantern/Binaries/Win64/Lantern.exe")
     );
     assert_eq!(
         lantern.prerequisites,
-        Some(StorePrerequisites {
+        [StorePrerequisites {
             name: "UE4 Prerequisites".to_string(),
             path: "Engine/Extras/Redist/en-us/UE4PrereqSetup_x64.exe".to_string(),
             args: "/quiet /norestart".to_string(),
             installed: false,
-        })
+        }]
     );
     // An empty prerequisite entry means none.
     let ashen = parse_installed(LIST_INSTALLED, "Ashen").unwrap().unwrap();
-    assert_eq!(ashen.prerequisites, None);
+    assert!(ashen.prerequisites.is_empty());
     assert_eq!(
-        ashen.exe_path(),
+        ashen.exe_path,
         PathBuf::from("/home/user/Games/Epic/Ashen Road/AshenRoad.exe")
     );
     assert_eq!(parse_installed(LIST_INSTALLED, "Nope").unwrap(), None);

@@ -1,0 +1,55 @@
+{
+ "id": "52867078467977926",
+ "game_id": "51153161090565251",
+ "platform_id": "gog",
+ "external_id": "1207658924",
+ "dlcs_ids": [],
+ "supported_operating_systems": [
+  {
+   "slug": "linux",
+   "name": "Linux"
+  },
+  {
+   "slug": "osx",
+   "name": "macOS"
+  },
+  {
+   "slug": "windows",
+   "name": "Windows"
+  }
+ ],
+ "title": {
+  "*": "Jotun Valhalla Edition",
+  "en-US": "Jotun"
+ },
+ "sorting_title": {
+  "*": "Jotun Valhalla Edition",
+  "en-US": "Jotun Valhalla Edition"
+ },
+ "type": "game",
+ "game": {
+  "id": "51153161090565251",
+  "title": {
+   "*": "Jotun",
+   "en-US": "Jotun"
+  },
+  "sorting_title": {
+   "*": "Jotun",
+   "en-US": "Jotun"
+  },
+  "type": "game",
+  "visible_in_library": true,
+  "vertical_cover": {
+   "url_format": "https://images.gog.com/edd21e7a826f7774caf7138d57f75365c4c5c3f9b20f11b732cb5124597bacf1{formatter}.{ext}?namespace=gamesdb"
+  },
+  "cover": {
+   "url_format": "https://images.gog.com/edd21e7a826f7774caf7138d57f75365c4c5c3f9b20f11b732cb5124597bacf1{formatter}.{ext}?namespace=gamesdb"
+  },
+  "logo": {
+   "url_format": "https://images.gog.com/67fa4050264ddabd469e445702ccc1178ef48fc3c502f2c18ab68d958f4a3838{formatter}.{ext}?namespace=gamesdb"
+  },
+  "background": {
+   "url_format": "https://images.gog.com/10013a47186d76c3b39f7396d1dc979b082aa04b645a938bc8b11e53e12af535{formatter}.{ext}?namespace=gamesdb"
+  }
+ }
+}

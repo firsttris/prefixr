@@ -1,0 +1,3 @@
+{"total_count": 4, "limit": 2, "page_token": "page2token", "items": [
+ {"platform_id": "gog", "external_id": 1453375253, "origin": "gog", "owned": true, "date_created": 1600000002, "owned_since": 1600000002, "certificate": "cert3"},
+ {"platform_id": "epic", "external_id": "Fortnite", "origin": "epic", "owned": true, "date_created": 1600000003, "owned_since": null, "certificate": "cert4"}]}

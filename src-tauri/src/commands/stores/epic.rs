@@ -229,27 +229,26 @@ pub fn install_args(app_name: &str, base_dir: &Path) -> Vec<OsString> {
 }
 
 /// The percentage from one of Legendary's progress lines
-/// (`[DLManager] INFO: = Progress: 12.34% (123/1000), Running for …`).
+/// (`[DLManager] INFO: = Progress: 12.34% (123/1000), Running for …`), or
+/// gogdl's, which are the same without the `%`
+/// (`[PROGRESS] INFO: = Progress: 12.34 1234/10000, Running for …`).
 pub fn parse_progress(line: &str) -> Option<f64> {
     let rest = line.split_once("= Progress:")?.1.trim_start();
-    let percent: f64 = rest.split('%').next()?.trim().parse().ok()?;
+    let number: String = rest
+        .chars()
+        .take_while(|c| c.is_ascii_digit() || *c == '.')
+        .collect();
+    let percent: f64 = number.parse().ok()?;
     percent.is_finite().then_some(percent.clamp(0.0, 100.0))
 }
 
 /// What Prefixr keeps about an installed game, from `legendary
-/// list-installed --json`.
+/// list-installed --json` (and its GOG counterpart, see `gog`).
 #[derive(Debug, Clone, PartialEq)]
 pub struct InstalledGame {
     pub install_path: PathBuf,
-    /// Relative to `install_path`.
-    pub executable: String,
-    pub prerequisites: Option<StorePrerequisites>,
-}
-
-impl InstalledGame {
-    pub fn exe_path(&self) -> PathBuf {
-        self.install_path.join(&self.executable)
-    }
+    pub exe_path: PathBuf,
+    pub prerequisites: Vec<StorePrerequisites>,
 }
 
 /// The game `app_name` among `legendary list-installed --json`'s games.
@@ -280,8 +279,8 @@ pub fn parse_installed(json: &str, app_name: &str) -> Result<Option<InstalledGam
         .into_iter()
         .find(|game| game.app_name == app_name)
         .map(|game| InstalledGame {
+            exe_path: Path::new(&game.install_path).join(&game.executable),
             install_path: PathBuf::from(game.install_path),
-            executable: game.executable,
             prerequisites: game
                 .prereq_info
                 .filter(|prereq| !prereq.path.trim().is_empty())
@@ -290,7 +289,9 @@ pub fn parse_installed(json: &str, app_name: &str) -> Result<Option<InstalledGam
                     path: prereq.path,
                     args: prereq.args,
                     installed: prereq.installed,
-                }),
+                })
+                .into_iter()
+                .collect(),
         }))
 }
 

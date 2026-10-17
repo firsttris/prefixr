@@ -1345,11 +1345,23 @@ async fn run_game(
     // account's tokens on their command line, fresh for every launch.
     let store_launch = match &game.store {
         Some(link) => {
-            if let Some(prereq) = link.prerequisites.as_ref().filter(|p| !p.installed) {
-                run_store_prerequisites(&runner_binary, &env, &game.exe_path, prereq, log_path)
-                    .await;
-                // Like the stores' own launchers: whether it worked or not,
-                // it isn't run again on every launch. The log shows it.
+            let pending: Vec<_> = link.prerequisites.iter().filter(|p| !p.installed).collect();
+            for prereq in &pending {
+                let install_dir = link.install_path.as_deref();
+                run_store_prerequisites(
+                    &runner_binary,
+                    &env,
+                    &game.exe_path,
+                    install_dir,
+                    prereq,
+                    log_path,
+                )
+                .await;
+            }
+            if !pending.is_empty() {
+                // Like the stores' own launchers: whether they worked or
+                // not, they aren't run again on every launch. The log shows
+                // it.
                 let _ = stores::mark_prerequisites_installed(app, game.id);
             }
             let launch = stores::launch_command(app, link).await?;
@@ -1623,6 +1635,7 @@ async fn run_store_prerequisites(
     runner_binary: &Path,
     env: &[(String, String)],
     game_exe: &Path,
+    install_dir: Option<&Path>,
     prereq: &StorePrerequisites,
     log_path: &Path,
 ) {
@@ -1633,14 +1646,23 @@ async fn run_store_prerequisites(
             .open(log_path)
             .and_then(|mut f| writeln!(f, "[prefixr] {text}"));
     };
-    let Some(install_dir) = store_install_dir(game_exe, &prereq.path) else {
-        note(format!(
-            "Prerequisites skipped: no install folder for {}",
-            prereq.path
-        ));
-        return;
+    // Shared redistributables have a path of their own; a game's own
+    // installer is inside its install folder.
+    let installer = if Path::new(&prereq.path).is_absolute() {
+        PathBuf::from(&prereq.path)
+    } else {
+        let Some(dir) = install_dir
+            .map(Path::to_path_buf)
+            .or_else(|| store_install_dir(game_exe, &prereq.path))
+        else {
+            note(format!(
+                "Prerequisites skipped: no install folder for {}",
+                prereq.path
+            ));
+            return;
+        };
+        dir.join(&prereq.path)
     };
-    let installer = install_dir.join(&prereq.path);
     let args = split_launch_args(&prereq.args).unwrap_or_default();
     note(format!(
         "Installing prerequisites: {} ({})",

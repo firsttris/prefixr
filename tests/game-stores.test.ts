@@ -65,6 +65,11 @@ describe("store helpers", () => {
     expect(notInstalled([game("A"), game("B", "id-b")]).map((g) => g.app_name)).toEqual(["A"]);
   });
 
+  it("names the stores", () => {
+    expect(stores.storeName("epic")).toBe("Epic Games");
+    expect(stores.storeName("gog")).toBe("GOG");
+  });
+
   it("keys games by store and id", () => {
     expect(storeGameKey("epic", "Fortnite")).toBe("epic:Fortnite");
   });

@@ -1,0 +1,3 @@
+{"total_count": 4, "limit": 2, "page_token": null, "next_page_token": "page2token", "items": [
+ {"platform_id": "gog", "external_id": "1207658924", "origin": "gog", "owned": true, "date_created": 1600000000, "owned_since": 1600000000, "certificate": "cert1"},
+ {"platform_id": "steam", "external_id": "440", "origin": "steam", "owned": true, "date_created": 1600000001, "owned_since": null, "certificate": "cert2"}]}
