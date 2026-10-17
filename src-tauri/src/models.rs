@@ -130,15 +130,18 @@ pub struct Game {
 pub enum StoreKind {
     /// The Epic Games Store, through Legendary.
     Epic,
+    /// GOG, through gogdl.
+    Gog,
 }
 
 impl StoreKind {
-    pub const ALL: [StoreKind; 1] = [StoreKind::Epic];
+    pub const ALL: [StoreKind; 2] = [StoreKind::Epic, StoreKind::Gog];
 
     /// The name used in file and folder names (`stores/epic/…`).
     pub fn slug(self) -> &'static str {
         match self {
             StoreKind::Epic => "epic",
+            StoreKind::Gog => "gog",
         }
     }
 
@@ -147,6 +150,7 @@ impl StoreKind {
     pub fn display_name(self) -> &'static str {
         match self {
             StoreKind::Epic => "Epic Games",
+            StoreKind::Gog => "GOG",
         }
     }
 }
@@ -156,13 +160,36 @@ impl StoreKind {
 #[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct StoreLink {
     pub store: StoreKind,
-    /// The store's own id for the game (Epic: the app name, e.g. `Fortnite`).
+    /// The store's own id for the game (Epic: the app name, e.g. `Fortnite`;
+    /// GOG: the product id, e.g. `1207658924`).
     pub app_name: String,
-    /// What the game wants installed in its prefix before it first runs
-    /// (Visual C++ runtimes, DirectX, …), as the store lists it. Run once by
-    /// the first launch, then marked as installed.
+    /// The folder the store installed the game in.
     #[serde(default)]
-    pub prerequisites: Option<StorePrerequisites>,
+    pub install_path: Option<PathBuf>,
+    /// What the game wants installed in its prefix before it first runs
+    /// (Visual C++ runtimes, DirectX, …), as the store lists it. Each runs
+    /// once, on the first launch, and is then marked as installed.
+    #[serde(default, deserialize_with = "one_or_many_prerequisites")]
+    pub prerequisites: Vec<StorePrerequisites>,
+}
+
+/// A list of prerequisites, as well as what a config written before GOG
+/// held there: Epic's one prerequisite (an object) or none (`null`).
+fn one_or_many_prerequisites<'de, D>(deserializer: D) -> Result<Vec<StorePrerequisites>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum OneOrMany {
+        Many(Vec<StorePrerequisites>),
+        One(StorePrerequisites),
+    }
+    Ok(match Option::<OneOrMany>::deserialize(deserializer)? {
+        Some(OneOrMany::Many(list)) => list,
+        Some(OneOrMany::One(one)) => vec![one],
+        None => Vec::new(),
+    })
 }
 
 /// A store's post-install step: an installer shipped with the game.
@@ -170,7 +197,8 @@ pub struct StoreLink {
 #[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct StorePrerequisites {
     pub name: String,
-    /// The installer's path, relative to the game's install folder.
+    /// The installer's path: relative to the game's install folder, or
+    /// absolute for one shared by several games (GOG's redistributables).
     pub path: String,
     /// Its arguments, one string as the store gives them.
     #[serde(default)]
@@ -626,11 +654,12 @@ pub struct SteamGridDbConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct StoresConfig {
-    /// The folder store games were last installed to, offered again for the
-    /// next one (each game gets a folder of its own inside it). `None`
-    /// until the first install, which suggests `~/Games/<store>`.
+    /// The folder each store's games were last installed to, offered again
+    /// for its next one (each game gets a folder of its own inside it).
+    /// Missing until a store's first install, which suggests
+    /// `~/Games/<store>`.
     #[serde(default)]
-    pub install_dir: Option<PathBuf>,
+    pub install_dirs: BTreeMap<StoreKind, PathBuf>,
 }
 
 /// GitHub settings — see `commands::github`. An optional personal access

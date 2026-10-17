@@ -67,6 +67,28 @@ pub const LEGENDARY: Helper = Helper {
     source_url: "https://github.com/Heroic-Games-Launcher/legendary",
 };
 
+/// Heroic's GOG downloader. Its zipapp unpacks a small native module
+/// (xdelta3 patching, built for Python's stable ABI) into
+/// `~/.cache/heroic_gogdl` on its first run.
+pub const GOGDL: Helper = Helper {
+    name: "gogdl",
+    display_name: "gogdl",
+    version: "1.3.1",
+    assets: &[
+        HelperAsset {
+            arch: "x86_64",
+            url: "https://github.com/Heroic-Games-Launcher/heroic-gogdl/releases/download/v1.3.1/gogdl_linux_x86_64",
+            sha256: "7a6f22da4943bdb4c00baf6250fcee7085c1104ba2ac401479e70ec96e722b59",
+        },
+        HelperAsset {
+            arch: "aarch64",
+            url: "https://github.com/Heroic-Games-Launcher/heroic-gogdl/releases/download/v1.3.1/gogdl_linux_arm64",
+            sha256: "9c70af33f5ca74d08236b4d50ca5f54262d9b4712d4a34c479e4263792fe55fc",
+        },
+    ],
+    source_url: "https://github.com/Heroic-Games-Launcher/heroic-gogdl",
+};
+
 /// More than any of the tools is (Legendary's zipapp is about 5 MB).
 const MAX_HELPER_BYTES: usize = 64 * 1024 * 1024;
 

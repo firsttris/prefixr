@@ -5,7 +5,8 @@
  */
 export type StorePrerequisites = { name: string, 
 /**
- * The installer's path, relative to the game's install folder.
+ * The installer's path: relative to the game's install folder, or
+ * absolute for one shared by several games (GOG's redistributables).
  */
 path: string, 
 /**

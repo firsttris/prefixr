@@ -154,3 +154,24 @@ fn umu_ids_are_normalized() {
         Some("gog")
     );
 }
+
+#[test]
+fn store_links_saved_before_gog_still_load() {
+    // The Epic-only build saved one prerequisite, or none as `null`.
+    let link = |prerequisites: &str| {
+        serde_json::from_str::<StoreLink>(&format!(
+            r#"{{"store": "epic", "app_name": "Fortnite", "prerequisites": {prerequisites}}}"#
+        ))
+        .unwrap()
+        .prerequisites
+    };
+    assert!(link("null").is_empty());
+    let one = link(r#"{"name": "UE Prereqs", "path": "Engine/x.exe", "args": "/quiet"}"#);
+    assert_eq!(one.len(), 1);
+    assert_eq!(one[0].name, "UE Prereqs");
+    assert!(!one[0].installed);
+    assert_eq!(link("[]").len(), 0);
+    let missing: StoreLink =
+        serde_json::from_str(r#"{"store": "gog", "app_name": "1207658924"}"#).unwrap();
+    assert!(missing.prerequisites.is_empty());
+}

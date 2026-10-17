@@ -1,0 +1,5 @@
+{"buildId": "56453436467238173", "clientId": "50225266424144145", "gameId": "1207658924", "language": "English", "languages": ["en-US"], "name": "Jotun", "osBins": [], "playTasks": [
+ {"category": "document", "name": "Manual", "path": "manual.pdf", "type": "FileTask"},
+ {"category": "game", "isPrimary": true, "languages": ["en-US"], "name": "Jotun", "path": "Bin\\Jotun.exe", "arguments": "-windowed \"-config=My Settings.ini\"", "workingDir": "Bin", "type": "FileTask"},
+ {"category": "tool", "name": "Website", "link": "https://example.com", "type": "URLTask"}
+], "rootGameId": "1207658924", "version": 1}

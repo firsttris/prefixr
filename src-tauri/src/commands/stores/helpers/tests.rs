@@ -16,16 +16,18 @@ const TOOL: Helper = Helper {
 
 #[test]
 fn every_pin_is_a_full_sha256_from_github_releases() {
-    for helper in [&LEGENDARY] {
+    for helper in [&LEGENDARY, &GOGDL] {
         assert!(!helper.assets.is_empty());
         for asset in helper.assets {
             assert_eq!(asset.sha256.len(), 64, "{}", asset.url);
             assert!(asset.sha256.chars().all(|c| c.is_ascii_hexdigit()));
+            // Tagged `0.20.43` or `v1.3.1`, depending on the project.
+            let release = |tag: String| format!("{}/releases/download/{tag}/", helper.source_url);
             assert!(
-                asset.url.starts_with(&format!(
-                    "{}/releases/download/{}/",
-                    helper.source_url, helper.version
-                )),
+                asset.url.starts_with(&release(helper.version.to_string()))
+                    || asset
+                        .url
+                        .starts_with(&release(format!("v{}", helper.version))),
                 "{} isn't a release of {} {}",
                 asset.url,
                 helper.name,

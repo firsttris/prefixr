@@ -5,7 +5,7 @@ A tour of everything Prefixr does. New to Prefixr? Start with [Getting started](
 - [The library](#the-library)
 - [Adding and editing games](#adding-and-editing-games)
 - [Installing a game from its setup program](#installing-a-game-from-its-setup-program)
-- [Stores (Epic Games)](#stores-epic-games)
+- [Stores (Epic Games, GOG)](#stores-epic-games-gog)
 - [Prefixes](#prefixes)
 - [Runners](#runners)
 - [Game settings](#game-settings)
@@ -28,7 +28,7 @@ or by runner. Prefixr remembers the view you chose.
 
 Each game shows its SteamGridDB cover if you picked one, otherwise the icon from its `.exe`.
 
-With a store connected (see [Stores](#stores-epic-games)), the library also shows that store's
+With a store connected (see [Stores](#stores-epic-games-gog)), the library also shows that store's
 games you haven't installed yet, with an **Install** button instead of the play button. Two more
 filters then appear in the toolbar: **Source** (all, added by hand, or one store) and **Installed
 only**. Store games carry the store's name on their card.
@@ -89,25 +89,32 @@ For games that come as an installer:
 
 If no shortcut is found or setup failed, **Show setup log** shows what the installer printed.
 
-## Stores (Epic Games)
+## Stores (Epic Games, GOG)
 
-Prefixr can install and start the games of your **Epic Games Store** account. They appear in the
-library next to the games you added yourself and run with the same prefixes, runners and settings.
-GOG and Amazon Games are planned.
+Prefixr can install and start the games of your **Epic Games Store** and **GOG** accounts. They
+appear in the library next to the games you added yourself and run with the same prefixes, runners
+and settings. Amazon Games is planned.
 
-Prefixr talks to the store through [Legendary](https://github.com/Heroic-Games-Launcher/legendary),
-the command line client the [Heroic Games Launcher](https://heroicgameslauncher.com/) uses. It is
-downloaded when you connect the store, at a version pinned in Prefixr and checked against its
-SHA-256, and deleted again when you disconnect. Like umu-launcher, it needs **Python 3**, which
-almost every distribution has installed.
+Prefixr talks to each store through the command line tool the
+[Heroic Games Launcher](https://heroicgameslauncher.com/) uses for it:
+[Legendary](https://github.com/Heroic-Games-Launcher/legendary) for Epic and
+[gogdl](https://github.com/Heroic-Games-Launcher/heroic-gogdl) for GOG. A tool is downloaded when
+you connect its store, at a version pinned in Prefixr and checked against its SHA-256, and deleted
+again when you disconnect. Like umu-launcher, they need **Python 3**, which almost every
+distribution has installed.
 
 ### Connecting your account
 
-1. Open **Stores** in the sidebar and click **Connect** next to *Epic Games*.
-2. Your browser opens Epic's login page. Sign in.
-3. Epic then shows a short page of text. Copy all of it (or only the value of
-   `authorizationCode`), paste it into Prefixr and click **Sign in**. The code works once and only
-   for a few minutes; if it's refused, open the login page again for a new one.
+1. Open **Stores** in the sidebar and click **Connect** next to the store.
+2. Your browser opens the store's login page. Sign in.
+3. Bring the login back to Prefixr and click **Sign in**:
+   - **Epic** then shows a short page of text. Copy all of it (or only the value of
+     `authorizationCode`).
+   - **GOG** then shows an almost empty page whose address contains `on_login_success?…code=…`.
+     Copy the whole address from the address bar.
+
+   The code works once and only for a few minutes; if it's refused, open the login page again for
+   a new one.
 
 Prefixr then loads your game list and the covers. **Refresh library** loads it again, for example
 after you bought a game. **Disconnect** signs you out; the games you installed stay installed.
@@ -119,7 +126,7 @@ has everything filled in:
 
 | Field | Default |
 | --- | --- |
-| **Install folder** | `~/Games/Epic` on the first install, after that the folder you used last. The game gets a folder of its own in it. |
+| **Install folder** | `~/Games/Epic` or `~/Games/GOG` on a store's first install, after that the folder you used last for that store. The game gets a folder of its own in it. |
 | **Prefix** | A new prefix for this game alone (recommended), under Prefixr's data folder. Any of your prefixes works too. |
 | **Runner** | Your newest Proton runner. |
 
@@ -133,16 +140,26 @@ settings and artwork in the game dialog. Its cover comes from the store; pick an
 
 ### Starting a store game
 
-Every start asks Legendary for the game's command line first, because online games need fresh
-login tokens on it. Without a connection, a game that can run offline still starts. A game's
+An **Epic** game's start asks Legendary for its command line first, because online games need
+fresh login tokens on it. Without a connection, a game that can run offline still starts. A game's
 **launch arguments** go between the game's own arguments and the account's, as in Epic's launcher.
 
+A **GOG** game needs no login to start: Prefixr starts the program the game's own
+`goggame-<id>.info` names as its main one, with its arguments and working folder, just as GOG
+Galaxy does. Games are installed in English; most let you switch the language in their settings.
+
 On its first start, a game installs what it lists as prerequisites (Visual C++ runtimes, DirectX
-and the like) into its prefix. That runs once; the launch log shows what happened.
+and the like) into its prefix. For GOG these are GOG's shared redistributables, downloaded once
+into Prefixr's data folder for all GOG games. That runs once per game; the launch log shows what
+happened.
+
+**Uninstall** removes an Epic game through Legendary, and a GOG game's folder (only once it's
+certain to be the game's: its `goggame-<id>.info` is in it).
 
 Not supported yet: updating installed games, cloud saves (use your own backup), DLC picked one by
-one (the DLC you own is installed with the game) and importing games installed by the Epic
-launcher or Heroic.
+one (the DLC you own is installed with the game), GOG's install scripts for a few older games and
+Galaxy features such as achievements, choosing a game's language, and importing games installed by
+another launcher.
 
 ## Prefixes
 

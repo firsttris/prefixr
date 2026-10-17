@@ -44,9 +44,9 @@
 | *Restart Steam?* | Steam must be closed while Prefixr changes its shortcuts. Confirm to let Prefixr quit and restart it (a running Steam game closes too), or quit Steam yourself first. |
 | *vm.max_map_count too low* | Click **Increase now** on the Performance page, or run the command shown there. |
 | *Python 3 wasn't found* | The store tools are Python programs. Install your distribution's `python3` package. |
-| *The sign-in didn't work* | Epic's code is valid once and for a few minutes. Open the login page again (**Open it again**) and paste the new page. |
+| *The sign-in didn't work* | The code is valid once and for a few minutes. Open the login page again (**Open it again**) and paste the new page (Epic) or address (GOG). |
 | *… isn't connected or the login has expired* | Connect the store again under **Stores**. Installed games stay; a game that can run offline starts without a login. |
-| *The install failed: …* | **Show log** under the card has Legendary's full output. Not enough disk space is the most common cause. |
+| *The install failed: …* | **Show log** under the card has the store tool's full output. Not enough disk space is the most common cause. |
 
 **The overlay, Gamescope or vkBasalt don't show up.** Prefixr leaves each of them out at launch when
 the tool isn't installed. Gamescope is also left out when Prefixr itself runs inside a Gamescope

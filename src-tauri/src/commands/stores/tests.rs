@@ -21,7 +21,8 @@ fn game(id: &str, store: Option<(StoreKind, &str)>) -> Game {
     game.store = store.map(|(store, app_name)| StoreLink {
         store,
         app_name: app_name.to_string(),
-        prerequisites: None,
+        install_path: None,
+        prerequisites: Vec::new(),
     });
     game
 }
@@ -134,5 +135,6 @@ fn a_game_from_before_stores_has_none() {
     .unwrap();
     let link = linked.store.unwrap();
     assert_eq!(link.store, StoreKind::Epic);
-    assert_eq!(link.prerequisites, None);
+    assert!(link.prerequisites.is_empty());
+    assert_eq!(link.install_path, None);
 }
