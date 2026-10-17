@@ -36,7 +36,7 @@ use crate::commands::umu::{get_umu_status, install_umu};
 use crate::commands::umu_database::search_umu_ids;
 use crate::commands::wine_tools::launch_wine_tool;
 use crate::commands::winetricks::{install_winetricks_verbs, list_installed_winetricks_verbs};
-use crate::config::{load_config, AppConfig, ConfigFileStamp, ConfigState};
+use crate::config::{load_config, lock_config, AppConfig, ConfigFileStamp, ConfigState};
 use crate::error::AppError;
 use crate::locale::{self, LocaleState};
 use crate::lock::LockExt;
@@ -328,6 +328,24 @@ enum UmuCommand {
     Search { query: String },
 }
 
+/// Whether `command` changes `config.json`. Only those wait for and hold
+/// the config lock: a launch or a winetricks install can take minutes and
+/// only reads it.
+fn changes_config(command: &Command) -> bool {
+    matches!(
+        command,
+        Command::Game(
+            GameCommand::Add(_)
+                | GameCommand::Edit(_)
+                | GameCommand::Remove { .. }
+                | GameCommand::Artwork(_)
+        ) | Command::Prefix(PrefixCommand::Add { .. } | PrefixCommand::Remove { .. })
+    )
+}
+
+/// `config.json.lock`, held for as long as the command line runs.
+struct ConfigLock(#[allow(dead_code)] fs::File);
+
 /// The exit code `run` ends with, set by the command before it ends the app.
 static EXIT_CODE: AtomicI32 = AtomicI32::new(0);
 
@@ -344,6 +362,17 @@ pub fn run(args: &[String], context: tauri::Context<tauri::Wry>) -> ! {
     let result = tauri::Builder::default()
         .setup(move |app| {
             app.manage(LocaleState::default());
+            // Taken before the config is read, and kept until the process
+            // exits (see `lock_config`).
+            if changes_config(&cli.command) {
+                match lock_config(app.handle()) {
+                    Ok(lock) => app.manage(ConfigLock(lock)),
+                    Err(message) => {
+                        eprintln!("error: {message}");
+                        std::process::exit(1);
+                    }
+                };
+            }
             let config = load_config(app.handle()).unwrap_or_else(|message| {
                 eprintln!(
                     "{}",

@@ -74,6 +74,31 @@ fn config_file_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(config_dir.join(CONFIG_FILE_NAME))
 }
 
+/// Holds `config.json.lock` exclusively, waiting while another process
+/// holds it. A command line call that changes the config holds it from
+/// reading the config until it exits, so two of them running at once can't
+/// write their own older copies over each other's changes. Released when
+/// the file is closed, including when the process ends in any way.
+pub fn lock_config(app: &AppHandle) -> Result<fs::File, String> {
+    lock_file(&config_file_path(app)?.with_extension("json.lock"))
+}
+
+fn lock_file(path: &Path) -> Result<fs::File, String> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Could not create config directory: {e}"))?;
+    }
+    let file = fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(path)
+        .map_err(|e| format!("Could not open {}: {e}", path.display()))?;
+    file.lock()
+        .map_err(|e| format!("Could not lock {}: {e}", path.display()))?;
+    Ok(file)
+}
+
 pub fn load_config(app: &AppHandle) -> Result<AppConfig, String> {
     let path = config_file_path(app)?;
     if !path.exists() {
