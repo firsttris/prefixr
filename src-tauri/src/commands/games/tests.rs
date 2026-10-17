@@ -552,3 +552,13 @@ fn any_unit_active_reads_systemctl_is_active_output() {
     assert!(!any_unit_active("activating\nfailed\n"));
     assert!(!any_unit_active(""));
 }
+
+#[test]
+fn a_game_starts_in_its_exes_folder() {
+    let dir = crate::test_util::TestDir::new("working-dir");
+    let exe = dir.join("Game.exe");
+    fs::write(&exe, "").unwrap();
+    assert_eq!(working_dir(&exe), Some(&*dir));
+    assert_eq!(working_dir(&dir.join("gone/Game.exe")), None);
+    assert_eq!(working_dir(Path::new("Game.exe")), None);
+}

@@ -1512,7 +1512,11 @@ async fn run_game(
 
     let (log_out, log_err) = log_stdio(log_path)?;
 
-    let mut child = runner_command(&launch_binary, env_pairs(&launch_env))
+    let mut command = runner_command(&launch_binary, env_pairs(&launch_env));
+    if let Some(dir) = working_dir(&game.exe_path) {
+        command.current_dir(dir);
+    }
+    let mut child = command
         .args(&wrapper_args)
         .arg(&game.exe_path)
         .args(&game_launch_args)
@@ -1566,6 +1570,15 @@ async fn run_game(
     }
 
     Ok(())
+}
+
+/// The folder a game starts in: its exe's own, as Windows starts a program
+/// from a shortcut. Plenty of games read files next to the exe by a
+/// relative path — Age of Empires IV its `App.ini`, without which it quits
+/// right away — so starting them from wherever Prefixr itself runs breaks
+/// them. `None` for an exe whose folder is gone (the launch reports that).
+fn working_dir(exe: &Path) -> Option<&Path> {
+    exe.parent().filter(|dir| dir.is_dir())
 }
 
 /// Variables holding a list, with their separator: a game's own value is
