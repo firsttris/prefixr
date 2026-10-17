@@ -70,6 +70,8 @@
   "gameList_steam_confirmButton": "Steam neu starten",
   "gameCard_running": "Läuft",
   "gameCard_notes": "Notizen",
+  "notesDialog_title": "Notizen – {name}",
+  "notesDialog_edit": "Bearbeiten",
   "gameCard_initializing": "Startet…",
   "gameCard_moreOptions": "Weitere Optionen",
   "gameCard_menuDesktopShortcut": "Auf Desktop",

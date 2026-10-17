@@ -17,6 +17,7 @@
     onRemove,
     onExportToSteam,
     onRemoveFromSteam,
+    onShowNotes,
   }: {
     game: Game;
     runState?: GameRunState;
@@ -26,6 +27,7 @@
     onRemove: () => void;
     onExportToSteam: () => void;
     onRemoveFromSteam: () => void;
+    onShowNotes: () => void;
   } = $props();
 
   const item = new GameItem(() => game);
@@ -74,7 +76,10 @@
           <div class="badges">
             <span class="runner">{game.runner_id}</span>
             {#if game.notes}
-              <span class="notes" title={game.notes} aria-label={m.gameCard_notes()}>📝</span>
+              <button type="button" class="notes" title={game.notes} onclick={onShowNotes}>
+                <span aria-hidden="true">📝</span>
+                {m.gameCard_notes()}
+              </button>
             {/if}
           </div>
         </div>
@@ -260,9 +265,26 @@
     gap: 0.4em;
   }
 
+  /* A button, unlike the runner badge next to it: brighter, with a border
+     that lights up on hover. */
   .notes {
-    font-size: 0.8em;
-    cursor: help;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
+    font-size: 0.72em;
+    font-weight: 600;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.22);
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    backdrop-filter: blur(6px);
+    padding: 0.15em 0.6em;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+
+  .notes:hover {
+    background: rgba(255, 255, 255, 0.36);
+    border-color: rgba(255, 255, 255, 0.8);
   }
 
   .runner {

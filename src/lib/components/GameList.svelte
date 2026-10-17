@@ -16,6 +16,7 @@
   import GameCard from "./GameCard.svelte";
   import GameListRow from "./GameListRow.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
+  import NotesDialog from "./NotesDialog.svelte";
   import type { Game } from "$lib/types";
 
   let {
@@ -27,6 +28,8 @@
     onEditArtwork: (game: Game) => void;
     onAddNew?: () => void;
   } = $props();
+
+  let showingNotes = $state<Game | null>(null);
 
   const VIEW_MODE_KEY = "library-view-mode";
 
@@ -213,6 +216,7 @@
         onRemove={() => handleRemove(game)}
         onExportToSteam={() => runSteamAction(game, "export")}
         onRemoveFromSteam={() => runSteamAction(game, "remove")}
+        onShowNotes={() => (showingNotes = game)}
       />
     {/each}
   </div>
@@ -228,6 +232,7 @@
         onRemove={() => handleRemove(game)}
         onExportToSteam={() => runSteamAction(game, "export")}
         onRemoveFromSteam={() => runSteamAction(game, "remove")}
+        onShowNotes={() => (showingNotes = game)}
       />
     {/each}
   </div>
@@ -236,6 +241,15 @@
 {#if steamNotice}
   <div class="notice {steamNotice.kind}" role="status">{steamNotice.text}</div>
 {/if}
+
+<NotesDialog
+  game={showingNotes}
+  onClose={() => (showingNotes = null)}
+  onEdit={(game) => {
+    showingNotes = null;
+    onEdit(game);
+  }}
+/>
 
 <ConfirmDialog
   open={steamConfirm !== null}
