@@ -36,11 +36,12 @@ before editing the file.
 | `umu-launcher/` | Prefixr's own copy of umu-launcher, with its version. |
 | `directx-layers/` | DXVK and VKD3D-Proton for Wine runners, with their versions, and the cached wine-mono installers. |
 | `winetricks/` | The winetricks script, refreshed weekly. |
-| `artwork/` | Images chosen from SteamGridDB, named after the game's ID, and the covers of store games (`store-epic-<app>.jpg`, `store-gog-<id>.jpg`). |
-| `helpers/` | The store tools (Legendary, gogdl), one file per pinned version. Removed when you disconnect the store. |
+| `artwork/` | Images chosen from SteamGridDB, named after the game's ID, and the covers of store games (`store-epic-<app>.jpg`, `store-gog-<id>.jpg`, `store-amazon-<id>.jpg`). |
+| `helpers/` | The store tools (Legendary, gogdl, Nile), one file per pinned version. Removed when you disconnect the store. |
 | `stores/epic/` | Legendary's own config (`legendary/`, including your Epic login) and the cached game list (`library.json`). |
 | `stores/gog/` | gogdl's login and manifests (`gogdl/`), your account name (`account.json`), the cached game list (`library.json`) and GOG's shared redistributables (`redist/`). |
-| `prefixes/` | The prefixes created for store games, one per game (`epic-<app>`, `gog-<id>`). |
+| `stores/amazon/` | Nile's config (`nile-config/nile/`: your Amazon login, the game list, the installed games and their manifests, the Amazon Games SDK) and the cached game list (`library.json`). |
+| `prefixes/` | The prefixes created for store games, one per game (`epic-<app>`, `gog-<id>`, `amazon-<id>`). |
 | `exe-icons/` | Icons extracted from the games' `.exe` files. |
 | `mangohud/`, `vkbasalt/` | The MangoHud and vkBasalt config of each game, written on every launch. |
 | `logs/<game-id>/` | The last 10 launch logs of each game. |

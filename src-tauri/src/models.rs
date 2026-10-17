@@ -132,16 +132,19 @@ pub enum StoreKind {
     Epic,
     /// GOG, through gogdl.
     Gog,
+    /// Amazon Games (Prime Gaming), through Nile.
+    Amazon,
 }
 
 impl StoreKind {
-    pub const ALL: [StoreKind; 2] = [StoreKind::Epic, StoreKind::Gog];
+    pub const ALL: [StoreKind; 3] = [StoreKind::Epic, StoreKind::Gog, StoreKind::Amazon];
 
     /// The name used in file and folder names (`stores/epic/…`).
     pub fn slug(self) -> &'static str {
         match self {
             StoreKind::Epic => "epic",
             StoreKind::Gog => "gog",
+            StoreKind::Amazon => "amazon",
         }
     }
 
@@ -151,6 +154,7 @@ impl StoreKind {
         match self {
             StoreKind::Epic => "Epic Games",
             StoreKind::Gog => "GOG",
+            StoreKind::Amazon => "Amazon Games",
         }
     }
 }
@@ -161,7 +165,8 @@ impl StoreKind {
 pub struct StoreLink {
     pub store: StoreKind,
     /// The store's own id for the game (Epic: the app name, e.g. `Fortnite`;
-    /// GOG: the product id, e.g. `1207658924`).
+    /// GOG: the product id, e.g. `1207658924`; Amazon: the product id,
+    /// e.g. `amzn1.adg.product.…`).
     pub app_name: String,
     /// The folder the store installed the game in.
     #[serde(default)]

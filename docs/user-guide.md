@@ -5,7 +5,7 @@ A tour of everything Prefixr does. New to Prefixr? Start with [Getting started](
 - [The library](#the-library)
 - [Adding and editing games](#adding-and-editing-games)
 - [Installing a game from its setup program](#installing-a-game-from-its-setup-program)
-- [Stores (Epic Games, GOG)](#stores-epic-games-gog)
+- [Stores (Epic Games, GOG, Amazon)](#stores-epic-games-gog-amazon)
 - [Prefixes](#prefixes)
 - [Runners](#runners)
 - [Game settings](#game-settings)
@@ -28,7 +28,7 @@ or by runner. Prefixr remembers the view you chose.
 
 Each game shows its SteamGridDB cover if you picked one, otherwise the icon from its `.exe`.
 
-With a store connected (see [Stores](#stores-epic-games-gog)), the library also shows that store's
+With a store connected (see [Stores](#stores-epic-games-gog-amazon)), the library also shows that store's
 games you haven't installed yet, with an **Install** button instead of the play button. Two more
 filters then appear in the toolbar: **Source** (all, added by hand, or one store) and **Installed
 only**. Store games carry the store's name on their card.
@@ -89,19 +89,20 @@ For games that come as an installer:
 
 If no shortcut is found or setup failed, **Show setup log** shows what the installer printed.
 
-## Stores (Epic Games, GOG)
+## Stores (Epic Games, GOG, Amazon)
 
-Prefixr can install and start the games of your **Epic Games Store** and **GOG** accounts. They
-appear in the library next to the games you added yourself and run with the same prefixes, runners
-and settings. Amazon Games is planned.
+Prefixr can install and start the games of your **Epic Games Store**, **GOG** and **Amazon Games**
+(Prime Gaming) accounts. They appear in the library next to the games you added yourself and run
+with the same prefixes, runners and settings.
 
 Prefixr talks to each store through the command line tool the
 [Heroic Games Launcher](https://heroicgameslauncher.com/) uses for it:
 [Legendary](https://github.com/Heroic-Games-Launcher/legendary) for Epic and
-[gogdl](https://github.com/Heroic-Games-Launcher/heroic-gogdl) for GOG. A tool is downloaded when
-you connect its store, at a version pinned in Prefixr and checked against its SHA-256, and deleted
-again when you disconnect. Like umu-launcher, they need **Python 3**, which almost every
-distribution has installed.
+[gogdl](https://github.com/Heroic-Games-Launcher/heroic-gogdl) for GOG and
+[Nile](https://github.com/imLinguin/nile) for Amazon. A tool is downloaded when you connect its
+store, at a version pinned in Prefixr and checked against its SHA-256, and deleted again when you
+disconnect. Like umu-launcher, Legendary and gogdl need **Python 3**, which almost every
+distribution has installed; Nile brings its own.
 
 ### Connecting your account
 
@@ -112,6 +113,8 @@ distribution has installed.
      `authorizationCode`).
    - **GOG** then shows an almost empty page whose address contains `on_login_success?…code=…`.
      Copy the whole address from the address bar.
+   - **Amazon** then shows its homepage, with an address containing
+     `openid.oa2.authorization_code=…`. Copy the whole address from the address bar.
 
    The code works once and only for a few minutes; if it's refused, open the login page again for
    a new one.
@@ -126,7 +129,7 @@ has everything filled in:
 
 | Field | Default |
 | --- | --- |
-| **Install folder** | `~/Games/Epic` or `~/Games/GOG` on a store's first install, after that the folder you used last for that store. The game gets a folder of its own in it. |
+| **Install folder** | `~/Games/Epic`, `~/Games/GOG` or `~/Games/Amazon` on a store's first install, after that the folder you used last for that store. The game gets a folder of its own in it. |
 | **Prefix** | A new prefix for this game alone (recommended), under Prefixr's data folder. Any of your prefixes works too. |
 | **Runner** | Your newest Proton runner. |
 
@@ -148,13 +151,19 @@ A **GOG** game needs no login to start: Prefixr starts the program the game's ow
 `goggame-<id>.info` names as its main one, with its arguments and working folder, just as GOG
 Galaxy does. Games are installed in English; most let you switch the language in their settings.
 
+An **Amazon** game starts with what its `fuel.json` names, in the working folder it asks for. Nile
+adds the Amazon Games SDK's environment (the entitlement and product the game checks), so Prime
+Gaming games that ask for it start without the Amazon Games app.
+
 On its first start, a game installs what it lists as prerequisites (Visual C++ runtimes, DirectX
 and the like) into its prefix. For GOG these are GOG's shared redistributables, downloaded once
-into Prefixr's data folder for all GOG games. That runs once per game; the launch log shows what
+into Prefixr's data folder for all GOG games; for Amazon, the installers its `fuel.json` lists
+under `PostInstall`. That runs once per game; the launch log shows what
 happened.
 
-**Uninstall** removes an Epic game through Legendary, and a GOG game's folder (only once it's
-certain to be the game's: its `goggame-<id>.info` is in it).
+**Uninstall** removes an Epic game through Legendary, an Amazon game through Nile (the files it
+installed), and a GOG game's folder (only once it's certain to be the game's: its
+`goggame-<id>.info` is in it).
 
 Not supported yet: updating installed games, cloud saves (use your own backup), DLC picked one by
 one (the DLC you own is installed with the game), GOG's install scripts for a few older games and

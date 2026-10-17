@@ -68,6 +68,7 @@ describe("store helpers", () => {
   it("names the stores", () => {
     expect(stores.storeName("epic")).toBe("Epic Games");
     expect(stores.storeName("gog")).toBe("GOG");
+    expect(stores.storeName("amazon")).toBe("Amazon Games");
   });
 
   it("keys games by store and id", () => {

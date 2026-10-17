@@ -1,0 +1,3 @@
+WARNING [CLI]:	 There was an error getting sdk
+INFO [AUTH_MANAGER]:	 Registerring a device. ID: 3135
+ERROR [AUTH_MANAGER]:	 Failed to register a device

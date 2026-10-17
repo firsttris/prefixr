@@ -12,11 +12,12 @@ const TOOL: Helper = Helper {
         sha256: "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
     }],
     source_url: "https://example.com/source",
+    needs_python: true,
 };
 
 #[test]
 fn every_pin_is_a_full_sha256_from_github_releases() {
-    for helper in [&LEGENDARY, &GOGDL] {
+    for helper in [&LEGENDARY, &GOGDL, &NILE] {
         assert!(!helper.assets.is_empty());
         for asset in helper.assets {
             assert_eq!(asset.sha256.len(), 64, "{}", asset.url);
@@ -79,4 +80,14 @@ fn finds_older_versions_but_not_other_tools() {
     // Nothing to keep: every file of the tool, for removing it.
     assert_eq!(stale_versions(&dir, &TOOL, Path::new("")).len(), 3);
     assert!(stale_versions(&dir.join("missing"), &TOOL, &keep).is_empty());
+}
+
+#[test]
+fn only_the_zipapps_need_the_systems_python() {
+    // Legendary and gogdl start with `#!/usr/bin/env python3`; Nile's
+    // PyInstaller build brings its own Python and runs without one.
+    assert_eq!(
+        [&LEGENDARY, &GOGDL, &NILE].map(|helper| helper.needs_python),
+        [true, true, false]
+    );
 }

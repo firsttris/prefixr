@@ -20,4 +20,8 @@ tool_name: string, tool_version: string,
 /**
  * Where the tool's source is (it's GPL-3.0, like Prefixr).
  */
-tool_source_url: string, };
+tool_source_url: string, 
+/**
+ * Whether the tool runs on the system's Python 3.
+ */
+tool_needs_python: boolean, };

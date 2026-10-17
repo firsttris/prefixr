@@ -1,17 +1,17 @@
 //! The command line tools Prefixr drives a store with.
 //!
 //! Each store is reached through a tool from the Heroic Games Launcher
-//! project (Legendary for Epic; gogdl and Nile would follow for GOG and
-//! Amazon), which keeps up with the stores' APIs, download formats and login
+//! project (Legendary for Epic, gogdl for GOG, Nile for Amazon), which keeps up with the stores' APIs, download formats and login
 //! flows. Prefixr doesn't bundle them: a tool is downloaded the first time
 //! its store is connected, from a release pinned here by version and SHA-256,
 //! so an update is a reviewed change to this file rather than whatever a
 //! release page serves that day. Disconnecting the store deletes it again.
 //!
-//! The Linux builds are Python zipapps (a single file starting with
-//! `#!/usr/bin/env python3`, its dependencies inside), just like the
-//! umu-launcher Prefixr already uses, so they need nothing but a system
-//! Python 3.
+//! Legendary's and gogdl's Linux builds are Python zipapps (a single file
+//! starting with `#!/usr/bin/env python3`, its dependencies inside), just
+//! like the umu-launcher Prefixr already uses, so they need nothing but a
+//! system Python 3. Nile's is a self-contained PyInstaller executable,
+//! which brings its own Python.
 
 use std::fs;
 use std::io::Write;
@@ -44,6 +44,8 @@ pub struct Helper {
     /// The tool's source, linked from the docs and the about notice (the
     /// tools are GPL-3.0, like Prefixr).
     pub source_url: &'static str,
+    /// Whether it runs on the system's Python (a zipapp).
+    pub needs_python: bool,
 }
 
 /// Heroic's fork of Legendary, which Heroic itself ships and keeps working
@@ -65,6 +67,7 @@ pub const LEGENDARY: Helper = Helper {
         },
     ],
     source_url: "https://github.com/Heroic-Games-Launcher/legendary",
+    needs_python: true,
 };
 
 /// Heroic's GOG downloader. Its zipapp unpacks a small native module
@@ -87,9 +90,33 @@ pub const GOGDL: Helper = Helper {
         },
     ],
     source_url: "https://github.com/Heroic-Games-Launcher/heroic-gogdl",
+    needs_python: true,
 };
 
-/// More than any of the tools is (Legendary's zipapp is about 5 MB).
+/// The Amazon Games client Heroic ships, by one of Heroic's maintainers.
+/// Its builds are PyInstaller executables (about 11 MB), not zipapps.
+pub const NILE: Helper = Helper {
+    name: "nile",
+    display_name: "Nile",
+    version: "1.2.0",
+    assets: &[
+        HelperAsset {
+            arch: "x86_64",
+            url: "https://github.com/imLinguin/nile/releases/download/v1.2.0/nile_linux_x86_64",
+            sha256: "d73519514df9d52c50c6feec629373cc3a0d9504e087b6c7372a8ca8a95e7bfe",
+        },
+        HelperAsset {
+            arch: "aarch64",
+            url: "https://github.com/imLinguin/nile/releases/download/v1.2.0/nile_linux_arm64",
+            sha256: "197859c629c47e4e4d7ed1d2a290b7bef1e778f891ff8ca42ba65dbb020ba751",
+        },
+    ],
+    source_url: "https://github.com/imLinguin/nile",
+    needs_python: false,
+};
+
+/// More than any of the tools is (Legendary's zipapp is about 5 MB, Nile's
+/// executable about 11 MB).
 const MAX_HELPER_BYTES: usize = 64 * 1024 * 1024;
 
 fn helpers_dir(app: &AppHandle) -> Result<PathBuf, String> {
@@ -158,7 +185,7 @@ static DOWNLOAD_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(())
 pub async fn ensure(app: &AppHandle, helper: &Helper) -> Result<PathBuf, AppError> {
     // The zipapps run on the system's Python; without one they'd fail with
     // a shell error nobody could make sense of.
-    if !command_on_path("python3") {
+    if helper.needs_python && !command_on_path("python3") {
         return Err(AppError::PythonNotFound);
     }
     let dir = helpers_dir(app)?;

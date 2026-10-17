@@ -1,0 +1,4 @@
+WARNING [CLI]:	 There was an error getting sdk
+INFO [CLI]:	 Found: Example Quest
+ERROR [DOWNLOAD]:	 Not enough space available
+INFO [CLI]:	 Download complete

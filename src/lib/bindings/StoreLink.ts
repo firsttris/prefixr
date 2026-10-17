@@ -8,7 +8,8 @@ import type { StorePrerequisites } from "./StorePrerequisites";
 export type StoreLink = { store: StoreKind, 
 /**
  * The store's own id for the game (Epic: the app name, e.g. `Fortnite`;
- * GOG: the product id, e.g. `1207658924`).
+ * GOG: the product id, e.g. `1207658924`; Amazon: the product id,
+ * e.g. `amzn1.adg.product.…`).
  */
 app_name: string, 
 /**
