@@ -252,6 +252,23 @@ fn picks_the_runner_the_prefix_games_share() {
 }
 
 #[test]
+fn only_commands_that_change_the_config_lock_it() {
+    let changes = |line: &str| changes_config(&Cli::try_parse_from(args(line)).unwrap().command);
+    assert!(changes(
+        "prefixr game add --exe /g.exe --prefix /p --runner r"
+    ));
+    assert!(changes("prefixr game edit quake --name Q"));
+    assert!(changes("prefixr game remove quake"));
+    assert!(changes("prefixr game artwork quake"));
+    assert!(changes("prefixr prefix add /p"));
+    assert!(changes("prefixr prefix remove /p"));
+    assert!(!changes("prefixr game list"));
+    assert!(!changes("prefixr game launch quake"));
+    assert!(!changes("prefixr prefix winetricks /p vcrun2022"));
+    assert!(!changes("prefixr runner download proton-ge"));
+}
+
+#[test]
 fn lines_up_a_table() {
     let text = table(
         &["ID", "NAME", "RUNNER"],

@@ -1,4 +1,19 @@
 use super::*;
+use crate::test_util::TestDir;
+
+#[test]
+fn the_config_lock_is_held_until_released() {
+    let dir = TestDir::new("config-lock");
+    let path = dir.join("sub/config.json.lock");
+    let held = lock_file(&path).unwrap();
+    let other = fs::OpenOptions::new().write(true).open(&path).unwrap();
+    assert!(matches!(
+        other.try_lock(),
+        Err(fs::TryLockError::WouldBlock)
+    ));
+    drop(held);
+    assert!(other.try_lock().is_ok());
+}
 
 #[test]
 fn migrates_flat_performance_and_overrides() {
