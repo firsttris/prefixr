@@ -174,6 +174,50 @@ fn find_game_rejects_invalid_or_unknown_ids() {
     );
 }
 
+/// An ICO holding the given PNGs as its entries.
+fn ico_of(pngs: &[Vec<u8>]) -> Vec<u8> {
+    let mut ico = vec![0, 0, 1, 0];
+    ico.extend((pngs.len() as u16).to_le_bytes());
+    let mut offset = 6 + 16 * pngs.len();
+    for png in pngs {
+        ico.extend([0, 0, 0, 0, 1, 0, 32, 0]);
+        ico.extend((png.len() as u32).to_le_bytes());
+        ico.extend((offset as u32).to_le_bytes());
+        offset += png.len();
+    }
+    for png in pngs {
+        ico.extend(png);
+    }
+    ico
+}
+
+fn rgb_png(size: u32) -> Vec<u8> {
+    let mut png = Vec::new();
+    image::DynamicImage::new_rgb8(size, size)
+        .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
+        .unwrap();
+    png
+}
+
+#[test]
+fn an_icon_with_rgb_pngs_gives_the_largest_one() {
+    let (small, large) = (rgb_png(32), rgb_png(256));
+    let ico = ico_of(&[small, large.clone()]);
+    // What the image crate itself makes of it.
+    assert!(image::load_from_memory_with_format(&ico, image::ImageFormat::Ico).is_err());
+
+    assert_eq!(ico_to_png(ico).unwrap(), large);
+}
+
+#[test]
+fn a_broken_icon_is_still_an_error() {
+    let mut ico = ico_of(&[rgb_png(16)]);
+    ico.truncate(30);
+    assert!(ico_to_png(ico)
+        .unwrap_err()
+        .starts_with("Could not read icon"));
+}
+
 #[test]
 fn ico_icons_become_png() {
     let mut ico = Vec::new();
