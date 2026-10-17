@@ -3,6 +3,7 @@ mod commands;
 mod config;
 mod env;
 mod error;
+mod host_env;
 mod http;
 mod locale;
 mod lock;

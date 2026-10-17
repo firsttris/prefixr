@@ -121,7 +121,7 @@ pub async fn fix_max_map_count() -> Result<(), AppError> {
     let pkexec_available = command_on_path("pkexec");
     let script = sysctl_fix_script();
     let run_result = if pkexec_available {
-        tokio::process::Command::new("pkexec")
+        crate::host_env::host_command("pkexec")
             .args(["sh", "-c", &script])
             .status()
             .await

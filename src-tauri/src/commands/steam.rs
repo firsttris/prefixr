@@ -107,7 +107,7 @@ async fn stop_steam() -> Result<(), AppError> {
         return Err(AppError::SteamCommandNotFound);
     }
     let deadline = Instant::now() + SHUTDOWN_TIMEOUT;
-    let mut child = tokio::process::Command::new("steam")
+    let mut child = crate::host_env::host_command("steam")
         .arg("-shutdown")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -129,7 +129,7 @@ async fn stop_steam() -> Result<(), AppError> {
 /// Starts Steam again after `stop_steam`, in its own process group so it
 /// doesn't go down with Prefixr. Best-effort: the export itself is done.
 fn start_steam() {
-    let _ = tokio::process::Command::new("steam")
+    let _ = crate::host_env::host_command("steam")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
