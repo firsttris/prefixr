@@ -24,6 +24,7 @@
     listenForPendingLaunch,
   } from "$lib/stores/games";
   import { listenForConfigChanges } from "$lib/stores/library";
+  import { appVersion, openReleaseNotes, refreshAppVersion } from "$lib/stores/system";
   import type { Game } from "$lib/types";
 
   type View =
@@ -72,6 +73,7 @@
       listenForConfigChanges(),
     ]);
     listeners.then(takePending);
+    refreshAppVersion().catch(() => {});
     return () => {
       listeners.then((unlisten) => unlisten.forEach((stop) => stop()));
     };
@@ -156,6 +158,16 @@
         </button>
       {/each}
     </div>
+    {#if $appVersion}
+      <button
+        type="button"
+        class="version"
+        title={m.nav_versionTitle()}
+        onclick={() => openReleaseNotes().catch(() => {})}
+      >
+        v{$appVersion}
+      </button>
+    {/if}
   </nav>
 
   <main>
@@ -312,6 +324,22 @@
     border: 1px solid var(--border);
     color: var(--text-muted);
     border-radius: 6px;
+  }
+
+  .version {
+    align-self: flex-start;
+    margin: 0 0.6em;
+    padding: 0.1em 0;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.72em;
+    opacity: 0.7;
+  }
+
+  .version:hover {
+    opacity: 1;
+    text-decoration: underline;
   }
 
   .lang-item.active {

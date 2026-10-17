@@ -1,3 +1,4 @@
+pub mod about;
 pub mod binary_vdf;
 pub mod games;
 pub mod github;

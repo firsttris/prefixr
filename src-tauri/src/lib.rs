@@ -17,6 +17,7 @@ use std::path::Path;
 use tauri::{Emitter, Manager, WebviewWindowBuilder, WindowEvent};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
+use commands::about::open_release_notes;
 use commands::games::{
     add_game, create_desktop_shortcut, create_menu_shortcut, ensure_install_desktop_entry,
     kill_game, launch_game, launch_game_headless, list_active_games, list_games, remove_game,
@@ -313,7 +314,8 @@ pub fn run() {
             latest_umu_version,
             search_umu_ids,
             set_ui_locale,
-            open_log
+            open_log,
+            open_release_notes
         ])
         .run(context)
         .expect("error while running tauri application");

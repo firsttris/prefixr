@@ -2,12 +2,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use std::process::Stdio;
-
 use tauri::{AppHandle, Manager};
 
 use crate::error::AppError;
-use crate::host_env::host_command;
+use crate::host_env::xdg_open;
 
 /// How many logs each game (or prefix) keeps. Every launch writes a new
 /// one, so without a limit they'd pile up forever.
@@ -96,26 +94,13 @@ fn log_file_in(root: &Path, path: &Path) -> Result<PathBuf, String> {
     }
 }
 
-/// Opens a log in the desktop's default app for it, through `xdg-open`
-/// started with the host's environment (see `host_env`). The opener
-/// plugin started it with the AppImage's, under which the desktop's own
-/// opener (e.g. `kde-open`) can't even load its libraries. An error lets the
-/// frontend fall back to showing the file in the file manager.
+/// Opens a log in the desktop's default app for it (see `xdg_open`). An
+/// error lets the frontend fall back to showing the file in the file
+/// manager.
 #[tauri::command]
 pub async fn open_log(app: AppHandle, path: String) -> Result<(), AppError> {
     let path = log_file_in(&logs_root(&app)?, Path::new(&path))?;
-    let status = host_command("xdg-open")
-        .arg(&path)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .await
-        .map_err(|e| format!("Could not run xdg-open: {e}"))?;
-    if !status.success() {
-        return Err(format!("xdg-open exited with {status}").into());
-    }
-    Ok(())
+    xdg_open(&path).await.map_err(AppError::from)
 }
 
 #[cfg(test)]

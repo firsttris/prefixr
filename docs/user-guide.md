@@ -313,3 +313,6 @@ the latest with **Show log** after an error. All logs are plain text files; see
 
 Prefixr is available in English and German. Switch with **DE** / **EN** at the bottom of the
 sidebar; the tray menu follows. On first start, Prefixr uses your system language.
+
+Below the language switch, the sidebar shows Prefixr's version. Click it to see what changed in that
+version on GitHub.
