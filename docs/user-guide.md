@@ -5,6 +5,7 @@ A tour of everything Prefixr does. New to Prefixr? Start with [Getting started](
 - [The library](#the-library)
 - [Adding and editing games](#adding-and-editing-games)
 - [Installing a game from its setup program](#installing-a-game-from-its-setup-program)
+- [Stores (Epic Games)](#stores-epic-games)
 - [Prefixes](#prefixes)
 - [Runners](#runners)
 - [Game settings](#game-settings)
@@ -27,6 +28,11 @@ or by runner. Prefixr remembers the view you chose.
 
 Each game shows its SteamGridDB cover if you picked one, otherwise the icon from its `.exe`.
 
+With a store connected (see [Stores](#stores-epic-games)), the library also shows that store's
+games you haven't installed yet, with an **Install** button instead of the play button. Two more
+filters then appear in the toolbar: **Source** (all, added by hand, or one store) and **Installed
+only**. Store games carry the store's name on their card.
+
 | State | What you see |
 | --- | --- |
 | **Starting…** | The launch is being prepared. On first use this includes downloads and setting up the prefix, which can take a few minutes. |
@@ -47,6 +53,8 @@ The **⋮** menu on a card or in a list row (where editing, artwork and removing
   [Steam integration](#steam-integration).
 - **Remove**: removes the game from the library together with its logs, artwork, shortcuts and
   settings files. The prefix and the game's files stay. A running game can't be removed.
+- **Uninstall** (instead of **Remove**, for a game installed from a store): deletes the game's
+  files as well. It stays in your store library and can be installed again.
 
 ## Adding and editing games
 
@@ -80,6 +88,61 @@ For games that come as an installer:
 5. The game dialog opens with everything filled in. Check it and click **Add**.
 
 If no shortcut is found or setup failed, **Show setup log** shows what the installer printed.
+
+## Stores (Epic Games)
+
+Prefixr can install and start the games of your **Epic Games Store** account. They appear in the
+library next to the games you added yourself and run with the same prefixes, runners and settings.
+GOG and Amazon Games are planned.
+
+Prefixr talks to the store through [Legendary](https://github.com/Heroic-Games-Launcher/legendary),
+the command line client the [Heroic Games Launcher](https://heroicgameslauncher.com/) uses. It is
+downloaded when you connect the store, at a version pinned in Prefixr and checked against its
+SHA-256, and deleted again when you disconnect. Like umu-launcher, it needs **Python 3**, which
+almost every distribution has installed.
+
+### Connecting your account
+
+1. Open **Stores** in the sidebar and click **Connect** next to *Epic Games*.
+2. Your browser opens Epic's login page. Sign in.
+3. Epic then shows a short page of text. Copy all of it (or only the value of
+   `authorizationCode`), paste it into Prefixr and click **Sign in**. The code works once and only
+   for a few minutes; if it's refused, open the login page again for a new one.
+
+Prefixr then loads your game list and the covers. **Refresh library** loads it again, for example
+after you bought a game. **Disconnect** signs you out; the games you installed stay installed.
+
+### Installing a game
+
+Click **Install** on a game in the library. The dialog shows the download and installed size and
+has everything filled in:
+
+| Field | Default |
+| --- | --- |
+| **Install folder** | `~/Games/Epic` on the first install, after that the folder you used last. The game gets a folder of its own in it. |
+| **Prefix** | A new prefix for this game alone (recommended), under Prefixr's data folder. Any of your prefixes works too. |
+| **Runner** | Your newest Proton runner. |
+
+The download runs in the background; the card shows its progress and has a **Cancel** button.
+What was downloaded is kept, so installing again continues where it stopped. Games of one store
+install one after another. If an install fails, the card shows why, with the install's log.
+
+Once installed, the game is an ordinary library game: you can change its prefix, runner,
+settings and artwork in the game dialog. Its cover comes from the store; pick another one under
+**Select artwork** if you like.
+
+### Starting a store game
+
+Every start asks Legendary for the game's command line first, because online games need fresh
+login tokens on it. Without a connection, a game that can run offline still starts. A game's
+**launch arguments** go between the game's own arguments and the account's, as in Epic's launcher.
+
+On its first start, a game installs what it lists as prerequisites (Visual C++ runtimes, DirectX
+and the like) into its prefix. That runs once; the launch log shows what happened.
+
+Not supported yet: updating installed games, cloud saves (use your own backup), DLC picked one by
+one (the DLC you own is installed with the game) and importing games installed by the Epic
+launcher or Heroic.
 
 ## Prefixes
 

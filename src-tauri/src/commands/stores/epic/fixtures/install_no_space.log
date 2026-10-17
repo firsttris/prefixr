@@ -1,0 +1,5 @@
+[cli] INFO: Preparing download for "Hollow Lantern" (Lantern)...
+
+Installation requirements check returned the following results:
+ - FAILURE: Not enough available disk space! 18.40 GiB < 22.46 GiB
+[cli] CRITICAL: Installation cannot proceed, exiting.

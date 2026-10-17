@@ -12,22 +12,39 @@
     steamGameIds,
     refreshSteamGames,
   } from "$lib/stores/games";
+  import {
+    storeGames,
+    storeInstalls,
+    storeInstallErrors,
+    storeGameKey,
+    storeName,
+    notInstalled,
+    refreshStoreGames,
+    initStoreEvents,
+    cancelStoreInstall,
+    dismissStoreInstallError,
+    uninstallStoreGame,
+  } from "$lib/stores/gameStores";
   import { backendError } from "$lib/i18n/index.svelte";
   import GameCard from "./GameCard.svelte";
   import GameListRow from "./GameListRow.svelte";
+  import StoreGameCard from "./StoreGameCard.svelte";
+  import StoreGameRow from "./StoreGameRow.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import NotesDialog from "./NotesDialog.svelte";
-  import type { Game } from "$lib/types";
+  import type { Game, StoreGame, StoreKind } from "$lib/types";
   import type { GameFormTab } from "./GameForm.svelte";
 
   let {
     onEdit,
     onEditArtwork,
     onAddNew,
+    onInstallStoreGame,
   }: {
     onEdit: (game: Game, tab?: GameFormTab) => void;
     onEditArtwork: (game: Game) => void;
     onAddNew?: () => void;
+    onInstallStoreGame: (game: StoreGame) => void;
   } = $props();
 
   let showingNotes = $state<Game | null>(null);
@@ -47,6 +64,15 @@
   let viewMode = $state<"grid" | "list">(loadViewMode());
   let query = $state("");
   let sortBy = $state<"name-asc" | "name-desc" | "runner">("name-asc");
+  // Where games come from: added by hand ("local") or from a store.
+  let source = $state<"all" | "local" | StoreKind>("all");
+  let installedOnly = $state(false);
+
+  // The connected stores' games that aren't installed yet, shown next to
+  // the library's own.
+  let uninstalled = $derived(notInstalled($storeGames));
+  let storesInLibrary = $derived([...new Set($storeGames.map((game) => game.store))]);
+  let hasAnything = $derived($games.length > 0 || uninstalled.length > 0);
 
   $effect(() => {
     try {
@@ -56,16 +82,37 @@
     }
   });
 
-  let visibleGames = $derived.by(() => {
-    const q = query.trim().toLowerCase();
-    let list = q ? $games.filter((g) => g.name.toLowerCase().includes(q)) : $games.slice();
+  type Entry =
+    | { kind: "game"; key: string; name: string; game: Game }
+    | { kind: "store"; key: string; name: string; storeGame: StoreGame };
 
+  let visibleEntries = $derived.by(() => {
+    const q = query.trim().toLowerCase();
+    const matches = (name: string) => !q || name.toLowerCase().includes(q);
+    const fromSource = (from: "local" | StoreKind) => source === "all" || source === from;
+    const list: Entry[] = [];
+    for (const game of $games) {
+      if (matches(game.name) && fromSource(game.store?.store ?? "local")) {
+        list.push({ kind: "game", key: game.id, name: game.name, game });
+      }
+    }
+    if (!installedOnly) {
+      for (const storeGame of uninstalled) {
+        if (matches(storeGame.title) && fromSource(storeGame.store)) {
+          const key = storeGameKey(storeGame.store, storeGame.app_name);
+          list.push({ kind: "store", key, name: storeGame.title, storeGame });
+        }
+      }
+    }
+
+    // Not-installed games have no runner yet: last when sorting by runner.
+    const runnerOf = (entry: Entry) => (entry.kind === "game" ? entry.game.runner_id : "\uffff");
     if (sortBy === "name-asc") {
       list.sort((a, b) => a.name.localeCompare(b.name));
     } else if (sortBy === "name-desc") {
       list.sort((a, b) => b.name.localeCompare(a.name));
     } else {
-      list.sort((a, b) => a.runner_id.localeCompare(b.runner_id) || a.name.localeCompare(b.name));
+      list.sort((a, b) => runnerOf(a).localeCompare(runnerOf(b)) || a.name.localeCompare(b.name));
     }
     return list;
   });
@@ -78,6 +125,9 @@
     refreshGames().catch((e) => (loadError = e));
     // Only marks which games are in Steam; without it, none are.
     refreshSteamGames().catch(() => {});
+    // A store that can't be read leaves just the library's own games.
+    refreshStoreGames().catch(() => {});
+    initStoreEvents();
   });
 
   // Steam changes run from here for both views, since a running Steam first
@@ -121,7 +171,7 @@
       await refreshSteamGames();
       const restarted = result.restarted_steam ? m.gameList_steam_restartedSuffix() : "";
       if (action === "remove-game") {
-        await removeGame(game.id);
+        await removeOrUninstall(game);
         notify(m.gameList_steam_doneRemovedBoth({ name: game.name, restarted }), "done");
       } else if (action === "remove") {
         notify(m.gameList_steam_doneRemoved({ name: game.name, restarted }), "done");
@@ -139,18 +189,23 @@
     }
   }
 
+  // A store game's files go with it: they belong to the store's install.
+  function removeOrUninstall(game: Game): Promise<void> {
+    return game.store ? uninstallStoreGame(game.id) : removeGame(game.id);
+  }
+
   function handleRemove(game: Game) {
     if ($steamGameIds.has(game.id)) {
       runSteamAction(game, "remove-game");
     } else {
-      removeGame(game.id).catch((e) =>
+      removeOrUninstall(game).catch((e) =>
         notify(m.gameList_steam_removeFailed({ name: game.name, error: backendError(e) }), "error"),
       );
     }
   }
 </script>
 
-{#if $games.length > 0}
+{#if hasAnything}
   <div class="toolbar">
     <input
       type="search"
@@ -164,6 +219,21 @@
       <option value="name-desc">{m.gameList_toolbar_sortNameDesc()}</option>
       <option value="runner">{m.gameList_toolbar_sortRunner()}</option>
     </select>
+
+    {#if storesInLibrary.length > 0}
+      <select bind:value={source} aria-label={m.gameList_toolbar_sourceLabel()}>
+        <option value="all">{m.gameList_toolbar_sourceAll()}</option>
+        <option value="local">{m.gameList_toolbar_sourceLocal()}</option>
+        {#each storesInLibrary as store (store)}
+          <option value={store}>{storeName(store)}</option>
+        {/each}
+      </select>
+
+      <label class="installed-only">
+        <input type="checkbox" bind:checked={installedOnly} />
+        {m.gameList_toolbar_installedOnly()}
+      </label>
+    {/if}
 
     <div class="view-toggle" role="group" aria-label={m.gameList_toolbar_viewToggleLabel()}>
       <button
@@ -188,9 +258,9 @@
   </div>
 {/if}
 
-{#if loadError && $games.length === 0}
+{#if loadError && !hasAnything}
   <p class="load-error">{m.gameList_loadFailed({ error: backendError(loadError) })}</p>
-{:else if $games.length === 0}
+{:else if !hasAnything}
   <div class="empty">
     <span class="empty-icon">🎮</span>
     <h3>{m.gameList_emptyLibrary_title()}</h3>
@@ -199,7 +269,7 @@
       <button type="button" class="primary" onclick={onAddNew}>{m.library_addGame()}</button>
     {/if}
   </div>
-{:else if visibleGames.length === 0}
+{:else if visibleEntries.length === 0}
   <div class="empty">
     <span class="empty-icon">🔍</span>
     <h3>{m.gameList_emptySearch_title()}</h3>
@@ -207,34 +277,60 @@
   </div>
 {:else if viewMode === "grid"}
   <div class="grid">
-    {#each visibleGames as game (game.id)}
-      <GameCard
-        {game}
-        runState={$gameRunState[game.id]}
-        inSteam={$steamGameIds.has(game.id)}
-        onEdit={() => onEdit(game)}
-        onEditArtwork={() => onEditArtwork(game)}
-        onRemove={() => handleRemove(game)}
-        onExportToSteam={() => runSteamAction(game, "export")}
-        onRemoveFromSteam={() => runSteamAction(game, "remove")}
-        onShowNotes={() => (showingNotes = game)}
-      />
+    {#each visibleEntries as entry (entry.key)}
+      {#if entry.kind === "game"}
+        {@const game = entry.game}
+        <GameCard
+          {game}
+          runState={$gameRunState[game.id]}
+          inSteam={$steamGameIds.has(game.id)}
+          onEdit={() => onEdit(game)}
+          onEditArtwork={() => onEditArtwork(game)}
+          onRemove={() => handleRemove(game)}
+          onExportToSteam={() => runSteamAction(game, "export")}
+          onRemoveFromSteam={() => runSteamAction(game, "remove")}
+          onShowNotes={() => (showingNotes = game)}
+        />
+      {:else}
+        {@const game = entry.storeGame}
+        <StoreGameCard
+          {game}
+          progress={$storeInstalls[entry.key]}
+          error={$storeInstallErrors[entry.key]}
+          onInstall={() => onInstallStoreGame(game)}
+          onCancel={() => cancelStoreInstall(game.store, game.app_name)}
+          onDismissError={() => dismissStoreInstallError(game.store, game.app_name)}
+        />
+      {/if}
     {/each}
   </div>
 {:else}
   <div class="list">
-    {#each visibleGames as game (game.id)}
-      <GameListRow
-        {game}
-        runState={$gameRunState[game.id]}
-        inSteam={$steamGameIds.has(game.id)}
-        onEdit={() => onEdit(game)}
-        onEditArtwork={() => onEditArtwork(game)}
-        onRemove={() => handleRemove(game)}
-        onExportToSteam={() => runSteamAction(game, "export")}
-        onRemoveFromSteam={() => runSteamAction(game, "remove")}
-        onShowNotes={() => (showingNotes = game)}
-      />
+    {#each visibleEntries as entry (entry.key)}
+      {#if entry.kind === "game"}
+        {@const game = entry.game}
+        <GameListRow
+          {game}
+          runState={$gameRunState[game.id]}
+          inSteam={$steamGameIds.has(game.id)}
+          onEdit={() => onEdit(game)}
+          onEditArtwork={() => onEditArtwork(game)}
+          onRemove={() => handleRemove(game)}
+          onExportToSteam={() => runSteamAction(game, "export")}
+          onRemoveFromSteam={() => runSteamAction(game, "remove")}
+          onShowNotes={() => (showingNotes = game)}
+        />
+      {:else}
+        {@const game = entry.storeGame}
+        <StoreGameRow
+          {game}
+          progress={$storeInstalls[entry.key]}
+          error={$storeInstallErrors[entry.key]}
+          onInstall={() => onInstallStoreGame(game)}
+          onCancel={() => cancelStoreInstall(game.store, game.app_name)}
+          onDismissError={() => dismissStoreInstallError(game.store, game.app_name)}
+        />
+      {/if}
     {/each}
   </div>
 {/if}
@@ -314,6 +410,18 @@
   }
 
   .toolbar select {
+    width: auto;
+  }
+
+  .installed-only {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.4em;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .installed-only input {
     width: auto;
   }
 

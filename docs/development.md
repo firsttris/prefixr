@@ -107,6 +107,7 @@ src-tauri/
 | `winetricks`, `wine_tools` | Installing dependencies, and Wine's own tools |
 | `performance`, `graphics`, `mangohud`, `proton_options` | The settings categories, and the config files and environment they turn into |
 | `steamgriddb` | Artwork search, download and cache |
+| `stores` (`epic`, `helpers`) | Store accounts: the pinned store tools, the library cache and covers, installs, and the command line a store game starts with |
 | `steam`, `binary_vdf` | Adding games to Steam through its binary `shortcuts.vdf` |
 | `icons`, `shell_link`, `logs` | Exe icons, reading `.lnk` shortcuts, and log rotation |
 | `github`, `locale` | The GitHub token, and the UI language as Rust needs it |

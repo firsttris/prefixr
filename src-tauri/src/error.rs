@@ -125,6 +125,42 @@ pub enum AppError {
     UnknownWineTool {
         tool: String,
     },
+    /// stores::helpers::ensure — the store tools are Python programs and
+    /// there's no `python3` on PATH.
+    PythonNotFound,
+    /// stores — the store's tool reported an error; `message` is its own
+    /// (English) text.
+    StoreCommandFailed {
+        store: String,
+        message: String,
+    },
+    /// stores — the store's tool needs a login: never connected, or the
+    /// saved login expired.
+    StoreNotConnected {
+        store: String,
+    },
+    /// stores::connect_store — what was pasted isn't an authorization code.
+    StoreInvalidAuthCode,
+    /// stores::connect_store — the store didn't accept the code (expired,
+    /// used before, or for another login).
+    StoreLoginFailed,
+    /// stores::install_store_game — the game is in the library already.
+    StoreGameAlreadyInstalled {
+        title: String,
+    },
+    /// stores::install_store_game — another game of the same store is
+    /// installing; its tool installs one at a time.
+    StoreInstallRunning {
+        title: String,
+    },
+    /// stores::install_store_game — the install was cancelled.
+    StoreInstallCancelled,
+    /// stores::install_store_game — the store's tool failed to install the
+    /// game.
+    StoreInstallFailed {
+        message: String,
+        log_path: String,
+    },
 }
 
 impl From<String> for AppError {

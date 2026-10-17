@@ -1,0 +1,7 @@
+[Core] WARNING: Getting locale failed: ValueError('not enough values to unpack (expected 2, got 1)'), falling back to using en-US.
+[cli] INFO: Logging in...
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/runpy.py", line 198, in _run_module_as_main
+  File "legendary_linux_x86_64/legendary/core.py", line 192, in _login
+    raise ValueError('No saved credentials')
+ValueError: No saved credentials

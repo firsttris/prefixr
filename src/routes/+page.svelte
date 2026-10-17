@@ -12,6 +12,8 @@
   import SteamGridDbSettings from "$lib/components/SteamGridDbSettings.svelte";
   import ArtworkPicker from "$lib/components/ArtworkPicker.svelte";
   import InstallDialog from "$lib/components/InstallDialog.svelte";
+  import StoreInstallDialog from "$lib/components/StoreInstallDialog.svelte";
+  import StoresSettings from "$lib/components/StoresSettings.svelte";
   import Modal from "$lib/components/Modal.svelte";
   import { getLocale, setLocale, type Locale } from "$lib/i18n/index.svelte";
   import {
@@ -25,7 +27,7 @@
   } from "$lib/stores/games";
   import { listenForConfigChanges } from "$lib/stores/library";
   import { appVersion, openReleaseNotes, refreshAppVersion } from "$lib/stores/system";
-  import type { Game } from "$lib/types";
+  import type { Game, StoreGame } from "$lib/types";
 
   type View =
     | "library"
@@ -35,6 +37,7 @@
     | "graphics"
     | "overlay"
     | "proton"
+    | "stores"
     | "steamgriddb";
   let view = $state<View>("library");
 
@@ -51,6 +54,7 @@
   let pickingArtworkFor = $state<Game | null>(null);
   let installingExePath = $state<string | null>(null);
   let installerRunning = $state(false);
+  let installingStoreGame = $state<StoreGame | null>(null);
 
   let modalGame = $derived(editing && editing !== "new" ? editing : undefined);
   let modalTitle = $derived(
@@ -141,6 +145,14 @@
     <button
       type="button"
       class="nav-item"
+      class:active={view === "stores"}
+      onclick={() => (view = "stores")}
+    >
+      {m.nav_stores()}
+    </button>
+    <button
+      type="button"
+      class="nav-item"
       class:active={view === "steamgriddb"}
       onclick={() => (view = "steamgriddb")}
     >
@@ -203,6 +215,7 @@
           editingTab = undefined;
           editing = "new";
         }}
+        onInstallStoreGame={(game) => (installingStoreGame = game)}
       />
     {:else if view === "prefixes"}
       <div class="page-header">
@@ -222,6 +235,11 @@
       <OverlaySettings />
     {:else if view === "proton"}
       <ProtonSettings />
+    {:else if view === "stores"}
+      <div class="page-header">
+        <h1>{m.library_storesHeading()}</h1>
+      </div>
+      <StoresSettings />
     {:else}
       <div class="page-header">
         <h1>{m.library_steamgriddbHeading()}</h1>
@@ -242,6 +260,18 @@
 >
   {#if pickingArtworkFor}
     <ArtworkPicker game={pickingArtworkFor} onDone={() => (pickingArtworkFor = null)} />
+  {/if}
+</Modal>
+
+<Modal
+  open={installingStoreGame !== null}
+  title={installingStoreGame
+    ? m.storeInstall_title({ name: installingStoreGame.title })
+    : m.storeInstall_titleFallback()}
+  onClose={() => (installingStoreGame = null)}
+>
+  {#if installingStoreGame}
+    <StoreInstallDialog game={installingStoreGame} onClose={() => (installingStoreGame = null)} />
   {/if}
 </Modal>
 

@@ -27,6 +27,7 @@ use crate::commands::shell_link::{find_recently_created_shortcuts, DetectedShort
 use crate::commands::steamgriddb::{
     artwork_dir, asset_cache_path, image_extension, remove_game_artwork_files,
 };
+use crate::commands::stores;
 use crate::commands::umu::{ensure_umu, runtime_present};
 use crate::config::{save_config, ConfigState};
 use crate::env::{self, Env};
@@ -35,6 +36,7 @@ use crate::locale::LocaleState;
 use crate::lock::LockExt;
 use crate::models::{
     normalize_umu_id, normalize_umu_store, split_launch_args, Game, GameInput, Runner, RunnerKind,
+    StorePrerequisites,
 };
 use crate::tray::rebuild_tray_menu;
 
@@ -636,6 +638,7 @@ pub fn add_game(
         umu_id,
         umu_store,
         overrides: game.overrides,
+        store: None,
     };
 
     let mut config = state.locked();
@@ -1336,6 +1339,29 @@ async fn run_game(
         &on_initializing,
     )
     .await?;
+
+    // A game installed from a store: what it wants in its prefix first runs
+    // once, and the store's tool says how it starts — online games need the
+    // account's tokens on their command line, fresh for every launch.
+    let store_launch = match &game.store {
+        Some(link) => {
+            if let Some(prereq) = link.prerequisites.as_ref().filter(|p| !p.installed) {
+                run_store_prerequisites(&runner_binary, &env, &game.exe_path, prereq, log_path)
+                    .await;
+                // Like the stores' own launchers: whether it worked or not,
+                // it isn't run again on every launch. The log shows it.
+                let _ = stores::mark_prerequisites_installed(app, game.id);
+            }
+            let launch = stores::launch_command(app, link).await?;
+            env.extend(launch.env.iter().cloned());
+            Some(launch)
+        }
+        None => None,
+    };
+    let exe_path = store_launch
+        .as_ref()
+        .map_or_else(|| game.exe_path.clone(), |launch| launch.exe_path.clone());
+
     // `kill_running_game` needs this exact value to reach the right
     // wineserver session.
     let wineprefix = game.prefix_path.to_string_lossy().into_owned();
@@ -1497,8 +1523,19 @@ async fn run_game(
     let launch_env = env;
 
     // Per-game exe arguments (PortProton calls these `LAUNCH_PARAMETERS`),
-    // e.g. `--launcher-skip -dx11`.
-    let game_launch_args = split_launch_args(&game.launch_args)?;
+    // e.g. `--launcher-skip -dx11`. A store game's own arguments go before
+    // them and the account's after, as the store's tool orders them.
+    let user_launch_args = split_launch_args(&game.launch_args)?;
+    let game_launch_args: Vec<String> = match &store_launch {
+        Some(launch) => launch
+            .game_args
+            .iter()
+            .cloned()
+            .chain(user_launch_args)
+            .chain(launch.account_args.iter().cloned())
+            .collect(),
+        None => user_launch_args,
+    };
 
     if scheduler_conflict {
         let note = if use_power_profile {
@@ -1515,12 +1552,16 @@ async fn run_game(
     let (log_out, log_err) = log_stdio(log_path)?;
 
     let mut command = runner_command(&launch_binary, env_pairs(&launch_env));
-    if let Some(dir) = working_dir(&game.exe_path) {
+    let store_dir = store_launch
+        .as_ref()
+        .map(|launch| launch.working_dir.as_path())
+        .filter(|dir| dir.is_dir());
+    if let Some(dir) = store_dir.or_else(|| working_dir(&exe_path)) {
         command.current_dir(dir);
     }
     let mut child = command
         .args(&wrapper_args)
-        .arg(&game.exe_path)
+        .arg(&exe_path)
         .args(&game_launch_args)
         .stdout(log_out)
         .stderr(log_err)
@@ -1538,7 +1579,7 @@ async fn run_game(
             pid: child.id(),
             wineserver: wineserver.clone(),
             wineprefix: wineprefix.clone(),
-            exe_path: game.exe_path.clone(),
+            exe_path: exe_path.clone(),
             killed: killed.clone(),
         },
     );
@@ -1572,6 +1613,68 @@ async fn run_game(
     }
 
     Ok(())
+}
+
+/// Runs a store game's prerequisites installer (Visual C++ runtimes and
+/// the like, see `StorePrerequisites`) in its prefix and waits for it, its
+/// output into the launch's log. Best-effort: a game often runs without
+/// them, and the log says what happened.
+async fn run_store_prerequisites(
+    runner_binary: &Path,
+    env: &[(String, String)],
+    game_exe: &Path,
+    prereq: &StorePrerequisites,
+    log_path: &Path,
+) {
+    use std::io::Write;
+    let note = |text: String| {
+        let _ = fs::OpenOptions::new()
+            .append(true)
+            .open(log_path)
+            .and_then(|mut f| writeln!(f, "[prefixr] {text}"));
+    };
+    let Some(install_dir) = store_install_dir(game_exe, &prereq.path) else {
+        note(format!(
+            "Prerequisites skipped: no install folder for {}",
+            prereq.path
+        ));
+        return;
+    };
+    let installer = install_dir.join(&prereq.path);
+    let args = split_launch_args(&prereq.args).unwrap_or_default();
+    note(format!(
+        "Installing prerequisites: {} ({})",
+        prereq.name,
+        installer.display()
+    ));
+    let Ok((log_out, log_err)) = log_stdio(log_path) else {
+        return;
+    };
+    let mut command = runner_command(runner_binary, env_pairs(env));
+    if let Some(dir) = installer.parent().filter(|dir| dir.is_dir()) {
+        command.current_dir(dir);
+    }
+    let result = command
+        .arg(&installer)
+        .args(&args)
+        .stdout(log_out)
+        .stderr(log_err)
+        .status()
+        .await;
+    match result {
+        Ok(status) => note(format!("Prerequisites installer exited with {status}")),
+        Err(e) => note(format!("Could not run the prerequisites installer: {e}")),
+    }
+}
+
+/// The folder a store game is installed in, from its exe and a path
+/// relative to that folder: the exe's nearest ancestor holding the path.
+fn store_install_dir(game_exe: &Path, relative: &str) -> Option<PathBuf> {
+    game_exe
+        .ancestors()
+        .skip(1)
+        .find(|dir| dir.join(relative).exists())
+        .map(Path::to_path_buf)
 }
 
 /// The folder a game starts in: its exe's own, as Windows starts a program

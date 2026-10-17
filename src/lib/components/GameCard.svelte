@@ -3,6 +3,7 @@
   import type { Game } from "$lib/types";
   import { killGame, launchGame, type GameRunState } from "$lib/stores/games";
   import { exeIconUrl } from "$lib/stores/steamgriddb";
+  import { storeName } from "$lib/stores/gameStores";
   import GameActionsMenu from "./GameActionsMenu.svelte";
   import GameFallbackIcon from "./GameFallbackIcon.svelte";
   import GameItemNotices from "./GameItemNotices.svelte";
@@ -74,7 +75,12 @@
       <div class="bottom-row">
         <div class="info">
           <h3 title={game.name}>{game.name}</h3>
-          <span class="runner">{game.runner_id}</span>
+          <div class="pills">
+            {#if game.store}
+              <span class="runner">{storeName(game.store.store)}</span>
+            {/if}
+            <span class="runner">{game.runner_id}</span>
+          </div>
         </div>
 
         <button
@@ -250,6 +256,12 @@
     line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+  }
+
+  .pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3em;
   }
 
   .runner {

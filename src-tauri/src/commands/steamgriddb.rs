@@ -371,7 +371,7 @@ pub(crate) fn asset_cache_path(dir: &Path, id: Uuid, kind: &str, ext: &str) -> P
 /// Removes any previously cached asset file of `kind` for `id`, regardless
 /// of extension, so switching between differently-formatted images doesn't
 /// leave stale files behind.
-fn remove_stale_asset_files(dir: &Path, id: Uuid, kind: &str) -> Result<(), String> {
+pub(crate) fn remove_stale_asset_files(dir: &Path, id: Uuid, kind: &str) -> Result<(), String> {
     let Ok(entries) = fs::read_dir(dir) else {
         return Ok(());
     };
@@ -420,11 +420,18 @@ fn is_steamgriddb_image_url(url: &str) -> bool {
 /// Downloads an artwork image from its source URL — only from SteamGridDB,
 /// and only up to `MAX_IMAGE_BYTES`.
 async fn download_image(image_url: &str) -> Result<Vec<u8>, String> {
-    use futures_util::StreamExt;
-
     if !is_steamgriddb_image_url(image_url) {
         return Err(format!("Not a SteamGridDB image: {image_url}"));
     }
+    download_image_unchecked(image_url).await
+}
+
+/// Downloads an image of at most `MAX_IMAGE_BYTES` from a URL the caller
+/// has already checked comes from where it should (SteamGridDB above, a
+/// store's own image CDN in `commands::stores`).
+pub(crate) async fn download_image_unchecked(image_url: &str) -> Result<Vec<u8>, String> {
+    use futures_util::StreamExt;
+
     let too_large = || format!("Image is larger than {} MB", MAX_IMAGE_BYTES / 1024 / 1024);
     let response = crate::http::client()
         .get(image_url)

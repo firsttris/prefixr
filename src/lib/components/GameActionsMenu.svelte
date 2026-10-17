@@ -215,7 +215,7 @@
             stroke-linejoin="round"
           />
         </svg>
-        {m.common_remove()}
+        {item.fromStore ? m.gameCard_menuUninstall() : m.common_remove()}
       </button>
     {/if}
   {/snippet}

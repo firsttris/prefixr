@@ -47,6 +47,11 @@ export class GameItem {
     $effect(() => () => clearTimeout(this.#doneTimer));
   }
 
+  /** Installed from a store: removing it uninstalls its files. */
+  get fromStore(): boolean {
+    return this.#game().store != null;
+  }
+
   async createShortcut(target: "desktop" | "menu"): Promise<void> {
     const id = this.#game().id;
     clearTimeout(this.#doneTimer);
