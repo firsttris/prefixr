@@ -2,7 +2,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use std::process::Stdio;
+
 use tauri::{AppHandle, Manager};
+
+use crate::error::AppError;
+use crate::host_env::host_command;
 
 /// How many logs each game (or prefix) keeps. Every launch writes a new
 /// one, so without a limit they'd pile up forever.
@@ -76,6 +81,41 @@ fn prune_logs(dir: &Path, keep: usize) {
     for (_, path) in &logs[..logs.len() - keep] {
         let _ = fs::remove_file(path);
     }
+}
+
+/// `path` as a log under `root`, with symlinks and `..` resolved — the only
+/// files `open_log` opens.
+fn log_file_in(root: &Path, path: &Path) -> Result<PathBuf, String> {
+    let not_a_log = || format!("Not a Prefixr log: {}", path.display());
+    let root = fs::canonicalize(root).map_err(|_| not_a_log())?;
+    let path = fs::canonicalize(path).map_err(|_| not_a_log())?;
+    if path.starts_with(&root) && path.is_file() {
+        Ok(path)
+    } else {
+        Err(not_a_log())
+    }
+}
+
+/// Opens a log in the desktop's default app for it, through `xdg-open`
+/// started with the host's environment (see `host_env`). The opener
+/// plugin started it with the AppImage's, under which the desktop's own
+/// opener (e.g. `kde-open`) can't even load its libraries. An error lets the
+/// frontend fall back to showing the file in the file manager.
+#[tauri::command]
+pub async fn open_log(app: AppHandle, path: String) -> Result<(), AppError> {
+    let path = log_file_in(&logs_root(&app)?, Path::new(&path))?;
+    let status = host_command("xdg-open")
+        .arg(&path)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .await
+        .map_err(|e| format!("Could not run xdg-open: {e}"))?;
+    if !status.success() {
+        return Err(format!("xdg-open exited with {status}").into());
+    }
+    Ok(())
 }
 
 #[cfg(test)]
