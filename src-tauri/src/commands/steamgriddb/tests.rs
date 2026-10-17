@@ -21,6 +21,7 @@ fn sample_game(id: Uuid, name: &str) -> Game {
         runner_id: "runner".to_string(),
         env_vars: Default::default(),
         launch_args: String::new(),
+        notes: String::new(),
         icon: None,
         steamgriddb_id: None,
         cover_grid_id: None,

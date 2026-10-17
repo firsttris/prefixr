@@ -79,6 +79,8 @@ struct Cli {
     command: Command,
 }
 
+// Parsed once per run, so the size of the largest variant doesn't matter.
+#[allow(clippy::large_enum_variant)]
 #[derive(Subcommand, Debug)]
 enum Command {
     /// The games in the library
@@ -191,6 +193,10 @@ struct GameSettings {
     /// Arguments for the game's exe, quoted as on a Windows command line
     #[arg(long, allow_hyphen_values = true)]
     args: Option<String>,
+    /// Notes kept with the game, e.g. a crack's offline login or why a
+    /// setting is needed ("" removes them)
+    #[arg(long)]
+    notes: Option<String>,
     /// The protonfixes match, e.g. umu-1091500 or a Steam app id ("" for none);
     /// see `prefixr umu search`
     #[arg(long)]
@@ -597,6 +603,9 @@ fn apply_settings(settings: GameSettings, input: &mut GameInput) {
     if let Some(args) = settings.args {
         input.launch_args = args;
     }
+    if let Some(notes) = settings.notes {
+        input.notes = notes.trim().to_string();
+    }
     if let Some(umu_id) = settings.umu_id {
         input.umu_id = Some(umu_id);
         // A store belongs to the id it was picked with.
@@ -638,6 +647,7 @@ fn game_input(game: &Game) -> GameInput {
         runner_id: game.runner_id.clone(),
         env_vars: game.env_vars.clone(),
         launch_args: game.launch_args.clone(),
+        notes: game.notes.clone(),
         umu_id: game.umu_id.clone(),
         umu_store: game.umu_store.clone(),
         overrides: game.overrides.clone(),
@@ -769,6 +779,10 @@ fn describe_game(game: &Game) -> String {
     if let Some(id) = game.steamgriddb_id {
         lines.push(format!("SteamGridDB: {id}"));
     }
+    if !game.notes.is_empty() {
+        lines.push("Notes:".to_string());
+        lines.extend(game.notes.lines().map(|line| format!("  {line}")));
+    }
     lines.join("\n")
 }
 
@@ -806,6 +820,7 @@ async fn game_command(app: &AppHandle, out: Out, command: GameCommand) -> Result
                 runner_id: args.runner,
                 env_vars: Default::default(),
                 launch_args: String::new(),
+                notes: String::new(),
                 umu_id: None,
                 umu_store: None,
                 overrides: Default::default(),

@@ -13,6 +13,12 @@ export type Game = { id: string, name: string, exe_path: string, prefix_path: st
  */
 launch_args: string, 
 /**
+ * Free text the user (or an agent setting the game up) keeps with the
+ * game: a crack's offline login, why an override is set, where a
+ * setting lives. Only shown, never used for a launch.
+ */
+notes: string, 
+/**
  * The path of the exe's embedded icon, saved as a PNG (see
  * `icons::exe_icon_path`), which the frontend loads through the asset
  * protocol. Extracted once when the game is added/updated; `None` if

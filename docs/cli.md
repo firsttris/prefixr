@@ -58,6 +58,7 @@ The settings `game add` and `game edit` take:
 | --- | --- |
 | `--env KEY=VALUE` | An environment variable (repeatable). `--unset-env KEY` removes one |
 | `--args "…"` | The launch arguments, quoted as on a Windows command line |
+| `--notes "…"` | The game's notes, shown on its card; `""` removes them |
 | `--umu-id <id>` | The [protonfixes match](user-guide.md#proton). A Steam app ID such as `377160` becomes `umu-377160`; `""` removes it. `--umu-store gog` sets the store |
 | `--proton NAME=on\|off\|default` | A Proton switch for this game (repeatable), for example `--proton PROTON_USE_WINED3D=on` |
 | `--gamemode`, `--power-profile`, `--inhibit-sleep`, `--mangohud` | `on`, `off`, or `default` to follow the global setting again |
@@ -133,7 +134,10 @@ A good way to work with an agent:
    environment variables (`DXVK_FRAME_RATE`, `WINEDLLOVERRIDES`, …), winetricks packages or
    registry keys. Most generic ones (DXVK, d3dx9, esync and fsync) are built into Proton already; the
    game-specific ones become `--env`, `prefix winetricks` and `prefix run … regedit /S file.reg`.
-5. **Save games live in the prefix.** When a game moves to a new prefix, have the agent copy its
+5. **Write down what you found.** `--notes` keeps it with the game: an offline login, why an
+   override is set, which config file holds the resolution. The next person (or agent) sees it on
+   the card.
+6. **Save games live in the prefix.** When a game moves to a new prefix, have the agent copy its
    saves from the old prefix's `drive_c/users/…` (`Documents`, `Saved Games`, `AppData`) into the
    new one's `drive_c/users/steamuser/…`.
 

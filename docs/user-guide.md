@@ -59,6 +59,7 @@ The **⋮** menu on a card (in the list view, the 🔗 button plus the buttons n
 | **Runner** | Proton or Wine build to run it with. See [Runners](#runners). |
 | **Environment variables** | `KEY=VALUE`, one per line. These win over every switch in the other tabs. `WINEDLLOVERRIDES` and `LD_PRELOAD` are added to what Prefixr sets, not replaced. |
 | **Launch arguments** | Passed to the game's `.exe`, for example `--launcher-skip -dx11`. Quote arguments with spaces: `-path "C:\My Game"`. |
+| **Notes** | Anything worth remembering about the game: an offline login, why a setting is needed, where its config file lives. A 📝 on the card shows them on hover. They're stored as plain text in `config.json`, so keep real passwords out. |
 
 The other tabs (**Performance**, **Graphics**, **Overlay**, and **Proton** for a Proton runner)
 override the global settings for this game only. See [Game settings](#game-settings).

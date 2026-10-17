@@ -64,6 +64,7 @@
     runnerId: existingGame?.runner_id ?? initialRunnerId ?? "",
     envVarsText: existingGame ? formatEnvVars(existingGame.env_vars) : "",
     launchArgs: existingGame?.launch_args ?? "",
+    notes: existingGame?.notes ?? "",
     umuId: existingGame?.umu_id ?? null,
     umuStore: existingGame?.umu_store ?? null,
     overrides: existingGame?.overrides,
@@ -75,6 +76,7 @@
   let runnerId = $state(defaults.runnerId);
   let envVarsText = $state(defaults.envVarsText);
   let launchArgs = $state(defaults.launchArgs);
+  let notes = $state(defaults.notes);
   let umuId = $state<string | null>(defaults.umuId);
   let umuStore = $state<string | null>(defaults.umuStore);
   let error = $state<unknown>(null);
@@ -302,6 +304,7 @@
       runner_id: runnerId,
       env_vars: parseEnvVars(envVarsText),
       launch_args: launchArgs.trim(),
+      notes: notes.trim(),
       umu_id: umuId,
       umu_store: umuStore,
       overrides: $state.snapshot({ performance: perf, graphics: gfx, overlay, proton }),
@@ -418,6 +421,12 @@
     <label>
       {m.gameForm_launchArgsLabel()}
       <input placeholder={m.gameForm_launchArgsPlaceholder()} bind:value={launchArgs} />
+    </label>
+
+    <label>
+      {m.gameForm_notesLabel()}
+      <textarea placeholder={m.gameForm_notesPlaceholder()} bind:value={notes}></textarea>
+      <span class="hint">{m.gameForm_notesHint()}</span>
     </label>
   {:else if activeTab === "performance"}
     {@render inheritHint(m.nav_performance())}

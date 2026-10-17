@@ -147,6 +147,29 @@ fn settings_change_only_what_is_given() {
 }
 
 #[test]
+fn sets_and_clears_notes() {
+    let mut input = input();
+    apply_settings(
+        GameSettings {
+            notes: Some("  Login: RELOADED / 1\n".into()),
+            ..Default::default()
+        },
+        &mut input,
+    );
+    assert_eq!(input.notes, "Login: RELOADED / 1");
+    apply_settings(GameSettings::default(), &mut input);
+    assert_eq!(input.notes, "Login: RELOADED / 1", "kept when not given");
+    apply_settings(
+        GameSettings {
+            notes: Some(String::new()),
+            ..Default::default()
+        },
+        &mut input,
+    );
+    assert_eq!(input.notes, "");
+}
+
+#[test]
 fn a_new_umu_id_drops_the_old_store() {
     let mut input = input();
     input.umu_id = Some("umu-1".into());

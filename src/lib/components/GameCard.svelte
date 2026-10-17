@@ -71,7 +71,12 @@
       <div class="bottom-row">
         <div class="info">
           <h3 title={game.name}>{game.name}</h3>
-          <span class="runner">{game.runner_id}</span>
+          <div class="badges">
+            <span class="runner">{game.runner_id}</span>
+            {#if game.notes}
+              <span class="notes" title={game.notes} aria-label={m.gameCard_notes()}>📝</span>
+            {/if}
+          </div>
         </div>
 
         <button
@@ -247,6 +252,17 @@
     line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+  }
+
+  .badges {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+  }
+
+  .notes {
+    font-size: 0.8em;
+    cursor: help;
   }
 
   .runner {

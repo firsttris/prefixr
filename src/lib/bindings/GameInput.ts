@@ -4,4 +4,4 @@ import type { GameOverrides } from "./GameOverrides";
 /**
  * Payload for `add_game`; the id is assigned by the backend.
  */
-export type GameInput = { name: string, exe_path: string, prefix_path: string, runner_id: string, env_vars: { [key in string]: string }, launch_args: string, umu_id: string | null, umu_store: string | null, overrides: GameOverrides, };
+export type GameInput = { name: string, exe_path: string, prefix_path: string, runner_id: string, env_vars: { [key in string]: string }, launch_args: string, notes: string, umu_id: string | null, umu_store: string | null, overrides: GameOverrides, };

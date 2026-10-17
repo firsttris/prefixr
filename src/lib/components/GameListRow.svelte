@@ -45,6 +45,9 @@
   <div class="meta">
     <span class="name" title={game.name}>{game.name}</span>
     <span class="runner">{game.runner_id}</span>
+    {#if game.notes}
+      <span class="notes" title={game.notes} aria-label={m.gameCard_notes()}>📝</span>
+    {/if}
   </div>
 
   <div class="status">
@@ -175,6 +178,12 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .notes {
+    flex-shrink: 0;
+    font-size: 0.8em;
+    cursor: help;
   }
 
   .runner {
