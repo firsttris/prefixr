@@ -464,13 +464,46 @@ fn ico_to_png(bytes: Vec<u8>) -> Result<Vec<u8>, String> {
     if !bytes.starts_with(&[0, 0, 1, 0]) {
         return Ok(bytes);
     }
-    let image = image::load_from_memory_with_format(&bytes, image::ImageFormat::Ico)
-        .map_err(|e| format!("Could not read icon: {e}"))?;
+    let image = match image::load_from_memory_with_format(&bytes, image::ImageFormat::Ico) {
+        Ok(image) => image,
+        // The decoder refuses a PNG inside the icon that isn't RGBA (seen
+        // on SteamGridDB), but a PNG is just what's wanted here anyway.
+        Err(e) => return embedded_png(&bytes).ok_or(format!("Could not read icon: {e}")),
+    };
     let mut png = Vec::new();
     image
         .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
         .map_err(|e| format!("Could not convert icon: {e}"))?;
     Ok(png)
+}
+
+const PNG_SIGNATURE: &[u8] = b"\x89PNG\r\n\x1a\n";
+
+/// The widest PNG an ICO file holds, as it is. An ICO's entries are
+/// listed after its 6-byte header, 16 bytes each, with the size and offset
+/// of their data at bytes 8 and 12; a PNG entry's width is in its `IHDR`
+/// chunk, right after the signature.
+fn embedded_png(ico: &[u8]) -> Option<Vec<u8>> {
+    let u32_at = |data: &[u8], at: usize, be: bool| -> Option<u32> {
+        let bytes: [u8; 4] = data.get(at..at + 4)?.try_into().ok()?;
+        Some(if be {
+            u32::from_be_bytes(bytes)
+        } else {
+            u32::from_le_bytes(bytes)
+        })
+    };
+    let count = u16::from_le_bytes(ico.get(4..6)?.try_into().ok()?) as usize;
+    (0..count)
+        .filter_map(|i| {
+            let entry = 6 + 16 * i;
+            let size = u32_at(ico, entry + 8, false)? as usize;
+            let offset = u32_at(ico, entry + 12, false)? as usize;
+            let data = ico.get(offset..offset.checked_add(size)?)?;
+            let width = u32_at(data, 16, true)?;
+            data.starts_with(PNG_SIGNATURE).then_some((width, data))
+        })
+        .max_by_key(|(width, _)| *width)
+        .map(|(_, data)| data.to_vec())
 }
 
 fn find_game<'a>(
