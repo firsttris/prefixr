@@ -68,7 +68,7 @@ packages, carry over the fixes from old launch scripts or other launchers, copy 
 pick the artwork, while you start each game from the window and say whether it works.
 
 ```text
-You:   Add all games under /mnt/games/LinuxRuleZ to Prefixr. Each one has its own Wine and a
+You:   Add all games under /mnt/games/ to Prefixr. Each one has its own Wine and a
        start script; give them Proton-GE instead and keep the fixes from the scripts.
 Agent: prefixr runner download proton-ge
        prefixr umu search "Fallout 4"
