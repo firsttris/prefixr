@@ -103,5 +103,24 @@ pub fn host_std_command(program: impl AsRef<OsStr>) -> std::process::Command {
     command
 }
 
+/// Opens `target` (a file or a URL) with the desktop's default app for it.
+/// `xdg-open` gets the host's environment: the opener plugin would start it
+/// with the AppImage's, under which the desktop's own opener (e.g.
+/// `kde-open`) can't even load its libraries.
+pub async fn xdg_open(target: impl AsRef<OsStr>) -> Result<(), String> {
+    let status = host_command("xdg-open")
+        .arg(target)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .await
+        .map_err(|e| format!("Could not run xdg-open: {e}"))?;
+    if !status.success() {
+        return Err(format!("xdg-open exited with {status}"));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests;
