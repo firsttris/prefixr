@@ -169,8 +169,27 @@ pub struct StoreLink {
     /// What the game wants installed in its prefix before it first runs
     /// (Visual C++ runtimes, DirectX, …), as the store lists it. Each runs
     /// once, on the first launch, and is then marked as installed.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "one_or_many_prerequisites")]
     pub prerequisites: Vec<StorePrerequisites>,
+}
+
+/// A list of prerequisites, as well as what a config written before GOG
+/// held there: Epic's one prerequisite (an object) or none (`null`).
+fn one_or_many_prerequisites<'de, D>(deserializer: D) -> Result<Vec<StorePrerequisites>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum OneOrMany {
+        Many(Vec<StorePrerequisites>),
+        One(StorePrerequisites),
+    }
+    Ok(match Option::<OneOrMany>::deserialize(deserializer)? {
+        Some(OneOrMany::Many(list)) => list,
+        Some(OneOrMany::One(one)) => vec![one],
+        None => Vec::new(),
+    })
 }
 
 /// A store's post-install step: an installer shipped with the game.

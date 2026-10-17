@@ -1123,6 +1123,9 @@ async fn install_gog(
             }
         }
     }
+    // Cancelled while the redistributables downloaded: the game stays on
+    // disk (installing again continues from it) but isn't added.
+    ensure_not_cancelled(installs, key)?;
     Ok(epic::InstalledGame {
         install_path: game_dir,
         exe_path: launch.exe_path,
@@ -1156,6 +1159,15 @@ async fn run_install(
         .map_err(|e| format!("Could not start {tool_name}: {e}"))?;
     if let Some(install) = installs.0.locked().get_mut(key) {
         install.pid = child.id();
+        // Cancelled before there was a process to stop (while the tool
+        // looked the game up, say): stopped right away, as a cancel would.
+        if install.cancelled {
+            if let Some(pid) = install.pid {
+                unsafe {
+                    libc::kill(-(pid as libc::pid_t), libc::SIGTERM);
+                }
+            }
+        }
     }
 
     let last_emit = Mutex::new(None::<Instant>);
@@ -1181,15 +1193,24 @@ async fn run_install(
         .await
         .map_err(|e| format!("{tool_name} failed: {e}"))?;
 
-    let cancelled = installs.0.locked().get(key).is_some_and(|i| i.cancelled);
-    if cancelled {
-        return Err(AppError::StoreInstallCancelled);
-    }
+    ensure_not_cancelled(installs, key)?;
     if !status.success() {
         return Err(install_failed(
             log_path,
             format!("{tool_name} exited with {status}"),
         ));
+    }
+    Ok(())
+}
+
+/// `StoreInstallCancelled` once the install was cancelled, for the steps
+/// after the download that no process of its own stands for.
+fn ensure_not_cancelled(
+    installs: &StoreInstalls,
+    key: &(StoreKind, String),
+) -> Result<(), AppError> {
+    if installs.0.locked().get(key).is_some_and(|i| i.cancelled) {
+        return Err(AppError::StoreInstallCancelled);
     }
     Ok(())
 }

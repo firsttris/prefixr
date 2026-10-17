@@ -275,17 +275,26 @@ pub struct InstallPlan {
 
 /// `gogdl info <id> --platform windows --lang en-US`'s JSON: sizes per
 /// language (`*` is what every language needs), the folder and the
-/// dependencies.
+/// dependencies. The sizes include the owned DLCs (`dlcs[].size`, in the
+/// same shape), as the install downloads them too.
 pub fn parse_info(json: &str) -> Result<InstallPlan, String> {
     let info: Value = serde_json::from_str(json.trim())
         .map_err(|e| format!("Could not read gogdl's game info: {e}"))?;
-    let sizes = info.get("size").unwrap_or(&Value::Null);
+    let dlc_sizes = info
+        .get("dlcs")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|dlc| dlc.get("size"));
+    let all_sizes: Vec<&Value> = info.get("size").into_iter().chain(dlc_sizes).collect();
     let size = |key: &str| {
-        let part = |language: &str| sizes.get(language)?.get(key)?.as_u64();
-        match (part("*"), part(LANGUAGE)) {
-            (None, None) => None,
-            (all, language) => Some(all.unwrap_or(0) + language.unwrap_or(0)),
-        }
+        all_sizes
+            .iter()
+            .flat_map(|sizes| {
+                ["*", LANGUAGE].map(|language| sizes.get(language)?.get(key)?.as_u64())
+            })
+            .flatten()
+            .reduce(|a, b| a + b)
     };
     let folder_name = info
         .get("folder_name")

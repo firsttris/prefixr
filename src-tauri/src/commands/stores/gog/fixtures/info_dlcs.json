@@ -1,0 +1,78 @@
+{
+  "size": {
+    "*": {
+      "download_size": 1500000000,
+      "disk_size": 2100000000
+    },
+    "en-US": {
+      "download_size": 300000000,
+      "disk_size": 400000000
+    },
+    "de-DE": {
+      "download_size": 310000000,
+      "disk_size": 410000000
+    }
+  },
+  "dlcs": [
+    {
+      "title": "Hearts of Stone",
+      "id": "1505852016",
+      "languages": [
+        "en-US"
+      ],
+      "size": {
+        "*": {
+          "download_size": 800000000,
+          "disk_size": 900000000
+        },
+        "en-US": {
+          "download_size": 100000000,
+          "disk_size": 100000000
+        }
+      }
+    },
+    {
+      "title": "Blood and Wine",
+      "id": "1640424747",
+      "languages": [
+        "en-US"
+      ],
+      "size": {
+        "*": {
+          "download_size": 1100000000,
+          "disk_size": 1300000000
+        }
+      }
+    }
+  ],
+  "buildId": "56453436467238173",
+  "languages": [
+    "en-US",
+    "de-DE"
+  ],
+  "folder_name": "Jotun",
+  "dependencies": [
+    "MSVC2017",
+    "ISI",
+    "DXSETUP"
+  ],
+  "versionEtag": "\"abc\"",
+  "builds": {
+    "total_count": 1,
+    "count": 1,
+    "items": [
+      {
+        "build_id": "56453436467238173",
+        "product_id": "1207658924",
+        "os": "windows",
+        "branch": null,
+        "version_name": "1.0",
+        "tags": [],
+        "public": true,
+        "date_published": "2016-09-29T13:00:00+0000",
+        "generation": 2,
+        "link": "https://cdn.gog.com/content-system/v2/meta/aa/bb/aabb"
+      }
+    ]
+  }
+}

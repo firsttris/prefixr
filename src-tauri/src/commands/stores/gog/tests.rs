@@ -131,6 +131,21 @@ fn sizes_add_the_language_to_what_every_language_needs() {
 }
 
 #[test]
+fn sizes_include_the_owned_dlcs() {
+    // `--with-dlcs` downloads them along with the game; gogdl lists their
+    // sizes apart (The Witcher 3 with both expansions, say).
+    let plan = parse_info(include_str!("fixtures/info_dlcs.json")).unwrap();
+    assert_eq!(
+        plan.sizes.download_size,
+        Some(1_800_000_000 + 900_000_000 + 1_100_000_000)
+    );
+    assert_eq!(
+        plan.sizes.disk_size,
+        Some(2_500_000_000 + 1_000_000_000 + 1_300_000_000)
+    );
+}
+
+#[test]
 fn download_installs_windows_build_with_dlc_into_the_folder() {
     let args = download_args("1207658924", Path::new("/home/user/Games/GOG"));
     let args: Vec<&str> = args.iter().map(|a| a.to_str().unwrap()).collect();
