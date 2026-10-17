@@ -14,7 +14,7 @@ use crate::commands::prefixes::effective_prefix_path;
 use crate::lock::LockExt;
 use crate::models::{
     Game, GitHubConfig, GraphicsConfig, MangoHudConfig, PerformanceConfig, PrefixInfo,
-    ProtonConfig, SteamGridDbConfig,
+    ProtonConfig, SteamGridDbConfig, StoresConfig,
 };
 
 const CONFIG_FILE_NAME: &str = "config.json";
@@ -40,6 +40,8 @@ pub struct AppConfig {
     pub steamgriddb: SteamGridDbConfig,
     #[serde(default)]
     pub github: GitHubConfig,
+    #[serde(default)]
+    pub stores: StoresConfig,
 }
 
 impl AppConfig {
@@ -58,6 +60,7 @@ impl AppConfig {
             proton: ProtonConfig::default(),
             steamgriddb: SteamGridDbConfig::default(),
             github: GitHubConfig::default(),
+            stores: StoresConfig::default(),
         })
     }
 }

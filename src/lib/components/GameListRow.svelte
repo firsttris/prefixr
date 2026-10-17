@@ -3,6 +3,7 @@
   import type { Game } from "$lib/types";
   import { killGame, launchGame, type GameRunState } from "$lib/stores/games";
   import { exeIconUrl } from "$lib/stores/steamgriddb";
+  import { storeName } from "$lib/stores/gameStores";
   import GameActionsMenu from "./GameActionsMenu.svelte";
   import GameFallbackIcon from "./GameFallbackIcon.svelte";
   import GameItemNotices from "./GameItemNotices.svelte";
@@ -46,7 +47,9 @@
 
   <div class="meta">
     <span class="name" title={game.name}>{game.name}</span>
-    <span class="runner">{game.runner_id}</span>
+    <span class="runner"
+      >{game.store ? `${storeName(game.store.store)} · ` : ""}{game.runner_id}</span
+    >
   </div>
 
   <div class="status">

@@ -562,3 +562,18 @@ fn a_game_starts_in_its_exes_folder() {
     assert_eq!(working_dir(&dir.join("gone/Game.exe")), None);
     assert_eq!(working_dir(Path::new("Game.exe")), None);
 }
+
+#[test]
+fn finds_a_store_games_install_folder_from_its_exe() {
+    let dir = crate::test_util::TestDir::new("store-install");
+    let exe = dir.join("Binaries/Win64/Game.exe");
+    fs::create_dir_all(exe.parent().unwrap()).unwrap();
+    fs::write(&exe, "").unwrap();
+    fs::create_dir_all(dir.join("Redist")).unwrap();
+    fs::write(dir.join("Redist/setup.exe"), "").unwrap();
+    assert_eq!(
+        store_install_dir(&exe, "Redist/setup.exe").as_deref(),
+        Some(dir.as_ref())
+    );
+    assert_eq!(store_install_dir(&exe, "Missing/setup.exe"), None);
+}

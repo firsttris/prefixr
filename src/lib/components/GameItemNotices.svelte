@@ -48,11 +48,17 @@
 
 <ConfirmDialog
   open={item.confirmingRemove}
-  title={m.gameCard_removeConfirmTitle()}
-  message={m.gameCard_removeConfirmMessage({
-    name: game.name,
-    steamPart: inSteam ? m.gameCard_removeConfirmSteamPart() : "",
-  })}
+  title={item.fromStore ? m.gameCard_uninstallConfirmTitle() : m.gameCard_removeConfirmTitle()}
+  message={item.fromStore
+    ? m.gameCard_uninstallConfirmMessage({
+        name: game.name,
+        steamPart: inSteam ? m.gameCard_removeConfirmSteamPart() : "",
+      })
+    : m.gameCard_removeConfirmMessage({
+        name: game.name,
+        steamPart: inSteam ? m.gameCard_removeConfirmSteamPart() : "",
+      })}
+  confirmLabel={item.fromStore ? m.gameCard_menuUninstall() : undefined}
   onConfirm={() => {
     item.confirmingRemove = false;
     onRemove();

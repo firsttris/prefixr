@@ -44,6 +44,11 @@ use commands::steamgriddb::{
     remove_game_icon, save_steamgriddb_config, search_steamgriddb_games, set_game_artwork,
     set_game_cover, set_game_icon,
 };
+use commands::stores::{
+    cancel_store_install, connect_store, disconnect_store, get_store_install_defaults,
+    install_store_game, list_store_accounts, list_store_games, list_store_installs,
+    open_store_login, sync_store_library, uninstall_store_game, StoreInstalls,
+};
 use commands::umu::{get_umu_status, install_umu, latest_umu_version};
 use commands::umu_database::search_umu_ids;
 use commands::wine_tools::launch_wine_tool;
@@ -202,6 +207,7 @@ pub fn run() {
             ))));
             app.manage(RunningGames::default());
             app.manage(LaunchingGames::default());
+            app.manage(StoreInstalls::default());
             app.manage(WindowVisible::new(true));
 
             if let Some(game_id) = run_game_id {
@@ -315,7 +321,18 @@ pub fn run() {
             search_umu_ids,
             set_ui_locale,
             open_log,
-            open_release_notes
+            open_release_notes,
+            list_store_accounts,
+            open_store_login,
+            connect_store,
+            disconnect_store,
+            sync_store_library,
+            list_store_games,
+            get_store_install_defaults,
+            install_store_game,
+            list_store_installs,
+            cancel_store_install,
+            uninstall_store_game
         ])
         .run(context)
         .expect("error while running tauri application");

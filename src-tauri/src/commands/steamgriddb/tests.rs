@@ -32,6 +32,7 @@ fn sample_game(id: Uuid, name: &str) -> Game {
         umu_id: None,
         umu_store: None,
         overrides: GameOverrides::default(),
+        store: None,
     }
 }
 
@@ -46,6 +47,7 @@ fn sample_config(games: Vec<Game>) -> AppConfig {
         proton: ProtonConfig::default(),
         steamgriddb: SteamGridDbConfig::default(),
         github: GitHubConfig::default(),
+        stores: Default::default(),
     }
 }
 

@@ -1,0 +1,10 @@
+[Core] WARNING: Getting locale failed: ValueError('not enough values to unpack (expected 2, got 1)'), falling back to using en-US.
+[cli] INFO: Preparing download for "Hollow Lantern" (Lantern)...
+[cli] INFO: Install size: 22462.00 MiB
+[DLManager] INFO: = Progress: 0.00% (0/5678), Running for 00:00:00, ETA: 00:00:00
+[DLManager] INFO:  - Downloaded: 0.00 MiB, Written: 0.00 MiB
+[DLManager] INFO: = Progress: 45.37% (2576/5678), Running for 00:04:12, ETA: 00:05:03
+[DLManager] INFO:  - Downloaded: 8550.12 MiB, Written: 10180.34 MiB
+[DLManager] INFO:  - Cache usage: 812.00 MiB, active tasks: 64
+[DLManager] INFO: = Progress: 100.00% (5678/5678), Running for 00:09:30, ETA: 00:00:00
+[cli] INFO: Finished installation process in 571.20 seconds.

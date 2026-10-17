@@ -111,6 +111,72 @@ pub struct Game {
     /// exactly as before.
     #[serde(default)]
     pub overrides: GameOverrides,
+    /// The store this game was installed from (see `commands::stores`), for
+    /// a game Prefixr installed from a connected store account. Its launch
+    /// then asks the store's tool for the command line (online games need
+    /// the account's tokens on it), and removing it uninstalls its files.
+    /// `None` for a game added by hand.
+    #[serde(default)]
+    pub store: Option<StoreLink>,
+}
+
+/// A store Prefixr can install games from. Each one is driven by a command
+/// line tool from the Heroic Games Launcher project (see
+/// `commands::stores::helpers`); a new store is a new variant here plus a
+/// module of its own under `commands::stores`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
+#[serde(rename_all = "lowercase")]
+pub enum StoreKind {
+    /// The Epic Games Store, through Legendary.
+    Epic,
+}
+
+impl StoreKind {
+    pub const ALL: [StoreKind; 1] = [StoreKind::Epic];
+
+    /// The name used in file and folder names (`stores/epic/…`).
+    pub fn slug(self) -> &'static str {
+        match self {
+            StoreKind::Epic => "epic",
+        }
+    }
+
+    /// The store's name as people know it, for log lines and errors that
+    /// aren't translated.
+    pub fn display_name(self) -> &'static str {
+        match self {
+            StoreKind::Epic => "Epic Games",
+        }
+    }
+}
+
+/// Ties a library game to the store entry it was installed from.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
+pub struct StoreLink {
+    pub store: StoreKind,
+    /// The store's own id for the game (Epic: the app name, e.g. `Fortnite`).
+    pub app_name: String,
+    /// What the game wants installed in its prefix before it first runs
+    /// (Visual C++ runtimes, DirectX, …), as the store lists it. Run once by
+    /// the first launch, then marked as installed.
+    #[serde(default)]
+    pub prerequisites: Option<StorePrerequisites>,
+}
+
+/// A store's post-install step: an installer shipped with the game.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
+pub struct StorePrerequisites {
+    pub name: String,
+    /// The installer's path, relative to the game's install folder.
+    pub path: String,
+    /// Its arguments, one string as the store gives them.
+    #[serde(default)]
+    pub args: String,
+    #[serde(default)]
+    pub installed: bool,
 }
 
 /// Steam's artwork slots besides the cover and icon, picked from
@@ -554,6 +620,17 @@ pub struct ProtonConfig {
 pub struct SteamGridDbConfig {
     #[serde(default)]
     pub api_key: Option<String>,
+}
+
+/// Store settings — see `commands::stores`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
+pub struct StoresConfig {
+    /// The folder store games were last installed to, offered again for the
+    /// next one (each game gets a folder of its own inside it). `None`
+    /// until the first install, which suggests `~/Games/<store>`.
+    #[serde(default)]
+    pub install_dir: Option<PathBuf>,
 }
 
 /// GitHub settings — see `commands::github`. An optional personal access

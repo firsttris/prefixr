@@ -28,6 +28,13 @@ pub fn game_log_dir(app: &AppHandle, game_id: &str) -> Result<PathBuf, String> {
 /// installer, Wine's own tools): `logs/prefixes/<sanitized-prefix-path>/`.
 /// Keyed by prefix, not by game: a prefix can outlive or be shared across
 /// several games, so there's no single game id that owns these.
+/// The logs of a store tool's runs for one game (its installs), e.g.
+/// `logs/stores/epic/Fortnite/`.
+pub fn store_log_dir(app: &AppHandle, store: &str, app_name: &str) -> Result<PathBuf, String> {
+    let dir_name = app_name.replace(['/', '\\', '.'], "_");
+    Ok(logs_root(app)?.join("stores").join(store).join(dir_name))
+}
+
 pub fn prefix_log_dir(app: &AppHandle, prefix_path: &Path) -> Result<PathBuf, String> {
     let dir_name = prefix_path.to_string_lossy().replace(['/', '\\'], "_");
     Ok(logs_root(app)?.join("prefixes").join(dir_name))
