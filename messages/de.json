@@ -512,6 +512,7 @@
   "backendErrors_store_login_failed": "Die Anmeldung hat nicht geklappt. Der Code gilt nur einmal und nur wenige Minuten — öffne die Anmeldeseite erneut und nimm den neuen Code.",
   "backendErrors_store_game_already_installed": "„{title}“ ist bereits installiert.",
   "backendErrors_store_install_running": "„{title}“ wird noch installiert. Spiele desselben Stores werden nacheinander installiert.",
+  "backendErrors_store_busy": "„{title}“ wird noch installiert. Brich die Installation ab oder warte, bis sie fertig ist, und versuche es dann erneut.",
   "backendErrors_store_install_cancelled": "Installation abgebrochen",
   "backendErrors_store_install_failed": "Die Installation ist fehlgeschlagen: {message} — Details im Log: {log_path}",
   "native_tray_hideWindow": "Fenster verstecken",

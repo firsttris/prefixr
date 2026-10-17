@@ -408,8 +408,24 @@ pub async fn connect_store(
 pub async fn disconnect_store(
     app: AppHandle,
     state: State<'_, ConfigState>,
+    installs: State<'_, StoreInstalls>,
     store: StoreKind,
 ) -> Result<(), AppError> {
+    // An install needs the tool to the end (and the login to download), and
+    // the tool would be deleted below while it runs.
+    let installing = installs
+        .0
+        .locked()
+        .keys()
+        .find(|(s, _)| *s == store)
+        .map(|(_, app_name)| app_name.clone());
+    if let Some(app_name) = installing {
+        let title = read_library(&app, store)
+            .into_iter()
+            .find(|entry| entry.app_name == app_name)
+            .map_or(app_name, |entry| entry.title);
+        return Err(AppError::StoreBusy { title });
+    }
     match store {
         StoreKind::Epic => {
             if let Some(legendary) = legendary_if_installed(&app)? {
@@ -747,7 +763,16 @@ async fn install(
         key: key.clone(),
     };
 
-    let prefix_path = install_prefix(app, state, store, &app_name, options.prefix_path.as_deref())?;
+    // A picked prefix is checked now; a new one is only made once the game
+    // is installed, so a failed or cancelled install leaves no unused
+    // prefix behind.
+    if let Some(picked) = options
+        .prefix_path
+        .as_deref()
+        .filter(|p| !p.trim().is_empty())
+    {
+        known_prefix(&state.locked(), picked)?;
+    }
     let install_dir = PathBuf::from(options.install_dir.trim());
     if !install_dir.is_absolute() {
         return Err(format!("Not an absolute folder: {}", install_dir.display()).into());
@@ -802,6 +827,7 @@ async fn install(
         }
     };
 
+    let prefix_path = install_prefix(app, state, store, &app_name, options.prefix_path.as_deref())?;
     let id = Uuid::new_v4();
     let exe_path = installed.exe_path();
     let icon = save_exe_icon(app, id, extract_icon_png(&exe_path).as_deref());
@@ -943,20 +969,31 @@ pub async fn uninstall_store_game(
         match link.store {
             StoreKind::Epic => {
                 let legendary = legendary(&app).await?;
-                let result = legendary
-                    .output([
+                let output = legendary
+                    .command([
                         "-y",
                         "uninstall",
                         link.app_name.as_str(),
                         "--skip-uninstaller",
                     ])
-                    .await;
-                // Already gone (deleted by hand) is fine: the game leaves the
-                // library all the same.
-                if let Err(message) = result {
-                    if !message.contains("not installed") {
-                        return Err(command_failed(link.store, message));
-                    }
+                    .output()
+                    .await
+                    .map_err(|e| format!("Could not run Legendary: {e}"))?;
+                // Legendary exits with 0 whether it uninstalled or not (it
+                // can't while another of its commands holds its lock), so
+                // its list of installed games tells. A game it no longer
+                // lists (deleted by hand, say) leaves the library all the
+                // same.
+                let installed = legendary
+                    .output(["list-installed", "--json"])
+                    .await
+                    .map_err(|e| command_failed(link.store, e))?;
+                if epic::parse_installed(&installed, &link.app_name)?.is_some() {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    let message = epic::error_message(&stderr).unwrap_or_else(|| {
+                        format!("{} is still installed after the uninstall", link.app_name)
+                    });
+                    return Err(command_failed(link.store, message));
                 }
             }
         }

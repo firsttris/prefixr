@@ -512,6 +512,7 @@
   "backendErrors_store_login_failed": "The sign-in didn't work. The code is only valid once and for a few minutes — open the login page again and use the new code.",
   "backendErrors_store_game_already_installed": "“{title}” is already installed.",
   "backendErrors_store_install_running": "“{title}” is still installing. Games of the same store install one after another.",
+  "backendErrors_store_busy": "“{title}” is still installing. Cancel the install or wait until it’s done, then try again.",
   "backendErrors_store_install_cancelled": "Install cancelled",
   "backendErrors_store_install_failed": "The install failed: {message} — details in the log: {log_path}",
   "native_tray_hideWindow": "Hide window",

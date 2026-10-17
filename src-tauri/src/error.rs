@@ -153,6 +153,10 @@ pub enum AppError {
     StoreInstallRunning {
         title: String,
     },
+    /// stores::disconnect_store — a game of the store is still installing.
+    StoreBusy {
+        title: String,
+    },
     /// stores::install_store_game — the install was cancelled.
     StoreInstallCancelled,
     /// stores::install_store_game — the store's tool failed to install the
