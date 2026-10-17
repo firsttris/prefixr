@@ -69,7 +69,7 @@
   "gameList_steam_confirmActionRemove": "entfernt „{name}“",
   "gameList_steam_confirmButton": "Steam neu starten",
   "gameCard_running": "Läuft",
-  "gameCard_notes": "Notizen",
+  "gameCard_menuShowNotes": "Notizen anzeigen",
   "notesDialog_title": "Notizen – {name}",
   "notesDialog_edit": "Bearbeiten",
   "gameCard_initializing": "Startet…",

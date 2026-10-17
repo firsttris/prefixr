@@ -39,6 +39,7 @@ hard way, so unsaved progress is lost.
 
 The **⋮** menu on a card (in the list view, the 🔗 button plus the buttons next to it) has:
 
+- **Show notes**: only for a game with notes; see [Adding and editing games](#adding-and-editing-games).
 - **Select artwork**: see [Artwork](#artwork).
 - **Edit game**: the same dialog as when adding it.
 - **To desktop** / **To start menu**: see [Shortcuts](#shortcuts).
@@ -59,7 +60,7 @@ The **⋮** menu on a card (in the list view, the 🔗 button plus the buttons n
 | **Runner** | Proton or Wine build to run it with. See [Runners](#runners). |
 | **Environment variables** | `KEY=VALUE`, one per line. These win over every switch in the other tabs. `WINEDLLOVERRIDES` and `LD_PRELOAD` are added to what Prefixr sets, not replaced. |
 | **Launch arguments** | Passed to the game's `.exe`, for example `--launcher-skip -dx11`. Quote arguments with spaces: `-path "C:\My Game"`. |
-| **Notes** | Anything worth remembering about the game: an offline login, why a setting is needed, where its config file lives. **📝 Notes** on the card opens them to read in full, copy from, or go on to edit. They're stored as plain text in `config.json`, so keep real passwords out. |
+| **Notes** | Anything worth remembering about the game: an offline login, why a setting is needed, where its config file lives. **Show notes** in the game's **⋮** menu opens them to read in full, copy from, or go on to edit. They're stored as plain text in `config.json`, so keep real passwords out. |
 
 The other tabs (**Performance**, **Graphics**, **Overlay**, and **Proton** for a Proton runner)
 override the global settings for this game only. See [Game settings](#game-settings).

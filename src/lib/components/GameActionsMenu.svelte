@@ -20,6 +20,7 @@
     onEditArtwork,
     onExportToSteam,
     onRemoveFromSteam,
+    onShowNotes,
   }: {
     item: GameItem;
     inSteam: boolean;
@@ -31,6 +32,8 @@
     onEditArtwork: () => void;
     onExportToSteam: () => void;
     onRemoveFromSteam: () => void;
+    // Only given for a game that has notes.
+    onShowNotes?: () => void;
   } = $props();
 </script>
 
@@ -54,6 +57,27 @@
 
 <Menu {label} {triggerClass} disabled={!full && item.shortcutState === "creating"} {trigger}>
   {#snippet items(close)}
+    {#if onShowNotes}
+      <button
+        type="button"
+        role="menuitem"
+        onclick={() => {
+          close();
+          onShowNotes();
+        }}
+      >
+        <svg class="menu-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path
+            d="M5 3h7l3 3v11H5V3z"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linejoin="round"
+          />
+          <path d="M8 9h4M8 12h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+        </svg>
+        {m.gameCard_menuShowNotes()}
+      </button>
+    {/if}
     {#if full}
       <button
         type="button"

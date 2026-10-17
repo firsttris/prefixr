@@ -64,6 +64,7 @@
         {onEditArtwork}
         {onExportToSteam}
         {onRemoveFromSteam}
+        onShowNotes={game.notes ? onShowNotes : undefined}
       >
         {#snippet trigger()}⋮{/snippet}
       </GameActionsMenu>
@@ -73,15 +74,7 @@
       <div class="bottom-row">
         <div class="info">
           <h3 title={game.name}>{game.name}</h3>
-          <div class="badges">
-            <span class="runner">{game.runner_id}</span>
-            {#if game.notes}
-              <button type="button" class="notes" title={game.notes} onclick={onShowNotes}>
-                <span aria-hidden="true">📝</span>
-                {m.gameCard_notes()}
-              </button>
-            {/if}
-          </div>
+          <span class="runner">{game.runner_id}</span>
         </div>
 
         <button
@@ -257,34 +250,6 @@
     line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
-  }
-
-  .badges {
-    display: flex;
-    align-items: center;
-    gap: 0.4em;
-  }
-
-  /* A button, unlike the runner badge next to it: brighter, with a border
-     that lights up on hover. */
-  .notes {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3em;
-    font-size: 0.72em;
-    font-weight: 600;
-    color: #fff;
-    background: rgba(255, 255, 255, 0.22);
-    border: 1px solid rgba(255, 255, 255, 0.45);
-    backdrop-filter: blur(6px);
-    padding: 0.15em 0.6em;
-    border-radius: 999px;
-    cursor: pointer;
-  }
-
-  .notes:hover {
-    background: rgba(255, 255, 255, 0.36);
-    border-color: rgba(255, 255, 255, 0.8);
   }
 
   .runner {

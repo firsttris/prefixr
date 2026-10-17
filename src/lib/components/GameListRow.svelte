@@ -47,12 +47,6 @@
   <div class="meta">
     <span class="name" title={game.name}>{game.name}</span>
     <span class="runner">{game.runner_id}</span>
-    {#if game.notes}
-      <button type="button" class="notes" title={game.notes} onclick={onShowNotes}>
-        <span aria-hidden="true">📝</span>
-        {m.gameCard_notes()}
-      </button>
-    {/if}
   </div>
 
   <div class="status">
@@ -74,6 +68,7 @@
       {onEditArtwork}
       {onExportToSteam}
       {onRemoveFromSteam}
+      onShowNotes={game.notes ? onShowNotes : undefined}
     >
       {#snippet trigger()}{item.shortcutState === "done" ? "✓" : "🔗"}{/snippet}
     </GameActionsMenu>
@@ -183,26 +178,6 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-
-  /* A button, unlike the runner badge next to it. */
-  .notes {
-    flex-shrink: 0;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3em;
-    font-size: 0.75em;
-    font-weight: 600;
-    color: var(--text);
-    background: var(--surface-raised);
-    border: 1px solid var(--border);
-    padding: 0.15em 0.6em;
-    border-radius: 999px;
-    cursor: pointer;
-  }
-
-  .notes:hover {
-    border-color: var(--accent);
   }
 
   .runner {
