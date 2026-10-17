@@ -70,6 +70,8 @@
   "gameList_steam_confirmButton": "Restart Steam",
   "gameCard_running": "Running",
   "gameCard_notes": "Notes",
+  "notesDialog_title": "Notes – {name}",
+  "notesDialog_edit": "Edit",
   "gameCard_initializing": "Starting…",
   "gameCard_moreOptions": "More options",
   "gameCard_menuDesktopShortcut": "To desktop",
