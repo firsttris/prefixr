@@ -182,20 +182,6 @@ impl LibraryConfig {
         Ok(())
     }
 
-    /// Puts the game in exactly these categories.
-    pub fn set_game_categories(&mut self, key: &str, ids: &[String]) -> Result<(), String> {
-        if let Some(unknown) = ids
-            .iter()
-            .find(|id| !self.categories.iter().any(|c| &c.id == *id))
-        {
-            return Err(format!("No category with id {unknown}"));
-        }
-        for category in &mut self.categories {
-            toggle(&mut category.games, key, ids.contains(&category.id));
-        }
-        Ok(())
-    }
-
     /// The names of the categories the game is in.
     pub fn categories_of(&self, key: &str) -> Vec<String> {
         self.categories
@@ -243,14 +229,17 @@ impl LibraryConfig {
 /// disk under the config lock first: the Prefixr Steam started a game
 /// through (`--run`) has held its copy since the game started, and the
 /// window or the command line may well have changed the library meanwhile.
+/// This process's own state is locked before the file is read, so a change
+/// the window makes meanwhile waits for the session and is kept, rather
+/// than lands between the read and the write and is lost.
 /// Best-effort, a lost session is no reason to fail the game's exit.
 pub fn record_play_session(app: &AppHandle, key: &str, played: Duration) {
     let result = (|| -> Result<(), String> {
         let _lock = lock_config(app)?;
-        let mut config = load_config(app)?;
-        config.library.record_session(key, now_secs(), played);
         let state = app.state::<ConfigState>();
         let mut current = state.locked();
+        let mut config = load_config(app)?;
+        config.library.record_session(key, now_secs(), played);
         save_config(app, &config)?;
         *current = config;
         Ok(())
@@ -339,15 +328,19 @@ pub fn delete_category(
     change(&app, &state, |library| library.delete_category(&id))
 }
 
+/// Adds the game to one category or takes it out, rather than setting all
+/// of its categories at once: quick clicks on two categories in a row then
+/// can't undo each other.
 #[tauri::command(async)]
-pub fn set_game_categories(
+pub fn set_in_category(
     app: AppHandle,
     state: State<ConfigState>,
+    id: String,
     key: String,
-    ids: Vec<String>,
+    member: bool,
 ) -> Result<LibraryConfig, AppError> {
     change(&app, &state, |library| {
-        library.set_game_categories(&key, &ids)
+        library.set_in_category(&id, &[key], member)
     })
 }
 

@@ -41,10 +41,12 @@ export function estimate(
   return { bytesPerSecond, secondsLeft };
 }
 
-/** "3 min", "1 h 5 min", "< 1 min". */
+/** "3 min", "1 h 5 min", "< 1 min": units German and English share. */
 export function formatDuration(secs: number): string {
+  // Rounded once, so 59.6 minutes become "1 h 0 min" rather than "60 min".
   if (secs < 60) return "< 1 min";
-  const hours = Math.floor(secs / 3600);
-  const minutes = Math.round((secs % 3600) / 60);
+  const total = Math.round(secs / 60);
+  const hours = Math.floor(total / 60);
+  const minutes = total % 60;
   return hours === 0 ? `${minutes} min` : `${hours} h ${minutes} min`;
 }

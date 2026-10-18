@@ -66,14 +66,10 @@ fn games_are_put_in_and_taken_out_of_categories() {
     library.set_in_category("Kinder", &keys[..1], true).unwrap();
     assert_eq!(library.categories[0].games, keys);
 
-    library
-        .set_game_categories("a", std::slice::from_ref(&coop.id))
-        .unwrap();
-    assert_eq!(library.categories_of("a"), ["Koop"]);
+    library.set_in_category(&coop.id, &keys[..1], true).unwrap();
+    assert_eq!(library.categories_of("a"), ["Kinder", "Koop"]);
     assert_eq!(library.categories_of("b"), ["Kinder"]);
-    assert!(library
-        .set_game_categories("a", &["nope".to_string()])
-        .is_err());
+    assert!(library.set_in_category("nope", &keys, true).is_err());
 
     library.set_in_category(&kids.id, &keys, false).unwrap();
     assert!(library.categories[0].games.is_empty());

@@ -27,6 +27,10 @@ const CACHE_MAX_AGE_SECS: u64 = 7 * 24 * 60 * 60;
 const MISSING_MAX_AGE_SECS: u64 = 24 * 60 * 60;
 const PARALLEL_REQUESTS: usize = 6;
 
+/// One lookup at a time reads and writes `protondb.json`, so two at once
+/// can't write over each other's ratings.
+static PROTONDB_CACHE: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 /// What's known about a game's compatibility, for the library.
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS), ts(export))]
@@ -110,6 +114,7 @@ async fn fetch_tier(app_id: u32) -> Option<Option<String>> {
 
 /// The ProtonDB ratings of these Steam apps, from the cache or ProtonDB.
 async fn protondb_tiers(app: &AppHandle, app_ids: Vec<u32>) -> HashMap<u32, String> {
+    let _cache = PROTONDB_CACHE.lock().await;
     let path = cache_path(app).ok();
     let mut cache = path.as_ref().map(read_cache).unwrap_or_default();
     let now = now_secs();
@@ -160,11 +165,16 @@ fn parse_store_key(key: &str) -> Option<(StoreKind, String)> {
 /// The compatibility of the games with these library keys. A game's own
 /// UMU id wins over the umu-database's entry for its store game. Best-effort:
 /// a game nothing is known about is left out.
+///
+/// Without `protondb`, only what's known locally (the umu-database, cached
+/// for a day): fast, so the library shows its umu badges before the
+/// ProtonDB ratings, which can take a while for a large library.
 #[tauri::command]
 pub async fn get_compatibility(
     app: AppHandle,
     state: State<'_, ConfigState>,
     keys: Vec<String>,
+    protondb: Option<bool>,
 ) -> Result<HashMap<String, Compatibility>, AppError> {
     let own: HashMap<String, (String, Option<String>)> = state
         .locked()
@@ -206,6 +216,9 @@ pub async fn get_compatibility(
         }
     }
 
+    if protondb != Some(true) {
+        return Ok(result);
+    }
     let mut app_ids: Vec<u32> = result.values().filter_map(|c| c.steam_app_id).collect();
     app_ids.sort_unstable();
     app_ids.dedup();

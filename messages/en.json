@@ -634,5 +634,6 @@
   "downloads_remaining": "about {time} left",
   "downloads_preparing": "Preparing…",
   "downloads_retry": "Try again",
-  "downloads_dismiss": "Dismiss"
+  "downloads_dismiss": "Dismiss",
+  "details_openFor": "Show details of {name}"
 }

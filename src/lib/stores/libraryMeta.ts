@@ -11,6 +11,9 @@ const EMPTY: LibraryConfig = { categories: [], favorites: [], hidden: [], activi
 
 export const libraryMeta = writable<LibraryConfig>(EMPTY);
 
+/** Whether `libraryMeta` holds what the backend has, rather than the empty start. */
+export const libraryMetaLoaded = writable(false);
+
 export const compatibility = writable<Record<string, Compatibility>>({});
 
 /** A library game's key: its store entry's when installed from a store. */
@@ -22,12 +25,17 @@ export function storeEntryKey(game: StoreGame): string {
   return storeGameKey(game.store, game.app_name);
 }
 
+function loaded(config: LibraryConfig) {
+  libraryMeta.set(config);
+  libraryMetaLoaded.set(true);
+}
+
 export async function refreshLibraryMeta(): Promise<void> {
-  libraryMeta.set(await invoke<LibraryConfig>("get_library"));
+  loaded(await invoke<LibraryConfig>("get_library"));
 }
 
 async function change(command: string, args: Record<string, unknown>): Promise<void> {
-  libraryMeta.set(await invoke<LibraryConfig>(command, args));
+  loaded(await invoke<LibraryConfig>(command, args));
 }
 
 export const setFavorite = (key: string, favorite: boolean) =>
@@ -41,8 +49,9 @@ export const renameCategory = (id: string, name: string) => change("rename_categ
 
 export const deleteCategory = (id: string) => change("delete_category", { id });
 
-export const setGameCategories = (key: string, ids: string[]) =>
-  change("set_game_categories", { key, ids });
+/** Adds the game to one category, or takes it out. */
+export const setInCategory = (id: string, key: string, member: boolean) =>
+  change("set_in_category", { id, key, member });
 
 export function isFavorite(meta: LibraryConfig, key: string): boolean {
   return meta.favorites.includes(key);
@@ -62,23 +71,32 @@ export function categoryIdsOf(meta: LibraryConfig, key: string): string[] {
 const asked = new Set<string>();
 
 /**
- * Looks up how well these games run; only the ones not looked up yet.
- * Best-effort: nothing known is simply nothing shown.
+ * Looks up how well these games run; only the ones not looked up yet. What
+ * the umu-database knows comes first and fast, the ProtonDB ratings after
+ * (a request per game not cached yet). Best-effort: nothing known is simply
+ * nothing shown.
  */
 export async function refreshCompatibility(keys: string[]): Promise<void> {
   const known = get(compatibility);
   const missing = keys.filter((key) => !(key in known) && !asked.has(key));
   if (missing.length === 0) return;
   missing.forEach((key) => asked.add(key));
-  try {
+  const lookUp = async (protondb: boolean) => {
     const found = await invoke<Record<string, Compatibility>>("get_compatibility", {
       keys: missing,
+      protondb,
     });
     compatibility.update((current) => ({ ...current, ...found }));
+  };
+  try {
+    await lookUp(false);
   } catch {
     // Offline and nothing cached: no badges, and asked again next time.
     missing.forEach((key) => asked.delete(key));
+    return;
   }
+  // Without ProtonDB (offline), the umu badges stay.
+  await lookUp(true).catch(() => {});
 }
 
 /** "3 h 20 min", "45 min" — or null for less than a minute. */

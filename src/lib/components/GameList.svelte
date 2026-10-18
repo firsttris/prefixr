@@ -27,6 +27,7 @@
   import {
     compatibility,
     libraryMeta,
+    libraryMetaLoaded,
     refreshCompatibility,
     refreshLibraryMeta,
     setFavorite,
@@ -112,9 +113,11 @@
   $effect(() => saveSetting("library-card-size", cardSize));
   $effect(() => saveSetting("library-collapsed", collapsed));
 
-  // A category that was deleted (here or from the command line) shows all.
+  // A category that was deleted (here or from the command line) shows all;
+  // not before the categories have loaded, which would drop a kept choice.
   $effect(() => {
     if (
+      $libraryMetaLoaded &&
       collection.startsWith("category:") &&
       !$libraryMeta.categories.some((c) => `category:${c.id}` === collection)
     ) {
@@ -127,6 +130,13 @@
     ...new Set($storeGames.map((game) => game.store)),
   ] as StoreKind[]);
   let hasAnything = $derived(entries.length > 0);
+  // A kept store choice stays offered while that store has no games (logged
+  // out, not loaded yet), so the filter can always be switched back.
+  let sourceOptions = $derived([
+    "all",
+    "local",
+    ...new Set([...storesInLibrary, ...(source === "all" || source === "local" ? [] : [source])]),
+  ] as Source[]);
   let shown = $derived(libraryView(entries, { query, sortBy, source, collection }, $libraryMeta));
   let counts = $derived(collectionCounts(entries, $libraryMeta, source));
   let perSource = $derived(sourceCounts(entries, $libraryMeta));
@@ -405,9 +415,9 @@
     </div>
   </div>
 
-  {#if storesInLibrary.length > 0}
+  {#if storesInLibrary.length > 0 || source !== "all"}
     <div class="sources" role="group" aria-label={m.gameList_sources_label()}>
-      {#each ["all", "local", ...storesInLibrary] as const as option (option)}
+      {#each sourceOptions as option (option)}
         <button
           type="button"
           class="source-chip"

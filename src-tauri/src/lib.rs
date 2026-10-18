@@ -29,8 +29,8 @@ use commands::github::{get_github_config, save_github_config};
 use commands::graphics::{get_graphics_config, save_graphics_config};
 use commands::graphics_layers::{get_directx_layers_status, update_directx_layers};
 use commands::library::{
-    create_category, delete_category, get_library, rename_category, set_favorite,
-    set_game_categories, set_hidden,
+    create_category, delete_category, get_library, rename_category, set_favorite, set_hidden,
+    set_in_category,
 };
 use commands::locale::set_ui_locale;
 use commands::logs::open_log;
@@ -355,7 +355,7 @@ pub fn run() {
             create_category,
             rename_category,
             delete_category,
-            set_game_categories,
+            set_in_category,
             get_compatibility
         ])
         .run(context)

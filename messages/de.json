@@ -634,5 +634,6 @@
   "downloads_remaining": "noch etwa {time}",
   "downloads_preparing": "Wird vorbereitet…",
   "downloads_retry": "Erneut versuchen",
-  "downloads_dismiss": "Ausblenden"
+  "downloads_dismiss": "Ausblenden",
+  "details_openFor": "Details zu {name} anzeigen"
 }

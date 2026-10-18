@@ -36,6 +36,8 @@ describe("download speed", () => {
     expect(formatDuration(30)).toBe("< 1 min");
     expect(formatDuration(5 * 60)).toBe("5 min");
     expect(formatDuration(3600 + 5 * 60)).toBe("1 h 5 min");
+    expect(formatDuration(59.7 * 60)).toBe("1 h 0 min");
+    expect(formatDuration(2 * 3600 - 10)).toBe("2 h 0 min");
   });
 });
 

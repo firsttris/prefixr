@@ -141,7 +141,9 @@ async fn load_database(app: &AppHandle) -> Result<Arc<Vec<IndexedEntry>>, String
     let path = cache_path(app)?;
     let cached = read_cache(&path);
     let (entries, fresh_for) = match cached {
-        Some((entries, age)) if age < CACHE_MAX_AGE => (entries, CACHE_MAX_AGE - age),
+        Some((entries, age)) if age < CACHE_MAX_AGE && has_codenames(&entries) => {
+            (entries, CACHE_MAX_AGE - age)
+        }
         cached => match download_database().await {
             Ok(entries) => {
                 if let Some(dir) = path.parent() {
@@ -158,6 +160,13 @@ async fn load_database(app: &AppHandle) -> Result<Arc<Vec<IndexedEntry>>, String
     let entries = Arc::new(index(entries));
     *LOADED.locked() = Some((Instant::now() + fresh_for, entries.clone()));
     Ok(entries)
+}
+
+/// A copy cached before the codenames were kept has none: it's downloaded
+/// again (and still used if that fails), so store games get their matches
+/// right away rather than after a day.
+fn has_codenames(entries: &[DatabaseEntry]) -> bool {
+    entries.is_empty() || entries.iter().any(|entry| entry.codename.is_some())
 }
 
 /// Lowercase words, punctuation dropped: "DOOM: The Dark Ages" and
@@ -282,17 +291,31 @@ fn database_store(store: StoreKind) -> &'static str {
     }
 }
 
+/// The database's store games by `(store, codename)`, the first entry for
+/// each, to look a library's worth of games up in one go.
+fn store_index(entries: &[IndexedEntry]) -> HashMap<(String, &str), &DatabaseEntry> {
+    let mut index = HashMap::new();
+    for entry in entries.iter().map(|indexed| &indexed.entry) {
+        let (Some(store), Some(codename)) = (
+            crate::models::normalize_umu_store(entry.store.clone()),
+            entry.codename.as_deref(),
+        ) else {
+            continue;
+        };
+        index.entry((store, codename)).or_insert(entry);
+    }
+    index
+}
+
 /// The umu-database's entry for a store's game, by its id there.
 fn find_store_entry<'a>(
-    entries: &'a [IndexedEntry],
+    index: &HashMap<(String, &str), &'a DatabaseEntry>,
     store: StoreKind,
     app_name: &str,
 ) -> Option<&'a DatabaseEntry> {
-    let store = database_store(store);
-    entries.iter().map(|indexed| &indexed.entry).find(|entry| {
-        entry.codename.as_deref() == Some(app_name)
-            && crate::models::normalize_umu_store(entry.store.clone()).as_deref() == Some(store)
-    })
+    index
+        .get(&(database_store(store).to_string(), app_name))
+        .copied()
 }
 
 /// The UMU ids (and their store) the umu-database has for these store
@@ -302,10 +325,11 @@ pub(crate) async fn umu_ids_for_store_games(
     games: &[(StoreKind, String)],
 ) -> Result<HashMap<(StoreKind, String), (String, String)>, String> {
     let entries = load_database(app).await?;
+    let index = store_index(&entries);
     Ok(games
         .iter()
         .filter_map(|(store, app_name)| {
-            let entry = find_store_entry(&entries, *store, app_name)?;
+            let entry = find_store_entry(&index, *store, app_name)?;
             Some((
                 (*store, app_name.clone()),
                 (entry.umu_id.clone(), database_store(*store).to_string()),

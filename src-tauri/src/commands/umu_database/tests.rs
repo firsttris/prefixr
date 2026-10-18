@@ -91,7 +91,8 @@ fn store_games_are_found_by_store_and_codename() {
     let mut cyberpunk_egs = entry("Cyberpunk 2077", "umu-1091500", None, "egs");
     cyberpunk_egs.codename = Some("Ginger".to_string());
     let entries = index(vec![cyberpunk_gog, cyberpunk_egs]);
-    let found = |store, name| find_store_entry(&entries, store, name).map(|e| e.store.clone());
+    let by_store = store_index(&entries);
+    let found = |store, name| find_store_entry(&by_store, store, name).map(|e| e.store.clone());
     assert_eq!(
         found(StoreKind::Gog, "1423049311"),
         Some(Some("GOG".to_string()))
@@ -111,4 +112,14 @@ fn database_rows_parse_with_their_codename() {
     )
     .unwrap();
     assert_eq!(row.codename.as_deref(), Some("1423049311"));
+}
+
+#[test]
+fn a_cache_from_before_codenames_is_downloaded_again() {
+    let old = vec![entry("Cyberpunk 2077", "umu-1091500", None, "gog")];
+    assert!(!has_codenames(&old));
+    let mut current = old.clone();
+    current[0].codename = Some("1423049311".to_string());
+    assert!(has_codenames(&current));
+    assert!(has_codenames(&[]));
 }

@@ -54,8 +54,9 @@ describe("the library's organization", () => {
     expect(invoke).toHaveBeenLastCalledWith("rename_category", { id: "k", name: "Kids" });
     await meta.deleteCategory("k");
     expect(invoke).toHaveBeenLastCalledWith("delete_category", { id: "k" });
-    await meta.setGameCategories("a", ["k"]);
-    expect(invoke).toHaveBeenLastCalledWith("set_game_categories", { key: "a", ids: ["k"] });
+    await meta.setInCategory("k", "a", true);
+    expect(invoke).toHaveBeenLastCalledWith("set_in_category", { id: "k", key: "a", member: true });
+    expect(get(meta.libraryMetaLoaded)).toBe(true);
   });
 
   it("keeps the old state when a change fails", async () => {
@@ -84,27 +85,42 @@ describe("the library's organization", () => {
 });
 
 describe("compatibility", () => {
-  it("only looks up games it doesn't know yet", async () => {
-    invoke.mockResolvedValueOnce({ a: { umu_id: "umu-1", protondb_tier: "gold" } });
+  it("shows the umu-database's matches first, then ProtonDB's ratings", async () => {
+    invoke
+      .mockResolvedValueOnce({ a: { umu_id: "umu-1", protondb_tier: null } })
+      .mockResolvedValueOnce({ a: { umu_id: "umu-1", protondb_tier: "gold" } });
     await meta.refreshCompatibility(["a", "b"]);
-    expect(invoke).toHaveBeenCalledWith("get_compatibility", { keys: ["a", "b"] });
+    expect(invoke.mock.calls).toEqual([
+      ["get_compatibility", { keys: ["a", "b"], protondb: false }],
+      ["get_compatibility", { keys: ["a", "b"], protondb: true }],
+    ]);
     expect(get(meta.compatibility).a?.protondb_tier).toBe("gold");
+  });
 
-    // "b" was asked about and isn't known: not asked again.
-    invoke.mockResolvedValueOnce({});
+  it("only looks up games it doesn't know yet", async () => {
+    invoke.mockResolvedValue({});
     await meta.refreshCompatibility(["a", "b", "c"]);
-    expect(invoke).toHaveBeenLastCalledWith("get_compatibility", { keys: ["c"] });
+    // "a" and "b" were asked about in the test before and aren't asked again.
+    expect(invoke).toHaveBeenLastCalledWith("get_compatibility", { keys: ["c"], protondb: true });
 
     invoke.mockClear();
     await meta.refreshCompatibility(["a", "b", "c"]);
     expect(invoke).not.toHaveBeenCalled();
   });
 
+  it("keeps the umu badges when ProtonDB can't be reached", async () => {
+    invoke
+      .mockResolvedValueOnce({ y: { umu_id: "umu-5" } })
+      .mockRejectedValueOnce(new Error("offline"));
+    await meta.refreshCompatibility(["y"]);
+    expect(get(meta.compatibility).y?.umu_id).toBe("umu-5");
+  });
+
   it("shows nothing rather than failing when offline, and asks again later", async () => {
     invoke.mockRejectedValueOnce(new Error("offline"));
     await expect(meta.refreshCompatibility(["z"])).resolves.toBeUndefined();
     expect(get(meta.compatibility)).toEqual({});
-    invoke.mockResolvedValueOnce({ z: { umu_id: "umu-9" } });
+    invoke.mockResolvedValue({ z: { umu_id: "umu-9" } });
     await meta.refreshCompatibility(["z"]);
     expect(get(meta.compatibility).z?.umu_id).toBe("umu-9");
   });

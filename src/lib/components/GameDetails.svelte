@@ -22,10 +22,11 @@
     formatPlaytime,
     libraryMeta,
     setFavorite,
-    setGameCategories,
+    setInCategory,
     setHidden,
   } from "$lib/stores/libraryMeta";
   import { backendError, getLocale } from "$lib/i18n/index.svelte";
+  import { isTopLayer, openLayer, trapTab } from "$lib/layers";
   import CompatBadges, { tierName } from "./CompatBadges.svelte";
   import FavoriteStar from "./FavoriteStar.svelte";
   import GameFallbackIcon from "./GameFallbackIcon.svelte";
@@ -97,10 +98,7 @@
   }
 
   function toggleCategory(id: string) {
-    const ids = inCategories.includes(id)
-      ? inCategories.filter((c) => c !== id)
-      : [...inCategories, id];
-    attempt(() => setGameCategories(key, ids));
+    attempt(() => setInCategory(id, key, !inCategories.includes(id)));
   }
 
   function date(secs: number | null | undefined): string {
@@ -113,23 +111,29 @@
   }
 
   let panel = $state<HTMLElement>();
+  let layer: ReturnType<typeof openLayer> | null = null;
   $effect(() => {
     if (!panel) return;
     const opener = document.activeElement;
+    layer = openLayer();
     panel.focus();
     return () => {
+      layer?.close();
+      layer = null;
       if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
     };
   });
+
+  // A dialog opened from here (editing, installing) is on top and handles
+  // the keys itself.
+  function handleKeydown(event: KeyboardEvent) {
+    if (!layer || !isTopLayer(layer.id) || !panel) return;
+    if (event.key === "Escape") onClose();
+    else trapTab(event, panel);
+  }
 </script>
 
-<svelte:window
-  onkeydown={entry
-    ? (e) => {
-        if (e.key === "Escape") onClose();
-      }
-    : undefined}
-/>
+<svelte:window onkeydown={entry ? handleKeydown : undefined} />
 
 {#if entry}
   <div class="backdrop" onclick={onClose} role="presentation"></div>

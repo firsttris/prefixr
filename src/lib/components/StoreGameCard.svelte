@@ -50,7 +50,12 @@
   }}
 >
   <div class="cover-wrap">
-    <button type="button" class="cover-hit" aria-label={m.details_open()} onclick={onOpenDetails}
+    <button
+      type="button"
+      class="cover-hit"
+      aria-label={m.details_openFor({ name: game.title })}
+      title={game.title}
+      onclick={onOpenDetails}
     ></button>
     {#if coverSrc}
       <img class="cover" src={coverSrc} alt="" loading="lazy" decoding="async" />
@@ -298,7 +303,9 @@
     pointer-events: none;
   }
 
-  .overlay :global(button) {
+  /* The badges keep their tooltips; the cut-off title has the cover's. */
+  .overlay :global(button),
+  .overlay :global(.badges) {
     pointer-events: auto;
   }
 </style>

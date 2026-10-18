@@ -364,12 +364,25 @@ pub(super) async fn category_command(
             out.print(&created, || format!("Added category {}", created.name))
         }
         CategoryCommand::Rename { category, name } => {
-            change(app, |library| library.rename_category(&category, &name))?;
-            out.print(&name, || format!("Renamed {category} to {name}"))
+            let mut renamed = None;
+            change(app, |library| {
+                library.rename_category(&category, &name)?;
+                renamed = Some(library.find_category(&name)?.clone());
+                Ok(())
+            })?;
+            let renamed = renamed.expect("set by the change");
+            out.print(&renamed, || {
+                format!("Renamed {category} to {}", renamed.name)
+            })
         }
         CategoryCommand::Remove { category } => {
-            change(app, |library| library.delete_category(&category))?;
-            out.print(&category, || format!("Removed category {category}"))
+            let mut removed = None;
+            change(app, |library| {
+                removed = Some(library.find_category(&category)?.clone());
+                library.delete_category(&category)
+            })?;
+            let removed = removed.expect("set by the change");
+            out.print(&removed, || format!("Removed category {}", removed.name))
         }
         CategoryCommand::Assign { category, games } => assign(app, out, &category, &games, true),
         CategoryCommand::Unassign { category, games } => assign(app, out, &category, &games, false),

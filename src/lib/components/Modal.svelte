@@ -1,6 +1,7 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
   import type { Snippet } from "svelte";
+  import { isTopLayer, openLayer, trapTab } from "$lib/layers";
 
   let {
     open,
@@ -40,39 +41,24 @@
     };
   });
 
-  const FOCUSABLE =
-    'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
-
-  function focusables(container: HTMLElement): HTMLElement[] {
-    return [...container.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
-      (el) => el.getClientRects().length > 0,
-    );
-  }
+  // Only the topmost dialog answers Escape and Tab (see `layers`).
+  let layer: ReturnType<typeof openLayer> | null = null;
+  $effect(() => {
+    if (!open) return;
+    layer = openLayer();
+    return () => {
+      layer?.close();
+      layer = null;
+    };
+  });
 
   function handleKeydown(event: KeyboardEvent) {
+    if (!layer || !isTopLayer(layer.id)) return;
     if (event.key === "Escape") {
       close();
       return;
     }
-    // Tab cycles within the dialog instead of moving on to the page behind.
-    if (event.key !== "Tab" || !panel) return;
-    const items = focusables(panel);
-    const first = items[0];
-    const last = items[items.length - 1];
-    const active = document.activeElement;
-    if (!first) {
-      event.preventDefault();
-      panel.focus();
-    } else if (!panel.contains(active)) {
-      event.preventDefault();
-      (event.shiftKey ? last : first).focus();
-    } else if (event.shiftKey && (active === first || active === panel)) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && active === last) {
-      event.preventDefault();
-      first.focus();
-    }
+    if (panel) trapTab(event, panel);
   }
 </script>
 
