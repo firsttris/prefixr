@@ -1,9 +1,10 @@
 # Command line & AI agents
 
-Everything you set up in Prefixr's window can also be done from a terminal: add and edit games,
-create prefixes, install winetricks packages, download runners, pick artwork and launch games. That
-makes Prefixr scriptable, and it lets an AI coding agent such as
-[Claude Code](https://claude.com/claude-code) set up your games for you.
+Most of what you do in Prefixr's window can also be done from a terminal: add and edit games,
+create prefixes, install winetricks packages, download runners, pick artwork, launch games, and
+sort the library into categories. That makes Prefixr scriptable, and it lets an AI coding agent
+such as [Claude Code](https://claude.com/claude-code) run your library for you: you say what you
+want, the agent does it, and you play.
 
 - [How it works](#how-it-works)
 - [Games](#games)
@@ -11,7 +12,7 @@ makes Prefixr scriptable, and it lets an AI coding agent such as
 - [Prefixes](#prefixes)
 - [Runners and umu-launcher](#runners-and-umu-launcher)
 - [JSON output and exit codes](#json-output-and-exit-codes)
-- [Setting up games with an AI agent](#setting-up-games-with-an-ai-agent)
+- [Working with an AI agent](#working-with-an-ai-agent)
 
 ## How it works
 
@@ -137,18 +138,43 @@ A command exits with `0` on success, `1` when it fails (the error is printed to 
 when its arguments are wrong. `game launch` exits with `1` when the game exits with an error, and
 `prefix run` when the program does.
 
-## Setting up games with an AI agent
+## Working with an AI agent
 
 The command line is made to be driven by an AI coding agent like
-[Claude Code](https://claude.com/claude-code): it can look at a game's files, find out what the game
-needs, and set it up in Prefixr while you test. Some things you can ask for:
+[Claude Code](https://claude.com/claude-code). Start the agent in a terminal on your desktop, tell
+it to use `prefixr` (it finds every command with `prefixr --help`), and keep Prefixr's window
+open: it shows each change within a second, so you see what the agent does and can try a game
+right away.
 
-- *"Add every game under `~/Games` to Prefixr, with Proton-GE, one prefix per game, the right
-  protonfixes match and artwork."*
-- *"These games come with their own Wine and start scripts. Move each game out of its bundled
-  prefix, add it to Prefixr with Proton, and carry over the fixes from the scripts and my save
-  games."*
-- *"Fallout 4 crashes on start. Read its latest Prefixr log and fix it."*
+What you can hand over:
+
+| Task | For example |
+| --- | --- |
+| **Set games up** | *"Add every game under `~/Games` to Prefixr, with Proton-GE, one prefix per game, the right protonfixes match and artwork."* |
+| **Move games over** | *"These games come with their own Wine and start scripts. Move each game out of its bundled prefix, add it to Prefixr with Proton, and carry over the fixes from the scripts and my save games."* |
+| **Fix games** | *"Fallout 4 crashes on start. Read its latest Prefixr log and fix it."* |
+| **Organize the library** | *"Create the categories Kids and Adults and sort all my games into them. Hide the store giveaways I've never played."* |
+| **Tidy up** | *"Give every game without artwork a cover, and add my favorites to Steam."* |
+
+### Organizing the library
+
+The agent reads the whole library, store games not installed yet included, with
+`prefixr library list --json`: each game's `key`, name, source, categories and play time. Then it
+creates the categories it needs and sorts the games in by key:
+
+```bash
+prefixr category add Kids
+prefixr category add Adults
+prefixr category assign Kids epic:Fortnite gog:1207658924
+prefixr category assign Adults "Fallout 4"
+prefixr library favorite "Fallout 4"
+prefixr library hide amazon:amzn1.adg.product.1234
+```
+
+It can decide by the names it knows, or look games up first (their age ratings, genres, co-op
+modes). The categories show up as chips above the library right away.
+
+### Setting games up
 
 A good way to work with an agent:
 
