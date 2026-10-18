@@ -140,8 +140,10 @@ VKD3D-Proton.
   and the exe icons. Copying `~/.config/com.tristan.prefixr/config.json` and
   `~/.local/share/com.tristan.prefixr/artwork/` by hand works too. Save games live in the prefixes,
   so back those up separately.
-- **Automatic backups** are in `~/.local/share/com.tristan.prefixr/backups/`: one a day, and one
-  before every restore; the newest 7 are kept.
+- **Automatic backups** are off until you turn them on under **Backup**. They go to
+  `~/.local/share/com.tristan.prefixr/backups/` unless you pick another folder there: one every few
+  days (daily by default), and one before every restore; the newest 7 are kept unless you set
+  another number.
 - **To start over**, quit Prefixr and remove `~/.config/com.tristan.prefixr/`. To free the space
   runners and caches take, also remove `~/.local/share/com.tristan.prefixr/`. Neither touches your
   prefixes or games.

@@ -49,6 +49,7 @@ fn sample_config(games: Vec<Game>) -> AppConfig {
         github: GitHubConfig::default(),
         stores: Default::default(),
         library: Default::default(),
+        backup: Default::default(),
     }
 }
 

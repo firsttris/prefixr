@@ -5,10 +5,11 @@
 //! and they stay where they are), the store logins, and unless asked for,
 //! the SteamGridDB API key and the GitHub token.
 //!
-//! Prefixr also backs up by itself into `backups/` under the data dir: once
-//! a day when the window opens, and before every restore, so a restore (or
-//! an agent's change) can always be undone. The newest `KEEP_AUTOMATIC` of
-//! those are kept.
+//! Prefixr also backs up by itself, into `backups/` under the data dir or
+//! the folder the user picked: before every restore, so a restore can
+//! always be undone, and when the user turned automatic backups on, every
+//! few days when the window opens. The newest few of those are kept (see
+//! `BackupConfig`).
 
 use std::fs;
 use std::io::Read;
@@ -20,7 +21,7 @@ use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::commands::library::now_secs;
 use crate::config::{
@@ -28,6 +29,7 @@ use crate::config::{
 };
 use crate::error::AppError;
 use crate::lock::LockExt;
+use crate::models::BackupConfig;
 
 /// The archive layout's version; a backup from a newer Prefixr with a
 /// higher one is refused rather than half understood.
@@ -36,7 +38,9 @@ const MANIFEST: &str = "manifest.json";
 const CONFIG: &str = "config.json";
 /// The data dir's folders a backup holds, as they're named in it too.
 const FOLDERS: [&str; 2] = ["artwork", "exe-icons"];
-const KEEP_AUTOMATIC: usize = 7;
+/// What the backup settings may hold; anything else is brought into range.
+const MAX_INTERVAL_DAYS: u32 = 365;
+const MAX_KEEP: u32 = 100;
 /// The automatic backups' file name prefixes; other files in `backups/`
 /// (a backup the user saved there) are never pruned.
 const AUTOMATIC_PREFIXES: [&str; 2] = ["daily-", "before-restore-"];
@@ -49,7 +53,7 @@ const MAX_UNPACKED_BYTES: u64 = 16 * 1024 * 1024 * 1024;
 /// Leftovers of a restore or backup that was cut off (a crash) are cleaned
 /// up once they're this old, so a running one is never touched.
 const LEFTOVER_AGE: Duration = Duration::from_secs(60 * 60);
-const DAILY: Duration = Duration::from_secs(24 * 60 * 60);
+const DAY: Duration = Duration::from_secs(24 * 60 * 60);
 
 /// Why a backup was made.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -58,7 +62,8 @@ const DAILY: Duration = Duration::from_secs(24 * 60 * 60);
 pub enum BackupReason {
     /// Made by the user, from the window or the command line.
     Manual,
-    /// The daily one, when the window opens.
+    /// The automatic one, when the window opens (named for when it was
+    /// always daily; kept so older backups still read).
     Daily,
     /// Made right before a restore, to undo it.
     BeforeRestore,
@@ -106,11 +111,44 @@ impl Locations {
             .path()
             .app_data_dir()
             .map_err(|e| format!("Could not resolve data directory: {e}"))?;
+        let settings = app.state::<ConfigState>().locked().backup.clone();
         Ok(Self {
-            backups_dir: data_dir.join("backups"),
+            backups_dir: backups_dir(&data_dir, &settings),
             data_dir,
         })
     }
+}
+
+/// Where the automatic backups go: the user's folder, or `backups/` under
+/// the data dir.
+pub fn backups_dir(data_dir: &Path, settings: &BackupConfig) -> PathBuf {
+    settings
+        .dir
+        .clone()
+        .unwrap_or_else(|| data_dir.join("backups"))
+}
+
+/// The settings as they're kept: numbers in range, a folder only when it's
+/// a full path.
+pub fn sanitized_settings(mut settings: BackupConfig) -> Result<BackupConfig, String> {
+    settings.interval_days = settings.interval_days.clamp(1, MAX_INTERVAL_DAYS);
+    settings.keep = settings.keep.clamp(1, MAX_KEEP);
+    settings.dir = settings
+        .dir
+        .filter(|dir| !dir.as_os_str().to_string_lossy().trim().is_empty());
+    if let Some(dir) = &settings.dir {
+        if !dir.is_absolute() {
+            return Err(format!(
+                "The backup folder must be a full path, not {}",
+                dir.display()
+            ));
+        }
+    }
+    Ok(settings)
+}
+
+fn keep(settings: &BackupConfig) -> usize {
+    settings.keep.clamp(1, MAX_KEEP) as usize
 }
 
 /// The config as it goes into a backup: the secrets left out unless asked
@@ -477,12 +515,14 @@ pub fn prune(backups_dir: &Path, keep: usize, except: Option<&Path>) {
     }
 }
 
-/// Whether the daily backup is due: none in `backups_dir` from the last day.
-pub fn daily_due(backups_dir: &Path, now: SystemTime) -> bool {
+/// Whether the automatic backup is due: none in `backups_dir` from the
+/// last `interval_days`.
+pub fn automatic_due(backups_dir: &Path, now: SystemTime, interval_days: u32) -> bool {
+    let interval = DAY * interval_days.clamp(1, MAX_INTERVAL_DAYS);
     !automatic_backups(backups_dir).iter().any(|path| {
         fs::metadata(path)
             .and_then(|m| m.modified())
-            .is_ok_and(|modified| now.duration_since(modified).is_ok_and(|age| age < DAILY))
+            .is_ok_and(|modified| now.duration_since(modified).is_ok_and(|age| age < interval))
     })
 }
 
@@ -547,19 +587,21 @@ fn automatic_backup(
     // With the secrets: these stay on this machine, and restoring one
     // should bring back exactly what was.
     let info = write_backup(&dest, &config, &locations, true, reason, &app_version(app))?;
-    prune(&locations.backups_dir, KEEP_AUTOMATIC, except);
+    prune(&locations.backups_dir, keep(&config.backup), except);
     Ok(info)
 }
 
-/// The daily backup, when the window opens, unless nothing changed since
-/// the last automatic one. Best-effort; the window's Backup page is told.
+/// The automatic backup, when the window opens (or they were just turned
+/// on): only when the user turned them on, it's due, and something changed
+/// since the last one. Best-effort; the window's Backup page is told.
 pub fn daily_backup(app: &AppHandle) {
     let Ok(locations) = Locations::of(app) else {
         return;
     };
     let now = SystemTime::now();
     clean_leftovers(&locations, now);
-    if !daily_due(&locations.backups_dir, now) {
+    let settings = app.state::<ConfigState>().locked().backup.clone();
+    if !settings.automatic || !automatic_due(&locations.backups_dir, now, settings.interval_days) {
         return;
     }
     let newest = automatic_backups(&locations.backups_dir)
@@ -576,7 +618,7 @@ pub fn daily_backup(app: &AppHandle) {
         Ok(_) => {
             let _ = app.emit("backups-changed", ());
         }
-        Err(e) => eprintln!("Could not make the daily backup: {e}"),
+        Err(e) => eprintln!("Could not make the automatic backup: {e}"),
     }
 }
 
@@ -638,7 +680,7 @@ pub fn restore(app: &AppHandle, path: &Path) -> Result<BackupInfo, String> {
         BackupReason::BeforeRestore,
         &app_version(app),
     )?;
-    prune(&locations.backups_dir, KEEP_AUTOMATIC, Some(path));
+    prune(&locations.backups_dir, keep(&now.backup), Some(path));
 
     let swapped = put_folders_in(&staging.0, &locations.data_dir, &tag)?;
     if let Err(e) = save_config(app, &merge_local(restored, &now)) {
@@ -671,6 +713,33 @@ pub fn list_backups(app: AppHandle) -> Result<Vec<BackupInfo>, AppError> {
         .iter()
         .filter_map(|path| backup_info(path).ok())
         .collect())
+}
+
+#[tauri::command]
+pub fn get_backup_config(state: State<ConfigState>) -> Result<BackupConfig, AppError> {
+    Ok(state.locked().backup.clone())
+}
+
+/// Saves the backup settings; turning them on makes the first one right
+/// away (when due), so the user sees it work.
+#[tauri::command(async)]
+pub fn save_backup_config(
+    app: AppHandle,
+    state: State<ConfigState>,
+    config: BackupConfig,
+) -> Result<BackupConfig, AppError> {
+    let settings = sanitized_settings(config)?;
+    let mut app_config = state.locked();
+    app_config.backup = settings.clone();
+    save_config(&app, &app_config)?;
+    drop(app_config);
+    // Another folder lists other backups.
+    let _ = app.emit("backups-changed", ());
+    if settings.automatic {
+        let app = app.clone();
+        tauri::async_runtime::spawn_blocking(move || daily_backup(&app));
+    }
+    Ok(settings)
 }
 
 #[tauri::command(async)]

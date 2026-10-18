@@ -210,7 +210,7 @@ fn automatic_backups_are_kept_to_the_newest_and_daily_once_a_day() {
     let dir = TestDir::new("backup-prune");
     let backups = dir.join("backups");
     fs::create_dir_all(&backups).unwrap();
-    assert!(daily_due(&backups, SystemTime::now()));
+    assert!(automatic_due(&backups, SystemTime::now(), 1));
     for i in 0..5 {
         let path = backups.join(format!("daily-{i}.tar.gz"));
         fs::write(&path, b"x").unwrap();
@@ -223,8 +223,9 @@ fn automatic_backups_are_kept_to_the_newest_and_daily_once_a_day() {
             .unwrap();
     }
     fs::write(backups.join("notes.txt"), b"not a backup").unwrap();
-    // The newest is from six days ago: a daily one is due.
-    assert!(daily_due(&backups, SystemTime::now()));
+    // The newest is from six days ago: a daily one is due, a weekly not.
+    assert!(automatic_due(&backups, SystemTime::now(), 1));
+    assert!(!automatic_due(&backups, SystemTime::now(), 7));
     let keep = backups.join("daily-0.tar.gz");
     prune(&backups, 2, Some(&keep));
     let left: Vec<_> = automatic_backups(&backups)
@@ -235,7 +236,44 @@ fn automatic_backups_are_kept_to_the_newest_and_daily_once_a_day() {
     assert!(backups.join("notes.txt").exists());
 
     fs::write(backups.join("daily-new.tar.gz"), b"x").unwrap();
-    assert!(!daily_due(&backups, SystemTime::now()));
+    assert!(!automatic_due(&backups, SystemTime::now(), 1));
+}
+
+#[test]
+fn automatic_backups_are_off_unless_turned_on_and_go_where_the_user_says() {
+    let defaults = BackupConfig::default();
+    assert!(!defaults.automatic);
+    assert_eq!((defaults.interval_days, defaults.keep), (1, 7));
+    // An older config without the settings reads as off.
+    let config: AppConfig =
+        serde_json::from_value(serde_json::json!({ "runners_dir": "/r" })).unwrap();
+    assert_eq!(config.backup, defaults);
+
+    let data = Path::new("/data");
+    assert_eq!(backups_dir(data, &defaults), Path::new("/data/backups"));
+    let custom = BackupConfig {
+        dir: Some(PathBuf::from("/mnt/nas/prefixr")),
+        ..defaults.clone()
+    };
+    assert_eq!(backups_dir(data, &custom), Path::new("/mnt/nas/prefixr"));
+}
+
+#[test]
+fn backup_settings_are_brought_into_range() {
+    let settings = sanitized_settings(BackupConfig {
+        automatic: true,
+        interval_days: 0,
+        keep: 1000,
+        dir: Some(PathBuf::from("  ")),
+    })
+    .unwrap();
+    assert_eq!((settings.interval_days, settings.keep), (1, 100));
+    assert_eq!(settings.dir, None);
+    assert!(sanitized_settings(BackupConfig {
+        dir: Some(PathBuf::from("relative/dir")),
+        ..BackupConfig::default()
+    })
+    .is_err());
 }
 
 #[test]

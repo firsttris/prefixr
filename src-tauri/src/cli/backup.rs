@@ -23,7 +23,7 @@ pub(super) enum BackupCommand {
         #[arg(long)]
         with_secrets: bool,
     },
-    /// List the automatic backups (daily, and before every restore), newest first
+    /// List the automatic backups (when turned on, and before every restore), newest first
     List,
     /// Restore a backup: a file, or a number from `backup list`. What is now
     /// is backed up first, so this can be undone

@@ -59,6 +59,15 @@ describe("backups", () => {
     expect(reload).toHaveBeenCalledOnce();
   });
 
+  it("keep their settings in the backend", async () => {
+    const settings = { automatic: true, interval_days: 3, keep: 5, dir: "/mnt/nas" };
+    invoke.mockResolvedValue(settings);
+    await expect(backup.getBackupConfig()).resolves.toEqual(settings);
+    expect(invoke).toHaveBeenLastCalledWith("get_backup_config");
+    await expect(backup.saveBackupConfig(settings)).resolves.toEqual(settings);
+    expect(invoke).toHaveBeenLastCalledWith("save_backup_config", { config: settings });
+  });
+
   it("tell the page when Prefixr made one", async () => {
     const onChange = vi.fn();
     await backup.listenForBackups(onChange);

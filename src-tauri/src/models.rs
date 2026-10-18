@@ -678,5 +678,32 @@ pub struct GitHubConfig {
     pub token: Option<String>,
 }
 
+/// The automatic backups — see `commands::backup`. Off unless the user
+/// turns them on, so they never fill a disk nobody asked them to.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
+#[serde(default)]
+pub struct BackupConfig {
+    pub automatic: bool,
+    /// Days between two automatic backups (made when the window opens).
+    pub interval_days: u32,
+    /// How many automatic backups are kept, the ones before a restore
+    /// included.
+    pub keep: u32,
+    /// Where they go; `backups/` under the data dir when unset.
+    pub dir: Option<PathBuf>,
+}
+
+impl Default for BackupConfig {
+    fn default() -> Self {
+        Self {
+            automatic: false,
+            interval_days: 1,
+            keep: 7,
+            dir: None,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests;
