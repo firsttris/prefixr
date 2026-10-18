@@ -202,7 +202,7 @@ fn progress_line(name: &str, last: Option<i64>, percent: f64, interactive: bool)
 }
 
 /// Resolves on Ctrl+C or SIGTERM (an agent's command timeout, say).
-async fn stop_signal() {
+pub(super) async fn stop_signal() {
     use tokio::signal::unix::{signal, SignalKind};
     let Ok(mut term) = signal(SignalKind::terminate()) else {
         let _ = tokio::signal::ctrl_c().await;

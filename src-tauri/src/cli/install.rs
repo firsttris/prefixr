@@ -12,10 +12,11 @@ use std::process::Command;
 use std::time::SystemTime;
 
 use clap::Args;
+use futures_util::future::Either;
 use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
 
-use super::store::runner_or_default;
+use super::store::{runner_or_default, stop_signal};
 use super::{
     apply_settings, check_exe, config, ensure_prefix, name_from_exe, short_id, GameSettings, Out,
 };
@@ -90,18 +91,31 @@ pub(super) async fn install(app: &AppHandle, out: Out, args: InstallGame) -> Res
     ));
     let started = SystemTime::now();
     let state: State<ConfigState> = app.state();
-    let ran = run_in_prefix(
-        app,
-        &state,
-        &prefix.display().to_string(),
-        &runner_id,
-        &program.display().to_string(),
-        &args.installer_args,
-    )
-    .await?;
-    // A setup.exe often only starts the real installer and exits: the
-    // prefix's wineserver runs until everything in it has ended.
-    wait_for_prefix(app, &runner_id, &ran.prefix).await;
+    let install = Box::pin(async {
+        let ran = run_in_prefix(
+            app,
+            &state,
+            &prefix.display().to_string(),
+            &runner_id,
+            &program.display().to_string(),
+            &args.installer_args,
+        )
+        .await?;
+        // A setup.exe often only starts the real installer and exits: the
+        // prefix's wineserver runs until everything in it has ended.
+        wineserver(app, &runner_id, &ran.prefix, "-w").await;
+        Ok::<_, AppError>(ran)
+    });
+    let ran = match futures_util::future::select(install, Box::pin(stop_signal())).await {
+        Either::Left((ran, _)) => ran?,
+        Either::Right(_) => {
+            // Ended here rather than by the signal, so that what still runs
+            // in the prefix lets go of a disc image, which is unmounted as
+            // `disc` goes.
+            wineserver(app, &runner_id, &prefix, "-k").await;
+            return Err("Stopped: the installer was ended".to_string().into());
+        }
+    };
     drop(disc);
 
     let shortcuts = find_recently_created_shortcuts(&ran.prefix, started);
@@ -171,9 +185,10 @@ fn under_config_lock<T>(
     change()
 }
 
-/// Waits until nothing runs in the prefix anymore. Not being able to tell
-/// isn't an error: the shortcuts found then are what there is so far.
-async fn wait_for_prefix(app: &AppHandle, runner_id: &str, prefix: &Path) {
+/// Runs the prefix's wineserver with `flag`: `-w` waits until nothing runs
+/// in the prefix anymore, `-k` ends what does. Not being able to isn't an
+/// error: after `-w`, the shortcuts found are what there is so far.
+async fn wineserver(app: &AppHandle, runner_id: &str, prefix: &Path, flag: &str) {
     let Ok(runner) = find_runner(&config(app).runners_dir, runner_id) else {
         return;
     };
@@ -182,7 +197,7 @@ async fn wait_for_prefix(app: &AppHandle, runner_id: &str, prefix: &Path) {
     };
     let prefix = prefix.display().to_string();
     let _ = runner_command(&wineserver, [("WINEPREFIX", prefix.as_str())])
-        .arg("-w")
+        .arg(flag)
         .status()
         .await;
 }

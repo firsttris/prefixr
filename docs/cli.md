@@ -102,14 +102,15 @@ Everything after `--` goes to the installer. Many installers run without a windo
 | Installer | Arguments |
 | --- | --- |
 | Inno Setup (GOG's offline installers, many others) | `/VERYSILENT /SUPPRESSMSGBOXES /DIR="C:\Games\<name>"` |
-| NSIS | `/S /D=C:\Games\<name>` (`/D` last, without quotes) |
+| NSIS | `/S`, and to pick the folder `'/D=C:\Games\<name>'` last. NSIS ignores `/D` for a folder with a space in it, as Wine passes that argument on in quotes |
 | Windows Installer (`.msi`) | `/qn` |
 
 An installer that has to be clicked through opens its window on the desktop as usual, and the
 command waits until you (or a [computer-use tool](#testing-games-on-screen)) are done. If the
 installer creates no shortcut, or several (a game and its configuration tool, say), the command
 names them and stops: add the game with `game add` then, or pass `--exe` the next time. The
-installer's log is in the error, and in the result as `log_path`.
+installer's log is in the error, and in the result as `log_path`. Ctrl+C, or an agent's
+command timeout, ends the installer and unmounts a disc image again.
 
 Disc images whose game checks for the disc while it runs, and installers that ask for a second
 disc, aren't covered. Without `udisksctl` (the `udisks2` package), extract the image first, for
