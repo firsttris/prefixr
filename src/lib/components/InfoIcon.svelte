@@ -8,12 +8,10 @@
   let popup: HTMLElement | undefined = $state();
   // Opens to the right of the icon, unless that would run past the
   // window's edge, as for an icon in the right column of a wide page.
-  let flip = $state(false);
-
-  $effect(() => {
-    flip =
-      !!popup && popup.getBoundingClientRect().right > document.documentElement.clientWidth - 8;
-  });
+  // Measured once, as it opens (before it could be flipped).
+  const flip = $derived(
+    !!popup && popup.getBoundingClientRect().right > document.documentElement.clientWidth - 8,
+  );
 
   function toggle() {
     open = !open;
