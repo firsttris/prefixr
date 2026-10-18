@@ -3,7 +3,9 @@
   menu role promises: it opens with focus on its first entry, the arrow
   keys, Home and End move between entries, Escape closes it (back to the
   trigger), and Tab or a click anywhere else closes it without being
-  swallowed. It opens downward, or upward when there's no room below.
+  swallowed. It opens downward, or upward when there's no room below. It's
+  placed on the window rather than in its parent, so a card's clipped cover
+  doesn't cut a long menu off; scrolling closes it.
   `items` renders the entries (role="menuitem"); call the `close` it gets
   before acting on one.
 -->
@@ -25,7 +27,8 @@
   } = $props();
 
   let open = $state(false);
-  let upward = $state(false);
+  // Where the menu sits on the window, from the trigger's place.
+  let place = $state("");
   let anchorEl: HTMLDivElement;
   let triggerEl: HTMLButtonElement;
   let menuEl = $state<HTMLDivElement>();
@@ -41,12 +44,26 @@
     open = false;
   }
 
+  function placeMenu(up: boolean) {
+    const rect = triggerEl.getBoundingClientRect();
+    const right = `right: ${document.documentElement.clientWidth - rect.right}px`;
+    place = up
+      ? `${right}; bottom: ${window.innerHeight - rect.top + 4}px`
+      : `${right}; top: ${rect.bottom + 4}px`;
+  }
+
   $effect(() => {
     if (!menuEl) return;
-    upward = false;
-    upward = menuEl.getBoundingClientRect().bottom > window.innerHeight;
+    placeMenu(false);
+    const below = menuEl.getBoundingClientRect().bottom > window.innerHeight;
+    // Upward only where it fits better there.
+    if (below && triggerEl.getBoundingClientRect().top > window.innerHeight / 2) placeMenu(true);
     entries()[0]?.focus();
   });
+
+  function handleScroll(event: Event) {
+    if (!menuEl?.contains(event.target as Node)) open = false;
+  }
 
   function handleMenuKeydown(event: KeyboardEvent) {
     const list = entries();
@@ -78,7 +95,11 @@
   }
 </script>
 
-<svelte:window onpointerdown={open ? handleWindowPointerdown : undefined} />
+<svelte:window
+  onpointerdown={open ? handleWindowPointerdown : undefined}
+  onresize={open ? () => (open = false) : undefined}
+/>
+<svelte:document onscrollcapture={open ? handleScroll : undefined} />
 
 <div class="menu-anchor" bind:this={anchorEl}>
   <button
@@ -98,7 +119,7 @@
     <div
       bind:this={menuEl}
       class="menu"
-      class:menu-up={upward}
+      style={place}
       role="menu"
       tabindex="-1"
       aria-label={label}
@@ -116,10 +137,10 @@
   }
 
   .menu {
-    position: absolute;
-    top: calc(100% + 0.3em);
-    right: 0;
-    z-index: 11;
+    position: fixed;
+    z-index: 30;
+    max-height: calc(100vh - 1em);
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
     min-width: 12em;
@@ -128,11 +149,6 @@
     border-radius: 8px;
     padding: 0.3em;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-  }
-
-  .menu.menu-up {
-    top: auto;
-    bottom: calc(100% + 0.3em);
   }
 
   .menu :global([role="menuitem"]) {

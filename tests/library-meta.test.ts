@@ -144,9 +144,7 @@ describe("compatibility", () => {
     const current = get(meta.libraryMeta);
     const game = { id: "a", runner_id: "wine", exe_path: "/g.exe", store: null } as Game;
     expect(meta.testOf(current, "a", game)).toEqual({ result, current: true });
-    expect(meta.testOf(current, "a", { ...game, runner_id: "GE-Proton10-7" })?.current).toBe(
-      false,
-    );
+    expect(meta.testOf(current, "a", { ...game, runner_id: "GE-Proton10-7" })?.current).toBe(false);
     expect(meta.testOf(current, "a")?.current).toBe(false);
     expect(meta.testOf(current, "b", game)).toBeNull();
 

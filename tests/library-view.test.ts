@@ -113,11 +113,8 @@ describe("the library view", () => {
     const entries = entriesOf(games, store);
     const shown = (collection: Parameters<typeof libraryView>[1]["collection"]) =>
       names(
-        libraryView(
-          entries,
-          { query: "", sortBy: "name-asc", source: "all", collection },
-          tested,
-        ).installed,
+        libraryView(entries, { query: "", sortBy: "name-asc", source: "all", collection }, tested)
+          .installed,
       );
     expect(shown("tested:works")).toEqual(["Quake"]);
     expect(shown("tested:broken")).toEqual([]);

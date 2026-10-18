@@ -182,6 +182,10 @@
     color: var(--danger);
   }
 
+  .chip.active .icon.test {
+    color: inherit;
+  }
+
   .count {
     font-size: 0.85em;
     opacity: 0.75;
