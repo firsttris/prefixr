@@ -5,6 +5,7 @@ pub mod github;
 pub mod graphics;
 pub mod graphics_layers;
 pub mod icons;
+pub mod library;
 pub mod locale;
 pub mod logs;
 pub mod mangohud;

@@ -21,6 +21,7 @@ use crate::commands::games::{
     add_game, create_desktop_shortcut, create_menu_shortcut, end_game_session, launch_game,
     remove_game, run_in_prefix, update_game, LaunchingGames, RunningGames,
 };
+use crate::commands::library::game_key;
 use crate::commands::logs::game_log_dir;
 use crate::commands::prefixes::{add_prefix, delete_prefix};
 use crate::commands::runner_downloads::{
@@ -43,11 +44,16 @@ use crate::lock::LockExt;
 use crate::models::{ArtworkKind, Game, GameInput, RunnerKind};
 use crate::tray::WindowVisible;
 
+mod library;
+use library::{CategoryCommand, LibraryCommand};
+
 /// The first arguments that make Prefixr a command line program rather than
 /// open its window. Everything else, including `--launch`, `--run` and
 /// `--install`, is left to the app as before.
 const CLI_ARGS: &[&str] = &[
     "game",
+    "library",
+    "category",
     "prefix",
     "runner",
     "umu",
@@ -86,6 +92,12 @@ enum Command {
     /// The games in the library
     #[command(subcommand)]
     Game(GameCommand),
+    /// The whole library, store games included: list it, mark favorites, hide games
+    #[command(subcommand)]
+    Library(LibraryCommand),
+    /// The library's categories, and which games are in them
+    #[command(subcommand)]
+    Category(CategoryCommand),
     /// Wine prefixes, and running things in them
     #[command(subcommand)]
     Prefix(PrefixCommand),
@@ -346,7 +358,11 @@ fn changes_config(command: &Command) -> bool {
                 | GameCommand::Remove { .. }
                 | GameCommand::Artwork(_)
         ) | Command::Prefix(PrefixCommand::Add { .. } | PrefixCommand::Remove { .. })
-    )
+    ) || match command {
+        Command::Library(command) => library::changes_config(command),
+        Command::Category(command) => library::category_changes_config(command),
+        _ => false,
+    }
 }
 
 /// `config.json.lock`, held for as long as the command line runs.
@@ -418,6 +434,8 @@ async fn execute(app: &AppHandle, cli: Cli) -> Result<(), AppError> {
     let out = Out { json: cli.json };
     match cli.command {
         Command::Game(command) => game_command(app, out, command).await,
+        Command::Library(command) => library::library_command(app, out, command).await,
+        Command::Category(command) => library::category_command(app, out, command).await,
         Command::Prefix(command) => prefix_command(app, out, command).await,
         Command::Runner(command) => runner_command(app, out, command).await,
         Command::Umu(command) => umu_command(app, out, command).await,
@@ -807,7 +825,14 @@ async fn game_command(app: &AppHandle, out: Out, command: GameCommand) -> Result
         }
         GameCommand::Show { game } => {
             let game = lookup_game(app, &game)?;
-            out.print(&game, || describe_game(&game))
+            let categories = config(app).library.categories_of(&game_key(&game));
+            out.print(&game, || {
+                let mut text = describe_game(&game);
+                if !categories.is_empty() {
+                    text.push_str(&format!("\nCategories:  {}", categories.join(", ")));
+                }
+                text
+            })
         }
         GameCommand::Add(args) => {
             let exe = check_exe(&args.exe)?;
