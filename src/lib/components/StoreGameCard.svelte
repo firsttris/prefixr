@@ -5,10 +5,12 @@
 -->
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
-  import type { StoreGame } from "$lib/types";
+  import type { Compatibility, StoreGame } from "$lib/types";
   import { storeCoverUrl, storeName } from "$lib/stores/gameStores";
   import { backendError } from "$lib/i18n/index.svelte";
   import GameFallbackIcon from "./GameFallbackIcon.svelte";
+  import CompatBadges from "./CompatBadges.svelte";
+  import FavoriteStar from "./FavoriteStar.svelte";
   import StoreInstallError from "./StoreInstallError.svelte";
 
   let {
@@ -18,6 +20,10 @@
     onInstall,
     onCancel,
     onDismissError,
+    favorite,
+    compat,
+    onToggleFavorite,
+    onOpenDetails,
   }: {
     game: StoreGame;
     progress?: number;
@@ -25,14 +31,27 @@
     onInstall: () => void;
     onCancel: () => void;
     onDismissError: () => void;
+    favorite: boolean;
+    compat?: Compatibility;
+    onToggleFavorite: () => void;
+    onOpenDetails: () => void;
   } = $props();
 
   let coverSrc = $derived(storeCoverUrl(game));
   let installing = $derived(progress !== undefined);
 </script>
 
-<article class="card" class:installing>
+<article
+  class="card"
+  class:installing
+  oncontextmenu={(e) => {
+    e.preventDefault();
+    onOpenDetails();
+  }}
+>
   <div class="cover-wrap">
+    <button type="button" class="cover-hit" aria-label={m.details_open()} onclick={onOpenDetails}
+    ></button>
     {#if coverSrc}
       <img class="cover" src={coverSrc} alt="" loading="lazy" decoding="async" />
     {:else}
@@ -43,8 +62,13 @@
 
     <span class="source">{storeName(game.store)}</span>
 
+    <div class="star-corner" class:favorite>
+      <FavoriteStar {favorite} onToggle={onToggleFavorite} onImage />
+    </div>
+
     <div class="overlay">
       <h3 title={game.title}>{game.title}</h3>
+      <CompatBadges {compat} onImage />
       {#if installing}
         <div class="progress-row">
           <span>{m.storeGame_installing()}</span>
@@ -224,5 +248,57 @@
     background: var(--accent);
     border-radius: 999px;
     transition: width 0.3s ease;
+  }
+
+  .star-corner {
+    position: absolute;
+    top: 0.6em;
+    right: 0.6em;
+    z-index: 5;
+  }
+
+  .star-corner:not(.favorite) {
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  .card:hover .star-corner,
+  .card:focus-within .star-corner {
+    opacity: 1;
+  }
+
+  /* Not installed yet: muted, so the installed games stand out. */
+  .cover {
+    filter: saturate(0.55) brightness(0.8);
+    transition: filter 0.2s;
+  }
+
+  .card:hover .cover,
+  .card:focus-within .cover,
+  .card.installing .cover {
+    filter: none;
+  }
+
+  .cover-hit {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .cover-hit:focus-visible {
+    outline-offset: -3px;
+  }
+
+  .overlay {
+    pointer-events: none;
+  }
+
+  .overlay :global(button) {
+    pointer-events: auto;
   }
 </style>

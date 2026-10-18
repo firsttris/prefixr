@@ -4,10 +4,13 @@
 // Rust types, not these.
 export type { ActiveGame } from "./bindings/ActiveGame";
 export type { AppError } from "./bindings/AppError";
+export type { Category } from "./bindings/Category";
+export type { Compatibility } from "./bindings/Compatibility";
 export type { ArtworkKind } from "./bindings/ArtworkKind";
 export type { DetectedShortcut } from "./bindings/DetectedShortcut";
 export type { DirectXLayerStatus } from "./bindings/DirectXLayerStatus";
 export type { Game } from "./bindings/Game";
+export type { GameActivity } from "./bindings/GameActivity";
 export type { GameExitedPayload } from "./bindings/GameExitedPayload";
 export type { GameInitializingPayload } from "./bindings/GameInitializingPayload";
 export type { GameInput } from "./bindings/GameInput";
@@ -19,6 +22,7 @@ export type { GitHubConfig } from "./bindings/GitHubConfig";
 export type { GraphicsConfig } from "./bindings/GraphicsConfig";
 export type { GraphicsOverrides } from "./bindings/GraphicsOverrides";
 export type { InstallerResult } from "./bindings/InstallerResult";
+export type { LibraryConfig } from "./bindings/LibraryConfig";
 export type { MangoHudConfig } from "./bindings/MangoHudConfig";
 export type { MangoHudLayout } from "./bindings/MangoHudLayout";
 export type { MaxMapCountStatus } from "./bindings/MaxMapCountStatus";

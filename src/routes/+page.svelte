@@ -14,6 +14,7 @@
   import InstallDialog from "$lib/components/InstallDialog.svelte";
   import StoreInstallDialog from "$lib/components/StoreInstallDialog.svelte";
   import StoresSettings from "$lib/components/StoresSettings.svelte";
+  import DownloadsView from "$lib/components/DownloadsView.svelte";
   import Modal from "$lib/components/Modal.svelte";
   import { getLocale, setLocale, type Locale } from "$lib/i18n/index.svelte";
   import {
@@ -26,7 +27,12 @@
     listenForPendingLaunch,
   } from "$lib/stores/games";
   import { listenForConfigChanges } from "$lib/stores/library";
-  import { notInstalled, storeGames } from "$lib/stores/gameStores";
+  import {
+    notInstalled,
+    storeGames,
+    storeInstallErrors,
+    storeInstalls,
+  } from "$lib/stores/gameStores";
   import { appVersion, openReleaseNotes, refreshAppVersion } from "$lib/stores/system";
   import type { Game, StoreGame } from "$lib/types";
 
@@ -39,6 +45,7 @@
     | "overlay"
     | "proton"
     | "stores"
+    | "downloads"
     | "steamgriddb";
   let view = $state<View>("library");
 
@@ -58,6 +65,9 @@
   let installingStoreGame = $state<StoreGame | null>(null);
 
   let availableCount = $derived(notInstalled($storeGames).length);
+  let downloadCount = $derived(
+    new Set([...Object.keys($storeInstalls), ...Object.keys($storeInstallErrors)]).size,
+  );
   let modalGame = $derived(editing && editing !== "new" ? editing : undefined);
   let modalTitle = $derived(
     editing === "new" ? m.library_addGameTitle() : m.library_editGameTitle(),
@@ -113,6 +123,19 @@
       onclick={() => (view = "library")}
     >
       {m.nav_library()}
+    </button>
+    <button
+      type="button"
+      class="nav-item"
+      class:active={view === "downloads"}
+      onclick={() => (view = "downloads")}
+    >
+      {m.nav_downloads()}
+      {#if downloadCount > 0}
+        <span class="nav-badge" class:failed={Object.keys($storeInstalls).length === 0}
+          >{downloadCount}</span
+        >
+      {/if}
     </button>
     <button
       type="button"
@@ -240,6 +263,11 @@
       <OverlaySettings />
     {:else if view === "proton"}
       <ProtonSettings />
+    {:else if view === "downloads"}
+      <div class="page-header">
+        <h1>{m.downloads_heading()}</h1>
+      </div>
+      <DownloadsView onInstallStoreGame={(game) => (installingStoreGame = game)} />
     {:else if view === "stores"}
       <div class="page-header">
         <h1>{m.library_storesHeading()}</h1>
@@ -320,6 +348,8 @@
   }
 
   .nav-item {
+    display: flex;
+    align-items: center;
     text-align: left;
     background: transparent;
     border: 1px solid transparent;
@@ -346,6 +376,22 @@
   .nav-divider {
     margin: 0.6em 0.8em;
     border-top: 1px solid var(--border);
+  }
+
+  .nav-badge {
+    margin-left: auto;
+    min-width: 1.5em;
+    padding: 0 0.45em;
+    border-radius: 999px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.75em;
+    font-weight: 600;
+    text-align: center;
+  }
+
+  .nav-badge.failed {
+    background: var(--danger);
   }
 
   .nav-item.active {

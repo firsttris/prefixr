@@ -1,11 +1,13 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
-  import type { Game } from "$lib/types";
+  import type { Compatibility, Game } from "$lib/types";
   import { killGame, launchGame, type GameRunState } from "$lib/stores/games";
   import { exeIconUrl } from "$lib/stores/steamgriddb";
   import { storeName } from "$lib/stores/gameStores";
   import GameActionsMenu from "./GameActionsMenu.svelte";
   import GameFallbackIcon from "./GameFallbackIcon.svelte";
+  import CompatBadges from "./CompatBadges.svelte";
+  import FavoriteStar from "./FavoriteStar.svelte";
   import GameItemNotices from "./GameItemNotices.svelte";
   import { GameItem } from "./gameItem.svelte";
 
@@ -19,6 +21,10 @@
     onExportToSteam,
     onRemoveFromSteam,
     onShowNotes,
+    favorite,
+    compat,
+    onToggleFavorite,
+    onOpenDetails,
   }: {
     game: Game;
     runState?: GameRunState;
@@ -29,12 +35,25 @@
     onExportToSteam: () => void;
     onRemoveFromSteam: () => void;
     onShowNotes: () => void;
+    favorite: boolean;
+    compat?: Compatibility;
+    onToggleFavorite: () => void;
+    onOpenDetails: () => void;
   } = $props();
 
   const item = new GameItem(() => game);
 </script>
 
-<div class="row" class:running={runState?.running}>
+<div
+  class="row"
+  class:running={runState?.running}
+  role="group"
+  aria-label={game.name}
+  oncontextmenu={(e) => {
+    e.preventDefault();
+    onOpenDetails();
+  }}
+>
   <div class="thumb">
     {#if item.coverSrc}
       <img class="cover" src={item.coverSrc} alt="" loading="lazy" decoding="async" />
@@ -45,11 +64,15 @@
     {/if}
   </div>
 
+  <FavoriteStar {favorite} onToggle={onToggleFavorite} />
   <div class="meta">
-    <span class="name" title={game.name}>{game.name}</span>
+    <button type="button" class="name" title={m.details_open()} onclick={onOpenDetails}
+      >{game.name}</button
+    >
     <span class="runner"
       >{game.store ? `${storeName(game.store.store)} · ` : ""}{game.runner_id}</span
     >
+    <CompatBadges {compat} />
   </div>
 
   <div class="status">
@@ -274,5 +297,20 @@
 
   .kill-sm:hover:not(:disabled) {
     border-color: var(--danger);
+  }
+
+  button.name {
+    padding: 0;
+    border: none;
+    background: none;
+    border-radius: 4px;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  button.name:hover {
+    color: var(--accent);
   }
 </style>

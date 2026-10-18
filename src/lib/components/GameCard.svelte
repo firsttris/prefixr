@@ -1,10 +1,12 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
-  import type { Game } from "$lib/types";
+  import type { Compatibility, Game } from "$lib/types";
   import { killGame, launchGame, type GameRunState } from "$lib/stores/games";
   import { exeIconUrl } from "$lib/stores/steamgriddb";
   import { storeName } from "$lib/stores/gameStores";
   import GameActionsMenu from "./GameActionsMenu.svelte";
+  import CompatBadges from "./CompatBadges.svelte";
+  import FavoriteStar from "./FavoriteStar.svelte";
   import GameFallbackIcon from "./GameFallbackIcon.svelte";
   import GameItemNotices from "./GameItemNotices.svelte";
   import { GameItem } from "./gameItem.svelte";
@@ -19,6 +21,10 @@
     onExportToSteam,
     onRemoveFromSteam,
     onShowNotes,
+    favorite,
+    compat,
+    onToggleFavorite,
+    onOpenDetails,
   }: {
     game: Game;
     runState?: GameRunState;
@@ -29,13 +35,26 @@
     onExportToSteam: () => void;
     onRemoveFromSteam: () => void;
     onShowNotes: () => void;
+    favorite: boolean;
+    compat?: Compatibility;
+    onToggleFavorite: () => void;
+    onOpenDetails: () => void;
   } = $props();
 
   const item = new GameItem(() => game);
 </script>
 
-<article class="card" class:running={runState?.running}>
+<article
+  class="card"
+  class:running={runState?.running}
+  oncontextmenu={(e) => {
+    e.preventDefault();
+    onOpenDetails();
+  }}
+>
   <div class="cover-wrap">
+    <button type="button" class="cover-hit" aria-label={m.details_open()} onclick={onOpenDetails}
+    ></button>
     {#if item.coverSrc}
       <img class="cover" src={item.coverSrc} alt="" loading="lazy" decoding="async" />
     {:else}
@@ -54,7 +73,8 @@
       <span class="status-badge init"><span class="dot"></span>{m.gameCard_initializing()}</span>
     {/if}
 
-    <div class="menu-corner">
+    <div class="menu-corner" class:favorite>
+      <FavoriteStar {favorite} onToggle={onToggleFavorite} onImage />
       <GameActionsMenu
         {item}
         {inSteam}
@@ -80,6 +100,7 @@
               <span class="runner">{storeName(game.store.store)}</span>
             {/if}
             <span class="runner">{game.runner_id}</span>
+            <CompatBadges {compat} onImage />
           </div>
         </div>
 
@@ -300,6 +321,44 @@
     top: 0.6em;
     right: 0.6em;
     z-index: 5;
+    display: flex;
+    gap: 0.3em;
+  }
+
+  /* The star only shows on a favorite, or while the card is pointed at. */
+  .menu-corner:not(.favorite) :global(.star) {
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  .card:hover .menu-corner :global(.star),
+  .card:focus-within .menu-corner :global(.star) {
+    opacity: 1;
+  }
+
+  /* The whole cover opens the details; the overlay's text lets clicks
+     through to it, its buttons don't. */
+  .cover-hit {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .cover-hit:focus-visible {
+    outline-offset: -3px;
+  }
+
+  .overlay {
+    pointer-events: none;
+  }
+
+  .overlay :global(button) {
+    pointer-events: auto;
   }
 
   .bottom-row {
