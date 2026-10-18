@@ -87,3 +87,26 @@ fn compatibility_is_only_in_the_json_when_looked_up() {
     let rows = entry_rows(&[&list[0]]);
     assert_eq!(rows[0][6], "protondb:gold, umu-fix");
 }
+
+#[test]
+fn listing_filters_by_hidden_favorites_and_category() {
+    let mut list = entries(&config(), &store_games());
+    list[0].hidden = true;
+    let keys = |list: Vec<LibraryEntry>| list.into_iter().map(|e| e.key).collect::<Vec<_>>();
+    assert_eq!(
+        keys(filter_entries(list.clone(), false, false, None)),
+        ["epic:Ferry", "gog:1"]
+    );
+    assert_eq!(
+        keys(filter_entries(list.clone(), true, false, None)).len(),
+        3
+    );
+    assert_eq!(
+        keys(filter_entries(list.clone(), false, true, None)),
+        ["gog:1"]
+    );
+    assert_eq!(
+        keys(filter_entries(list, false, false, Some("Kinder"))),
+        ["epic:Ferry"]
+    );
+}

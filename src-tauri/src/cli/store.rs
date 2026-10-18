@@ -6,21 +6,23 @@
 
 use std::cmp::Ordering;
 use std::io::IsTerminal;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
 use tauri::{AppHandle, Listener, Manager};
 
 use super::library::{all_entries, find_entry, LibraryEntry};
-use super::{config, table, Out};
+use super::{absolute, config, table, Out};
 use crate::commands::games::LaunchingGames;
 use crate::commands::runners::scan_runners;
 use crate::commands::stores::{
-    connect_store, disconnect_store, get_store_install_defaults, install_store_game,
-    list_store_accounts, open_store_login, sync_store_library, uninstall_store_game,
-    StoreInstallOptions, StoreInstallProgressPayload, StoreInstalls,
+    cancel_store_install, connect_store, disconnect_store, get_store_install_defaults,
+    install_store_game, list_store_accounts, prepare_store_login, sync_store_library,
+    uninstall_store_game, StoreInstallOptions, StoreInstallProgressPayload, StoreInstalls,
 };
 use crate::error::AppError;
+use crate::host_env::xdg_open;
 use crate::lock::LockExt;
 use crate::models::{Runner, RunnerKind, StoreKind};
 
@@ -151,10 +153,44 @@ fn split_key(key: &str) -> Option<(StoreKind, String)> {
 }
 
 #[derive(Serialize)]
-struct Connected {
+struct Login {
     store: StoreKind,
-    login_opened: bool,
+    /// The page to sign in on, also when the browser couldn't be opened
+    /// (no desktop session): open it anywhere.
+    url: String,
+    opened: bool,
     next: String,
+}
+
+#[derive(Serialize)]
+struct Synced {
+    store: StoreKind,
+    games: usize,
+}
+
+/// The progress line for `percent`, or `None` when nothing changed enough
+/// to print one: every percent in a terminal (one line, rewritten), every
+/// 10 % otherwise (an agent's log), starting with 0 %.
+fn progress_line(name: &str, last: Option<i64>, percent: f64, interactive: bool) -> Option<String> {
+    let percent = percent.floor() as i64;
+    if interactive {
+        (last != Some(percent)).then(|| format!("\r{name}: {percent} %   "))
+    } else {
+        last.is_none_or(|last| last / 10 != percent / 10)
+            .then(|| format!("{name}: {percent} %\n"))
+    }
+}
+
+/// Resolves on Ctrl+C or SIGTERM (an agent's command timeout, say).
+async fn stop_signal() {
+    use tokio::signal::unix::{signal, SignalKind};
+    let Ok(mut term) = signal(SignalKind::terminate()) else {
+        let _ = tokio::signal::ctrl_c().await;
+        return;
+    };
+    let ctrl_c = Box::pin(tokio::signal::ctrl_c());
+    let term = Box::pin(term.recv());
+    futures_util::future::select(ctrl_c, term).await;
 }
 
 pub(super) async fn store_command(
@@ -182,32 +218,51 @@ pub(super) async fn store_command(
         }
         StoreCommand::Login { store } => {
             let store = StoreKind::from(store);
-            open_store_login(app.clone(), store).await?;
+            let url = prepare_store_login(app, store).await?;
+            let opened = match xdg_open(&url).await {
+                Ok(()) => true,
+                Err(e) => {
+                    out.note(&format!(
+                        "Could not open the browser ({e}); open the address yourself."
+                    ));
+                    false
+                }
+            };
             let next = format!(
-                "Log in in the browser, then run: prefixr store connect {} <code>  \
+                "Log in, then run: prefixr store connect {} <code>  \
                  (the code the page shows, or the whole page or address)",
                 store.slug()
             );
-            out.print(
-                &Connected {
-                    store,
-                    login_opened: true,
-                    next: next.clone(),
-                },
-                || next,
-            )
+            let login = Login {
+                store,
+                url: url.clone(),
+                opened,
+                next: next.clone(),
+            };
+            out.print(&login, || format!("{url}\n{next}"))
         }
         StoreCommand::Connect { store, code } => {
             let store = StoreKind::from(store);
             let account = connect_store(app.clone(), store, code).await?;
             out.note("Fetching the game list…");
-            let games = sync_store_library(app.clone(), app.state(), store).await?;
+            // The login worked either way: a failed sync isn't a reason to
+            // try the (now used) code again.
+            let games = match sync_store_library(app.clone(), app.state(), store).await {
+                Ok(games) => games.len().to_string(),
+                Err(e) => {
+                    out.note(&format!(
+                        "Connected, but the game list failed: {}. Try `prefixr store sync {}`.",
+                        e.localized(crate::locale::Locale::En),
+                        store.slug()
+                    ));
+                    "?".to_string()
+                }
+            };
             let name = account.account_name.clone().unwrap_or_default();
             out.print(&account, || {
                 format!(
-                    "Connected {} as {name}: {} games",
-                    store.display_name(),
-                    games.len()
+                    "Connected {} as {name}: {games} games",
+                    store.display_name()
                 )
             })
         }
@@ -219,7 +274,11 @@ pub(super) async fn store_command(
         StoreCommand::Sync { store } => {
             let store = StoreKind::from(store);
             let games = sync_store_library(app.clone(), app.state(), store).await?;
-            out.print(&games.len(), || {
+            let synced = Synced {
+                store,
+                games: games.len(),
+            };
+            out.print(&synced, || {
                 format!("{}: {} games", store.display_name(), games.len())
             })
         }
@@ -271,21 +330,23 @@ async fn install(
             .clone(),
     };
     let install_dir = match dir {
-        Some(dir) => dir,
+        Some(dir) => absolute(Path::new(&dir))?.to_string_lossy().into_owned(),
         None => {
             get_store_install_defaults(app.clone(), app.state(), store, app_name.clone())
                 .await?
                 .install_dir
         }
     };
+    let prefix = match prefix {
+        Some(prefix) => Some(absolute(Path::new(&prefix))?.to_string_lossy().into_owned()),
+        None => None,
+    };
 
     out.note(&format!(
         "Installing {} with {runner_id} into {install_dir}…",
         entry.name
     ));
-    // Progress on stderr: a line that updates in a terminal, every 10 %
-    // otherwise (an agent's log).
-    let last = Arc::new(Mutex::new(-1i64));
+    let last = Arc::new(Mutex::new(None));
     let interactive = std::io::stderr().is_terminal();
     let (name, key_app) = (entry.name.clone(), app_name.clone());
     let listener = app.listen_any("store-install-progress", move |event| {
@@ -296,28 +357,35 @@ async fn install(
         if progress.app_name != key_app {
             return;
         }
-        let percent = progress.percent.floor() as i64;
         let mut last = last.locked();
-        if interactive && percent != *last {
-            eprint!("\r{name}: {percent} %   ");
-        } else if !interactive && percent / 10 != *last / 10 {
-            eprintln!("{name}: {percent} %");
+        if let Some(line) = progress_line(&name, *last, progress.percent, interactive) {
+            eprint!("{line}");
+            *last = Some(progress.percent.floor() as i64);
         }
-        *last = percent;
     });
-    let result = install_store_game(
+    let install = Box::pin(install_store_game(
         app.clone(),
         app.state(),
         app.state::<StoreInstalls>(),
         store,
-        app_name,
+        app_name.clone(),
         StoreInstallOptions {
             install_dir,
             prefix_path: prefix,
             runner_id,
         },
-    )
-    .await;
+    ));
+    // Ended from outside (Ctrl+C, an agent's timeout): the store's tool runs
+    // in a process group of its own and would go on downloading, so it's
+    // stopped like the window's Cancel does, and the install ends as one.
+    let result = match futures_util::future::select(install, Box::pin(stop_signal())).await {
+        futures_util::future::Either::Left((result, _)) => result,
+        futures_util::future::Either::Right((_, install)) => {
+            out.note("\nStopping the install…");
+            let _ = cancel_store_install(app.state::<StoreInstalls>(), store, app_name);
+            install.await
+        }
+    };
     app.unlisten(listener);
     if interactive {
         eprintln!();

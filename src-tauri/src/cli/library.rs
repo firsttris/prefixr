@@ -250,6 +250,22 @@ fn duration(secs: u64) -> String {
     }
 }
 
+/// The games `library list` shows: hidden ones only when asked for, then
+/// only favorites or one category's games if asked.
+pub(crate) fn filter_entries(
+    entries: Vec<LibraryEntry>,
+    hidden: bool,
+    favorites: bool,
+    category: Option<&str>,
+) -> Vec<LibraryEntry> {
+    entries
+        .into_iter()
+        .filter(|e| hidden || !e.hidden)
+        .filter(|e| !favorites || e.favorite)
+        .filter(|e| category.is_none_or(|name| e.categories.iter().any(|c| c == name)))
+        .collect()
+}
+
 fn entry_rows(entries: &[&LibraryEntry]) -> Vec<Vec<String>> {
     entries
         .iter()
@@ -298,29 +314,22 @@ pub(super) async fn library_command(
             hidden,
             compatibility,
         } => {
-            let mut entries = entries;
-            if compatibility {
-                let keys = entries.iter().map(|e| e.key.clone()).collect();
-                let mut known =
-                    get_compatibility(app.clone(), app.state(), keys, Some(true)).await?;
-                for entry in &mut entries {
-                    entry.compatibility = known.remove(&entry.key);
-                }
-            }
             let category = match category {
                 Some(query) => Some(config(app).library.find_category(&query)?.name.clone()),
                 None => None,
             };
-            let shown: Vec<&LibraryEntry> = entries
-                .iter()
-                .filter(|e| hidden || !e.hidden)
-                .filter(|e| !favorites || e.favorite)
-                .filter(|e| {
-                    category
-                        .as_ref()
-                        .is_none_or(|name| e.categories.contains(name))
-                })
-                .collect();
+            let mut shown = filter_entries(entries, hidden, favorites, category.as_deref());
+            // Only for the games listed: a request per game ProtonDB isn't
+            // cached for.
+            if compatibility {
+                let keys = shown.iter().map(|e| e.key.clone()).collect();
+                let mut known =
+                    get_compatibility(app.clone(), app.state(), keys, Some(true)).await?;
+                for entry in &mut shown {
+                    entry.compatibility = known.remove(&entry.key);
+                }
+            }
+            let shown: Vec<&LibraryEntry> = shown.iter().collect();
             out.print(&shown, || {
                 if shown.is_empty() {
                     return "No games".to_string();

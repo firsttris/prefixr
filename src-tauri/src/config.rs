@@ -268,6 +268,10 @@ pub fn update_config<T>(
     let result = change(&mut config)?;
     save_config(app, &config)?;
     *current = config;
+    drop(current);
+    // What another process changed came in with it too; the window shows
+    // that now rather than on its next change.
+    let _ = app.emit("config-changed", ());
     Ok(result)
 }
 

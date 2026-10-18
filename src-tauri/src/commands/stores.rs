@@ -12,6 +12,7 @@
 
 use std::collections::HashMap;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
@@ -32,7 +33,7 @@ use crate::commands::steamgriddb::{
     artwork_dir, asset_cache_path, download_image_unchecked, image_extension,
     remove_stale_asset_files,
 };
-use crate::config::{save_config, update_config, ConfigState};
+use crate::config::{save_config, update_config, AppConfig, ConfigState};
 use crate::error::AppError;
 use crate::host_env::xdg_open;
 use crate::lock::LockExt;
@@ -466,39 +467,44 @@ pub async fn list_store_accounts(app: AppHandle) -> Result<Vec<StoreAccount>, Ap
     Ok(accounts)
 }
 
-/// Opens the store's login page in the browser. The store's tool is
-/// downloaded first, so a missing Python shows up now rather than after the
-/// user logged in.
-#[tauri::command]
-pub async fn open_store_login(app: AppHandle, store: StoreKind) -> Result<(), AppError> {
+/// The store's login page, with the store's tool downloaded first, so a
+/// missing Python shows up now rather than after the user logged in.
+pub async fn prepare_store_login(app: &AppHandle, store: StoreKind) -> Result<String, AppError> {
     match store {
         StoreKind::Epic => {
-            legendary(&app).await?;
-            xdg_open(epic::LOGIN_URL).await?;
+            legendary(app).await?;
+            Ok(epic::LOGIN_URL.to_string())
         }
         StoreKind::Gog => {
-            gogdl(&app).await?;
-            xdg_open(gog::LOGIN_URL).await?;
+            gogdl(app).await?;
+            Ok(gog::LOGIN_URL.to_string())
         }
         // Amazon's login address is made for this one login (it carries a
         // code challenge), so Nile prepares it, and what `register` needs
         // to finish it later is kept until then.
         StoreKind::Amazon => {
-            let nile = nile(&app).await?;
+            let nile = nile(app).await?;
             let (json, stderr) = nile
                 .output(["auth", "--login", "--non-interactive"])
                 .await
                 .map_err(|e| command_failed(store, e))?;
             let request = amazon::parse_login_request(&json)
                 .map_err(|e| command_failed(store, amazon::error_message(&stderr).unwrap_or(e)))?;
-            let path = amazon_login_request_file(&app)?;
+            let path = amazon_login_request_file(app)?;
             write_private(
                 &path,
                 &serde_json::to_vec(&request).map_err(|e| e.to_string())?,
             )?;
-            xdg_open(&request.url).await?;
+            Ok(request.url)
         }
     }
+}
+
+/// Opens the store's login page in the browser.
+#[tauri::command]
+pub async fn open_store_login(app: AppHandle, store: StoreKind) -> Result<(), AppError> {
+    let url = prepare_store_login(&app, store).await?;
+    xdg_open(&url).await?;
     Ok(())
 }
 
@@ -604,7 +610,7 @@ pub async fn disconnect_store(
         .keys()
         .find(|(s, _)| *s == store)
         .map(|(_, app_name)| app_name.clone());
-    if let Some(app_name) = installing {
+    if let Some(app_name) = installing.or_else(|| store_install_elsewhere(&app, store)) {
         let title = read_library(&app, store)
             .into_iter()
             .find(|entry| entry.app_name == app_name)
@@ -976,6 +982,81 @@ fn install_prefix(
     Ok(path)
 }
 
+/// Adds an installed store game to the library, unless a game from the
+/// same store entry got there meanwhile (installed by another Prefixr).
+pub(crate) fn add_installed(config: &mut AppConfig, game: &Game) -> Result<(), String> {
+    if let Some(link) = &game.store {
+        if installed_games(&config.games).contains_key(&(link.store, link.app_name.as_str())) {
+            return Err(format!("{} is in the library already", game.name));
+        }
+    }
+    config.games.push(game.clone());
+    config.library.record_added(&game_key(game), now_secs());
+    Ok(())
+}
+
+fn install_lock_path(app: &AppHandle, store: StoreKind) -> Result<PathBuf, String> {
+    Ok(store_dir(app, store)?.join("install.lock"))
+}
+
+fn open_install_lock(path: &Path) -> Result<fs::File, String> {
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir).map_err(|e| format!("Could not create {}: {e}", dir.display()))?;
+    }
+    fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .read(true)
+        .write(true)
+        .open(path)
+        .map_err(|e| format!("Could not open {}: {e}", path.display()))
+}
+
+/// Takes a store's install lock for `app_name`, held until the returned
+/// file is dropped (or the process ends, however it ends).
+pub(crate) fn claim_install_lock(
+    path: &Path,
+    app_name: &str,
+) -> Result<Result<fs::File, String>, String> {
+    let mut file = open_install_lock(path)?;
+    match file.try_lock() {
+        Ok(()) => {
+            // Who holds it, for the others' messages.
+            let _ = file.set_len(0);
+            let _ = file.write_all(app_name.as_bytes());
+            Ok(Ok(file))
+        }
+        Err(fs::TryLockError::WouldBlock) => Ok(Err(fs::read_to_string(path).unwrap_or_default())),
+        Err(fs::TryLockError::Error(e)) => Err(format!("Could not lock {}: {e}", path.display())),
+    }
+}
+
+fn claim_store_install(
+    app: &AppHandle,
+    store: StoreKind,
+    app_name: &str,
+) -> Result<fs::File, AppError> {
+    match claim_install_lock(&install_lock_path(app, store)?, app_name)? {
+        Ok(file) => Ok(file),
+        Err(other) => {
+            let title = read_library(app, store)
+                .into_iter()
+                .find(|e| e.app_name == other)
+                .map_or(other, |e| e.title);
+            Err(AppError::StoreInstallRunning { title })
+        }
+    }
+}
+
+/// The game another Prefixr is installing from this store, if one is.
+fn store_install_elsewhere(app: &AppHandle, store: StoreKind) -> Option<String> {
+    let path = install_lock_path(app, store).ok()?;
+    if !path.exists() {
+        return None;
+    }
+    claim_install_lock(&path, "").ok()?.err()
+}
+
 /// Puts the store's cover in place as the game's own (see
 /// `steamgriddb::Slot::Cover`), so the card keeps it after the install.
 fn adopt_cover(app: &AppHandle, store: StoreKind, entry: &StoreLibraryEntry, game: &mut Game) {
@@ -1064,6 +1145,9 @@ async fn install(
         installs,
         key: key.clone(),
     };
+    // The window and the command line each only know their own installs;
+    // this lock is what keeps them from running two of a store's at once.
+    let _store_lock = claim_store_install(app, store, &app_name)?;
 
     // A picked prefix is checked now; a new one is only made once the game
     // is installed, so a failed or cancelled install leaves no unused
@@ -1081,15 +1165,16 @@ async fn install(
     }
     fs::create_dir_all(&install_dir)
         .map_err(|e| format!("Could not create {}: {e}", install_dir.display()))?;
-    {
-        let mut config = state.locked();
-        if config.stores.install_dirs.get(&store) != Some(&install_dir) {
-            config
-                .stores
-                .install_dirs
-                .insert(store, install_dir.clone());
-            save_config(app, &config)?;
-        }
+    if state.locked().stores.install_dirs.get(&store) != Some(&install_dir) {
+        // Through the config as it is on disk: the command line's copy is
+        // from its start, which looking up the defaults may be a while ago.
+        let dir = install_dir.clone();
+        tokio::task::block_in_place(|| {
+            update_config(app, |config| {
+                config.stores.install_dirs.insert(store, dir);
+                Ok(())
+            })
+        })?;
     }
 
     let emit = |percent: f64| {
@@ -1193,11 +1278,7 @@ async fn install(
     };
     adopt_cover(app, store, &entry, &mut game);
 
-    update_config(app, |config| {
-        config.games.push(game.clone());
-        config.library.record_added(&game_key(&game), now_secs());
-        Ok(())
-    })?;
+    tokio::task::block_in_place(|| update_config(app, |config| add_installed(config, &game)))?;
     emit(100.0);
     Ok(game)
 }

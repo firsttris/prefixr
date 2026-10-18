@@ -93,3 +93,25 @@ fn only_uninstalling_holds_the_config_lock() {
     assert!(!changes_config(&parse("prefixr store sync gog")));
     assert!(!changes_config(&parse("prefixr store list")));
 }
+
+#[test]
+fn progress_shows_every_percent_in_a_terminal_and_every_ten_otherwise() {
+    assert_eq!(
+        progress_line("Doom", None, 0.0, false).as_deref(),
+        Some("Doom: 0 %\n")
+    );
+    assert_eq!(progress_line("Doom", Some(0), 9.9, false), None);
+    assert_eq!(
+        progress_line("Doom", Some(0), 10.2, false).as_deref(),
+        Some("Doom: 10 %\n")
+    );
+    assert_eq!(progress_line("Doom", Some(42), 42.7, true), None);
+    assert_eq!(
+        progress_line("Doom", Some(42), 43.0, true).as_deref(),
+        Some("\rDoom: 43 %   ")
+    );
+    assert_eq!(
+        progress_line("Doom", None, 0.0, true).as_deref(),
+        Some("\rDoom: 0 %   ")
+    );
+}

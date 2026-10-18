@@ -119,13 +119,22 @@ per game, and calls `prefixr category assign Kinder epic:Fortnite gog:1207658924
 The games are named as in `library list`: by key (`epic:<app>`, `gog:<id>`, …) or name. All of a
 store's games, installed or not, show up there once it's connected.
 
-Logging in still needs you: after `store login`, sign in in the browser and pass on what the page
-shows, as in the window (see [Connecting your account](user-guide.md#connecting-your-account)): for
+Logging in still needs you: `store login` opens the store's page in the browser and prints its
+address (open that yourself when there's no browser to open, over SSH say). Sign in there and pass
+on what the page shows, as in the window (see [Connecting your account](user-guide.md#connecting-your-account)): for
 Epic the page's text, for GOG and Amazon the address from the address bar. `store connect` takes it
 as it is. The code works once and only for a few minutes.
 
-`store install` prints its progress on stderr and returns the new game (with `--json`, as JSON). An
-open window shows the install on its **Downloads** page as well.
+`store install` prints its progress on stderr (a line that updates in a terminal, every 10 % in a
+log) and returns the new game (with `--json`, as JSON). It takes a while, so an agent should run it
+in the background. Ctrl+C, or the agent's own timeout, stops the download as the window's
+**Cancel** does. An open window shows the game in the library once it's installed, not on its
+**Downloads** page, which only shows the window's own installs. A store connected, synced or
+disconnected from the command line shows up in the window after its next start or **Refresh
+library**.
+
+Only one install per store runs at a time, also across the window and the command line: a second
+one is refused while the first runs.
 
 ## Prefixes
 
@@ -247,5 +256,6 @@ A good way to work with an agent:
    new one's `drive_c/users/steamuser/…`.
 
 Moving and copying files is up to the agent's own tools; Prefixr's command line takes over from
-there. Nothing an agent does through it deletes game files or prefixes: removing a game or a prefix
-only takes it off Prefixr's lists.
+there. Nothing an agent does through it deletes game files or prefixes, with one exception:
+`store uninstall` deletes a store game's files, as **Uninstall** in the window does (the game can be
+installed again from the store). Removing a game or a prefix only takes it off Prefixr's lists.
