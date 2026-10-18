@@ -518,7 +518,7 @@ pub(crate) fn write_raw_archive(dest: &Path, entries: &[(&str, &[u8])]) {
         .unwrap()
         .finish()
         .unwrap()
-        .flush()
+        .sync_all()
         .unwrap();
 }
 
