@@ -164,7 +164,7 @@ The documentation is also available as a website:
 | [Getting started](https://firsttris.github.io/prefixr/getting-started.html) | Install Prefixr and get your first game running |
 | [User guide](https://firsttris.github.io/prefixr/user-guide.html) | The library, prefixes, runners, per-game settings, artwork and Steam |
 | [Configuration & files](https://firsttris.github.io/prefixr/configuration.html) | Where Prefixr keeps its data, command-line options, API keys |
-| [Command line & AI agents](https://firsttris.github.io/prefixr/cli.html) | Every command, JSON output, and letting an AI agent set up, fix and organize your games |
+| [Command line & AI agents](https://firsttris.github.io/prefixr/cli.html) | Every command, JSON output, the Prefixr skill, and letting an AI agent set up, fix and organize your games |
 | [Troubleshooting & FAQ](https://firsttris.github.io/prefixr/troubleshooting.html) | Common problems and how to fix them |
 | [Development](https://firsttris.github.io/prefixr/development.html) | Building from source, architecture, tests and releases |
 

@@ -16,7 +16,8 @@ name.
 
 `~/.config/com.tristan.prefixr/config.json` holds the library and all settings: the games, the prefix
 list, the global Performance, Graphics, Overlay and Proton settings, the SteamGridDB API key, the
-GitHub token, and under `library` your categories, favorites, hidden games and play times.
+GitHub token, under `library` your categories, favorites, hidden games and play times, and under
+`backup` the automatic backups' settings.
 
 Prefixr saves it atomically (written to a temporary file, then renamed), so a crash or a full disk
 never leaves half a file. If the file can't be read when Prefixr starts, Prefixr shows the error and
@@ -50,6 +51,7 @@ before editing the file.
 | `stores/amazon/` | Nile's config (`nile-config/nile/`: your Amazon login, the game list, the installed games and their manifests, the Amazon Games SDK) and the cached game list (`library.json`). |
 | `prefixes/` | The prefixes created for store games, one per game (`epic-<app>`, `gog-<id>`, `amazon-<id>`). |
 | `exe-icons/` | Icons extracted from the games' `.exe` files. |
+| `backups/` | The automatic backups, when turned on under **Backup**, and the one made before every restore. Another folder can be picked there. |
 | `mangohud/`, `vkbasalt/` | The MangoHud and vkBasalt config of each game, written on every launch. |
 | `logs/<game-id>/` | The last 10 launch logs of each game. |
 | `logs/prefixes/<prefix>/` | The last 10 logs of setup programs, winetricks and Wine tools run in a prefix. |
@@ -73,6 +75,7 @@ Your prefixes live wherever you created or found them; Prefixr only remembers th
 | Your desktop folder | **To desktop** on a game. Prefixr honors a localized `XDG_DESKTOP_DIR`, such as `~/Schreibtisch`. |
 | `~/.steam/root/userdata/<user>/config/shortcuts.vdf` and `grid/` | **Add to Steam**, **Update in Steam** and **Remove from Steam**. The previous file is kept as `shortcuts.vdf.bak`. |
 | `$XDG_RUNTIME_DIR/prefixr/<game-id>.lock` | While a game launches or runs, so two Prefixr processes (an open window and one Steam started) never start the same game twice. |
+| `~/.claude/skills/prefixr/SKILL.md` | Only when you run `prefixr skill install`: the [Prefixr skill](cli.md#the-prefixr-skill) for Claude Code. |
 | `/etc/sysctl.d/99-prefixr-max-map-count.conf` | Only when you click **Increase now** for `vm.max_map_count`, after a password prompt. |
 
 ## Command-line options
@@ -82,7 +85,7 @@ Your prefixes live wherever you created or found them; Prefixr only remembers th
 | `prefixr --launch <game-id>` | Starts the game. If Prefixr is already open, that window starts it instead. Desktop and menu shortcuts use this. |
 | `prefixr --run <game-id>` | Starts the game without any window and exits when the game does. A failure before the game starts is shown in a dialog. Steam uses this for games added to it. |
 | `prefixr --install <path/to/setup.exe>` | Opens the install dialog for that setup program. The *Install Prefixr* file-manager entry uses this. |
-| `prefixr game …`, `prefix …`, `runner …`, `umu …` | The command line: everything the window does, from a terminal or a script. See [Command line & AI agents](cli.md). |
+| `prefixr game …`, `library …`, `category …`, `store …`, `prefix …`, `runner …`, `umu …`, `backup …`, `skill …` | The command line: everything the window does, from a terminal or a script. See [Command line & AI agents](cli.md). |
 
 A game's ID is the `id` of its entry in `config.json`. It also appears in the `Exec=` line of the
 game's shortcuts.
