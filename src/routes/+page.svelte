@@ -394,8 +394,8 @@
 
   main {
     flex: 1;
+    min-width: 0;
     padding: 2em;
-    max-width: 1100px;
     overflow-y: auto;
   }
 

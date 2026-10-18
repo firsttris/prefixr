@@ -475,7 +475,7 @@
     <p class="error">{backendError(error)}</p>
   {/if}
 
-  <button type="submit" class="primary" disabled={submitting}>
+  <button type="submit" class="primary submit" disabled={submitting}>
     {#if submitting}
       {existingGame ? m.gameForm_submitSaving() : m.gameForm_submitAdding()}
     {:else}
@@ -491,12 +491,31 @@
     gap: 1em;
   }
 
+  /* The tabs and the submit button stick to the edges of the dialog's
+     scrolling body, so switching tabs and saving never needs a scroll. The
+     negative offsets cancel the body's padding. */
   .tabs {
+    position: sticky;
+    top: -1.2em;
+    z-index: 1;
+    margin-top: -1.2em;
+    padding-top: 1.2em;
+    background: var(--surface);
     display: flex;
     flex-wrap: wrap;
     gap: 0.3em;
     border-bottom: 1px solid var(--border);
     padding-bottom: 0.5em;
+  }
+
+  .submit {
+    position: sticky;
+    bottom: -1.2em;
+    z-index: 1;
+    margin-bottom: -1.2em;
+    box-shadow:
+      0 0.6em 0 var(--surface),
+      0 -1em 1em -0.4em var(--surface);
   }
 
   .tabs button {

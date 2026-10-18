@@ -129,8 +129,11 @@
     border: 1px solid var(--border);
     border-radius: var(--radius);
     width: min(480px, 100%);
-    max-height: 85vh;
-    overflow-y: auto;
+    /* As tall as the window allows; only the body scrolls, so the title
+       and close button stay in view however long the content is. */
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
   }
 
@@ -139,6 +142,7 @@
   }
 
   header {
+    flex-shrink: 0;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -148,5 +152,7 @@
 
   .body {
     padding: 1.2em;
+    overflow-y: auto;
+    min-height: 0;
   }
 </style>
