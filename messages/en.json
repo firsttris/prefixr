@@ -268,15 +268,31 @@
   "prefixManager_filterNotSetUp": "Not set up yet",
   "prefixManager_filterMissing": "Folder missing",
   "prefixManager_notSetUpTitle": "Wine sets it up the first time a game in it starts.",
-  "prefixManager_missingTitle": "The folder isn't there (anymore). Is its drive mounted?",
+  "prefixManager_missingTitle": "There's no folder at this path. Is its drive mounted?",
   "prefixManager_shownCount": "{shown} of {total}",
   "prefixManager_elsewhere": "Other locations",
   "prefixManager_noMatch": "No prefix matches the search or filter.",
   "prefixManager_editGame": "Open this game's settings",
-  "prefixManager_moreGames": "and {count} more",
+  "prefixManager_moreGames": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "and {count} more",
+        "countPlural=other": "and {count} more"
+      }
+    }
+  ],
   "prefixManager_depsShort": "Dependencies",
   "prefixManager_moreActions": "More actions",
   "prefixManager_showFolder": "Show folder",
+  "prefixManager_filterUnreadable": "Not readable",
+  "prefixManager_unreadableTitle": "The folder is there, but Prefixr can't look into it (permissions, or a read error).",
+  "prefixManager_timedOut": "No answer",
+  "prefixManager_timedOutTitle": "The folder didn't answer in time: a network share that's gone, or a drive still spinning up? Open the page again to check once more.",
+  "prefixManager_revealed": "Prefix of {name}",
+  "prefixManager_notListed": "This prefix of {games} isn't in the list any more. The game still uses it.",
+  "prefixManager_addAgain": "Add it again",
   "prefixSelect_unusedGroup": "Unused ({count})",
   "prefixSelect_usedGroup": "In use, by game ({count})",
   "runnerList_explainer": "A runner is the compatibility layer that gets a Windows game running on Linux at all — e.g. {proton} (known from Steam) or {wine}. It translates the game's Windows calls into the Linux system, essentially a translation layer between the two worlds.",

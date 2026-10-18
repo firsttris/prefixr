@@ -268,15 +268,31 @@
   "prefixManager_filterNotSetUp": "Noch nicht eingerichtet",
   "prefixManager_filterMissing": "Ordner fehlt",
   "prefixManager_notSetUpTitle": "Wine richtet ihn beim ersten Start eines Spiels darin ein.",
-  "prefixManager_missingTitle": "Der Ordner ist nicht (mehr) da. Ist sein Laufwerk eingehängt?",
+  "prefixManager_missingTitle": "Unter diesem Pfad gibt es keinen Ordner. Ist sein Laufwerk eingehängt?",
   "prefixManager_shownCount": "{shown} von {total}",
   "prefixManager_elsewhere": "Andere Orte",
   "prefixManager_noMatch": "Kein Prefix passt zur Suche oder zum Filter.",
   "prefixManager_editGame": "Einstellungen dieses Spiels öffnen",
-  "prefixManager_moreGames": "und {count} weitere",
+  "prefixManager_moreGames": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "und {count} weiteres",
+        "countPlural=other": "und {count} weitere"
+      }
+    }
+  ],
   "prefixManager_depsShort": "Abhängigkeiten",
   "prefixManager_moreActions": "Weitere Aktionen",
   "prefixManager_showFolder": "Ordner anzeigen",
+  "prefixManager_filterUnreadable": "Nicht lesbar",
+  "prefixManager_unreadableTitle": "Der Ordner ist da, aber Prefixr kann nicht hineinsehen (Rechte oder ein Lesefehler).",
+  "prefixManager_timedOut": "Keine Antwort",
+  "prefixManager_timedOutTitle": "Der Ordner hat nicht rechtzeitig geantwortet: eine Netzwerkfreigabe, die weg ist, oder ein Laufwerk, das noch anläuft? Öffne die Seite noch einmal, um erneut zu prüfen.",
+  "prefixManager_revealed": "Prefix von {name}",
+  "prefixManager_notListed": "Dieser Prefix von {games} ist nicht mehr in der Liste. Das Spiel verwendet ihn weiterhin.",
+  "prefixManager_addAgain": "Wieder hinzufügen",
   "prefixSelect_unusedGroup": "Nicht verwendet ({count})",
   "prefixSelect_usedGroup": "In Verwendung, nach Spiel ({count})",
   "runnerList_explainer": "Ein Runner ist die Kompatibilitätsschicht, die ein Windows-Spiel unter Linux überhaupt zum Laufen bringt — z. B. {proton} (bekannt von Steam) oder {wine}. Er übersetzt die Windows-Programmaufrufe des Spiels ins Linux-System, quasi eine Übersetzungsschicht zwischen den beiden Welten.",

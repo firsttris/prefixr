@@ -13,7 +13,7 @@
   import { get } from "svelte/store";
   import { prefixes } from "$lib/stores/prefixes";
   import { games, refreshGames } from "$lib/stores/games";
-  import { prefixOptions } from "$lib/prefixView";
+  import { listedPath, pickerFallback, prefixOptions } from "$lib/prefixView";
 
   let {
     value = $bindable(),
@@ -33,6 +33,15 @@
   let options = $derived(prefixOptions($prefixes, $games));
   let unused = $derived(options.filter((o) => !o.used));
   let used = $derived(options.filter((o) => o.used));
+  let fallback = $derived(pickerFallback(value, options));
+
+  // A listed prefix written another way (a trailing slash) is taken as the
+  // list spells it, so its option shows as chosen: to the backend it's the
+  // same folder.
+  $effect(() => {
+    const listed = value ? listedPath(value, $prefixes) : null;
+    if (listed && listed !== value) value = listed;
+  });
 
   // The names come from the library's games; without them (a dialog opened
   // before the library was shown) every prefix would pass as unused.
@@ -60,8 +69,8 @@
         </optgroup>
       {/if}
       <!-- A prefix removed from the list is still the game's own. -->
-      {#if value && !options.some((o) => o.path === value)}
-        <option {value}>{value}</option>
+      {#if fallback}
+        <option value={fallback}>{fallback}</option>
       {/if}
     </select>
     {@render beside?.()}

@@ -2,6 +2,6 @@
 import type { PrefixState } from "./PrefixState";
 
 /**
- * A prefix in the list, with how far along its folder is.
+ * A listed prefix and how its folder is.
  */
-export type PrefixListing = { path: string, state: PrefixState, };
+export type PrefixStatus = { path: string, state: PrefixState, };

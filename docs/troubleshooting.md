@@ -23,7 +23,7 @@
    on plain Wine or the other way round.
 5. **Install missing dependencies.** A log mentioning `MSVCP140.dll`, `VCRUNTIME140.dll`,
    `d3dx9_43.dll`, `xinput1_3.dll` or similar means a runtime is missing. Install it in the prefix
-   with **Install dependencies** (see [winetricks](user-guide.md#installing-dependencies-winetricks)).
+   with **Dependencies** on the Prefixes page (see [winetricks](user-guide.md#installing-dependencies-winetricks)).
 6. **Check the Proton switches.** For old DirectX 8/9 games with graphical glitches, try
    **OpenGL instead of DXVK (WineD3D)**. For crashes related to Nvidia detection, try
    **Disable NVAPI**.

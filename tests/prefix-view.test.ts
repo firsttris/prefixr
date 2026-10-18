@@ -2,40 +2,70 @@ import { describe, expect, it } from "vitest";
 import {
   filterCounts,
   groupByRoot,
+  listedPath,
   matchesFilter,
   matchesQuery,
   namesLabel,
+  pickerFallback,
   prefixEntries,
   prefixOptions,
+  revealTarget,
+  samePath,
   sharedRoots,
   sortPrefixes,
+  type PrefixSort,
 } from "$lib/prefixView";
-import type { Game, PrefixListing } from "$lib/types";
+import type { Game, PrefixInfo, PrefixState } from "$lib/types";
 
 const ROOT = "/mnt/games/Prefixr";
 
 const game = (id: string, name: string, prefix_path: string) => ({ id, name, prefix_path }) as Game;
 
-const prefixes: PrefixListing[] = [
-  { path: `${ROOT}/Zeta/prefix`, state: "ready" },
-  { path: `${ROOT}/Alpha/prefix`, state: "not_set_up" },
-  { path: `${ROOT}/Shared/prefix`, state: "ready" },
-  { path: `${ROOT}/Leftover/prefix`, state: "ready" },
-  { path: "/home/me/Games/epic/prefix", state: "ready" },
-  { path: "/home/me/Games/bottles/old", state: "missing" },
-  { path: "/opt/lonely", state: "ready" },
+const prefixes: PrefixInfo[] = [
+  { path: `${ROOT}/Zeta/prefix` },
+  { path: `${ROOT}/Alpha/prefix` },
+  { path: `${ROOT}/Shared/prefix` },
+  { path: `${ROOT}/Leftover/prefix` },
+  { path: "/home/me/Games/epic/prefix" },
+  { path: "/home/me/Games/bottles/old" },
+  { path: "/opt/lonely" },
 ];
+
+const states: Record<string, PrefixState> = {
+  [`${ROOT}/Zeta/prefix`]: "ready",
+  [`${ROOT}/Alpha/prefix`]: "not_set_up",
+  [`${ROOT}/Shared/prefix`]: "timed_out",
+  [`${ROOT}/Leftover/prefix`]: "unreadable",
+  "/home/me/Games/epic/prefix": "ready",
+  "/home/me/Games/bottles/old": "missing",
+  // /opt/lonely: not looked at (yet).
+};
 
 const games = [
   game("z", "Zeta Run", `${ROOT}/Zeta/prefix`),
+  // Written with a trailing slash, as a CLI or an agent may have.
   game("a", "Alpha Drift", `${ROOT}/Alpha/prefix/`),
   game("s2", "Pokémon Blue", `${ROOT}/Shared/prefix`),
   game("s1", "Echo Valley", `${ROOT}/Shared/prefix`),
   game("e", "Basalt", "/home/me/Games/epic/prefix"),
 ];
 
-const entries = prefixEntries(prefixes, games);
+const entries = prefixEntries(prefixes, games, states);
 const byPath = (path: string) => entries.find((e) => e.path === path)!;
+
+describe("samePath", () => {
+  it("takes a path with and without a trailing slash as the same", () => {
+    expect(samePath("/a/b/", "/a/b")).toBe(true);
+    expect(samePath("/a/b//", "/a/b")).toBe(true);
+    expect(samePath("/a/b", "/a/bc")).toBe(false);
+    expect(samePath("/", "/")).toBe(true);
+  });
+
+  it("finds a listed prefix however its path is written, as the list spells it", () => {
+    expect(listedPath(`${ROOT}/Alpha/prefix/`, prefixes)).toBe(`${ROOT}/Alpha/prefix`);
+    expect(listedPath("/elsewhere", prefixes)).toBeNull();
+  });
+});
 
 describe("sharedRoots", () => {
   it("gives each path the deepest folder it shares with another one", () => {
@@ -70,6 +100,11 @@ describe("prefixEntries", () => {
   it("matches a game's prefix path despite a trailing slash", () => {
     expect(byPath(`${ROOT}/Alpha/prefix`).games.map((g) => g.id)).toEqual(["a"]);
   });
+
+  it("has no state for a folder not looked at yet", () => {
+    expect(byPath("/opt/lonely").state).toBeNull();
+    expect(prefixEntries(prefixes, games).every((e) => e.state === null)).toBe(true);
+  });
 });
 
 describe("filters and search", () => {
@@ -80,6 +115,8 @@ describe("filters and search", () => {
       shared: 1,
       not_set_up: 1,
       missing: 1,
+      // Can't be read, or no answer in time.
+      unreadable: 2,
     });
     const unused = entries.filter((e) => matchesFilter(e, "unused")).map((e) => e.rest);
     expect(unused).toEqual(["Leftover/prefix", "bottles/old", "/opt/lonely"]);
@@ -96,7 +133,7 @@ describe("filters and search", () => {
 });
 
 describe("sortPrefixes", () => {
-  const rests = (sort: "name" | "path" | "games") => sortPrefixes(entries, sort).map((e) => e.rest);
+  const rests = (sort: PrefixSort) => sortPrefixes(entries, sort).map((e) => e.rest);
 
   it("sorts by the first game's name, unused ones last by path", () => {
     expect(rests("name")).toEqual([
@@ -117,12 +154,33 @@ describe("sortPrefixes", () => {
 });
 
 describe("groupByRoot", () => {
-  it("groups by shared folder, the ones under none last", () => {
-    const groups = groupByRoot(sortPrefixes(entries, "name"));
-    expect(groups.map((g) => [g.root, g.entries.length])).toEqual([
+  const roots = (sort: PrefixSort) =>
+    groupByRoot(sortPrefixes(entries, sort)).map((g) => [g.root, g.entries.length]);
+
+  it("orders the folders by their first entry, so the sort holds across them", () => {
+    // By path: the folders by path, the one under none (/opt) last.
+    expect(roots("path")).toEqual([
       ["/home/me/Games", 2],
       [ROOT, 4],
       ["", 1],
+    ]);
+    // By number of games: the folder of the most-shared prefix first.
+    expect(roots("games")[0]).toEqual([ROOT, 4]);
+    // By game: the folder of the first name (Alpha Drift) first.
+    expect(roots("name")).toEqual([
+      [ROOT, 4],
+      ["/home/me/Games", 2],
+      ["", 1],
+    ]);
+  });
+
+  it("keeps the order of the entries within a folder", () => {
+    const [first] = groupByRoot(sortPrefixes(entries, "games"));
+    expect(first!.entries.map((e) => e.rest)).toEqual([
+      "Shared/prefix",
+      "Alpha/prefix",
+      "Zeta/prefix",
+      "Leftover/prefix",
     ]);
   });
 });
@@ -146,14 +204,49 @@ describe("prefix picker options", () => {
   });
 
   it("falls back to the full path for two that would read the same", () => {
-    const twins: PrefixListing[] = [
-      { path: "/a/x/prefix", state: "ready" },
-      { path: "/b/y/prefix", state: "ready" },
-    ];
+    const twins: PrefixInfo[] = [{ path: "/a/x/prefix" }, { path: "/b/y/prefix" }];
     const sameName = [game("1", "Doom", "/a/x/prefix"), game("2", "Doom", "/b/y/prefix")];
     expect(prefixOptions(twins, sameName).map((o) => o.label)).toEqual([
       "/a/x/prefix",
       "/b/y/prefix",
     ]);
+  });
+
+  describe("the extra option for a value the list doesn't have", () => {
+    const options = prefixOptions(prefixes, games);
+
+    it("is there for a game's prefix removed from the list", () => {
+      expect(pickerFallback("/removed/prefix", options)).toBe("/removed/prefix");
+    });
+
+    it("isn't there for the empty value: a placeholder, or the store's new prefix", () => {
+      expect(pickerFallback("", options)).toBeNull();
+    });
+
+    it("isn't there for a listed prefix, with or without a trailing slash", () => {
+      expect(pickerFallback(`${ROOT}/Alpha/prefix`, options)).toBeNull();
+      expect(pickerFallback(`${ROOT}/Alpha/prefix/`, options)).toBeNull();
+    });
+  });
+});
+
+describe("revealTarget", () => {
+  it("leads to the listed prefix, as the list spells it", () => {
+    expect(revealTarget(`${ROOT}/Alpha/prefix/`, prefixes)).toEqual({
+      listed: true,
+      path: `${ROOT}/Alpha/prefix`,
+    });
+  });
+
+  it("leads to a notice for a game's prefix that isn't listed any more", () => {
+    expect(revealTarget("/removed/prefix", prefixes)).toEqual({
+      listed: false,
+      path: "/removed/prefix",
+    });
+  });
+
+  it("leads nowhere without a path", () => {
+    expect(revealTarget(null, prefixes)).toBeNull();
+    expect(revealTarget("", prefixes)).toBeNull();
   });
 });

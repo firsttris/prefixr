@@ -30,7 +30,7 @@ export type { OverlayOverrides } from "./bindings/OverlayOverrides";
 export type { PerformanceConfig } from "./bindings/PerformanceConfig";
 export type { PerformanceOverrides } from "./bindings/PerformanceOverrides";
 export type { PrefixInfo } from "./bindings/PrefixInfo";
-export type { PrefixListing } from "./bindings/PrefixListing";
+export type { PrefixStatus } from "./bindings/PrefixStatus";
 export type { PrefixState } from "./bindings/PrefixState";
 export type { ProtonConfig } from "./bindings/ProtonConfig";
 export type { ProtonOption } from "./bindings/ProtonOption";

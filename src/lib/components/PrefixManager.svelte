@@ -13,7 +13,14 @@
   import { loadAll } from "$lib/load";
   import { open } from "@tauri-apps/plugin-dialog";
   import { revealItemInDir } from "@tauri-apps/plugin-opener";
-  import { prefixes, refreshPrefixes, addPrefix, deletePrefix } from "$lib/stores/prefixes";
+  import {
+    prefixes,
+    prefixStates,
+    refreshPrefixes,
+    refreshPrefixStates,
+    addPrefix,
+    deletePrefix,
+  } from "$lib/stores/prefixes";
   import { games, refreshGames } from "$lib/stores/games";
   import { showLog } from "$lib/logViewer";
   import Modal from "$lib/components/Modal.svelte";
@@ -28,6 +35,8 @@
     matchesQuery,
     namesLabel,
     prefixEntries,
+    revealTarget,
+    samePath,
     sortPrefixes,
     type PrefixEntry,
     type PrefixFilter,
@@ -68,7 +77,7 @@
 
   $effect(() => saveSetting("prefixes-sort", sort));
 
-  let entries = $derived(prefixEntries($prefixes, $games));
+  let entries = $derived(prefixEntries($prefixes, $games, $prefixStates));
   let counts = $derived(filterCounts(entries));
   let shown = $derived(
     sortPrefixes(
@@ -79,8 +88,10 @@
   let groups = $derived(groupByRoot(shown));
   // A heading per shared folder; not for a list of unrelated paths only.
   let showRoots = $derived(groups.length > 1 || (groups.length === 1 && groups[0]!.root !== ""));
-  // The empty page opens on the form: nothing else to do there.
-  let formOpen = $derived(adding || (loaded && $prefixes.length === 0));
+  // The empty page opens on the form, without the button to toggle it:
+  // there's nothing else to do there.
+  let empty = $derived(loaded && !loadError && $prefixes.length === 0);
+  let formOpen = $derived(adding || empty);
 
   // The filters besides "all", the rarer ones only when there's one.
   let filters = $derived(
@@ -90,6 +101,7 @@
         ["shared", m.prefixManager_filterShared()],
         ["not_set_up", m.prefixManager_filterNotSetUp()],
         ["missing", m.prefixManager_filterMissing()],
+        ["unreadable", m.prefixManager_filterUnreadable()],
       ] as const
     ).filter(([value]) => value === "unused" || counts[value] > 0 || filter === value),
   );
@@ -97,39 +109,75 @@
   // The games that use the prefix about to be deleted, so the dialog can
   // name them.
   let affectedGames = $derived(
-    deleting ? $games.filter((g) => g.prefix_path === deleting).map((g) => g.name) : [],
+    deleting ? $games.filter((g) => samePath(g.prefix_path, deleting!)).map((g) => g.name) : [],
   );
+
+  // A game's prefix asked for that isn't in the list (any more).
+  let unlisted = $state<string | null>(null);
+  let unlistedGames = $derived(
+    unlisted ? $games.filter((g) => samePath(g.prefix_path, unlisted!)).map((g) => g.name) : [],
+  );
+  let readding = $state(false);
+  let readdError = $state<unknown>(null);
+  // Read out when a prefix is revealed, for whoever can't see the mark.
+  let announcement = $state("");
+
+  // The folders are looked at after the list is there, and don't hold it up.
+  function refreshStates() {
+    refreshPrefixStates().catch(() => {});
+  }
 
   onMount(() => {
     loadAll(refreshPrefixes(), refreshGames())
       .catch((e) => (loadError = e))
       .finally(() => (loaded = true));
+    refreshStates();
   });
 
   onDestroy(() => clearTimeout(highlightTimer));
 
-  // Scrolls to a prefix and marks it for a moment, clearing whatever would
-  // hide it.
+  // Scrolls to a prefix, marks it for a moment and moves focus to it,
+  // clearing whatever would hide it.
   async function reveal(prefixPath: string) {
     query = "";
     filter = "all";
+    unlisted = null;
     highlighted = prefixPath;
     clearTimeout(highlightTimer);
     highlightTimer = setTimeout(() => (highlighted = null), 2500);
     await tick();
-    listEl
-      ?.querySelector(`[data-path="${CSS.escape(prefixPath)}"]`)
-      ?.scrollIntoView({ block: "center" });
+    const row = listEl?.querySelector<HTMLElement>(`[data-path="${CSS.escape(prefixPath)}"]`);
+    row?.scrollIntoView({ block: "center" });
+    row?.focus({ preventScroll: true });
+    const entry = entries.find((e) => e.path === prefixPath);
+    if (entry) announcement = m.prefixManager_revealed({ name: entryLabel(entry) });
   }
 
-  // Once the list has it: the page may still be loading when it's asked.
-  let revealed: string | null = null;
+  // Once the list is there: the page may still be loading when it's asked.
+  let handled: string | null = null;
   $effect(() => {
     const wanted = focusPath;
-    if (!wanted || wanted === revealed || !$prefixes.some((p) => p.path === wanted)) return;
-    revealed = wanted;
-    reveal(wanted);
+    if (!wanted || wanted === handled || !loaded) return;
+    handled = wanted;
+    const target = revealTarget(wanted, $prefixes);
+    if (target?.listed) reveal(target.path);
+    else if (target) unlisted = target.path;
   });
+
+  async function addAgain() {
+    if (!unlisted) return;
+    readding = true;
+    readdError = null;
+    try {
+      const added = await addPrefix(unlisted);
+      refreshStates();
+      await reveal(added);
+    } catch (e) {
+      readdError = e;
+    } finally {
+      readding = false;
+    }
+  }
 
   // What a prefix is called in a dialog's title: its games, or its path.
   function entryLabel(entry: PrefixEntry): string {
@@ -152,6 +200,7 @@
       const added = await addPrefix(path);
       path = "";
       adding = false;
+      refreshStates();
       reveal(added);
     } catch (e) {
       error = e;
@@ -184,27 +233,52 @@
 {#snippet gameNames()}<strong>{affectedGames.join(", ")}</strong>{/snippet}
 
 <section class="prefixes">
-  <div class="toolbar">
-    <input
-      type="search"
-      bind:value={query}
-      placeholder={m.prefixManager_searchPlaceholder()}
-      aria-label={m.prefixManager_searchPlaceholder()}
-    />
-    <select bind:value={sort} aria-label={m.prefixManager_sortLabel()}>
-      <option value="name">{m.prefixManager_sortName()}</option>
-      <option value="path">{m.prefixManager_sortPath()}</option>
-      <option value="games">{m.prefixManager_sortGames()}</option>
-    </select>
-    <button
-      type="button"
-      class="primary add-toggle"
-      aria-expanded={formOpen}
-      onclick={() => (adding = !adding)}
-    >
-      {m.prefixManager_addToggle()}
-    </button>
-  </div>
+  <!-- Nothing to search, sort or toggle on the empty page: the form is open. -->
+  {#if !empty}
+    <div class="toolbar">
+      <input
+        type="search"
+        bind:value={query}
+        placeholder={m.prefixManager_searchPlaceholder()}
+        aria-label={m.prefixManager_searchPlaceholder()}
+      />
+      <select bind:value={sort} aria-label={m.prefixManager_sortLabel()}>
+        <option value="name">{m.prefixManager_sortName()}</option>
+        <option value="path">{m.prefixManager_sortPath()}</option>
+        <option value="games">{m.prefixManager_sortGames()}</option>
+      </select>
+      <button
+        type="button"
+        class="primary add-toggle"
+        aria-expanded={formOpen}
+        onclick={() => (adding = !adding)}
+      >
+        {m.prefixManager_addToggle()}
+      </button>
+    </div>
+  {/if}
+
+  <p class="visually-hidden" aria-live="polite">{announcement}</p>
+
+  {#if unlisted}
+    <div class="notice" role="status">
+      <p>
+        {m.prefixManager_notListed({ games: unlistedGames.join(", ") || "–" })}
+      </p>
+      <code class="dialog-path">{unlisted}</code>
+      {#if readdError}
+        <p class="error">{backendError(readdError)}</p>
+      {/if}
+      <div class="form-actions">
+        <button type="button" class="ghost" onclick={() => (unlisted = null)}
+          >{m.common_close()}</button
+        >
+        <button type="button" class="primary" disabled={readding} onclick={addAgain}>
+          {readding ? m.prefixManager_adding() : m.prefixManager_addAgain()}
+        </button>
+      </div>
+    </div>
+  {/if}
 
   {#if formOpen}
     <form class="panel" onsubmit={handleSubmit}>
@@ -285,7 +359,8 @@
 
 {#snippet row(entry: PrefixEntry)}
   {@const more = entry.games.length - NAMES_SHOWN}
-  <li data-path={entry.path} class:highlighted={highlighted === entry.path}>
+  <!-- Focusable from code only, for reveal(). -->
+  <li data-path={entry.path} tabindex="-1" class:highlighted={highlighted === entry.path}>
     <div class="prefix-info">
       <div class="names">
         {#each entry.games.slice(0, NAMES_SHOWN) as game, i (game.id)}
@@ -315,6 +390,14 @@
         {:else if entry.state === "missing"}
           <span class="badge missing" title={m.prefixManager_missingTitle()}>
             {m.prefixManager_filterMissing()}
+          </span>
+        {:else if entry.state === "unreadable"}
+          <span class="badge missing" title={m.prefixManager_unreadableTitle()}>
+            {m.prefixManager_filterUnreadable()}
+          </span>
+        {:else if entry.state === "timed_out"}
+          <span class="badge" title={m.prefixManager_timedOutTitle()}>
+            {m.prefixManager_timedOut()}
           </span>
         {/if}
       </div>
@@ -448,6 +531,26 @@
   .add-toggle {
     margin-left: auto;
     white-space: nowrap;
+  }
+
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .notice {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6em;
+    padding: 1em 1.2em;
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius);
+    font-size: 0.9em;
   }
 
   .panel {
@@ -587,7 +690,6 @@
   li.highlighted {
     border-color: var(--accent);
   }
-
   .prefix-info {
     min-width: 0;
     display: flex;
