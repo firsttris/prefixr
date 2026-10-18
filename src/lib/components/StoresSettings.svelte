@@ -238,7 +238,10 @@
     flex-wrap: wrap;
   }
 
+  /* Takes the room the buttons leave and wraps its text in it, so the
+     buttons stay on the right however long the description is. */
   .identity {
+    flex: 1 1 20em;
     display: flex;
     gap: 0.9em;
     align-items: center;

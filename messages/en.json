@@ -32,6 +32,16 @@
       "match": { "countPlural=one": "{count} game", "countPlural=other": "{count} games" }
     }
   ],
+  "library_storeAvailableCount": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} more to install from stores",
+        "countPlural=other": "{count} more to install from stores"
+      }
+    }
+  ],
   "library_addGame": "+ Add game",
   "library_addGameTitle": "Add game",
   "library_editGameTitle": "Edit game",

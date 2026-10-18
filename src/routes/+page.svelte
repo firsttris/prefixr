@@ -26,6 +26,7 @@
     listenForPendingLaunch,
   } from "$lib/stores/games";
   import { listenForConfigChanges } from "$lib/stores/library";
+  import { notInstalled, storeGames } from "$lib/stores/gameStores";
   import { appVersion, openReleaseNotes, refreshAppVersion } from "$lib/stores/system";
   import type { Game, StoreGame } from "$lib/types";
 
@@ -56,6 +57,7 @@
   let installerRunning = $state(false);
   let installingStoreGame = $state<StoreGame | null>(null);
 
+  let availableCount = $derived(notInstalled($storeGames).length);
   let modalGame = $derived(editing && editing !== "new" ? editing : undefined);
   let modalTitle = $derived(
     editing === "new" ? m.library_addGameTitle() : m.library_editGameTitle(),
@@ -188,9 +190,12 @@
       <div class="page-header">
         <div>
           <h1>{m.library_heading()}</h1>
-          {#if $games.length > 0}
+          {#if $games.length > 0 || availableCount > 0}
             <p class="subtitle">
               {m.library_gameCount({ count: $games.length })}
+              {#if availableCount > 0}
+                · {m.library_storeAvailableCount({ count: availableCount })}
+              {/if}
             </p>
           {/if}
         </div>
