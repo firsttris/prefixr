@@ -130,66 +130,68 @@
       </div>
 
       <div class="controls">
-        <div class="control-group">
-          <span class="tune-title">{m.overlayEditor_positionTitle()}</span>
-          <div class="position-grid">
-            {#each POSITIONS as pos (pos.value)}
-              <button
-                type="button"
-                class="position-btn pos-{pos.value}"
-                class:active={value.position === pos.value}
-                title={pickMsg(msgGroup.mangohud_positions, pos.value)}
-                onclick={() => setLayout({ position: pos.value })}
-              ></button>
-            {/each}
+        <div class="look-controls">
+          <div class="control-group">
+            <span class="tune-title">{m.overlayEditor_positionTitle()}</span>
+            <div class="position-grid">
+              {#each POSITIONS as pos (pos.value)}
+                <button
+                  type="button"
+                  class="position-btn pos-{pos.value}"
+                  class:active={value.position === pos.value}
+                  title={pickMsg(msgGroup.mangohud_positions, pos.value)}
+                  onclick={() => setLayout({ position: pos.value })}
+                ></button>
+              {/each}
+            </div>
           </div>
-        </div>
 
-        <div class="control-group">
-          <span class="tune-title">{m.overlayEditor_colorTitle()}</span>
-          <div class="colors">
-            {#each COLORS as color (color.hex)}
-              <button
-                type="button"
-                class="color-swatch"
-                class:active={value.theme_color === color.hex}
-                title={pickMsg(msgGroup.mangohud_colors, color.hex)}
-                style={`--swatch-color:#${color.hex}`}
-                onclick={() => setLayout({ theme_color: color.hex })}
-              ></button>
-            {/each}
+          <div class="control-group">
+            <span class="tune-title">{m.overlayEditor_colorTitle()}</span>
+            <div class="colors">
+              {#each COLORS as color (color.hex)}
+                <button
+                  type="button"
+                  class="color-swatch"
+                  class:active={value.theme_color === color.hex}
+                  title={pickMsg(msgGroup.mangohud_colors, color.hex)}
+                  style={`--swatch-color:#${color.hex}`}
+                  onclick={() => setLayout({ theme_color: color.hex })}
+                ></button>
+              {/each}
+            </div>
           </div>
+
+          <label class="control-group">
+            <span class="tune-title">{m.overlayEditor_backgroundOpacity()}</span>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={value.background_alpha}
+              oninput={(e) => setLayout({ background_alpha: e.currentTarget.valueAsNumber })}
+            />
+          </label>
+
+          <label class="checkbox-row">
+            <input
+              type="checkbox"
+              checked={value.round_corners}
+              onchange={(e) => setLayout({ round_corners: e.currentTarget.checked })}
+            />
+            {m.overlayEditor_roundedCorners()}
+          </label>
+
+          <label class="checkbox-row">
+            <input
+              type="checkbox"
+              checked={value.horizontal}
+              onchange={(e) => setLayout({ horizontal: e.currentTarget.checked })}
+            />
+            {m.overlayEditor_horizontalLayout()}
+          </label>
         </div>
-
-        <label class="control-group">
-          <span class="tune-title">{m.overlayEditor_backgroundOpacity()}</span>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.05"
-            value={value.background_alpha}
-            oninput={(e) => setLayout({ background_alpha: e.currentTarget.valueAsNumber })}
-          />
-        </label>
-
-        <label class="checkbox-row">
-          <input
-            type="checkbox"
-            checked={value.round_corners}
-            onchange={(e) => setLayout({ round_corners: e.currentTarget.checked })}
-          />
-          {m.overlayEditor_roundedCorners()}
-        </label>
-
-        <label class="checkbox-row">
-          <input
-            type="checkbox"
-            checked={value.horizontal}
-            onchange={(e) => setLayout({ horizontal: e.currentTarget.checked })}
-          />
-          {m.overlayEditor_horizontalLayout()}
-        </label>
 
         <div class="control-group">
           <span class="tune-title">{m.overlayEditor_perfValuesTitle()}</span>
@@ -523,6 +525,12 @@
     min-width: 0;
   }
 
+  .look-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 1.1em;
+  }
+
   .control-group {
     display: flex;
     flex-direction: column;
@@ -607,5 +615,24 @@
 
   .checkbox-row input {
     width: auto;
+  }
+
+  /* A maximized window: the preview stays in view while the options fill the rest in columns. */
+  @container settings-panel (min-width: 960px) {
+    .tune-grid {
+      grid-template-columns: minmax(340px, 0.8fr) 1.4fr;
+    }
+
+    .preview-wrap {
+      position: sticky;
+      top: 1em;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: start;
+      gap: 1.4em;
+    }
   }
 </style>

@@ -85,7 +85,7 @@
     display: flex;
     flex-direction: column;
     gap: 1.4em;
-    max-width: 780px;
+    max-width: var(--page-max);
   }
 
   .header-row {

@@ -111,7 +111,7 @@
     display: flex;
     flex-direction: column;
     gap: 1.2em;
-    max-width: 780px;
+    max-width: var(--page-max);
   }
 
   .warning-banner {

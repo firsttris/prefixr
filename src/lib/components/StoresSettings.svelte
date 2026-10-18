@@ -213,7 +213,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.8em;
-    max-width: 780px;
+    max-width: var(--page-max);
   }
 
   .store {
