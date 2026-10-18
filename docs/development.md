@@ -81,10 +81,12 @@ src/
     i18n/               Locale switching and backendError()
     types.ts            Re-exports the generated types
 tests/                  Vitest tests
+skills/prefixr/         The Agent Skill (SKILL.md) built into `prefixr skill install`
 src-tauri/
   src/
     lib.rs              App setup, single-instance handoff, command registration
-    cli.rs              The command line (`prefixr game …`), with its tests in cli/tests.rs
+    cli.rs              The command line (`prefixr game …`), with its tests in cli/tests.rs;
+                        library, store, backup and skill commands in cli/<name>.rs
     commands/           One module per area, each with its tests in commands/<name>/tests.rs
     config.rs           Loading, migrating and atomically saving config.json
     models.rs           The persisted data model (games, settings)
@@ -98,6 +100,7 @@ src-tauri/
 
 | Module | Responsibility |
 | --- | --- |
+| `backup` | Backups and restoring them, the automatic backups and their settings |
 | `games` | The library, launching and stopping games, installers, shortcuts, the `--run` headless mode |
 | `prefixes` | The prefix list, and finding the real prefix inside a Steam compatdata folder |
 | `runners` | Detecting runners and building the commands that run them |
@@ -119,14 +122,16 @@ src-tauri/
 `LockExt::locked()`, which also accepts a poisoned lock, and never hold it across an `.await`.
 Every change is saved to `config.json` with a write to a temporary file and a rename.
 
-**Command line.** `prefixr game …`, `prefix …`, `runner …` and `umu …` are parsed with
-[clap](https://docs.rs/clap) in `cli.rs`. They start the app without a window, as `--run` does, and
-call the same Tauri command functions the frontend invokes, passing `app.state()` for their
-`State` parameters, so there is no second implementation to keep in sync. Progress comes from the
-same events the frontend listens to. To add a command, add a variant to the matching subcommand
-enum and call the existing command function. The window's process watches `config.json`
-(`watch_config_file`): when another process changed it, the config is reloaded and the frontend gets
-`config-changed` and refreshes the library.
+**Command line.** `prefixr game …`, `library …`, `prefix …`, `store …` and the rest are parsed with
+[clap](https://docs.rs/clap) in `cli.rs`. They start the app without a window, as `--run` does
+(all but `skill`, which needs no app), and call the same Tauri command functions the frontend
+invokes, passing `app.state()` for their `State` parameters, so there is no second implementation
+to keep in sync. Progress comes from the same events the frontend listens to. To add a command, add
+a variant to the matching subcommand enum and call the existing command function. When you add,
+rename or change a command an agent uses, update `skills/prefixr/SKILL.md` too: a test parses
+every example command in it. The window's process watches `config.json` (`watch_config_file`):
+when another process changed it, the config is reloaded and the frontend gets `config-changed` and
+refreshes the library.
 
 **Errors.** Every command returns `AppError`, serialized as `{ code, ...fields }`. The frontend turns
 it into text with `backendError()`, so an error stays in the chosen language even after switching.

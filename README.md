@@ -72,7 +72,9 @@ See the [user guide](https://firsttris.github.io/prefixr/user-guide.html) for a 
 
 Prefixr is built so that an AI coding agent such as [Claude Code](https://claude.com/claude-code)
 can do the work for you through its [command line](https://firsttris.github.io/prefixr/cli.html).
-You say what you want, the agent does it, and you watch the window update and play:
+You say what you want, the agent does it, and you watch the window update and play. Run
+`prefixr skill install` once, and Claude Code knows how to work with Prefixr from the start
+([more](https://firsttris.github.io/prefixr/cli.html#the-prefixr-skill)).
 
 - **Add games:** it looks at your game folders, adds each game with the right runner and prefix,
   finds its [protonfixes](https://github.com/Open-Wine-Components/umu-protonfixes) match, installs
@@ -162,7 +164,7 @@ The documentation is also available as a website:
 | [Getting started](https://firsttris.github.io/prefixr/getting-started.html) | Install Prefixr and get your first game running |
 | [User guide](https://firsttris.github.io/prefixr/user-guide.html) | The library, prefixes, runners, per-game settings, artwork and Steam |
 | [Configuration & files](https://firsttris.github.io/prefixr/configuration.html) | Where Prefixr keeps its data, command-line options, API keys |
-| [Command line & AI agents](https://firsttris.github.io/prefixr/cli.html) | Every command, JSON output, and letting an AI agent set up, fix and organize your games |
+| [Command line & AI agents](https://firsttris.github.io/prefixr/cli.html) | Every command, JSON output, the Prefixr skill, and letting an AI agent set up, fix and organize your games |
 | [Troubleshooting & FAQ](https://firsttris.github.io/prefixr/troubleshooting.html) | Common problems and how to fix them |
 | [Development](https://firsttris.github.io/prefixr/development.html) | Building from source, architecture, tests and releases |
 

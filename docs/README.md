@@ -16,7 +16,7 @@ Also as a website with search: **https://firsttris.github.io/prefixr/**
   options, the API keys it can use, and what a launch sets up.
 - **[Command line & AI agents](cli.md)**: manage the library, its categories, prefixes and
   runners from a terminal or a script, and let an AI agent such as Claude Code set up, fix and
-  organize your games.
+  organize your games, with the Prefixr skill to teach it how.
 - **[Troubleshooting & FAQ](troubleshooting.md)**: what to do when a game doesn't start or the app
   misbehaves, plus answers to common questions.
 

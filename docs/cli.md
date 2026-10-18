@@ -229,6 +229,27 @@ it to use `prefixr` (it finds every command with `prefixr --help`), and keep Pre
 open: it shows each change within a second, so you see what the agent does and can try a game
 right away.
 
+### The Prefixr skill
+
+Prefixr comes with an [Agent Skill](https://docs.claude.com/en/docs/claude-code/skills): a
+`SKILL.md` that teaches an agent how to work with Prefixr. It covers the commands, `--json`, backing
+up first, one game at a time, reading the logs, protonfixes, test results and notes. With it
+installed, the agent picks it up by itself whenever you talk about your games.
+
+| Command | Does |
+| --- | --- |
+| `skill install [--dir <dir>]` | Installs the skill for Claude Code, in `~/.claude/skills/prefixr/`. `--dir` puts `SKILL.md` into another folder, for an agent that reads skills from elsewhere |
+| `skill show` | Prints the skill, to read it or paste it into an agent that doesn't read skill files |
+
+```bash
+prefixr skill install
+```
+
+Run it again after updating Prefixr: the skill is built into Prefixr, so the installed one then
+matches the new version's commands. Neither command needs the desktop session, so they work over
+SSH too. The skill is also in the repository, at
+[`skills/prefixr/SKILL.md`](https://github.com/firsttris/prefixr/blob/main/skills/prefixr/SKILL.md).
+
 What you can hand over:
 
 | Task | For example |
