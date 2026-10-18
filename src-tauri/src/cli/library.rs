@@ -195,7 +195,7 @@ pub(crate) fn find_entry<'a>(
         .unwrap_or_else(|| Err(format!("No game matches \"{query}\"")))
 }
 
-fn all_entries(app: &AppHandle) -> Result<Vec<LibraryEntry>, AppError> {
+pub(super) fn all_entries(app: &AppHandle) -> Result<Vec<LibraryEntry>, AppError> {
     let store_games: Vec<_> = list_store_games(app.clone(), app.state())?
         .into_iter()
         .map(|game| {

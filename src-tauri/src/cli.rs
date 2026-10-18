@@ -33,6 +33,7 @@ use crate::commands::steamgriddb::{
     list_steamgriddb_artwork, list_steamgriddb_grids, list_steamgriddb_icons,
     search_steamgriddb_games, set_game_artwork, set_game_cover, set_game_icon,
 };
+use crate::commands::stores::StoreInstalls;
 use crate::commands::umu::{get_umu_status, install_umu};
 use crate::commands::umu_database::search_umu_ids;
 use crate::commands::wine_tools::launch_wine_tool;
@@ -45,7 +46,9 @@ use crate::models::{ArtworkKind, Game, GameInput, RunnerKind};
 use crate::tray::WindowVisible;
 
 mod library;
+mod store;
 use library::{CategoryCommand, LibraryCommand};
+use store::StoreCommand;
 
 /// The first arguments that make Prefixr a command line program rather than
 /// open its window. Everything else, including `--launch`, `--run` and
@@ -54,6 +57,7 @@ const CLI_ARGS: &[&str] = &[
     "game",
     "library",
     "category",
+    "store",
     "prefix",
     "runner",
     "umu",
@@ -98,6 +102,9 @@ enum Command {
     /// The library's categories, and which games are in them
     #[command(subcommand)]
     Category(CategoryCommand),
+    /// Store accounts (Epic Games, GOG, Amazon Games): connect, sync, install games
+    #[command(subcommand)]
+    Store(StoreCommand),
     /// Wine prefixes, and running things in them
     #[command(subcommand)]
     Prefix(PrefixCommand),
@@ -361,6 +368,7 @@ fn changes_config(command: &Command) -> bool {
     ) || match command {
         Command::Library(command) => library::changes_config(command),
         Command::Category(command) => library::category_changes_config(command),
+        Command::Store(command) => store::changes_config(command),
         _ => false,
     }
 }
@@ -406,6 +414,7 @@ pub fn run(args: &[String], context: tauri::Context<tauri::Wry>) -> ! {
             app.manage(ConfigFileStamp::default());
             app.manage(RunningGames::default());
             app.manage(LaunchingGames::default());
+            app.manage(StoreInstalls::default());
             app.manage(WindowVisible::new(false));
 
             let handle = app.handle().clone();
@@ -436,6 +445,7 @@ async fn execute(app: &AppHandle, cli: Cli) -> Result<(), AppError> {
         Command::Game(command) => game_command(app, out, command).await,
         Command::Library(command) => library::library_command(app, out, command).await,
         Command::Category(command) => library::category_command(app, out, command).await,
+        Command::Store(command) => store::store_command(app, out, command).await,
         Command::Prefix(command) => prefix_command(app, out, command).await,
         Command::Runner(command) => runner_command(app, out, command).await,
         Command::Umu(command) => umu_command(app, out, command).await,

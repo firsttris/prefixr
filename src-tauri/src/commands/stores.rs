@@ -32,7 +32,7 @@ use crate::commands::steamgriddb::{
     artwork_dir, asset_cache_path, download_image_unchecked, image_extension,
     remove_stale_asset_files,
 };
-use crate::config::{save_config, ConfigState};
+use crate::config::{save_config, update_config, ConfigState};
 use crate::error::AppError;
 use crate::host_env::xdg_open;
 use crate::lock::LockExt;
@@ -139,7 +139,7 @@ pub struct StoreInstallFinishedPayload {
     pub app_name: String,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 pub struct StoreInstallProgressPayload {
     pub store: StoreKind,
@@ -954,15 +954,24 @@ fn install_prefix(
     app_name: &str,
     picked: Option<&str>,
 ) -> Result<PathBuf, AppError> {
-    let mut config = state.locked();
     if let Some(path) = picked.filter(|path| !path.trim().is_empty()) {
-        return Ok(known_prefix(&config, path)?);
+        return Ok(known_prefix(&state.locked(), path)?);
     }
     let path = effective_prefix_path(&new_prefix_path(app, store, app_name)?);
     fs::create_dir_all(&path).map_err(|e| format!("Could not create prefix directory: {e}"))?;
-    if !config.prefixes.iter().any(|prefix| prefix.path == path) {
-        config.prefixes.push(PrefixInfo { path: path.clone() });
-        save_config(app, &config)?;
+    if !state
+        .locked()
+        .prefixes
+        .iter()
+        .any(|prefix| prefix.path == path)
+    {
+        // An install takes minutes; the config may have changed meanwhile.
+        update_config(app, |config| {
+            if !config.prefixes.iter().any(|prefix| prefix.path == path) {
+                config.prefixes.push(PrefixInfo { path: path.clone() });
+            }
+            Ok(())
+        })?;
     }
     Ok(path)
 }
@@ -1184,10 +1193,11 @@ async fn install(
     };
     adopt_cover(app, store, &entry, &mut game);
 
-    let mut config = state.locked();
-    config.games.push(game.clone());
-    config.library.record_added(&game_key(&game), now_secs());
-    save_config(app, &config)?;
+    update_config(app, |config| {
+        config.games.push(game.clone());
+        config.library.record_added(&game_key(&game), now_secs());
+        Ok(())
+    })?;
     emit(100.0);
     Ok(game)
 }

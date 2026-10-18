@@ -248,6 +248,29 @@ pub fn save_config(app: &AppHandle, config: &AppConfig) -> Result<(), String> {
     Ok(())
 }
 
+/// Changes the config as it is on disk now, for a change made long after
+/// this process read it: the end of a store install, a game's play time.
+/// The config lock keeps other processes' changes out meanwhile, and this
+/// process's own state is locked before the file is read, so nothing
+/// changed here in between is lost either.
+///
+/// Not for a process that holds the config lock itself (a command line
+/// call that changes the config holds it from the start): it would wait for
+/// itself.
+pub fn update_config<T>(
+    app: &AppHandle,
+    change: impl FnOnce(&mut AppConfig) -> Result<T, String>,
+) -> Result<T, String> {
+    let _lock = lock_config(app)?;
+    let state = app.state::<ConfigState>();
+    let mut current = state.locked();
+    let mut config = load_config(app)?;
+    let result = change(&mut config)?;
+    save_config(app, &config)?;
+    *current = config;
+    Ok(result)
+}
+
 /// When and how big `config.json` was, to tell a change by another process
 /// (the command line, a `--run` Prefixr) from this process's own writes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
