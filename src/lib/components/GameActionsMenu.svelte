@@ -1,7 +1,7 @@
 <!--
   A library entry's menu. The card puts every action in it; the list row
   has buttons of its own for editing and removing, and only needs the
-  shortcut and Steam entries (`full` off).
+  file manager, shortcut and Steam entries (`full` off).
 -->
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
@@ -128,6 +128,24 @@
       </button>
       <span class="divider" role="separator"></span>
     {/if}
+    <button
+      type="button"
+      role="menuitem"
+      onclick={() => {
+        close();
+        item.showInFileManager();
+      }}
+    >
+      <svg class="menu-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path
+          d="M2.5 5.5a1.5 1.5 0 011.5-1.5h3.6l1.6 1.8H16a1.5 1.5 0 011.5 1.5v7.2a1.5 1.5 0 01-1.5 1.5H4a1.5 1.5 0 01-1.5-1.5V5.5z"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linejoin="round"
+        />
+      </svg>
+      {m.gameCard_menuShowInFileManager()}
+    </button>
     <button
       type="button"
       role="menuitem"

@@ -1,6 +1,7 @@
 <!--
   Everything about one game in a panel at the window's right edge: its
-  status and play time, how well it runs, its categories, and what can be
+  status and play time, how well it runs and was tested to, its
+  categories, and what can be
   done with it. Opens from a click on a card's cover or a right-click on
   a card or row; Escape or a click beside it closes it.
 -->
@@ -24,7 +25,12 @@
     setFavorite,
     setInCategory,
     setHidden,
+    setTestStatus,
+    testOf,
   } from "$lib/stores/libraryMeta";
+  import { TEST_STATUSES, TEST_SYMBOL, testLabel, testedOn } from "$lib/testStatus";
+  import type { TestStatus } from "$lib/types";
+  import { revealItemInDir } from "@tauri-apps/plugin-opener";
   import { backendError, getLocale } from "$lib/i18n/index.svelte";
   import { isTopLayer, openLayer, trapTab } from "$lib/layers";
   import CompatBadges, { tierName } from "./CompatBadges.svelte";
@@ -56,6 +62,7 @@
   let inCategories = $derived(categoryIdsOf($libraryMeta, key));
   let activity = $derived($libraryMeta.activity[key]);
   let compat = $derived($compatibility[key]);
+  let test = $derived(testOf($libraryMeta, key, game ?? undefined));
   let runState = $derived(game ? $gameRunState[game.id] : undefined);
   let source = $derived(
     game?.store ? storeName(game.store.store) : storeGame ? storeName(storeGame.store) : null,
@@ -98,6 +105,12 @@
     } catch (e) {
       error = e;
     }
+  }
+
+  // A note an agent wrote stays when the status is changed here.
+  function setTest(status: TestStatus | null, note = test?.result.note ?? "") {
+    const id = game?.id;
+    if (id) attempt(() => setTestStatus(id, status, note));
   }
 
   function toggleCategory(id: string) {
@@ -243,7 +256,17 @@
             {/if}
           </dd>
           <dt>{m.details_exe()}</dt>
-          <dd class="path">{game.exe_path}</dd>
+          <dd>
+            <span class="path">{game.exe_path}</span>
+            <button
+              type="button"
+              class="link link-button"
+              onclick={() => {
+                const exe = game?.exe_path;
+                if (exe) revealItemInDir(exe).catch((e) => (error = e));
+              }}>{m.gameCard_menuShowInFileManager()} →</button
+            >
+          </dd>
         {/if}
       </dl>
 
@@ -265,6 +288,37 @@
         {/if}
       {:else}
         <p class="muted">{m.details_noUmuFix()}</p>
+      {/if}
+
+      {#if game}
+        <h3>{m.details_test()}</h3>
+        <div class="test-choice" role="group" aria-label={m.details_test()}>
+          {#each TEST_STATUSES as status (status)}
+            {@const chosen = test?.result.status === status}
+            <button
+              type="button"
+              class="test-option"
+              class:active={chosen}
+              aria-pressed={chosen}
+              title={chosen ? m.details_testClear() : undefined}
+              onclick={() => setTest(chosen ? null : status)}
+            >
+              <span class="test-symbol {status}" aria-hidden="true">{TEST_SYMBOL[status]}</span>
+              {testLabel(status)}
+            </button>
+          {/each}
+        </div>
+        {#if test}
+          <p class="muted">{testedOn(test.result.tested_at)}</p>
+          {#if test.result.note}
+            <p class="notes">{test.result.note}</p>
+          {/if}
+          {#if !test.current}
+            <p class="muted">{m.details_testOutdated({ runner: test.result.runner_id })}</p>
+          {/if}
+        {:else}
+          <p class="muted">{m.details_untested()}</p>
+        {/if}
       {/if}
 
       <h3>{m.details_categories()}</h3>
@@ -496,6 +550,51 @@
   .category.active {
     background: var(--accent);
     border-color: var(--accent);
+    color: #fff;
+  }
+
+  .test-choice {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4em;
+  }
+
+  .test-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    padding: 0.35em 0.7em;
+    border-radius: 999px;
+    font-size: 0.85em;
+  }
+
+  .test-option.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+
+  .test-symbol {
+    display: inline-grid;
+    place-items: center;
+    width: 1.3em;
+    height: 1.3em;
+    border-radius: 50%;
+    font-size: 0.8em;
+    font-weight: 700;
+  }
+
+  .test-symbol.works {
+    background: var(--success);
+    color: #08130d;
+  }
+
+  .test-symbol.issues {
+    background: #f5b43c;
+    color: #1d1404;
+  }
+
+  .test-symbol.broken {
+    background: var(--danger);
     color: #fff;
   }
 

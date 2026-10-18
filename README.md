@@ -85,7 +85,8 @@ You say what you want, the agent does it, and you watch the window update and pl
   copies your save games.
 - **Fix games:** when a game doesn't start, it reads the log and changes the setup until it does.
 - **Test games:** with a computer-use tool for the Linux desktop (see the tip below), it starts
-  each game, looks at the screen, and tells you which ones work.
+  each game, looks at the screen, and marks it on its cover as working (✓), working with issues
+  (!) or broken (✕), with a note on what it saw.
 - **Organize the library:** it creates categories such as *Kids* and *Adults* and sorts every game
   into them, marks favorites and hides what you won't play.
 - **Keep notes:** it writes down what it found (an offline login, why a setting is needed) with

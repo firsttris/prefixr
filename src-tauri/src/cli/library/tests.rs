@@ -94,19 +94,80 @@ fn listing_filters_by_hidden_favorites_and_category() {
     list[0].hidden = true;
     let keys = |list: Vec<LibraryEntry>| list.into_iter().map(|e| e.key).collect::<Vec<_>>();
     assert_eq!(
-        keys(filter_entries(list.clone(), false, false, None)),
+        keys(filter_entries(list.clone(), false, false, None, None)),
         ["epic:Ferry", "gog:1"]
     );
     assert_eq!(
-        keys(filter_entries(list.clone(), true, false, None)).len(),
+        keys(filter_entries(list.clone(), true, false, None, None)).len(),
         3
     );
     assert_eq!(
-        keys(filter_entries(list.clone(), false, true, None)),
+        keys(filter_entries(list.clone(), false, true, None, None)),
         ["gog:1"]
     );
     assert_eq!(
-        keys(filter_entries(list, false, false, Some("Kinder"))),
+        keys(filter_entries(list, false, false, Some("Kinder"), None)),
         ["epic:Ferry"]
+    );
+}
+
+#[test]
+fn test_results_are_listed_and_filtered_while_they_hold() {
+    let mut config = config();
+    let hollow = config.games[0].clone();
+    let ferry = config.games[1].clone();
+    config
+        .library
+        .set_tested(&hollow, Some(TestStatus::Works), "Menu reached", 5);
+    config
+        .library
+        .set_tested(&ferry, Some(TestStatus::Broken), "", 5);
+    // Since tested, Night Ferry got another runner.
+    config.games[1].runner_id = "GE-Proton10-7".to_string();
+    let list = entries(&config, &store_games());
+
+    let hollow = list[0].tested.as_ref().unwrap();
+    assert!(hollow.current);
+    assert_eq!(hollow.result.note, "Menu reached");
+    assert!(!list[1].tested.as_ref().unwrap().current);
+    assert!(list[2].tested.is_none());
+
+    let keys = |list: Vec<LibraryEntry>| list.into_iter().map(|e| e.key).collect::<Vec<_>>();
+    let filter = |f| keys(filter_entries(list.clone(), false, false, None, Some(f)));
+    assert_eq!(
+        filter(TestedFilter::Works),
+        ["3f1c2a52-9a43-4f53-9a8e-1b2c3d4e5f60"]
+    );
+    assert!(filter(TestedFilter::Broken).is_empty());
+    assert_eq!(filter(TestedFilter::Untested), ["epic:Ferry", "gog:1"]);
+
+    let rows = entry_rows(&list.iter().collect::<Vec<_>>());
+    assert_eq!(rows[0][6], "tested:works");
+    assert_eq!(rows[1][6], "tested:broken (outdated)");
+}
+
+#[test]
+fn a_test_result_is_listed_in_the_json_with_whether_it_holds() {
+    let mut config = config();
+    let hollow = config.games[0].clone();
+    config
+        .library
+        .set_tested(&hollow, Some(TestStatus::Issues), "No sound", 9);
+    let list = entries(&config, &store_games());
+    let json = serde_json::to_value(&list[0]).unwrap();
+    assert_eq!(
+        json["tested"],
+        serde_json::json!({
+            "status": "issues",
+            "note": "No sound",
+            "tested_at": 9,
+            "runner_id": "wine",
+            "exe_path": "/games/hollow.exe",
+            "current": true,
+        })
+    );
+    assert_eq!(
+        serde_json::to_value(&list[2]).unwrap()["tested"],
+        serde_json::Value::Null
     );
 }

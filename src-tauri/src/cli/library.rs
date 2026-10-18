@@ -2,14 +2,17 @@
 //! store games not installed yet included, and how it's organized —
 //! categories, favorites, hidden games. Made for an agent sorting a library
 //! into categories: `library list --json` gives every game's key, and
-//! `category assign` takes any number of them.
+//! `category assign` takes any number of them. An agent testing games
+//! notes what it found with `library test-status`.
 
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
 
 use super::{config, table, Out};
 use crate::commands::compatibility::{get_compatibility, Compatibility};
-use crate::commands::library::{game_key, store_key, LibraryConfig};
+use crate::commands::library::{
+    game_key, now_secs, store_key, LibraryConfig, TestResult, TestStatus,
+};
 use crate::commands::stores::list_store_games;
 use crate::config::{save_config, AppConfig, ConfigState};
 use crate::error::AppError;
@@ -29,6 +32,9 @@ pub(super) enum LibraryCommand {
         /// Also list hidden games
         #[arg(long)]
         hidden: bool,
+        /// Only the games tested with this result, or the untested ones
+        #[arg(long, value_enum)]
+        tested: Option<TestedFilter>,
         /// Also look up each game's ProtonDB rating and umu-protonfixes match
         /// (a request per game ProtonDB isn't cached for)
         #[arg(long)]
@@ -41,6 +47,16 @@ pub(super) enum LibraryCommand {
         #[arg(long)]
         off: bool,
     },
+    /// Note how a game ran when tested: works, issues (it plays, with
+    /// something wrong), broken; `clear` takes the result away
+    TestStatus {
+        game: String,
+        #[arg(value_enum)]
+        status: TestArg,
+        /// What was seen or tried, shown with the result in the window
+        #[arg(long, default_value = "")]
+        note: String,
+    },
     /// Hide games from the library (`--off` shows them again)
     Hide {
         #[arg(required = true)]
@@ -48,6 +64,34 @@ pub(super) enum LibraryCommand {
         #[arg(long)]
         off: bool,
     },
+}
+
+#[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum TestArg {
+    Works,
+    Issues,
+    Broken,
+    Clear,
+}
+
+impl TestArg {
+    fn status(self) -> Option<TestStatus> {
+        match self {
+            TestArg::Works => Some(TestStatus::Works),
+            TestArg::Issues => Some(TestStatus::Issues),
+            TestArg::Broken => Some(TestStatus::Broken),
+            TestArg::Clear => None,
+        }
+    }
+}
+
+#[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum TestedFilter {
+    Works,
+    Issues,
+    Broken,
+    /// Never tested, or tested with another runner or exe than it has now
+    Untested,
 }
 
 #[derive(clap::Subcommand, Debug)]
@@ -98,10 +142,21 @@ pub(crate) struct LibraryEntry {
     pub hidden: bool,
     pub playtime_secs: u64,
     pub last_played: Option<u64>,
+    /// What testing the game found, if it was tested.
+    pub tested: Option<TestedEntry>,
     /// Only with `library list --compatibility`, for a game something is
     /// known about.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub compatibility: Option<Compatibility>,
+}
+
+/// A test result as listed: `current` is false once the game has another
+/// runner or exe than it was tested with, or isn't installed.
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct TestedEntry {
+    #[serde(flatten)]
+    pub result: TestResult,
+    pub current: bool,
 }
 
 /// Every game, installed ones first in library order, then the stores'
@@ -113,7 +168,15 @@ pub(crate) fn entries(
     let library = &config.library;
     let entry = |key: String, name: String, source: String, game_id: Option<String>| {
         let activity = library.activity.get(&key).cloned().unwrap_or_default();
+        let game = game_id
+            .as_ref()
+            .and_then(|id| config.games.iter().find(|g| &g.id.to_string() == id));
+        let tested = library.tested.get(&key).map(|result| TestedEntry {
+            current: game.is_some_and(|game| result.is_current(game)),
+            result: result.clone(),
+        });
         LibraryEntry {
+            tested,
             categories: library.categories_of(&key),
             favorite: library.favorites.contains(&key),
             hidden: library.hidden.contains(&key),
@@ -257,13 +320,39 @@ pub(crate) fn filter_entries(
     hidden: bool,
     favorites: bool,
     category: Option<&str>,
+    tested: Option<TestedFilter>,
 ) -> Vec<LibraryEntry> {
     entries
         .into_iter()
         .filter(|e| hidden || !e.hidden)
         .filter(|e| !favorites || e.favorite)
         .filter(|e| category.is_none_or(|name| e.categories.iter().any(|c| c == name)))
+        .filter(|e| tested.is_none_or(|filter| tested_as(e, filter)))
         .collect()
+}
+
+/// Whether the entry's current test result is `filter`'s; one for another
+/// setup counts as untested.
+fn tested_as(entry: &LibraryEntry, filter: TestedFilter) -> bool {
+    let status = entry
+        .tested
+        .as_ref()
+        .filter(|t| t.current)
+        .map(|t| t.result.status);
+    match filter {
+        TestedFilter::Works => status == Some(TestStatus::Works),
+        TestedFilter::Issues => status == Some(TestStatus::Issues),
+        TestedFilter::Broken => status == Some(TestStatus::Broken),
+        TestedFilter::Untested => status.is_none(),
+    }
+}
+
+fn status_word(status: TestStatus) -> &'static str {
+    match status {
+        TestStatus::Works => "works",
+        TestStatus::Issues => "issues",
+        TestStatus::Broken => "broken",
+    }
 }
 
 fn entry_rows(entries: &[&LibraryEntry]) -> Vec<Vec<String>> {
@@ -276,6 +365,13 @@ fn entry_rows(entries: &[&LibraryEntry]) -> Vec<Vec<String>> {
             }
             if e.hidden {
                 flags.push("hidden".to_string());
+            }
+            if let Some(tested) = &e.tested {
+                let outdated = if tested.current { "" } else { " (outdated)" };
+                flags.push(format!(
+                    "tested:{}{outdated}",
+                    status_word(tested.result.status)
+                ));
             }
             if let Some(compat) = &e.compatibility {
                 if let Some(tier) = &compat.protondb_tier {
@@ -312,13 +408,14 @@ pub(super) async fn library_command(
             category,
             favorites,
             hidden,
+            tested,
             compatibility,
         } => {
             let category = match category {
                 Some(query) => Some(config(app).library.find_category(&query)?.name.clone()),
                 None => None,
             };
-            let mut shown = filter_entries(entries, hidden, favorites, category.as_deref());
+            let mut shown = filter_entries(entries, hidden, favorites, category.as_deref(), tested);
             // Only for the games listed: a request per game ProtonDB isn't
             // cached for.
             if compatibility {
@@ -357,6 +454,29 @@ pub(super) async fn library_command(
             let verb = if off { "Unmarked" } else { "Marked" };
             out.print(&keys, || {
                 format!("{verb} {} game(s) as favorite", keys.len())
+            })
+        }
+        LibraryCommand::TestStatus { game, status, note } => {
+            let entry = find_entry(&entries, &game)?;
+            let game = entry
+                .game_id
+                .as_ref()
+                .and_then(|id| {
+                    config(app)
+                        .games
+                        .into_iter()
+                        .find(|g| &g.id.to_string() == id)
+                })
+                .ok_or_else(|| format!("{} isn't installed, so it can't be tested", entry.name))?;
+            let mut result = None;
+            change(app, |library| {
+                library.set_tested(&game, status.status(), &note, now_secs());
+                result = library.tested.get(&entry.key).cloned();
+                Ok(())
+            })?;
+            out.print(&result, || match &result {
+                Some(result) => format!("{}: {}", entry.name, status_word(result.status)),
+                None => format!("{}: no test result", entry.name),
             })
         }
         LibraryCommand::Hide { games, off } => {

@@ -1,6 +1,7 @@
 <!--
   The library's collections as chips: all games, favorites, each of the
-  user's categories, and the hidden games (only once there are any). A new
+  user's categories, the games a test found to work, have issues or be
+  broken, and the hidden games (those only once there are any). A new
   category is named right in the row; renaming and deleting happen in the
   dialog behind the gear.
 -->
@@ -10,6 +11,7 @@
   import type { Collection } from "$lib/libraryView";
   import { get } from "svelte/store";
   import { createCategory, libraryMeta } from "$lib/stores/libraryMeta";
+  import { TEST_STATUSES, TEST_SYMBOL, testLabel } from "$lib/testStatus";
   import { backendError } from "$lib/i18n/index.svelte";
   import CategoryManager from "./CategoryManager.svelte";
 
@@ -52,7 +54,7 @@
   }
 </script>
 
-{#snippet chip(value: Collection, label: string, icon?: string)}
+{#snippet chip(value: Collection, label: string, icon?: string, iconClass = "")}
   <button
     type="button"
     class="chip"
@@ -60,7 +62,7 @@
     aria-pressed={collection === value}
     onclick={() => (collection = value)}
   >
-    {#if icon}<span class="icon" aria-hidden="true">{icon}</span>{/if}
+    {#if icon}<span class="icon {iconClass}" aria-hidden="true">{icon}</span>{/if}
     {label}
     <span class="count">{counts[value] ?? 0}</span>
   </button>
@@ -71,6 +73,11 @@
   {@render chip("favorites", m.gameList_chips_favorites(), "★")}
   {#each categories as category (category.id)}
     {@render chip(`category:${category.id}`, category.name)}
+  {/each}
+  {#each TEST_STATUSES as status (status)}
+    {#if (counts[`tested:${status}`] ?? 0) > 0 || collection === `tested:${status}`}
+      {@render chip(`tested:${status}`, testLabel(status), TEST_SYMBOL[status], `test ${status}`)}
+    {/if}
   {/each}
   {#if (counts.hidden ?? 0) > 0}
     {@render chip("hidden", m.gameList_chips_hidden(), "◌")}
@@ -157,6 +164,26 @@
 
   .icon {
     font-size: 0.95em;
+  }
+
+  .icon.test {
+    font-weight: 700;
+  }
+
+  .icon.works {
+    color: var(--success);
+  }
+
+  .icon.issues {
+    color: #f5b43c;
+  }
+
+  .icon.broken {
+    color: var(--danger);
+  }
+
+  .chip.active .icon.test {
+    color: inherit;
   }
 
   .count {

@@ -3,7 +3,10 @@
   menu role promises: it opens with focus on its first entry, the arrow
   keys, Home and End move between entries, Escape closes it (back to the
   trigger), and Tab or a click anywhere else closes it without being
-  swallowed. It opens downward, or upward when there's no room below.
+  swallowed. It opens downward, or upward when there's no room below. It's
+  put on the page's body, placed by its trigger, rather than in its parent:
+  that way a card's clipped cover doesn't cut a long menu off and the next
+  card's buttons can't end up on top of it. Scrolling closes it.
   `items` renders the entries (role="menuitem"); call the `close` it gets
   before acting on one.
 -->
@@ -25,7 +28,8 @@
   } = $props();
 
   let open = $state(false);
-  let upward = $state(false);
+  // Where the menu sits on the window, from the trigger's place.
+  let place = $state("");
   let anchorEl: HTMLDivElement;
   let triggerEl: HTMLButtonElement;
   let menuEl = $state<HTMLDivElement>();
@@ -41,12 +45,34 @@
     open = false;
   }
 
+  // By its size and the trigger's place, not by where it is: that's still
+  // where it was the last time it was open.
+  function placeMenu(menu: HTMLElement) {
+    const rect = triggerEl.getBoundingClientRect();
+    const right = `right: ${document.documentElement.clientWidth - rect.right}px`;
+    const fitsBelow = rect.bottom + 4 + menu.offsetHeight <= window.innerHeight;
+    // Upward only where it fits better there.
+    const up = !fitsBelow && rect.top > window.innerHeight / 2;
+    place = up
+      ? `${right}; bottom: ${window.innerHeight - rect.top + 4}px`
+      : `${right}; top: ${rect.bottom + 4}px`;
+  }
+
   $effect(() => {
     if (!menuEl) return;
-    upward = false;
-    upward = menuEl.getBoundingClientRect().bottom > window.innerHeight;
+    placeMenu(menuEl);
     entries()[0]?.focus();
   });
+
+  /** Moves the menu to the page's body while it's open. */
+  function onBody(node: HTMLElement) {
+    document.body.appendChild(node);
+    return { destroy: () => node.remove() };
+  }
+
+  function handleScroll(event: Event) {
+    if (!menuEl?.contains(event.target as Node)) open = false;
+  }
 
   function handleMenuKeydown(event: KeyboardEvent) {
     const list = entries();
@@ -74,11 +100,16 @@
   }
 
   function handleWindowPointerdown(event: PointerEvent) {
-    if (!anchorEl.contains(event.target as Node)) open = false;
+    const target = event.target as Node;
+    if (!anchorEl.contains(target) && !menuEl?.contains(target)) open = false;
   }
 </script>
 
-<svelte:window onpointerdown={open ? handleWindowPointerdown : undefined} />
+<svelte:window
+  onpointerdown={open ? handleWindowPointerdown : undefined}
+  onresize={open ? () => (open = false) : undefined}
+/>
+<svelte:document onscrollcapture={open ? handleScroll : undefined} />
 
 <div class="menu-anchor" bind:this={anchorEl}>
   <button
@@ -97,8 +128,9 @@
   {#if open}
     <div
       bind:this={menuEl}
+      use:onBody
       class="menu"
-      class:menu-up={upward}
+      style={place}
       role="menu"
       tabindex="-1"
       aria-label={label}
@@ -116,10 +148,10 @@
   }
 
   .menu {
-    position: absolute;
-    top: calc(100% + 0.3em);
-    right: 0;
-    z-index: 11;
+    position: fixed;
+    z-index: 30;
+    max-height: calc(100vh - 1em);
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
     min-width: 12em;
@@ -128,11 +160,6 @@
     border-radius: 8px;
     padding: 0.3em;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-  }
-
-  .menu.menu-up {
-    top: auto;
-    bottom: calc(100% + 0.3em);
   }
 
   .menu :global([role="menuitem"]) {

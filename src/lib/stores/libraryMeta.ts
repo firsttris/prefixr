@@ -1,13 +1,26 @@
 import { invoke } from "@tauri-apps/api/core";
 import { get, writable } from "svelte/store";
-import type { Compatibility, Game, LibraryConfig, StoreGame } from "$lib/types";
+import type {
+  Compatibility,
+  Game,
+  LibraryConfig,
+  StoreGame,
+  TestResult,
+  TestStatus,
+} from "$lib/types";
 import { storeGameKey } from "$lib/stores/gameStores";
 
-// How the library is organized (categories, favorites, hidden games) and
-// played (see `commands::library`), plus what's known about how well its
+// How the library is organized (categories, favorites, hidden games),
+// played and tested (see `commands::library`), plus what's known about how well its
 // games run (see `commands::compatibility`). All keyed by `entryKey`.
 
-const EMPTY: LibraryConfig = { categories: [], favorites: [], hidden: [], activity: {} };
+const EMPTY: LibraryConfig = {
+  categories: [],
+  favorites: [],
+  hidden: [],
+  activity: {},
+  tested: {},
+};
 
 export const libraryMeta = writable<LibraryConfig>(EMPTY);
 
@@ -52,6 +65,27 @@ export const deleteCategory = (id: string) => change("delete_category", { id });
 /** Adds the game to one category, or takes it out. */
 export const setInCategory = (id: string, key: string, member: boolean) =>
   change("set_in_category", { id, key, member });
+
+export const TEST_STATUSES: TestStatus[] = ["works", "issues", "broken"];
+
+/** Notes how a library game ran when tested; `null` takes the result away. */
+export const setTestStatus = (gameId: string, status: TestStatus | null, note = "") =>
+  change("set_test_status", { gameId, status, note });
+
+export interface GameTest {
+  result: TestResult;
+  /** False once the game has another runner or exe than it was tested with. */
+  current: boolean;
+}
+
+/** What testing the game found, if it was tested (see `TestResult::is_current`). */
+export function testOf(meta: LibraryConfig, key: string, game?: Game): GameTest | null {
+  const result = meta.tested[key];
+  if (!result) return null;
+  const current =
+    !!game && result.runner_id === game.runner_id && result.exe_path === game.exe_path;
+  return { result, current };
+}
 
 export function isFavorite(meta: LibraryConfig, key: string): boolean {
   return meta.favorites.includes(key);

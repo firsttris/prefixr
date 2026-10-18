@@ -16,6 +16,7 @@ const library = (favorites: string[]): LibraryConfig => ({
   favorites,
   hidden: [],
   activity: {},
+  tested: {},
 });
 
 beforeEach(() => {
@@ -123,5 +124,21 @@ describe("compatibility", () => {
     invoke.mockResolvedValue({ z: { umu_id: "umu-9" } });
     await meta.refreshCompatibility(["z"]);
     expect(get(meta.compatibility).z?.umu_id).toBe("umu-9");
+  });
+
+  it("tells a test result for another setup than the game has now", () => {
+    const result = {
+      status: "issues" as const,
+      note: "No sound",
+      tested_at: 5,
+      runner_id: "wine",
+      exe_path: "/g.exe",
+    };
+    const current = { ...library([]), tested: { a: result } };
+    const game = { id: "a", runner_id: "wine", exe_path: "/g.exe", store: null } as Game;
+    expect(meta.testOf(current, "a", game)).toEqual({ result, current: true });
+    expect(meta.testOf(current, "a", { ...game, runner_id: "GE-Proton10-7" })?.current).toBe(false);
+    expect(meta.testOf(current, "a")?.current).toBe(false);
+    expect(meta.testOf(current, "b", game)).toBeNull();
   });
 });

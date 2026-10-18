@@ -706,5 +706,16 @@
   ],
   "backup_confirmTitle": "Restore the backup?",
   "backup_confirmMessage": "The library and all settings are replaced with the backup from {when} ({summary}). What is now is backed up first and then shows up under “Automatic backups”.",
-  "backup_restored": "“{file}” is restored. What was before is the first backup below."
+  "backup_restored": "“{file}” is restored. What was before is the first backup below.",
+  "test_works": "Works",
+  "test_issues": "Works with issues",
+  "test_broken": "Broken",
+  "test_testedOn": "tested on {date}",
+  "test_outdated": "runner or exe changed since",
+  "details_test": "Tested",
+  "details_untested": "Not tested yet. Pick the result above, or let an agent test it (prefixr library test-status).",
+  "details_testOutdated": "Tested with {runner}. The runner or exe has changed since, so the result may no longer hold.",
+  "details_testClear": "Click again to clear the test status",
+  "gameCard_menuShowInFileManager": "Show in file manager",
+  "gameCard_revealFailed": "The file manager couldn’t show the exe: {error}"
 }

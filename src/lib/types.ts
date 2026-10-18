@@ -57,6 +57,8 @@ export type { StoreKind } from "./bindings/StoreKind";
 export type { StoreLink } from "./bindings/StoreLink";
 export type { StorePrerequisites } from "./bindings/StorePrerequisites";
 export type { StoresConfig } from "./bindings/StoresConfig";
+export type { TestResult } from "./bindings/TestResult";
+export type { TestStatus } from "./bindings/TestStatus";
 export type { UmuMatch } from "./bindings/UmuMatch";
 export type { UmuMatchSource } from "./bindings/UmuMatchSource";
 export type { UmuStatus } from "./bindings/UmuStatus";

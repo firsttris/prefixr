@@ -31,6 +31,8 @@
     refreshCompatibility,
     refreshLibraryMeta,
     setFavorite,
+    TEST_STATUSES,
+    testOf,
   } from "$lib/stores/libraryMeta";
   import {
     collectionCounts,
@@ -98,7 +100,9 @@
     isOneOf("all", "local", "epic", "gog", "amazon")(value);
   const isCollection = (value: unknown): value is Collection =>
     isOneOf("all", "favorites", "hidden")(value) ||
-    (typeof value === "string" && value.startsWith("category:"));
+    (typeof value === "string" &&
+      (value.startsWith("category:") ||
+        TEST_STATUSES.some((status) => value === `tested:${status}`)));
 
   let viewMode = $state<"grid" | "list">(loadViewMode());
   let query = $state("");
@@ -293,6 +297,7 @@
       compat,
       onToggleFavorite: () => setFavorite(entry.key, !favorite),
       onOpenDetails: () => (detailsKey = entry.key),
+      test: testOf($libraryMeta, entry.key, game),
     }}
     {#if asRow}
       <GameListRow {...props} />

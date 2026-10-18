@@ -28,7 +28,7 @@ describe("config changes from another process", () => {
         case "list_steam_games":
           return ["a"];
         case "get_library":
-          return { categories: [], favorites: ["a"], hidden: [], activity: {} };
+          return { categories: [], favorites: ["a"], hidden: [], activity: {}, tested: {} };
       }
       throw new Error(`unexpected ${cmd}`);
     });

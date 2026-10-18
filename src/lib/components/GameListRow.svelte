@@ -4,7 +4,9 @@
   import { killGame, launchGame, type GameRunState } from "$lib/stores/games";
   import { exeIconUrl } from "$lib/stores/steamgriddb";
   import { storeName } from "$lib/stores/gameStores";
+  import type { GameTest } from "$lib/stores/libraryMeta";
   import GameActionsMenu from "./GameActionsMenu.svelte";
+  import TestDot from "./TestDot.svelte";
   import GameFallbackIcon from "./GameFallbackIcon.svelte";
   import CompatBadges from "./CompatBadges.svelte";
   import FavoriteStar from "./FavoriteStar.svelte";
@@ -25,6 +27,7 @@
     compat,
     onToggleFavorite,
     onOpenDetails,
+    test,
   }: {
     game: Game;
     runState?: GameRunState;
@@ -39,6 +42,7 @@
     compat?: Compatibility;
     onToggleFavorite: () => void;
     onOpenDetails: () => void;
+    test: GameTest | null;
   } = $props();
 
   const item = new GameItem(() => game);
@@ -66,9 +70,12 @@
 
   <FavoriteStar {favorite} onToggle={onToggleFavorite} />
   <div class="meta">
-    <button type="button" class="name" title={m.details_open()} onclick={onOpenDetails}
-      >{game.name}</button
-    >
+    <span class="name-line">
+      {#if test}<TestDot {test} />{/if}
+      <button type="button" class="name" title={m.details_open()} onclick={onOpenDetails}
+        >{game.name}</button
+      >
+    </span>
     <span class="runner"
       >{game.store ? `${storeName(game.store.store)} · ` : ""}{game.runner_id}</span
     >
@@ -190,6 +197,13 @@
     width: 1.7em;
     height: 1.7em;
     object-fit: contain;
+  }
+
+  .name-line {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    min-width: 0;
   }
 
   .meta {

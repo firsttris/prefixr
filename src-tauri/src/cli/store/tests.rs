@@ -53,6 +53,7 @@ fn entry(key: &str, name: &str, source: &str, game_id: Option<&str>) -> LibraryE
         hidden: false,
         playtime_secs: 0,
         last_played: None,
+        tested: None,
         compatibility: None,
     }
 }

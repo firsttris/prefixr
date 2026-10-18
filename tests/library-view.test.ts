@@ -35,6 +35,7 @@ const meta: LibraryConfig = {
     a: { added_at: 10, last_played: 300, playtime_secs: 60 },
     "epic:doom": { added_at: 20, last_played: 500, playtime_secs: 7200 },
   },
+  tested: {},
 };
 
 const view = (options: Partial<Parameters<typeof libraryView>[1]>) =>
@@ -89,5 +90,38 @@ describe("the library view", () => {
 
   it("offers the most recently played games to continue", () => {
     expect(names(recentlyPlayed(entriesOf(games, store), meta, 5))).toEqual(["Doom", "Quake"]);
+  });
+
+  it("filters by test result, one for another runner counting as untested", () => {
+    const quake = games[0];
+    const tested: LibraryConfig = {
+      ...meta,
+      tested: {
+        a: { status: "works", note: "", tested_at: 1, runner_id: "wine", exe_path: "/q.exe" },
+        // Doom was tested with another runner than it has now.
+        "epic:doom": {
+          status: "broken",
+          note: "",
+          tested_at: 1,
+          runner_id: "GE-Proton10-7",
+          exe_path: "/d.exe",
+        },
+      },
+    };
+    games[0] = { ...quake, exe_path: "/q.exe" };
+    games[1] = { ...games[1], exe_path: "/d.exe" };
+    const entries = entriesOf(games, store);
+    const shown = (collection: Parameters<typeof libraryView>[1]["collection"]) =>
+      names(
+        libraryView(entries, { query: "", sortBy: "name-asc", source: "all", collection }, tested)
+          .installed,
+      );
+    expect(shown("tested:works")).toEqual(["Quake"]);
+    expect(shown("tested:broken")).toEqual([]);
+    const counts = collectionCounts(entries, tested, "all");
+    expect(counts["tested:works"]).toBe(1);
+    expect(counts["tested:broken"]).toBe(0);
+    expect(counts["tested:issues"]).toBe(0);
+    games[0] = quake;
   });
 });

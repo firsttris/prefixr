@@ -1,5 +1,5 @@
 <!--
-  A library entry's launch error and failed shortcut, and the question
+  A library entry's launch error, failed shortcut or file manager, and the question
   before it's removed — the same in the card and the list row, which only
   lay the notices out differently (`inline` for the row).
 -->
@@ -37,6 +37,12 @@
         {m.gameCard_showLog()}
       </button>
     {/if}
+  </div>
+{/if}
+
+{#if item.revealError}
+  <div class="toast" class:inline>
+    <span>{m.gameCard_revealFailed({ error: backendError(item.revealError) })}</span>
   </div>
 {/if}
 
