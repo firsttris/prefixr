@@ -33,7 +33,7 @@ use crate::commands::steamgriddb::{
     artwork_dir, asset_cache_path, download_image_unchecked, image_extension,
     remove_stale_asset_files,
 };
-use crate::config::{save_config, update_config, AppConfig, ConfigState};
+use crate::config::{update_config, AppConfig, ConfigState};
 use crate::error::AppError;
 use crate::host_env::xdg_open;
 use crate::lock::LockExt;
@@ -1611,6 +1611,11 @@ pub async fn uninstall_store_game(
             }
         }
     }
+    // Taken only now: deleting the files can take minutes, and the window
+    // doesn't wait for the lock. The game leaves the config as it is now.
+    let _lock = tokio::task::block_in_place(|| crate::config::lock_config(&app))?;
+    let fresh = crate::config::load_config(&app)?;
+    *state.locked() = fresh;
     remove_game(app.clone(), state, launching, id)
 }
 
@@ -1687,17 +1692,23 @@ fn write_private(path: &Path, bytes: &[u8]) -> Result<(), String> {
 /// Records that a store game's prerequisites ran, so later launches skip
 /// them.
 pub fn mark_prerequisites_installed(app: &AppHandle, game_id: Uuid) -> Result<(), String> {
-    let state = app.state::<ConfigState>();
-    let mut config = state.locked();
-    let Some(game) = config.games.iter_mut().find(|game| game.id == game_id) else {
-        return Ok(());
-    };
-    if let Some(link) = game.store.as_mut() {
-        for prereq in &mut link.prerequisites {
-            prereq.installed = true;
-        }
+    // Through the config as it is on disk: the prerequisites take a while,
+    // and a `--run` or command line launch has held its copy since it began.
+    update_config(app, |config| {
+        mark_installed(config, game_id);
+        Ok(())
+    })
+}
+
+pub(crate) fn mark_installed(config: &mut AppConfig, game_id: Uuid) {
+    let link = config
+        .games
+        .iter_mut()
+        .find(|game| game.id == game_id)
+        .and_then(|game| game.store.as_mut());
+    for prereq in link.into_iter().flat_map(|link| &mut link.prerequisites) {
+        prereq.installed = true;
     }
-    save_config(app, &config)
 }
 
 #[cfg(test)]

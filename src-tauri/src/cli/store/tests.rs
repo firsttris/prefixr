@@ -76,7 +76,7 @@ fn only_store_games_are_found_for_installing() {
 }
 
 #[test]
-fn only_uninstalling_holds_the_config_lock() {
+fn no_store_command_holds_the_config_lock_from_the_start() {
     use clap::Parser;
     let parse = |line: &str| match super::super::Cli::try_parse_from(line.split(' '))
         .unwrap()
@@ -85,7 +85,7 @@ fn only_uninstalling_holds_the_config_lock() {
         super::super::Command::Store(command) => command,
         other => panic!("not a store command: {other:?}"),
     };
-    assert!(changes_config(&parse("prefixr store uninstall doom")));
+    assert!(!changes_config(&parse("prefixr store uninstall doom")));
     assert!(!changes_config(&parse(
         "prefixr store install doom --runner GE-Proton10-4"
     )));

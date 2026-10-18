@@ -73,11 +73,13 @@ pub(super) enum StoreCommand {
     Uninstall { game: String },
 }
 
-/// Uninstalling removes a game from the library at once. An install takes
-/// minutes, so it doesn't hold the config lock throughout: it writes its
-/// results to the config as it is on disk then (see `config::update_config`).
-pub(super) fn changes_config(command: &StoreCommand) -> bool {
-    matches!(command, StoreCommand::Uninstall { .. })
+/// None of them hold the config lock from the start: an install or an
+/// uninstall takes minutes, and the window doesn't wait for the lock, so a
+/// copy of the config held that long would undo what the window saves
+/// meanwhile. Each writes the config as it is on disk at its end instead
+/// (see `config::update_config` and `uninstall_store_game`).
+pub(super) fn changes_config(_command: &StoreCommand) -> bool {
+    false
 }
 
 /// Runner names compared with their numbers as numbers, as the window's

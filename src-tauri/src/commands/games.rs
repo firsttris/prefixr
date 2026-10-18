@@ -1368,7 +1368,9 @@ async fn run_game(
                 // Like the stores' own launchers: whether they worked or
                 // not, they aren't run again on every launch. The log shows
                 // it.
-                let _ = stores::mark_prerequisites_installed(app, game.id);
+                let _ = tokio::task::block_in_place(|| {
+                    stores::mark_prerequisites_installed(app, game.id)
+                });
             }
             let launch = stores::launch_command(app, link).await?;
             env.extend(launch.env.iter().cloned());
