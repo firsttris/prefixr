@@ -62,7 +62,7 @@ you can reuse an existing prefix from any of them as it is.
 | 🎛️ **Per-game tuning** | [MangoHud](https://github.com/flightlessmango/MangoHud) with presets, [GameMode](https://github.com/FeralInteractive/gamemode), power profiles, [Gamescope](https://github.com/ValveSoftware/gamescope), [vkBasalt](https://github.com/DadSchoorse/vkBasalt) and every `PROTON_*` switch your runner supports. Set them once globally, override them per game. |
 | 🛒 **Stores** | Connect your Epic Games, GOG and Amazon Games accounts and their games show up in the library, ready to install with one click: a prefix of their own, your newest Proton, the store's cover. A *Downloads* page shows the installs with their speed and time left. Epic's online games start with their login tokens. Powered by Heroic's [Legendary](https://github.com/Heroic-Games-Launcher/legendary) and [gogdl](https://github.com/Heroic-Games-Launcher/heroic-gogdl) and [Nile](https://github.com/imLinguin/nile), downloaded on connect at pinned, checksum-verified versions. |
 | 🖼️ **Artwork & Steam** | Covers, icons, heroes and logos from [SteamGridDB](https://www.steamgriddb.com/). Add any game to Steam as a non-Steam game, artwork included, so it shows up in Big Picture and Game Mode on the Steam Deck. |
-| ⌨️ **Command line** | The window's work as commands: `prefixr game add`, `prefixr prefix winetricks`, `prefixr runner download`, `prefixr category assign` and more, with JSON output for scripts and agents. An open window shows the changes right away. |
+| ⌨️ **Command line** | The window's work as commands: `prefixr game add`, `prefixr prefix winetricks`, `prefixr runner download`, `prefixr category assign`, `prefixr store install` and more, with JSON output for scripts and agents. An open window shows the changes right away. |
 | 🧰 **Everyday comfort** | Tray icon with the running games and a way to stop a hung one, logs of the last 10 runs per game and prefix, a `vm.max_map_count` check, English and German UI. |
 
 See the [user guide](https://firsttris.github.io/prefixr/user-guide.html) for a tour of every feature.
@@ -76,6 +76,8 @@ You say what you want, the agent does it, and you watch the window update and pl
 - **Add games:** it looks at your game folders, adds each game with the right runner and prefix,
   finds its [protonfixes](https://github.com/Open-Wine-Components/umu-protonfixes) match, installs
   winetricks packages and picks the artwork.
+- **Install from your stores:** it connects your Epic Games, GOG and Amazon accounts (you sign in
+  once in the browser) and installs their games.
 - **Move games over:** it carries over the fixes from old launch scripts or other launchers and
   copies your save games.
 - **Fix games:** when a game doesn't start, it reads the log and changes the setup until it does.

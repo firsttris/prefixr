@@ -8,6 +8,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Manager};
 
 use super::{config, table, Out};
+use crate::commands::compatibility::{get_compatibility, Compatibility};
 use crate::commands::library::{game_key, store_key, LibraryConfig};
 use crate::commands::stores::list_store_games;
 use crate::config::{save_config, AppConfig, ConfigState};
@@ -28,6 +29,10 @@ pub(super) enum LibraryCommand {
         /// Also list hidden games
         #[arg(long)]
         hidden: bool,
+        /// Also look up each game's ProtonDB rating and umu-protonfixes match
+        /// (a request per game ProtonDB isn't cached for)
+        #[arg(long)]
+        compatibility: bool,
     },
     /// Mark games as favorites (`--off` unmarks them)
     Favorite {
@@ -93,6 +98,10 @@ pub(crate) struct LibraryEntry {
     pub hidden: bool,
     pub playtime_secs: u64,
     pub last_played: Option<u64>,
+    /// Only with `library list --compatibility`, for a game something is
+    /// known about.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compatibility: Option<Compatibility>,
 }
 
 /// Every game, installed ones first in library order, then the stores'
@@ -110,6 +119,7 @@ pub(crate) fn entries(
             hidden: library.hidden.contains(&key),
             playtime_secs: activity.playtime_secs,
             last_played: activity.last_played,
+            compatibility: None,
             installed: game_id.is_some(),
             key,
             name,
@@ -246,10 +256,18 @@ fn entry_rows(entries: &[&LibraryEntry]) -> Vec<Vec<String>> {
         .map(|e| {
             let mut flags = Vec::new();
             if e.favorite {
-                flags.push("favorite");
+                flags.push("favorite".to_string());
             }
             if e.hidden {
-                flags.push("hidden");
+                flags.push("hidden".to_string());
+            }
+            if let Some(compat) = &e.compatibility {
+                if let Some(tier) = &compat.protondb_tier {
+                    flags.push(format!("protondb:{tier}"));
+                }
+                if compat.umu_id.is_some() {
+                    flags.push("umu-fix".to_string());
+                }
             }
             vec![
                 match &e.game_id {
@@ -278,7 +296,17 @@ pub(super) async fn library_command(
             category,
             favorites,
             hidden,
+            compatibility,
         } => {
+            let mut entries = entries;
+            if compatibility {
+                let keys = entries.iter().map(|e| e.key.clone()).collect();
+                let mut known =
+                    get_compatibility(app.clone(), app.state(), keys, Some(true)).await?;
+                for entry in &mut entries {
+                    entry.compatibility = known.remove(&entry.key);
+                }
+            }
             let category = match category {
                 Some(query) => Some(config(app).library.find_category(&query)?.name.clone()),
                 None => None,

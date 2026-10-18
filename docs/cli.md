@@ -1,14 +1,15 @@
 # Command line & AI agents
 
 Most of what you do in Prefixr's window can also be done from a terminal: add and edit games,
-create prefixes, install winetricks packages, download runners, pick artwork, launch games, and
-sort the library into categories. That makes Prefixr scriptable, and it lets an AI coding agent
+create prefixes, install winetricks packages, download runners, pick artwork, launch games, connect
+store accounts and install their games, and sort the library into categories. That makes Prefixr scriptable, and it lets an AI coding agent
 such as [Claude Code](https://claude.com/claude-code) run your library for you: you say what you
 want, the agent does it, and you play.
 
 - [How it works](#how-it-works)
 - [Games](#games)
 - [Library, categories and favorites](#library-categories-and-favorites)
+- [Stores](#stores)
 - [Prefixes](#prefixes)
 - [Runners and umu-launcher](#runners-and-umu-launcher)
 - [JSON output and exit codes](#json-output-and-exit-codes)
@@ -86,7 +87,7 @@ too.
 
 | Command | Does |
 | --- | --- |
-| `library list [--category <name>] [--favorites] [--hidden]` | Lists every game with its key, source, whether it's installed, its categories and play time. Hidden games only with `--hidden` |
+| `library list [--category <name>] [--favorites] [--hidden] [--compatibility]` | Lists every game with its key, source, whether it's installed, its categories and play time. Hidden games only with `--hidden`; `--compatibility` adds each game's ProtonDB rating and umu-protonfixes match |
 | `library favorite <game>… [--off]` | Marks games as favorites, or unmarks them |
 | `library hide <game>… [--off]` | Hides games from the library (they show up under **Hidden**), or shows them again |
 | `category list` | Lists the categories and how many games each holds |
@@ -102,6 +103,29 @@ and installed again.
 Sorting a whole library into categories is a job for an agent: *"Create the categories Kinder,
 Koop and Rennspiele, and sort my games into them."* It reads `prefixr library list --json`, decides
 per game, and calls `prefixr category assign Kinder epic:Fortnite gog:1207658924 …`.
+
+## Stores
+
+| Command | Does |
+| --- | --- |
+| `store list` | Lists Epic Games, GOG and Amazon Games: connected or not, the account, how many games |
+| `store login <store>` | Opens the store's login page in the browser (`epic`, `gog` or `amazon`) |
+| `store connect <store> <code>` | Finishes the login with the code the page shows, then fetches the game list |
+| `store disconnect <store>` | Signs out; games installed from the store stay installed |
+| `store sync <store>` | Fetches the store's game list again, for example after buying a game |
+| `store install <game> [--dir <dir>] [--prefix <dir>] [--runner <id>]` | Installs a store game and adds it to the library. Without options: the store's last install folder, a new prefix of its own and the newest Proton |
+| `store uninstall <game>` | Deletes a store game's files and takes it out of the library; it stays in the store's list |
+
+The games are named as in `library list`: by key (`epic:<app>`, `gog:<id>`, …) or name. All of a
+store's games, installed or not, show up there once it's connected.
+
+Logging in still needs you: after `store login`, sign in in the browser and pass on what the page
+shows, as in the window (see [Connecting your account](user-guide.md#connecting-your-account)): for
+Epic the page's text, for GOG and Amazon the address from the address bar. `store connect` takes it
+as it is. The code works once and only for a few minutes.
+
+`store install` prints its progress on stderr and returns the new game (with `--json`, as JSON). An
+open window shows the install on its **Downloads** page as well.
 
 ## Prefixes
 
@@ -151,6 +175,7 @@ What you can hand over:
 | Task | For example |
 | --- | --- |
 | **Set games up** | *"Add every game under `~/Games` to Prefixr, with Proton-GE, one prefix per game, the right protonfixes match and artwork."* |
+| **Install from your stores** | *"Connect my GOG account and install all my GOG games that are rated Gold or better on ProtonDB."* |
 | **Move games over** | *"These games come with their own Wine and start scripts. Move each game out of its bundled prefix, add it to Prefixr with Proton, and carry over the fixes from the scripts and my save games."* |
 | **Fix games** | *"Fallout 4 crashes on start. Read its latest Prefixr log and fix it."* |
 | **Organize the library** | *"Create the categories Kids and Adults and sort all my games into them. Hide the store giveaways I've never played."* |

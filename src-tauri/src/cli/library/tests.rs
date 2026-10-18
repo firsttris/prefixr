@@ -68,3 +68,22 @@ fn games_are_found_by_key_id_or_name() {
     assert!(find_entry(&list, "e").is_err(), "several match");
     assert!(find_entry(&list, "nothing like it").is_err());
 }
+
+#[test]
+fn compatibility_is_only_in_the_json_when_looked_up() {
+    let mut list = entries(&config(), &store_games());
+    assert!(serde_json::to_value(&list[0])
+        .unwrap()
+        .get("compatibility")
+        .is_none());
+    list[0].compatibility = Some(Compatibility {
+        umu_id: Some("umu-1091500".to_string()),
+        umu_store: None,
+        protondb_tier: Some("gold".to_string()),
+        steam_app_id: Some(1091500),
+    });
+    let json = serde_json::to_value(&list[0]).unwrap();
+    assert_eq!(json["compatibility"]["protondb_tier"], "gold");
+    let rows = entry_rows(&[&list[0]]);
+    assert_eq!(rows[0][6], "protondb:gold, umu-fix");
+}
