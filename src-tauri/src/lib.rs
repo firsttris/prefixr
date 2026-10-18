@@ -18,7 +18,10 @@ use tauri::{Emitter, Manager, WebviewWindowBuilder, WindowEvent};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
 use commands::about::open_release_notes;
-use commands::backup::{create_backup, inspect_backup, list_backups, restore_backup};
+use commands::backup::{
+    create_backup, get_backup_config, inspect_backup, list_backups, restore_backup,
+    save_backup_config,
+};
 use commands::compatibility::get_compatibility;
 use commands::games::{
     add_game, create_desktop_shortcut, create_menu_shortcut, ensure_install_desktop_entry,
@@ -361,6 +364,8 @@ pub fn run() {
             list_backups,
             inspect_backup,
             restore_backup,
+            get_backup_config,
+            save_backup_config,
             get_library,
             set_favorite,
             set_hidden,

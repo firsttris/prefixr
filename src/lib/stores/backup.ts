@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { BackupInfo } from "$lib/types";
+import type { BackupConfig, BackupInfo } from "$lib/types";
 
 // Backups of the library and its settings (see `commands::backup`).
 
@@ -8,7 +8,16 @@ export async function createBackup(path: string, includeSecrets: boolean): Promi
   return await invoke<BackupInfo>("create_backup", { path, includeSecrets });
 }
 
-/** The automatic backups (daily, and before every restore), newest first. */
+export async function getBackupConfig(): Promise<BackupConfig> {
+  return await invoke<BackupConfig>("get_backup_config");
+}
+
+/** Saves the automatic backups' settings; returns them as kept (numbers in range). */
+export async function saveBackupConfig(config: BackupConfig): Promise<BackupConfig> {
+  return await invoke<BackupConfig>("save_backup_config", { config });
+}
+
+/** The automatic backups (when turned on, and before every restore), newest first. */
 export async function listBackups(): Promise<BackupInfo[]> {
   return await invoke<BackupInfo[]>("list_backups");
 }
@@ -49,7 +58,7 @@ export function takeRestoredBackup(): string | null {
   }
 }
 
-/** Calls `onChange` when an automatic backup was made (the daily one, or before a restore). */
+/** Calls `onChange` when an automatic backup was made, or their folder changed. */
 export function listenForBackups(onChange: () => void): Promise<UnlistenFn> {
   return listen("backups-changed", onChange);
 }

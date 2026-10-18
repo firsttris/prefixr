@@ -206,7 +206,7 @@ Without `--runner`, a prefix command uses the runner all of the prefix's games u
 | Command | Does |
 | --- | --- |
 | `backup create [<file>] [--with-secrets]` | Backs up the library, all settings, categories, play times and artwork to one file: the one given, or `prefixr-backup-<UTC date>-<time>.tar.gz` in the current folder. The API keys only with `--with-secrets` |
-| `backup list` | Lists the automatic backups (daily, and before every restore), newest first and numbered. A `backup create` file isn't among them |
+| `backup list` | Lists the automatic backups (when turned on under **Backup**, and before every restore), newest first and numbered. A `backup create` file isn't among them |
 | `backup restore <file or number>` | Restores a backup: a file, or a number from `backup list`. What is now is backed up first, so `prefixr backup restore 1` undoes it |
 
 See [Backup and restore](user-guide.md#backup-and-restore) for what a backup holds.

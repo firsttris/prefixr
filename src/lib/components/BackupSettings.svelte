@@ -1,26 +1,31 @@
 <!--
   Backing up and restoring the library: a backup to a file of the user's,
   restoring one from a file, and the automatic backups Prefixr makes itself
-  (daily, and before every restore) to restore with one click.
+  (every few days when turned on, and before every restore) to restore with
+  one click.
 -->
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
   import { onMount } from "svelte";
   import { open, save } from "@tauri-apps/plugin-dialog";
-  import type { BackupInfo } from "$lib/types";
+  import type { BackupConfig, BackupInfo } from "$lib/types";
   import {
     createBackup,
     defaultBackupName,
+    getBackupConfig,
     inspectBackup,
     listBackups,
     listenForBackups,
     restoreBackup,
+    saveBackupConfig,
   } from "$lib/stores/backup";
   import { backendError, getLocale } from "$lib/i18n/index.svelte";
   import { formatBytes } from "$lib/stores/gameStores";
   import ConfirmDialog from "./ConfirmDialog.svelte";
+  import SettingToggle from "./SettingToggle.svelte";
 
   let automatic = $state<BackupInfo[]>([]);
+  let settings = $state<BackupConfig | null>(null);
   let includeSecrets = $state(false);
   let busy = $state<"create" | "restore" | null>(null);
   let error = $state<unknown>(null);
@@ -41,6 +46,9 @@
   // start, or the one before a restore that then failed.
   onMount(() => {
     refresh();
+    getBackupConfig()
+      .then((s) => (settings = s))
+      .catch((e) => (error = e));
     const unlisten = listenForBackups(refresh);
     return () => {
       unlisten.then((stop) => stop());
@@ -58,6 +66,22 @@
       busy = null;
       refresh();
     }
+  }
+
+  // Saved on every change; the backend brings the numbers into range.
+  async function saveSettings(change: Partial<BackupConfig>) {
+    if (!settings) return;
+    error = null;
+    try {
+      settings = await saveBackupConfig({ ...settings, ...change });
+    } catch (e) {
+      error = e;
+    }
+  }
+
+  async function browseDir() {
+    const selected = await open({ directory: true, defaultPath: settings?.dir ?? undefined });
+    if (typeof selected === "string") saveSettings({ dir: selected });
   }
 
   function create() {
@@ -153,6 +177,60 @@
 
   <section class="panel">
     <h2>{m.backup_automaticHeading()}</h2>
+    {#if settings}
+      <SettingToggle
+        label={m.backup_automaticToggle()}
+        description={m.backup_automaticToggleHint()}
+        checked={settings.automatic}
+        onToggle={(automatic) => saveSettings({ automatic })}
+      >
+        {#if settings.automatic}
+          <div class="fields">
+            <label>
+              {m.backup_intervalLabel()}
+              <input
+                type="number"
+                min="1"
+                max="365"
+                value={settings.interval_days}
+                onchange={(e) =>
+                  saveSettings({ interval_days: e.currentTarget.valueAsNumber || 1 })}
+              />
+            </label>
+            <label>
+              {m.backup_keepLabel()}
+              <input
+                type="number"
+                min="1"
+                max="100"
+                value={settings.keep}
+                onchange={(e) => saveSettings({ keep: e.currentTarget.valueAsNumber || 1 })}
+              />
+              <span class="hint">{m.backup_keepHint()}</span>
+            </label>
+          </div>
+        {/if}
+      </SettingToggle>
+      <label>
+        {m.backup_dirLabel()}
+        <div class="row">
+          <input
+            type="text"
+            class="dir"
+            placeholder={m.backup_dirDefault()}
+            value={settings.dir ?? ""}
+            onchange={(e) => saveSettings({ dir: e.currentTarget.value.trim() || null })}
+          />
+          <button type="button" onclick={browseDir}>{m.backup_browse()}</button>
+          {#if settings.dir}
+            <button type="button" class="ghost" onclick={() => saveSettings({ dir: null })}
+              >{m.common_reset()}</button
+            >
+          {/if}
+        </div>
+        <span class="hint">{m.backup_dirHint()}</span>
+      </label>
+    {/if}
     <p class="hint">{m.backup_automaticHint()}</p>
     {#if automatic.length === 0}
       <p class="muted">{m.backup_automaticEmpty()}</p>
@@ -240,6 +318,22 @@
 
   .check input {
     width: auto;
+  }
+
+  .fields {
+    display: flex;
+    gap: 1em;
+    flex-wrap: wrap;
+  }
+
+  .fields label {
+    flex: 1;
+    min-width: 12em;
+  }
+
+  .row .dir {
+    flex: 1;
+    min-width: 12em;
   }
 
   .row {
