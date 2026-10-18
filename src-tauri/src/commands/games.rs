@@ -17,6 +17,7 @@ use crate::commands::github::read_token;
 use crate::commands::graphics::{ensure_vkbasalt_conf, vkbasalt_conf_path};
 use crate::commands::graphics_layers::{ensure_directx_layer_cache, ensure_wine_mono_msi};
 use crate::commands::icons::{exe_icon_path, extract_icon_png, save_exe_icon};
+use crate::commands::library::{game_key, now_secs, record_play_session};
 use crate::commands::logs::{game_log_dir, new_log_file, prefix_log_dir};
 use crate::commands::mangohud::{ensure_mangohud_conf, mangohud_conf_path};
 use crate::commands::prefixes::known_prefix;
@@ -643,6 +644,9 @@ pub fn add_game(
 
     let mut config = state.locked();
     config.games.push(new_game.clone());
+    config
+        .library
+        .record_added(&game_key(&new_game), now_secs());
     save_config(&app, &config)?;
     Ok(new_game)
 }
@@ -717,9 +721,11 @@ pub fn remove_game(
     };
     let mut config = state.locked();
 
-    if !config.games.iter().any(|g| g.id == game_id) {
+    let Some(game) = config.games.iter().find(|g| g.id == game_id) else {
         return Err(format!("No game with id {id}").into());
-    }
+    };
+    let game = game.clone();
+    config.library.game_removed(&game);
 
     config.games.retain(|g| g.id != game_id);
     save_config(&app, &config)?;
@@ -1605,10 +1611,15 @@ async fn run_game(
         },
     );
 
+    let started_at = Instant::now();
     let wait_result = child.wait().await;
 
     running.0.locked().remove(&game_id);
     rebuild_tray_menu(app);
+    let (session_app, key) = (app.clone(), game_key(&game));
+    let played = started_at.elapsed();
+    let _ =
+        tokio::task::spawn_blocking(move || record_play_session(&session_app, &key, played)).await;
 
     let status = wait_result.map_err(|e| format!("Game process failed: {e}"))?;
 

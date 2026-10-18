@@ -1,10 +1,12 @@
 pub mod about;
 pub mod binary_vdf;
+pub mod compatibility;
 pub mod games;
 pub mod github;
 pub mod graphics;
 pub mod graphics_layers;
 pub mod icons;
+pub mod library;
 pub mod locale;
 pub mod logs;
 pub mod mangohud;

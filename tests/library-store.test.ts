@@ -15,6 +15,7 @@ vi.mock("@tauri-apps/api/event", () => ({
 const { listenForConfigChanges } = await import("$lib/stores/library");
 const { games, steamGameIds } = await import("$lib/stores/games");
 const { prefixes } = await import("$lib/stores/prefixes");
+const { libraryMeta } = await import("$lib/stores/libraryMeta");
 
 describe("config changes from another process", () => {
   it("reload the library", async () => {
@@ -26,6 +27,8 @@ describe("config changes from another process", () => {
           return [{ path: "/p" }];
         case "list_steam_games":
           return ["a"];
+        case "get_library":
+          return { categories: [], favorites: ["a"], hidden: [], activity: {} };
       }
       throw new Error(`unexpected ${cmd}`);
     });
@@ -36,6 +39,7 @@ describe("config changes from another process", () => {
     expect(get(games)).toEqual([{ id: "a", name: "Quake" }]);
     expect(get(prefixes)).toEqual([{ path: "/p" }]);
     expect(get(steamGameIds)).toEqual(new Set(["a"]));
+    expect(get(libraryMeta).favorites).toEqual(["a"]);
     unlisten();
     expect(listeners.has("config-changed")).toBe(false);
   });

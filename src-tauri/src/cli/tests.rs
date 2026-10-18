@@ -289,6 +289,42 @@ fn only_commands_that_change_the_config_lock_it() {
     assert!(!changes("prefixr game launch quake"));
     assert!(!changes("prefixr prefix winetricks /p vcrun2022"));
     assert!(!changes("prefixr runner download proton-ge"));
+    assert!(changes("prefixr library favorite quake"));
+    assert!(changes("prefixr library hide quake --off"));
+    assert!(changes("prefixr category add Kinder"));
+    assert!(changes("prefixr category rename Kinder Kids"));
+    assert!(changes("prefixr category remove Kinder"));
+    assert!(changes(
+        "prefixr category assign Kinder quake epic:Fortnite"
+    ));
+    assert!(changes("prefixr category unassign Kinder quake"));
+    assert!(!changes("prefixr library list --category Kinder"));
+    assert!(!changes("prefixr category list"));
+}
+
+#[test]
+fn library_and_category_commands_are_a_command_line() {
+    assert!(is_cli(&args("prefixr library list")));
+    assert!(is_cli(&args("prefixr category list")));
+    assert!(
+        Cli::try_parse_from(args("prefixr category assign Kinder")).is_err(),
+        "needs a game"
+    );
+    assert!(
+        Cli::try_parse_from(args("prefixr library favorite")).is_err(),
+        "needs a game"
+    );
+    let cli =
+        Cli::try_parse_from(args("prefixr library list --favorites --hidden --json")).unwrap();
+    assert!(cli.json);
+    assert!(matches!(
+        cli.command,
+        Command::Library(LibraryCommand::List {
+            favorites: true,
+            hidden: true,
+            category: None
+        })
+    ));
 }
 
 #[test]

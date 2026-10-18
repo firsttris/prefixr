@@ -10,6 +10,7 @@ use serde_json::{json, Map, Value};
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::commands::icons;
+use crate::commands::library::LibraryConfig;
 use crate::commands::prefixes::effective_prefix_path;
 use crate::lock::LockExt;
 use crate::models::{
@@ -42,6 +43,8 @@ pub struct AppConfig {
     pub github: GitHubConfig,
     #[serde(default)]
     pub stores: StoresConfig,
+    #[serde(default)]
+    pub library: LibraryConfig,
 }
 
 impl AppConfig {
@@ -61,6 +64,7 @@ impl AppConfig {
             steamgriddb: SteamGridDbConfig::default(),
             github: GitHubConfig::default(),
             stores: StoresConfig::default(),
+            library: LibraryConfig::default(),
         })
     }
 }

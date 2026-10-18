@@ -1,5 +1,5 @@
 use crate::error::AppError;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -11,6 +11,7 @@ use tauri::{AppHandle, Manager, State};
 use crate::commands::steamgriddb::{read_api_key, search_steam_apps, steam_apps, SteamApp};
 use crate::config::ConfigState;
 use crate::lock::LockExt;
+use crate::models::StoreKind;
 
 /// The umu-database (https://github.com/Open-Wine-Components/umu-database)
 /// maps games from other stores to the UMU id that umu-protonfixes keys its
@@ -37,6 +38,10 @@ struct DatabaseEntry {
     acronym: Option<String>,
     #[serde(default)]
     store: Option<String>,
+    /// The store's own id for the game: Legendary's app name, GOG's
+    /// product id, …
+    #[serde(default)]
+    codename: Option<String>,
 }
 
 /// Where a suggestion came from.
@@ -136,7 +141,9 @@ async fn load_database(app: &AppHandle) -> Result<Arc<Vec<IndexedEntry>>, String
     let path = cache_path(app)?;
     let cached = read_cache(&path);
     let (entries, fresh_for) = match cached {
-        Some((entries, age)) if age < CACHE_MAX_AGE => (entries, CACHE_MAX_AGE - age),
+        Some((entries, age)) if age < CACHE_MAX_AGE && has_codenames(&entries) => {
+            (entries, CACHE_MAX_AGE - age)
+        }
         cached => match download_database().await {
             Ok(entries) => {
                 if let Some(dir) = path.parent() {
@@ -153,6 +160,13 @@ async fn load_database(app: &AppHandle) -> Result<Arc<Vec<IndexedEntry>>, String
     let entries = Arc::new(index(entries));
     *LOADED.locked() = Some((Instant::now() + fresh_for, entries.clone()));
     Ok(entries)
+}
+
+/// A copy cached before the codenames were kept has none: it's downloaded
+/// again (and still used if that fails), so store games get their matches
+/// right away rather than after a day.
+fn has_codenames(entries: &[DatabaseEntry]) -> bool {
+    entries.is_empty() || entries.iter().any(|entry| entry.codename.is_some())
 }
 
 /// Lowercase words, punctuation dropped: "DOOM: The Dark Ages" and
@@ -266,6 +280,62 @@ pub async fn search_umu_ids(
         Err(e) => return Err(e.into()),
     };
     Ok(merge(steam, database))
+}
+
+/// The umu-database's name for a store, as in its `store` column.
+fn database_store(store: StoreKind) -> &'static str {
+    match store {
+        StoreKind::Epic => "egs",
+        StoreKind::Gog => "gog",
+        StoreKind::Amazon => "amazon",
+    }
+}
+
+/// The database's store games by `(store, codename)`, the first entry for
+/// each, to look a library's worth of games up in one go.
+fn store_index(entries: &[IndexedEntry]) -> HashMap<(String, &str), &DatabaseEntry> {
+    let mut index = HashMap::new();
+    for entry in entries.iter().map(|indexed| &indexed.entry) {
+        let (Some(store), Some(codename)) = (
+            crate::models::normalize_umu_store(entry.store.clone()),
+            entry.codename.as_deref(),
+        ) else {
+            continue;
+        };
+        index.entry((store, codename)).or_insert(entry);
+    }
+    index
+}
+
+/// The umu-database's entry for a store's game, by its id there.
+fn find_store_entry<'a>(
+    index: &HashMap<(String, &str), &'a DatabaseEntry>,
+    store: StoreKind,
+    app_name: &str,
+) -> Option<&'a DatabaseEntry> {
+    index
+        .get(&(database_store(store).to_string(), app_name))
+        .copied()
+}
+
+/// The UMU ids (and their store) the umu-database has for these store
+/// games, by `(store, app name)`; the ones it doesn't know are left out.
+pub(crate) async fn umu_ids_for_store_games(
+    app: &AppHandle,
+    games: &[(StoreKind, String)],
+) -> Result<HashMap<(StoreKind, String), (String, String)>, String> {
+    let entries = load_database(app).await?;
+    let index = store_index(&entries);
+    Ok(games
+        .iter()
+        .filter_map(|(store, app_name)| {
+            let entry = find_store_entry(&index, *store, app_name)?;
+            Some((
+                (*store, app_name.clone()),
+                (entry.umu_id.clone(), database_store(*store).to_string()),
+            ))
+        })
+        .collect())
 }
 
 #[cfg(test)]

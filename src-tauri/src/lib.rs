@@ -18,6 +18,7 @@ use tauri::{Emitter, Manager, WebviewWindowBuilder, WindowEvent};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
 use commands::about::open_release_notes;
+use commands::compatibility::get_compatibility;
 use commands::games::{
     add_game, create_desktop_shortcut, create_menu_shortcut, ensure_install_desktop_entry,
     kill_game, launch_game, launch_game_headless, list_active_games, list_games, remove_game,
@@ -27,6 +28,10 @@ use commands::games::{
 use commands::github::{get_github_config, save_github_config};
 use commands::graphics::{get_graphics_config, save_graphics_config};
 use commands::graphics_layers::{get_directx_layers_status, update_directx_layers};
+use commands::library::{
+    create_category, delete_category, get_library, rename_category, set_favorite, set_hidden,
+    set_in_category,
+};
 use commands::locale::set_ui_locale;
 use commands::logs::open_log;
 use commands::mangohud::{get_mangohud_config, save_mangohud_config};
@@ -343,7 +348,15 @@ pub fn run() {
             install_store_game,
             list_store_installs,
             cancel_store_install,
-            uninstall_store_game
+            uninstall_store_game,
+            get_library,
+            set_favorite,
+            set_hidden,
+            create_category,
+            rename_category,
+            delete_category,
+            set_in_category,
+            get_compatibility
         ])
         .run(context)
         .expect("error while running tauri application");

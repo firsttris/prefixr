@@ -25,6 +25,7 @@ use uuid::Uuid;
 
 use crate::commands::games::{remove_game, LaunchingGames};
 use crate::commands::icons::{extract_icon_png, save_exe_icon};
+use crate::commands::library::{game_key, now_secs};
 use crate::commands::logs::{new_log_file, store_log_dir};
 use crate::commands::prefixes::{effective_prefix_path, known_prefix};
 use crate::commands::steamgriddb::{
@@ -1185,6 +1186,7 @@ async fn install(
 
     let mut config = state.locked();
     config.games.push(game.clone());
+    config.library.record_added(&game_key(&game), now_secs());
     save_config(app, &config)?;
     emit(100.0);
     Ok(game)

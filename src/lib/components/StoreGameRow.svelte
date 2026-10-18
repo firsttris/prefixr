@@ -1,10 +1,12 @@
 <!-- StoreGameCard for the library's list view, laid out like GameListRow. -->
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
-  import type { StoreGame } from "$lib/types";
+  import type { Compatibility, StoreGame } from "$lib/types";
   import { storeCoverUrl, storeName } from "$lib/stores/gameStores";
   import { backendError } from "$lib/i18n/index.svelte";
   import GameFallbackIcon from "./GameFallbackIcon.svelte";
+  import CompatBadges from "./CompatBadges.svelte";
+  import FavoriteStar from "./FavoriteStar.svelte";
   import StoreInstallError from "./StoreInstallError.svelte";
 
   let {
@@ -14,6 +16,10 @@
     onInstall,
     onCancel,
     onDismissError,
+    favorite,
+    compat,
+    onToggleFavorite,
+    onOpenDetails,
   }: {
     game: StoreGame;
     progress?: number;
@@ -21,6 +27,10 @@
     onInstall: () => void;
     onCancel: () => void;
     onDismissError: () => void;
+    favorite: boolean;
+    compat?: Compatibility;
+    onToggleFavorite: () => void;
+    onOpenDetails: () => void;
   } = $props();
 
   let coverSrc = $derived(storeCoverUrl(game));
@@ -28,7 +38,16 @@
 </script>
 
 <div class="wrap">
-  <div class="row" class:installing>
+  <div
+    class="row"
+    class:installing
+    role="group"
+    aria-label={game.title}
+    oncontextmenu={(e) => {
+      e.preventDefault();
+      onOpenDetails();
+    }}
+  >
     <div class="thumb">
       {#if coverSrc}
         <img class="cover" src={coverSrc} alt="" loading="lazy" decoding="async" />
@@ -37,9 +56,13 @@
       {/if}
     </div>
 
+    <FavoriteStar {favorite} onToggle={onToggleFavorite} />
     <div class="meta">
-      <span class="name" title={game.title}>{game.title}</span>
+      <button type="button" class="name" title={m.details_open()} onclick={onOpenDetails}
+        >{game.title}</button
+      >
       <span class="pill">{storeName(game.store)} · {m.storeGame_notInstalled()}</span>
+      <CompatBadges {compat} />
     </div>
 
     {#if installing}
@@ -149,5 +172,20 @@
     color: var(--text-muted);
     width: 3em;
     text-align: right;
+  }
+
+  button.name {
+    padding: 0;
+    border: none;
+    background: none;
+    border-radius: 4px;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  button.name:hover {
+    color: var(--accent);
   }
 </style>

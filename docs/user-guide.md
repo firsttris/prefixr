@@ -23,15 +23,52 @@ A tour of everything Prefixr does. New to Prefixr? Start with [Getting started](
 ## The library
 
 The **Library** shows your games as cover cards (grid view) or as a compact list (list view);
-switch with the two buttons next to the sort menu. Search filters by name, and you can sort by name
-or by runner. Prefixr remembers the view you chose.
+switch with the two buttons at the right of the toolbar, and set the size of the cards with the
+slider next to them. Search filters by name (`/` jumps to it). You can sort by name, by when you last
+played, by when a game was added, by play time, or by runner. Prefixr remembers the view, the sort,
+the filters and the card size.
+
+The library has up to three sections: **Continue playing** (the games you played last), **Installed**
+and **In your stores** (the stores' games you haven't installed yet). A click on a section's title
+folds it away.
+
+### Favorites, categories and hidden games
+
+The chips above the games pick what you see: **All**, **Favorites**, each of your categories, and
+**Hidden** (once you've hidden a game). The numbers say how many games each holds.
+
+- **Favorites**: the star on a card or row marks a game as a favorite.
+- **Categories**: **+ Category** creates one, such as *Kinder* or *Koop*; the gear renames and
+  deletes them. Add a game to categories in its details. An AI agent can sort a whole library into
+  categories, see [Command line](cli.md#library-categories-and-favorites).
+- **Hidden**: hide a game in its details, say a store's giveaway you won't play. It then only shows
+  under **Hidden**.
+
+### Game details
+
+A click on a game's cover (or a right-click on a card or row) opens its details at the window's
+right edge: play time, when it was last played and added, its size (for a store game), runner,
+prefix and program, its categories, and how well it runs:
+
+- **ProtonDB**: the game's rating on [ProtonDB](https://www.protondb.com), from Platinum to Borked,
+  for a game whose UMU ID is a Steam app ID.
+- **umu fix**: umu-protonfixes has fixes for the game and applies them at launch.
+
+Both also show as small badges on the cards, so you can see before installing a store game whether
+it's likely to run. Play time is counted for every launch, also from Steam.
+
+### Downloads
+
+**Downloads** in the sidebar lists the store installs that are running, with their speed and the
+time left, and the ones that failed, to try again. The number next to it counts both.
 
 Each game shows its SteamGridDB cover if you picked one, otherwise the icon from its `.exe`.
 
 With a store connected (see [Stores](#stores-epic-games-gog-amazon)), the library also shows that store's
-games you haven't installed yet, with an **Install** button instead of the play button. Two more
-filters then appear in the toolbar: **Source** (all, added by hand, or one store) and **Installed
-only**. Store games carry the store's name on their card.
+games you haven't installed yet, with an **Install** button instead of the play button, in the
+**In your stores** section. Their covers are muted until you point at them. Chips above the library
+then filter by source: all, your own, or one store. Store games carry the store's name on their
+card.
 
 | State | What you see |
 | --- | --- |

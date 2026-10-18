@@ -48,6 +48,7 @@ fn sample_config(games: Vec<Game>) -> AppConfig {
         steamgriddb: SteamGridDbConfig::default(),
         github: GitHubConfig::default(),
         stores: Default::default(),
+        library: Default::default(),
     }
 }
 
