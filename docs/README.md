@@ -1,7 +1,9 @@
 # Prefixr documentation
 
-Prefixr is a native Linux app for running Windows games with Wine and Proton. These pages cover
-everything from the first launch to how the code is put together.
+**The agentic game launcher for Linux: let an AI agent handle all your games.** Prefixr is a
+native Linux app for running Windows games with Wine and Proton, and everything it does can be
+driven by an AI agent through its [command line](cli.md). These pages cover everything from the
+first launch to how the code is put together.
 Also as a website with search: **https://firsttris.github.io/prefixr/**
 
 ## For players

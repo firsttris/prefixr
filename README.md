@@ -1,13 +1,14 @@
 <div align="center">
   <h1>Prefixr</h1>
 
-  <p><strong>Run Windows games on Linux with Wine and Proton, without the terminal.</strong></p>
+  <p><strong>The agentic game launcher for Linux: let an AI agent handle all your games.</strong></p>
 
   <p>
-    A native Linux game launcher that manages your Wine and Proton prefixes, downloads runners
-    like Proton-GE, and sets up each game with MangoHud, Gamescope, GameMode and Steam artwork.
-    Use it with the mouse, or let an AI agent run it for you: everything the window does is a
-    command an agent can call.
+    Your agent adds your Windows games, picks Wine or Proton, fixes the ones that won't start and
+    sorts your library into categories, while you watch the window and play. Prefixr manages the
+    prefixes, downloads runners like Proton-GE, and sets up each game with MangoHud, Gamescope,
+    GameMode and Steam artwork. Everything an agent does through its command line also works with a
+    few clicks.
   </p>
 
   <img src="docs/Banner.jpeg" alt="Prefixr: a Linux game library for Windows games running on Wine and Proton" width="100%">
@@ -32,7 +33,10 @@
 
 ## What is Prefixr?
 
-Prefixr is a desktop app for playing **Windows games on Linux**. You add a game's `.exe`, pick a
+Prefixr is a desktop app for playing **Windows games on Linux**, made to be run by an **AI agent**
+as much as by you. Hand your game folders to an agent such as
+[Claude Code](https://claude.com/claude-code) and it does the setup through Prefixr's command line
+([see below](#-let-an-ai-agent-run-your-library)), or do it yourself: in the window you add a game's `.exe`, pick a
 **Wine or Proton prefix** and a **runner**, and Prefixr takes care of the rest: it creates the
 prefix, launches the game through [umu-launcher](https://github.com/Open-Wine-Components/umu-launcher)
 the way Steam launches Proton, applies [protonfixes](https://github.com/Open-Wine-Components/umu-protonfixes),
