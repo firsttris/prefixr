@@ -1,18 +1,18 @@
 <script lang="ts" module>
-  import * as messages from "$lib/paraglide/messages";
+  import * as m from "$lib/paraglide/messages";
 
   export function tierName(tier: string): string {
     switch (tier) {
       case "platinum":
-        return messages.compat_tier_platinum();
+        return m.compat_tier_platinum();
       case "gold":
-        return messages.compat_tier_gold();
+        return m.compat_tier_gold();
       case "silver":
-        return messages.compat_tier_silver();
+        return m.compat_tier_silver();
       case "bronze":
-        return messages.compat_tier_bronze();
+        return m.compat_tier_bronze();
       case "borked":
-        return messages.compat_tier_borked();
+        return m.compat_tier_borked();
       default:
         return tier;
     }
@@ -24,7 +24,6 @@
   row: its ProtonDB rating and whether umu-protonfixes has fixes for it.
 -->
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
   import type { Compatibility } from "$lib/types";
 
   let { compat, onImage = false }: { compat?: Compatibility; onImage?: boolean } = $props();

@@ -15,8 +15,8 @@ name.
 ## Configuration file
 
 `~/.config/com.tristan.prefixr/config.json` holds the library and all settings: the games, the prefix
-list, the global Performance, Graphics, Overlay and Proton settings, the SteamGridDB API key and the
-GitHub token.
+list, the global Performance, Graphics, Overlay and Proton settings, the SteamGridDB API key, the
+GitHub token, and under `library` your categories, favorites, hidden games and play times.
 
 Prefixr saves it atomically (written to a temporary file, then renamed), so a crash or a full disk
 never leaves half a file. If the file can't be read when Prefixr starts, Prefixr shows the error and
@@ -51,7 +51,8 @@ before editing the file.
 | `WebKitCache/`, `storage/`, `localstorage/` | The window's own browser data (see [Troubleshooting](troubleshooting.md#clearing-the-webkit-cache)). |
 
 `~/.cache/com.tristan.prefixr/umu-database.json` caches the umu database for the protonfixes search
-for a day.
+and the library's umu fix badges for a day, and `protondb.json` the games' ProtonDB ratings for a
+week.
 
 Your prefixes live wherever you created or found them; Prefixr only remembers their paths.
 

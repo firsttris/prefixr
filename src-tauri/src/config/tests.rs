@@ -96,6 +96,21 @@ fn disk_json_leaves_out_icons() {
 }
 
 #[test]
+fn disk_json_keeps_the_library_organization() {
+    let mut config: AppConfig = serde_json::from_value(json!({ "runners_dir": "/r" })).unwrap();
+    config.library.create_category("Kinder").unwrap();
+    config.library.set_favorite("epic:Fortnite", true);
+    config
+        .library
+        .record_session("epic:Fortnite", 100, std::time::Duration::from_secs(90));
+
+    let written = to_disk_json(&config).unwrap();
+    let read: AppConfig = serde_json::from_str(&written).unwrap();
+    assert_eq!(read.library, config.library);
+    assert_eq!(read.library.activity["epic:Fortnite"].playtime_secs, 90);
+}
+
+#[test]
 fn leaves_current_shape_alone() {
     let mut value = json!({
         "runners_dir": "/r",

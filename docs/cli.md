@@ -7,6 +7,7 @@ makes Prefixr scriptable, and it lets an AI coding agent such as
 
 - [How it works](#how-it-works)
 - [Games](#games)
+- [Library, categories and favorites](#library-categories-and-favorites)
 - [Prefixes](#prefixes)
 - [Runners and umu-launcher](#runners-and-umu-launcher)
 - [JSON output and exit codes](#json-output-and-exit-codes)
@@ -73,6 +74,33 @@ prefixr game add --name "Fallout 4" \
   --umu-id 377160 \
   --env DXVK_FRAME_RATE=58
 ```
+
+## Library, categories and favorites
+
+`game` commands work on the games in the library. The `library` and `category` commands cover the
+whole library: also the games of your connected stores that aren't installed yet. They name a game
+by its **key**, which `library list` shows: `epic:<app>`, `gog:<id>` or `amazon:<id>` for a store's
+game, the game's ID for one you added by hand. Its name, or a part of it only one game has, works
+too.
+
+| Command | Does |
+| --- | --- |
+| `library list [--category <name>] [--favorites] [--hidden]` | Lists every game with its key, source, whether it's installed, its categories and play time. Hidden games only with `--hidden` |
+| `library favorite <game>… [--off]` | Marks games as favorites, or unmarks them |
+| `library hide <game>… [--off]` | Hides games from the library (they show up under **Hidden**), or shows them again |
+| `category list` | Lists the categories and how many games each holds |
+| `category add <name>` | Creates a category, e.g. `Kinder` |
+| `category rename <category> <new name>` | Renames a category |
+| `category remove <category>` | Deletes a category; its games stay in the library |
+| `category assign <category> <game>…` | Puts games in a category; a game can be in several |
+| `category unassign <category> <game>…` | Takes games out of a category |
+
+A store game keeps its categories, favorite mark and play time when it's installed, uninstalled
+and installed again.
+
+Sorting a whole library into categories is a job for an agent: *"Create the categories Kinder,
+Koop and Rennspiele, and sort my games into them."* It reads `prefixr library list --json`, decides
+per game, and calls `prefixr category assign Kinder epic:Fortnite gog:1207658924 …`.
 
 ## Prefixes
 

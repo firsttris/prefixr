@@ -219,6 +219,15 @@ impl LibraryConfig {
         activity.playtime_secs += played.as_secs();
     }
 
+    /// After `game` was removed from the library: a store game stays in it
+    /// as one to install again, and keeps its categories and play time for
+    /// that; a game added by hand is gone for good.
+    pub fn game_removed(&mut self, game: &Game) {
+        if game.store.is_none() {
+            self.forget(&game_key(game));
+        }
+    }
+
     /// Drops everything about a game that's gone for good.
     pub fn forget(&mut self, key: &str) {
         self.favorites.retain(|k| k != key);

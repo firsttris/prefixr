@@ -115,3 +115,19 @@ fn configs_without_a_library_load_with_an_empty_one() {
         serde_json::from_value(serde_json::json!({ "runners_dir": "/runners" })).unwrap();
     assert_eq!(config.library, LibraryConfig::default());
 }
+
+#[test]
+fn removing_a_store_game_keeps_its_organization_for_a_reinstall() {
+    let own = game(None);
+    let from_store = game(Some((StoreKind::Epic, "Ferry")));
+    let mut library = LibraryConfig::default();
+    for key in [game_key(&own), game_key(&from_store)] {
+        library.set_favorite(&key, true);
+        library.record_added(&key, 1);
+    }
+    library.game_removed(&from_store);
+    library.game_removed(&own);
+    assert_eq!(library.favorites, ["epic:Ferry"]);
+    assert!(library.activity.contains_key("epic:Ferry"));
+    assert!(!library.activity.contains_key(&game_key(&own)));
+}

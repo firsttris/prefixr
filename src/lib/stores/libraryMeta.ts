@@ -57,21 +57,27 @@ export function categoryIdsOf(meta: LibraryConfig, key: string): string[] {
   return meta.categories.filter((c) => c.games.includes(key)).map((c) => c.id);
 }
 
+// The games already looked up, found or not, so a game nothing is known
+// about isn't asked about again on every change of the library.
+const asked = new Set<string>();
+
 /**
  * Looks up how well these games run; only the ones not looked up yet.
  * Best-effort: nothing known is simply nothing shown.
  */
 export async function refreshCompatibility(keys: string[]): Promise<void> {
   const known = get(compatibility);
-  const missing = keys.filter((key) => !(key in known));
+  const missing = keys.filter((key) => !(key in known) && !asked.has(key));
   if (missing.length === 0) return;
+  missing.forEach((key) => asked.add(key));
   try {
     const found = await invoke<Record<string, Compatibility>>("get_compatibility", {
       keys: missing,
     });
     compatibility.update((current) => ({ ...current, ...found }));
   } catch {
-    // Offline and nothing cached: no badges.
+    // Offline and nothing cached: no badges, and asked again next time.
+    missing.forEach((key) => asked.delete(key));
   }
 }
 

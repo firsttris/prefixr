@@ -724,12 +724,8 @@ pub fn remove_game(
     let Some(game) = config.games.iter().find(|g| g.id == game_id) else {
         return Err(format!("No game with id {id}").into());
     };
-    // A store game stays in the library as one to install again, and keeps
-    // its categories and play time for that.
-    if game.store.is_none() {
-        let key = game_key(game);
-        config.library.forget(&key);
-    }
+    let game = game.clone();
+    config.library.game_removed(&game);
 
     config.games.retain(|g| g.id != game_id);
     save_config(&app, &config)?;
