@@ -155,6 +155,17 @@ pub fn run() {
             show_and_focus(app);
             rebuild_tray_menu(app);
         }));
+        // Reopens the window at the size, position and maximized state it
+        // was left in. Not its visibility: quitting from the tray while the
+        // window is hidden must not make the next start hidden too.
+        builder = builder.plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(
+                    tauri_plugin_window_state::StateFlags::all()
+                        - tauri_plugin_window_state::StateFlags::VISIBLE,
+                )
+                .build(),
+        );
     }
     builder
         .plugin(tauri_plugin_opener::init())
