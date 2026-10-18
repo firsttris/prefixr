@@ -48,6 +48,8 @@
     | "downloads"
     | "steamgriddb";
   let view = $state<View>("library");
+  // The prefix the prefixes page opens at, when a game's details sent us there.
+  let prefixFocus = $state<string | null>(null);
 
   // The game settings categories: set globally here, overridable per game
   // in the game dialog's tabs of the same names.
@@ -141,7 +143,10 @@
       type="button"
       class="nav-item"
       class:active={view === "prefixes"}
-      onclick={() => (view = "prefixes")}
+      onclick={() => {
+        prefixFocus = null;
+        view = "prefixes";
+      }}
     >
       {m.nav_prefixes()}
     </button>
@@ -244,12 +249,22 @@
           editing = "new";
         }}
         onInstallStoreGame={(game) => (installingStoreGame = game)}
+        onShowPrefix={(path) => {
+          prefixFocus = path;
+          view = "prefixes";
+        }}
       />
     {:else if view === "prefixes"}
       <div class="page-header">
         <h1>{m.library_prefixesHeading()}</h1>
       </div>
-      <PrefixManager />
+      <PrefixManager
+        focusPath={prefixFocus}
+        onEditGame={(game) => {
+          editingTab = undefined;
+          editing = game;
+        }}
+      />
     {:else if view === "runners"}
       <div class="page-header">
         <h1>{m.library_runnersHeading()}</h1>

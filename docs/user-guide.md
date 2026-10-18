@@ -48,7 +48,8 @@ The chips above the games pick what you see: **All**, **Favorites**, each of you
 
 A click on a game's cover (or a right-click on a card or row) opens its details at the window's
 right edge: play time, when it was last played and added, its size (for a store game), runner,
-prefix and program, its categories, and how well it runs:
+prefix (with **Show in prefixes**, see [The prefixes page](#the-prefixes-page)) and program, its
+categories, and how well it runs:
 
 - **ProtonDB**: the game's rating on [ProtonDB](https://www.protondb.com), from Platinum to Borked,
   for a game whose UMU ID is a Steam app ID.
@@ -212,9 +213,31 @@ another launcher.
 A prefix is a self-contained Windows environment: its own `C:` drive, registry and installed
 programs, separate from your Linux system and from other prefixes.
 
+### The prefixes page
+
+The **Prefixes** page lists every prefix by the games that use it. A click on a game's name opens
+its settings, and a prefix no game uses says *Unused*. Prefixes that sit in the same folder (say
+`/mnt/games/Prefixr/<game>/prefix` for each game) are grouped under that folder, shown once as a
+heading, so each row only shows the part of the path that sets it apart. Hover over it for the
+full path.
+
+- **Search** finds a prefix by a game's name or by its path.
+- **Filters** show only the prefixes that are *Unused*, *Shared by several games*, *Not set up
+  yet* (Wine sets a prefix up the first time a game in it starts), *Folder missing* (nothing at
+  its path, for example on a drive that isn't mounted) or *Not readable* (the folder can't be read,
+  or didn't answer within a few seconds, like a network share whose server is gone). Each one
+  shows how many prefixes it matches, and the rarer ones only appear when there are any.
+- **Sort** by game, by path or by the number of games using each prefix. The folder headings
+  follow the sort too.
+- Each row has **Dependencies** (winetricks, see below) and **Wine tools** buttons. Its **⋮** menu
+  has **Show folder**, which opens the folder in your file manager, and **Remove**.
+
+**Show in prefixes** in a game's details opens this page at the game's prefix. If the prefix was
+removed from the list, the page says so and offers to **Add it again**.
+
 ### Adding a prefix
 
-Under **Prefixes**, choose a folder and click **Add prefix**:
+Click **+ Add prefix**, choose a folder and click **Add prefix**:
 
 - **A new or empty folder** becomes a new prefix. Nothing is written until the first game or tool
   runs in it.
@@ -225,11 +248,13 @@ Under **Prefixes**, choose a folder and click **Add prefix**:
 A folder that already contains other files is refused, so a prefix never ends up mixed into
 unrelated data.
 
-Each prefix shows how many games use it.
+In the game dialog and the install dialogs, the prefix list names each prefix after its games, in
+alphabetical order, so typing a game's name in the open list jumps to its prefix. Unused prefixes
+come first, under their own heading. The chosen prefix's full path is shown below the list.
 
 ### Installing dependencies (winetricks)
 
-**Install dependencies** (📦) opens the winetricks dialog for a prefix. The common packages are
+**Dependencies** opens the winetricks dialog for a prefix. The common packages are
 listed with a short explanation: the Visual C++ runtimes 2005 to 2022, .NET Framework 4.8, the
 Windows core fonts, the DirectX shader compiler, D3DX9, XAudio/XACT, DirectShow, PhysX, GDI+ and the
 Visual Basic 6 runtime. **Browse more packages** searches all of winetricks' DLL and font packages.
@@ -244,7 +269,7 @@ The packages go into the prefix, so they apply to every game using it.
 
 ### Wine tools
 
-**Open Wine tools** (🛠️) starts one of Wine's own programs in the prefix:
+**Wine tools** starts one of Wine's own programs in the prefix:
 
 | Tool | Use it for |
 | --- | --- |
@@ -257,7 +282,7 @@ The packages go into the prefix, so they apply to every game using it.
 
 ### Removing a prefix
 
-**Remove** only takes a prefix off Prefixr's list. The folder, its programs and save games stay on
+**Remove** (in a prefix's **⋮** menu) only takes a prefix off Prefixr's list. The folder, its programs and save games stay on
 disk, and games that use it keep working. A prefix whose game is running can't be removed.
 
 ## Runners

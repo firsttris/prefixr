@@ -61,11 +61,13 @@
     onEditArtwork,
     onAddNew,
     onInstallStoreGame,
+    onShowPrefix,
   }: {
     onEdit: (game: Game, tab?: GameFormTab) => void;
     onEditArtwork: (game: Game) => void;
     onAddNew?: () => void;
     onInstallStoreGame: (game: StoreGame) => void;
+    onShowPrefix?: (path: string) => void;
   } = $props();
 
   let showingNotes = $state<Game | null>(null);
@@ -493,6 +495,7 @@
   {onEdit}
   {onEditArtwork}
   {onInstallStoreGame}
+  {onShowPrefix}
 />
 
 <NotesDialog
