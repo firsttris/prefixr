@@ -23,6 +23,12 @@ never leaves half a file. If the file can't be read when Prefixr starts, Prefixr
 quits **without touching it**, rather than starting empty and overwriting your library on the next
 save. Fix the JSON or move the file away to start fresh.
 
+Several Prefixr processes can use the file at once: the window, the command line, and the one Steam
+starts for a game. A command line call that changes the library holds `config.json.lock` while it
+runs. Anything that takes long (a store install or uninstall, a game's first launch with its
+prerequisites, recording play time, a restore) writes its result into the file as it is on disk
+by then, under that lock, so changes made meanwhile in the window or by another command stay.
+
 The runners folder is the one setting without a UI: `runners_dir` in `config.json`. Quit Prefixr
 before editing the file.
 
@@ -38,6 +44,7 @@ before editing the file.
 | `winetricks/` | The winetricks script, refreshed weekly. |
 | `artwork/` | Images chosen from SteamGridDB, named after the game's ID, and the covers of store games (`store-epic-<app>.jpg`, `store-gog-<id>.jpg`, `store-amazon-<id>.jpg`). |
 | `helpers/` | The store tools (Legendary, gogdl, Nile), one file per pinned version. Removed when you disconnect the store. |
+| `stores/<store>/install.lock` | Held while one of the store's games installs, so the window and the command line never install from the same store at once. |
 | `stores/epic/` | Legendary's own config (`legendary/`, including your Epic login) and the cached game list (`library.json`). |
 | `stores/gog/` | gogdl's login and manifests (`gogdl/`), your account name (`account.json`), the cached game list (`library.json`) and GOG's shared redistributables (`redist/`). |
 | `stores/amazon/` | Nile's config (`nile-config/nile/`: your Amazon login, the game list, the installed games and their manifests, the Amazon Games SDK) and the cached game list (`library.json`). |

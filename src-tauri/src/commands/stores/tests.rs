@@ -173,3 +173,30 @@ fn a_stores_install_lock_is_held_across_processes_and_names_the_game() {
     drop(held);
     assert!(claim_install_lock(&path, "other").unwrap().is_ok());
 }
+
+#[test]
+fn a_store_games_prerequisites_are_marked_installed_in_the_given_config() {
+    let mut config: AppConfig =
+        serde_json::from_value(serde_json::json!({ "runners_dir": "/r" })).unwrap();
+    let mut with_prereqs = game(
+        "3f1c2a52-9a43-4f53-9a8e-1b2c3d4e5f60",
+        Some((StoreKind::Gog, "1")),
+    );
+    with_prereqs.store.as_mut().unwrap().prerequisites =
+        serde_json::from_value(serde_json::json!([
+            { "name": "VC++", "path": "redist/vcredist.exe", "installed": false }
+        ]))
+        .unwrap();
+    let id = with_prereqs.id;
+    config.games.push(with_prereqs);
+    // A change made meanwhile by another process, in the config read now.
+    config
+        .library
+        .create_category("Added during launch")
+        .unwrap();
+    mark_installed(&mut config, id);
+    assert!(config.games[0].store.as_ref().unwrap().prerequisites[0].installed);
+    assert_eq!(config.library.categories.len(), 1);
+    // An unknown game changes nothing.
+    mark_installed(&mut config, uuid::Uuid::new_v4());
+}
