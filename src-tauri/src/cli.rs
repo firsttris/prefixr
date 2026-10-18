@@ -72,7 +72,11 @@ const CLI_ARGS: &[&str] = &[
 ];
 
 pub fn is_cli(args: &[String]) -> bool {
-    args.get(1)
+    // `--json` goes anywhere, also before the subcommand: `prefixr --json
+    // game list` is the command line too, not the window.
+    args.iter()
+        .skip(1)
+        .find(|arg| arg.as_str() != "--json")
         .is_some_and(|arg| CLI_ARGS.contains(&arg.as_str()))
 }
 

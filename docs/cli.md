@@ -175,7 +175,7 @@ See [Backup and restore](user-guide.md#backup-and-restore) for what a backup hol
 ## JSON output and exit codes
 
 Add `--json` to any command to get its result as JSON on stdout, for example
-`prefixr game list --json`. Messages for people (progress, notes) always go to stderr, so they
+`prefixr game list --json` (or `prefixr --json game list`). Messages for people (progress, notes) always go to stderr, so they
 never mix into it.
 
 A command exits with `0` on success, `1` when it fails (the error is printed to stderr), and `2`
