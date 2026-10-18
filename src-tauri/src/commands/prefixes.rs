@@ -2,6 +2,7 @@ use crate::error::AppError;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use serde::Serialize;
 use tauri::{AppHandle, State};
 
 use crate::commands::games::LaunchingGames;
@@ -127,10 +128,53 @@ pub async fn delete_prefix(
     save_config(&app, &config).map_err(AppError::from)
 }
 
-#[tauri::command]
-pub fn list_prefixes(state: State<ConfigState>) -> Result<Vec<PrefixInfo>, AppError> {
-    let config = state.locked();
-    Ok(config.prefixes.clone())
+/// How far along a prefix's folder is: set up (Wine has made its
+/// `drive_c`), not yet (that happens on the first launch of a game in it),
+/// or gone, e.g. on a drive that isn't mounted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
+#[serde(rename_all = "snake_case")]
+pub enum PrefixState {
+    Ready,
+    NotSetUp,
+    Missing,
+}
+
+/// A prefix in the list, with how far along its folder is.
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
+pub struct PrefixListing {
+    pub path: PathBuf,
+    pub state: PrefixState,
+}
+
+pub fn prefix_state(path: &Path) -> PrefixState {
+    if path.join("drive_c").is_dir() {
+        PrefixState::Ready
+    } else if path.is_dir() {
+        PrefixState::NotSetUp
+    } else {
+        PrefixState::Missing
+    }
+}
+
+/// The folders are looked at once the config is let go, so a slow drive
+/// doesn't hold up everything else that needs it.
+#[tauri::command(async)]
+pub fn list_prefixes(state: State<ConfigState>) -> Result<Vec<PrefixListing>, AppError> {
+    let paths: Vec<PathBuf> = state
+        .locked()
+        .prefixes
+        .iter()
+        .map(|p| p.path.clone())
+        .collect();
+    Ok(paths
+        .into_iter()
+        .map(|path| PrefixListing {
+            state: prefix_state(&path),
+            path,
+        })
+        .collect())
 }
 
 #[cfg(test)]

@@ -43,3 +43,16 @@ fn known_prefixes_are_listed_or_used_by_a_game() {
     assert!(known_prefix(&config, "/prefixes/removed-from-list").is_ok());
     assert!(known_prefix(&config, "/home/user/.ssh").is_err());
 }
+
+#[test]
+fn prefix_states_follow_the_folder() {
+    let dir = TestDir::new("dir");
+    let ready = dir.join("ready");
+    fs::create_dir_all(ready.join("drive_c")).unwrap();
+    let fresh = dir.join("fresh");
+    fs::create_dir_all(&fresh).unwrap();
+
+    assert_eq!(prefix_state(&ready), PrefixState::Ready);
+    assert_eq!(prefix_state(&fresh), PrefixState::NotSetUp);
+    assert_eq!(prefix_state(&dir.join("gone")), PrefixState::Missing);
+}

@@ -1,11 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { writable } from "svelte/store";
-import type { PrefixInfo } from "$lib/types";
+import type { PrefixListing } from "$lib/types";
 
-export const prefixes = writable<PrefixInfo[]>([]);
+export const prefixes = writable<PrefixListing[]>([]);
 
 export async function refreshPrefixes(): Promise<void> {
-  prefixes.set(await invoke<PrefixInfo[]>("list_prefixes"));
+  prefixes.set(await invoke<PrefixListing[]>("list_prefixes"));
 }
 
 // Returns the path registered: for a Proton compat data folder, its `pfx/`.
