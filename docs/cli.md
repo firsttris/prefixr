@@ -161,7 +161,7 @@ store's games, installed or not, show up there once it's connected.
 
 Logging in still needs you: `store login` opens the store's page in the browser and prints its
 address (open that yourself when there's no browser to open, over SSH say). Sign in there and pass
-on what the page shows, as in the window (see [Connecting your account](user-guide.md#connecting-your-account)): for
+on what the page shows, as with **Connect in the browser** in the window (see [Connecting your account](user-guide.md#connecting-your-account)): for
 Epic the page's text, for GOG and Amazon the address from the address bar. `store connect` takes it
 as it is. The code works once and only for a few minutes.
 

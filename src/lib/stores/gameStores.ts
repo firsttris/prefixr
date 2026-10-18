@@ -79,6 +79,18 @@ export async function openStoreLogin(store: StoreKind): Promise<void> {
   await invoke("open_store_login", { store });
 }
 
+/**
+ * Signs in in a window of Prefixr's own that takes the code itself, then
+ * fetches the account's games. False when the user closed the window.
+ */
+export async function loginStoreInApp(store: StoreKind): Promise<boolean> {
+  const account = await invoke<StoreAccount | null>("login_store_in_app", { store });
+  if (!account) return false;
+  await refreshStoreAccounts();
+  await syncStoreLibrary(store);
+  return true;
+}
+
 /** Logs in with the pasted code, then fetches the account's games. */
 export async function connectStore(store: StoreKind, code: string): Promise<void> {
   await invoke<StoreAccount>("connect_store", { store, code });
