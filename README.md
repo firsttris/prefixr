@@ -72,7 +72,9 @@ See the [user guide](https://firsttris.github.io/prefixr/user-guide.html) for a 
 
 Prefixr is built so that an AI coding agent such as [Claude Code](https://claude.com/claude-code)
 can do the work for you through its [command line](https://firsttris.github.io/prefixr/cli.html).
-You say what you want, the agent does it, and you watch the window update and play:
+You say what you want, the agent does it, and you watch the window update and play. Run
+`prefixr skill install` once, and Claude Code knows how to work with Prefixr from the start
+([more](https://firsttris.github.io/prefixr/cli.html#the-prefixr-skill)).
 
 - **Add games:** it looks at your game folders, adds each game with the right runner and prefix,
   finds its [protonfixes](https://github.com/Open-Wine-Components/umu-protonfixes) match, installs

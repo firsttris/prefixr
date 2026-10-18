@@ -48,9 +48,11 @@ use crate::tray::WindowVisible;
 mod backup;
 mod install;
 mod library;
+mod skill;
 mod store;
 use backup::BackupCommand;
 use library::{CategoryCommand, LibraryCommand};
+use skill::SkillCommand;
 use store::StoreCommand;
 
 /// The first arguments that make Prefixr a command line program rather than
@@ -65,6 +67,7 @@ const CLI_ARGS: &[&str] = &[
     "runner",
     "umu",
     "backup",
+    "skill",
     "help",
     "--help",
     "-h",
@@ -125,6 +128,9 @@ enum Command {
     /// Back up and restore the library, its settings and artwork
     #[command(subcommand)]
     Backup(BackupCommand),
+    /// The Agent Skill that teaches an AI agent to use this command line
+    #[command(subcommand)]
+    Skill(SkillCommand),
 }
 
 #[derive(Subcommand, Debug)]
@@ -400,6 +406,20 @@ static EXIT_CODE: AtomicI32 = AtomicI32::new(0);
 pub fn run(args: &[String], context: tauri::Context<tauri::Wry>) -> ! {
     let cli = Cli::try_parse_from(args).unwrap_or_else(|e| e.exit());
     let locale = LocaleState::default().get();
+    // Needs neither the config nor the desktop session.
+    let cli = match cli.command {
+        Command::Skill(command) => {
+            if let Err(error) = skill::skill_command(Out { json: cli.json }, command) {
+                eprintln!("error: {}", error.localized(locale));
+                std::process::exit(1);
+            }
+            std::process::exit(0);
+        }
+        command => Cli {
+            json: cli.json,
+            command,
+        },
+    };
     if crate::running_as_root() {
         eprintln!("{}", locale::text(locale, "native_root_message", &[]));
         std::process::exit(1);
@@ -466,6 +486,7 @@ async fn execute(app: &AppHandle, cli: Cli) -> Result<(), AppError> {
         Command::Runner(command) => runner_command(app, out, command).await,
         Command::Umu(command) => umu_command(app, out, command).await,
         Command::Backup(command) => backup::backup_command(app, out, command).await,
+        Command::Skill(command) => skill::skill_command(out, command),
     }
 }
 
