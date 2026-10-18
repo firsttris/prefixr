@@ -128,6 +128,9 @@ For games that come as an installer:
 
 If no shortcut is found or setup failed, **Show setup log** shows what the installer printed.
 
+From a terminal, or for an AI agent, [`prefixr game install`](cli.md#installing-from-a-setup-file-or-a-disc)
+does the same in one step, also from a disc image (`.iso`).
+
 ## Stores (Epic Games, GOG, Amazon)
 
 Prefixr can install and start the games of your **Epic Games Store**, **GOG** and **Amazon Games**

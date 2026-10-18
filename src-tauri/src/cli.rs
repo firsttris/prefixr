@@ -46,6 +46,7 @@ use crate::models::{ArtworkKind, Game, GameInput, RunnerKind};
 use crate::tray::WindowVisible;
 
 mod backup;
+mod install;
 mod library;
 mod store;
 use backup::BackupCommand;
@@ -134,6 +135,9 @@ enum GameCommand {
     Show { game: String },
     /// Add a game to the library
     Add(AddGame),
+    /// Run a game's installer (a setup .exe or .msi, or a disc image) in a
+    /// prefix, then add the game it installed
+    Install(install::InstallGame),
     /// Change a game; what isn't given stays as it is
     Edit(EditGame),
     /// Remove a game from the library; its prefix and files stay
@@ -365,7 +369,8 @@ enum UmuCommand {
 
 /// Whether `command` changes `config.json`. Only those wait for and hold
 /// the config lock: a launch or a winetricks install can take minutes and
-/// only reads it.
+/// only reads it. `game install` takes it only for its changes, around the
+/// installer (see `install::under_config_lock`).
 fn changes_config(command: &Command) -> bool {
     matches!(
         command,
@@ -906,6 +911,7 @@ async fn game_command(app: &AppHandle, out: Out, command: GameCommand) -> Result
             remove_game(app.clone(), app.state(), app.state(), game.id.to_string())?;
             out.print(&game.id, || format!("Removed \"{}\"", game.name))
         }
+        GameCommand::Install(args) => install::install(app, out, args).await,
         GameCommand::Launch { game } => launch(app, out, &game).await,
         GameCommand::Stop { game } => {
             let game = lookup_game(app, &game)?;
