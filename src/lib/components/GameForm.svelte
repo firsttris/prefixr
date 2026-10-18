@@ -5,6 +5,7 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
   import RunnerSelect from "$lib/components/RunnerSelect.svelte";
+  import PrefixSelect from "$lib/components/PrefixSelect.svelte";
   import Message from "$lib/components/Message.svelte";
   import { onMount, untrack } from "svelte";
   import { loadAll } from "$lib/load";
@@ -393,16 +394,11 @@
 
     <label>
       {m.gameForm_prefixLabel()}
-      <select bind:value={prefixPath} aria-invalid={showMissing && missing.prefix}>
-        <option value="" disabled selected>{m.gameForm_prefixChoose()}</option>
-        {#each $prefixes as prefix (prefix.path)}
-          <option value={prefix.path}>{prefix.path}</option>
-        {/each}
-        <!-- A prefix removed from the list is still the game's own. -->
-        {#if prefixPath && !$prefixes.some((p) => p.path === prefixPath)}
-          <option value={prefixPath}>{prefixPath}</option>
-        {/if}
-      </select>
+      <PrefixSelect bind:value={prefixPath} invalid={showMissing && missing.prefix}>
+        {#snippet first()}
+          <option value="" disabled selected>{m.gameForm_prefixChoose()}</option>
+        {/snippet}
+      </PrefixSelect>
       {#if $prefixes.length === 0}
         <span class="hint">{m.gameForm_prefixEmptyHint()}</span>
       {/if}

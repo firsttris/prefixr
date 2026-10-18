@@ -9,9 +9,10 @@
   import { onMount } from "svelte";
   import { open } from "@tauri-apps/plugin-dialog";
   import RunnerSelect from "$lib/components/RunnerSelect.svelte";
+  import PrefixSelect from "$lib/components/PrefixSelect.svelte";
   import { loadAll } from "$lib/load";
   import { getLocale } from "$lib/i18n/index.svelte";
-  import { prefixes, refreshPrefixes } from "$lib/stores/prefixes";
+  import { refreshPrefixes } from "$lib/stores/prefixes";
   import { runners, refreshRunners } from "$lib/stores/runners";
   import {
     formatBytes,
@@ -108,12 +109,11 @@
   <div class="two">
     <label>
       {m.gameForm_prefixLabel()}
-      <select bind:value={prefixPath} disabled={loading}>
-        <option value={NEW_PREFIX}>{m.storeInstall_newPrefix()}</option>
-        {#each $prefixes as prefix (prefix.path)}
-          <option value={prefix.path}>{prefix.path}</option>
-        {/each}
-      </select>
+      <PrefixSelect bind:value={prefixPath} disabled={loading}>
+        {#snippet first()}
+          <option value={NEW_PREFIX}>{m.storeInstall_newPrefix()}</option>
+        {/snippet}
+      </PrefixSelect>
     </label>
     <label>
       {m.gameForm_runnerLabel()}

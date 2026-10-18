@@ -37,12 +37,15 @@
     onEdit,
     onEditArtwork,
     onInstallStoreGame,
+    onShowPrefix,
   }: {
     entry: Entry | null;
     onClose: () => void;
     onEdit: (game: Game) => void;
     onEditArtwork: (game: Game) => void;
     onInstallStoreGame: (game: StoreGame) => void;
+    // To the prefixes page, at this game's prefix.
+    onShowPrefix?: (path: string) => void;
   } = $props();
 
   let key = $derived(entry?.key ?? "");
@@ -225,7 +228,20 @@
           <dt>{m.details_runner()}</dt>
           <dd>{game.runner_id}</dd>
           <dt>{m.details_prefix()}</dt>
-          <dd class="path">{game.prefix_path}</dd>
+          <dd>
+            <span class="path">{game.prefix_path}</span>
+            {#if onShowPrefix}
+              <button
+                type="button"
+                class="link link-button"
+                onclick={() => {
+                  const path = game?.prefix_path;
+                  onClose();
+                  if (path) onShowPrefix(path);
+                }}>{m.details_showPrefix()} →</button
+              >
+            {/if}
+          </dd>
           <dt>{m.details_exe()}</dt>
           <dd class="path">{game.exe_path}</dd>
         {/if}
@@ -451,6 +467,18 @@
     color: var(--accent);
     font-size: 0.88em;
     text-decoration: none;
+  }
+
+  .link-button {
+    display: block;
+    background: none;
+    border: none;
+    padding: 0;
+    margin-top: 0.15em;
+  }
+
+  .link-button:hover:not(:disabled) {
+    text-decoration: underline;
   }
 
   .categories {

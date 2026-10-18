@@ -1,10 +1,11 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
   import RunnerSelect from "$lib/components/RunnerSelect.svelte";
+  import PrefixSelect from "$lib/components/PrefixSelect.svelte";
   import { onMount } from "svelte";
   import { loadAll } from "$lib/load";
   import { open } from "@tauri-apps/plugin-dialog";
-  import { prefixes, refreshPrefixes, addPrefix } from "$lib/stores/prefixes";
+  import { refreshPrefixes, addPrefix } from "$lib/stores/prefixes";
   import { refreshRunners } from "$lib/stores/runners";
   import { runInstaller } from "$lib/stores/games";
   import { prettifyExeName } from "$lib/gameName";
@@ -113,23 +114,22 @@
     <form onsubmit={handleStart}>
       <label>
         {m.gameForm_prefixLabel()}
-        <div class="row">
-          <select bind:value={prefixPath} disabled={creatingPrefix || busy}>
+        <PrefixSelect bind:value={prefixPath} disabled={creatingPrefix || busy}>
+          {#snippet first()}
             <option value="" disabled selected>{m.gameForm_prefixChoose()}</option>
-            {#each $prefixes as prefix (prefix.path)}
-              <option value={prefix.path}>{prefix.path}</option>
-            {/each}
-          </select>
-          <button
-            type="button"
-            class="icon-button"
-            title={m.installDialog_newPrefixTitle()}
-            disabled={creatingPrefix || busy}
-            onclick={createNewPrefix}
-          >
-            {creatingPrefix ? "…" : "+"}
-          </button>
-        </div>
+          {/snippet}
+          {#snippet beside()}
+            <button
+              type="button"
+              class="icon-button"
+              title={m.installDialog_newPrefixTitle()}
+              disabled={creatingPrefix || busy}
+              onclick={createNewPrefix}
+            >
+              {creatingPrefix ? "…" : "+"}
+            </button>
+          {/snippet}
+        </PrefixSelect>
       </label>
 
       <label>
@@ -235,10 +235,6 @@
   .row {
     display: flex;
     gap: 0.5em;
-  }
-
-  .row select {
-    flex: 1;
   }
 
   .icon-button {

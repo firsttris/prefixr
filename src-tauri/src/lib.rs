@@ -39,7 +39,7 @@ use commands::mangohud::{get_mangohud_config, save_mangohud_config};
 use commands::performance::{
     check_max_map_count, fix_max_map_count, get_performance_config, save_performance_config,
 };
-use commands::prefixes::{add_prefix, delete_prefix, list_prefixes};
+use commands::prefixes::{add_prefix, delete_prefix, list_prefixes, prefix_states};
 use commands::proton_options::{get_proton_config, list_proton_options, save_proton_config};
 use commands::runner_downloads::{download_runner, list_runner_releases, list_runner_sources};
 use commands::runners::{delete_runner, list_runners};
@@ -303,6 +303,7 @@ pub fn run() {
             add_prefix,
             delete_prefix,
             list_prefixes,
+            prefix_states,
             list_runner_sources,
             list_runner_releases,
             download_runner,
