@@ -47,6 +47,7 @@ its name, or by a part of its name that only one game has: `prefixr game launch 
 | `game list` | Lists the games with ID, runner, UMU ID and prefix |
 | `game show <game>` | Shows all of a game's settings |
 | `game add --exe <exe> --prefix <dir> --runner <id> [settings]` | Adds a game. A prefix Prefixr doesn't know yet is added (and created) first. Without `--name`, the name comes from the `.exe` |
+| `game install <installer> --prefix <dir> [--runner <id>] [--name] [--exe] [--setup] [settings] [-- <installer args>…]` | Runs a game's installer in a prefix and adds the game it installed. The installer is a setup `.exe` or `.msi`, or a disc image (`.iso`). Without `--runner`, the newest Proton. See [Installing from a setup file or a disc](#installing-from-a-setup-file-or-a-disc) |
 | `game edit <game> [--name] [--exe] [--prefix] [--runner] [--clear-env] [settings]` | Changes a game. Whatever you don't pass stays as it is |
 | `game remove <game>` | Removes the game from the library, like **Remove** in the window. Prefix and game files stay |
 | `game launch <game>` | Starts the game and waits until it exits; prints the log's path |
@@ -56,7 +57,7 @@ its name, or by a part of its name that only one game has: `prefixr game launch 
 | `game shortcut <game> [--place menu\|desktop]` | Creates a start menu or desktop shortcut |
 | `game steam-add <game> [--restart-steam]` / `game steam-remove <game>` | Adds the game to Steam, or removes it |
 
-The settings `game add` and `game edit` take:
+The settings `game add`, `game install` and `game edit` take:
 
 | Option | Sets |
 | --- | --- |
@@ -77,6 +78,42 @@ prefixr game add --name "Fallout 4" \
   --umu-id 377160 \
   --env DXVK_FRAME_RATE=58
 ```
+
+### Installing from a setup file or a disc
+
+`game install` does what **Run installer** does in the window, in one step:
+
+1. It adds the prefix if Prefixr doesn't know it yet.
+2. A disc image is mounted read-only with `udisksctl` (no root needed) and unmounted again at the
+   end. The installer on it is the one its `autorun.inf` starts, else its `setup.exe` or
+   `install.exe`; `--setup <path on the disc>` picks another.
+3. It runs the installer and waits until it, and everything it started, has ended.
+4. It adds the game the installer created a shortcut for, named after the shortcut unless `--name`
+   is given.
+
+```bash
+prefixr game install ~/Downloads/setup_game_1.0.exe --prefix ~/Games/prefixes/game \
+  -- /VERYSILENT /SUPPRESSMSGBOXES /DIR="C:\Games\Game"
+prefixr game install ~/ISOs/GAME_DISC1.iso --prefix ~/Games/prefixes/game --umu-id umu-12345
+```
+
+Everything after `--` goes to the installer. Many installers run without a window when told to:
+
+| Installer | Arguments |
+| --- | --- |
+| Inno Setup (GOG's offline installers, many others) | `/VERYSILENT /SUPPRESSMSGBOXES /DIR="C:\Games\<name>"` |
+| NSIS | `/S /D=C:\Games\<name>` (`/D` last, without quotes) |
+| Windows Installer (`.msi`) | `/qn` |
+
+An installer that has to be clicked through opens its window on the desktop as usual, and the
+command waits until you (or a [computer-use tool](#testing-games-on-screen)) are done. If the
+installer creates no shortcut, or several (a game and its configuration tool, say), the command
+names them and stops: add the game with `game add` then, or pass `--exe` the next time. The
+installer's log is in the error, and in the result as `log_path`.
+
+Disc images whose game checks for the disc while it runs, and installers that ask for a second
+disc, aren't covered. Without `udisksctl` (the `udisks2` package), extract the image first, for
+example with `7z x game.iso -ogame`, and pass the installer in it.
 
 ## Library, categories and favorites
 
@@ -195,6 +232,7 @@ What you can hand over:
 | Task | For example |
 | --- | --- |
 | **Set games up** | *"Add every game under `~/Games` to Prefixr, with Proton-GE, one prefix per game, the right protonfixes match and artwork."* |
+| **Install from a setup file or disc** | *"Install the game from `~/ISOs/GAME.iso` into its own prefix, then find its protonfixes match and artwork."* |
 | **Install from your stores** | *"Connect my GOG account and install all my GOG games that are rated Gold or better on ProtonDB."* |
 | **Move games over** | *"These games come with their own Wine and start scripts. Move each game out of its bundled prefix, add it to Prefixr with Proton, and carry over the fixes from the scripts and my save games."* |
 | **Fix games** | *"Fallout 4 crashes on start. Read its latest Prefixr log and fix it."* |

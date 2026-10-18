@@ -130,6 +130,24 @@ pub(crate) fn default_runner(runners: &[Runner]) -> Option<&Runner> {
     newest(Some(RunnerKind::Proton)).or_else(|| newest(None))
 }
 
+/// The runner given, checked to be installed, or the default one.
+pub(super) fn runner_or_default(
+    runners: &[Runner],
+    runner: Option<String>,
+) -> Result<String, AppError> {
+    match runner {
+        Some(id) if runners.iter().any(|r| r.id == id) => Ok(id),
+        Some(id) => Err(format!("No runner {id}; see `prefixr runner list`").into()),
+        None => Ok(default_runner(runners)
+            .ok_or_else(|| {
+                "No runner installed yet; download one with `prefixr runner download proton-ge`"
+                    .to_string()
+            })?
+            .id
+            .clone()),
+    }
+}
+
 /// The store game `query` names, among the store games.
 fn find_store_game<'a>(
     entries: &'a [LibraryEntry],
@@ -319,18 +337,7 @@ async fn install(
     let (store, app_name) =
         split_key(&entry.key).ok_or_else(|| format!("{} is not a store game", entry.name))?;
 
-    let runners = scan_runners(&config(app).runners_dir)?;
-    let runner_id = match runner {
-        Some(id) if runners.iter().any(|r| r.id == id) => id,
-        Some(id) => return Err(format!("No runner {id}; see `prefixr runner list`").into()),
-        None => default_runner(&runners)
-            .ok_or_else(|| {
-                "No runner installed yet; download one with `prefixr runner download proton-ge`"
-                    .to_string()
-            })?
-            .id
-            .clone(),
-    };
+    let runner_id = runner_or_default(&scan_runners(&config(app).runners_dir)?, runner)?;
     let install_dir = match dir {
         Some(dir) => absolute(Path::new(&dir))?.to_string_lossy().into_owned(),
         None => {

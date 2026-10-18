@@ -287,6 +287,9 @@ fn only_commands_that_change_the_config_lock_it() {
     assert!(changes("prefixr prefix remove /p"));
     assert!(!changes("prefixr game list"));
     assert!(!changes("prefixr game launch quake"));
+    assert!(!changes(
+        "prefixr game install /g/setup.exe --prefix /p -- /VERYSILENT"
+    ));
     assert!(!changes("prefixr prefix winetricks /p vcrun2022"));
     assert!(!changes("prefixr runner download proton-ge"));
     assert!(changes("prefixr library favorite quake"));
