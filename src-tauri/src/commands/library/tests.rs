@@ -127,3 +127,44 @@ fn removing_a_store_game_keeps_its_organization_for_a_reinstall() {
     assert!(library.activity.contains_key("epic:Ferry"));
     assert!(!library.activity.contains_key(&game_key(&own)));
 }
+
+#[test]
+fn a_test_result_keeps_the_setup_it_was_found_with() {
+    let mut library = LibraryConfig::default();
+    let mut game = game(Some((StoreKind::Epic, "Ferry")));
+    library.set_tested(&game, Some(TestStatus::Issues), "  Videos stay black \n", 1_700);
+    let result = &library.tested["epic:Ferry"];
+    assert_eq!(result.status, TestStatus::Issues);
+    assert_eq!(result.note, "Videos stay black");
+    assert_eq!(result.tested_at, 1_700);
+    assert_eq!(result.runner_id, "wine");
+    assert_eq!(result.exe_path, "/games/game.exe");
+    assert!(result.is_current(&game));
+
+    game.runner_id = "GE-Proton10-7".to_string();
+    assert!(!library.tested["epic:Ferry"].is_current(&game));
+
+    library.set_tested(&game, None, "", 1_800);
+    assert!(library.tested.is_empty());
+}
+
+#[test]
+fn a_test_result_goes_with_a_game_removed_for_good_only() {
+    let mut library = LibraryConfig::default();
+    let local = game(None);
+    let store = game(Some((StoreKind::Gog, "1")));
+    library.set_tested(&local, Some(TestStatus::Works), "", 1);
+    library.set_tested(&store, Some(TestStatus::Broken), "", 1);
+    library.game_removed(&local);
+    library.game_removed(&store);
+    assert_eq!(library.tested.keys().collect::<Vec<_>>(), ["gog:1"]);
+}
+
+#[test]
+fn a_library_from_before_test_results_loads() {
+    let library: LibraryConfig =
+        serde_json::from_value(serde_json::json!({ "favorites": ["a"] })).unwrap();
+    assert!(library.tested.is_empty());
+    let status: TestStatus = serde_json::from_value(serde_json::json!("broken")).unwrap();
+    assert_eq!(status, TestStatus::Broken);
+}

@@ -1,10 +1,12 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
-  import type { Compatibility, Game } from "$lib/types";
+  import type { Compatibility, Game, TestStatus } from "$lib/types";
   import { killGame, launchGame, type GameRunState } from "$lib/stores/games";
   import { exeIconUrl } from "$lib/stores/steamgriddb";
   import { storeName } from "$lib/stores/gameStores";
+  import type { GameTest } from "$lib/stores/libraryMeta";
   import GameActionsMenu from "./GameActionsMenu.svelte";
+  import TestDot from "./TestDot.svelte";
   import CompatBadges from "./CompatBadges.svelte";
   import FavoriteStar from "./FavoriteStar.svelte";
   import GameFallbackIcon from "./GameFallbackIcon.svelte";
@@ -25,6 +27,8 @@
     compat,
     onToggleFavorite,
     onOpenDetails,
+    test,
+    onSetTestStatus,
   }: {
     game: Game;
     runState?: GameRunState;
@@ -39,6 +43,8 @@
     compat?: Compatibility;
     onToggleFavorite: () => void;
     onOpenDetails: () => void;
+    test: GameTest | null;
+    onSetTestStatus: (status: TestStatus | null) => void;
   } = $props();
 
   const item = new GameItem(() => game);
@@ -76,6 +82,8 @@
       <span class="status-badge running"><span class="dot"></span>{m.gameCard_running()}</span>
     {:else if runState?.initializing}
       <span class="status-badge init"><span class="dot"></span>{m.gameCard_initializing()}</span>
+    {:else if test}
+      <span class="test-corner"><TestDot {test} onImage /></span>
     {/if}
 
     <div class="menu-corner" class:favorite>
@@ -91,6 +99,8 @@
         {onExportToSteam}
         {onRemoveFromSteam}
         onShowNotes={game.notes ? onShowNotes : undefined}
+        testStatus={test?.result.status ?? null}
+        {onSetTestStatus}
       >
         {#snippet trigger()}⋮{/snippet}
       </GameActionsMenu>
@@ -211,6 +221,14 @@
     padding: 0.3em 0.65em;
     border-radius: 999px;
     backdrop-filter: blur(6px);
+  }
+
+  .test-corner {
+    position: absolute;
+    top: 0.6em;
+    left: 0.6em;
+    z-index: 2;
+    display: flex;
   }
 
   .status-badge.running {

@@ -1,6 +1,6 @@
 //! How the library is organized beyond the games themselves: the user's
-//! categories ("Kinder", "Koop", …), favorites, hidden games, and when and
-//! how long each game was played.
+//! categories ("Kinder", "Koop", …), favorites, hidden games, when and how
+//! long each game was played, and whether it was tested to run.
 //!
 //! All of it is keyed by a game's *library key* (see `game_key`), so it
 //! covers both games added by hand and store games that aren't installed
@@ -8,6 +8,7 @@
 //! installed, uninstalled and installed again.
 
 use std::collections::BTreeMap;
+use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
@@ -34,6 +35,47 @@ pub struct LibraryConfig {
     pub hidden: Vec<String>,
     #[serde(default)]
     pub activity: BTreeMap<String, GameActivity>,
+    /// What testing a game found, by the user or an agent (`prefixr library
+    /// test-status`). Untested games have no entry.
+    #[serde(default)]
+    pub tested: BTreeMap<String, TestResult>,
+}
+
+/// How a game ran when it was tested.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
+#[serde(rename_all = "snake_case")]
+pub enum TestStatus {
+    /// It starts and plays.
+    Works,
+    /// It plays, with something wrong or missing (black videos, no sound,
+    /// needs a login or a controller).
+    Issues,
+    /// It doesn't start, or can't be played.
+    Broken,
+}
+
+/// The result of testing a game, and the setup it was tested with: once the
+/// game has another runner or exe, the result may no longer hold.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(export))]
+pub struct TestResult {
+    pub status: TestStatus,
+    /// What was seen or tried, e.g. "Videos stay black; PROTON_USE_WINED3D
+    /// didn't help".
+    #[serde(default)]
+    pub note: String,
+    /// Seconds since the Unix epoch.
+    pub tested_at: u64,
+    pub runner_id: String,
+    pub exe_path: String,
+}
+
+impl TestResult {
+    /// Whether `game` still has the setup it was tested with.
+    pub fn is_current(&self, game: &Game) -> bool {
+        self.runner_id == game.runner_id && Path::new(&self.exe_path) == game.exe_path
+    }
 }
 
 /// A category of the user's, holding games by their library key.
@@ -214,11 +256,35 @@ impl LibraryConfig {
         }
     }
 
+    /// Records how `game` ran when tested just now, with the setup it has;
+    /// `None` takes the result away again.
+    pub fn set_tested(&mut self, game: &Game, status: Option<TestStatus>, note: &str, at: u64) {
+        let key = game_key(game);
+        match status {
+            Some(status) => {
+                self.tested.insert(
+                    key,
+                    TestResult {
+                        status,
+                        note: note.trim().to_string(),
+                        tested_at: at,
+                        runner_id: game.runner_id.clone(),
+                        exe_path: game.exe_path.display().to_string(),
+                    },
+                );
+            }
+            None => {
+                self.tested.remove(&key);
+            }
+        }
+    }
+
     /// Drops everything about a game that's gone for good.
     pub fn forget(&mut self, key: &str) {
         self.favorites.retain(|k| k != key);
         self.hidden.retain(|k| k != key);
         self.activity.remove(key);
+        self.tested.remove(key);
         for category in &mut self.categories {
             category.games.retain(|k| k != key);
         }
@@ -317,6 +383,29 @@ pub fn delete_category(
     id: String,
 ) -> Result<LibraryConfig, AppError> {
     change(&app, &state, |library| library.delete_category(&id))
+}
+
+/// Records how a library game ran when tested, or (`status` left out) takes
+/// the result away again.
+#[tauri::command(async)]
+pub fn set_test_status(
+    app: AppHandle,
+    state: State<ConfigState>,
+    game_id: String,
+    status: Option<TestStatus>,
+    note: String,
+) -> Result<LibraryConfig, AppError> {
+    let game = state
+        .locked()
+        .games
+        .iter()
+        .find(|g| g.id.to_string() == game_id)
+        .cloned()
+        .ok_or_else(|| format!("No game with id {game_id}"))?;
+    change(&app, &state, |library| {
+        library.set_tested(&game, status, &note, now_secs());
+        Ok(())
+    })
 }
 
 /// Adds the game to one category or takes it out, rather than setting all

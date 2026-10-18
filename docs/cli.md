@@ -88,9 +88,10 @@ too.
 
 | Command | Does |
 | --- | --- |
-| `library list [--category <name>] [--favorites] [--hidden] [--compatibility]` | Lists every game with its key, source, whether it's installed, its categories and play time. Hidden games only with `--hidden`; `--compatibility` adds each game's ProtonDB rating and umu-protonfixes match |
+| `library list [--category <name>] [--favorites] [--hidden] [--tested works\|issues\|broken\|untested] [--compatibility]` | Lists every game with its key, source, whether it's installed, its categories, play time and test result. Hidden games only with `--hidden`; `--tested` lists only the games with that test result; `--compatibility` adds each game's ProtonDB rating and umu-protonfixes match |
 | `library favorite <game>… [--off]` | Marks games as favorites, or unmarks them |
 | `library hide <game>… [--off]` | Hides games from the library (they show up under **Hidden**), or shows them again |
+| `library test-status <game> works\|issues\|broken\|clear [--note "…"]` | Notes how an installed game ran when tested: it **works**, works with **issues** (black videos, no sound, needs a login), or is **broken**. The window shows it as a small ✓, ! or ✕ on the cover, the note as its tooltip. `clear` takes the result away |
 | `category list` | Lists the categories and how many games each holds |
 | `category add <name>` | Creates a category, e.g. `Kinder` |
 | `category rename <category> <new name>` | Renames a category |
@@ -239,7 +240,13 @@ With one connected, the agent can test a whole library on its own:
    through, a black screen, an error dialog.
 3. Stop it with `prefixr game stop <game>` and read `prefixr game log <game> --print` if it looked
    wrong.
-4. Fix the setup and try again, or note the result with `--notes` and move on.
+4. Fix the setup and try again.
+5. Note the result: `prefixr library test-status <game> works`, `issues --note "Videos stay
+   black"` or `broken --note "Crashes on start with VK_ERROR_DEVICE_LOST; tried WINED3D"`.
+
+A result belongs to the runner and exe the game had when tested. Once either changes, the window
+shows it faded and `library list --tested untested` lists the game again, so *"test every game
+that's untested"* also catches the ones whose setup changed since.
 
 These tools are community projects and get full control of your desktop: check what one does
 before you install it, and stay near the computer while the agent tests. Games that need an online

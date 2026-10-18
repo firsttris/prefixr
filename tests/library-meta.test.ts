@@ -16,6 +16,7 @@ const library = (favorites: string[]): LibraryConfig => ({
   favorites,
   hidden: [],
   activity: {},
+  tested: {},
 });
 
 beforeEach(() => {
@@ -123,5 +124,38 @@ describe("compatibility", () => {
     invoke.mockResolvedValue({ z: { umu_id: "umu-9" } });
     await meta.refreshCompatibility(["z"]);
     expect(get(meta.compatibility).z?.umu_id).toBe("umu-9");
+  });
+
+  it("sets a game's test status by its id and tells a result for another setup", async () => {
+    const result = {
+      status: "issues" as const,
+      note: "No sound",
+      tested_at: 5,
+      runner_id: "wine",
+      exe_path: "/g.exe",
+    };
+    invoke.mockResolvedValueOnce({ ...library([]), tested: { a: result } });
+    await meta.setTestStatus("a", "issues", "No sound");
+    expect(invoke).toHaveBeenCalledWith("set_test_status", {
+      gameId: "a",
+      status: "issues",
+      note: "No sound",
+    });
+    const current = get(meta.libraryMeta);
+    const game = { id: "a", runner_id: "wine", exe_path: "/g.exe", store: null } as Game;
+    expect(meta.testOf(current, "a", game)).toEqual({ result, current: true });
+    expect(meta.testOf(current, "a", { ...game, runner_id: "GE-Proton10-7" })?.current).toBe(
+      false,
+    );
+    expect(meta.testOf(current, "a")?.current).toBe(false);
+    expect(meta.testOf(current, "b", game)).toBeNull();
+
+    invoke.mockResolvedValueOnce(library([]));
+    await meta.setTestStatus("a", null);
+    expect(invoke).toHaveBeenLastCalledWith("set_test_status", {
+      gameId: "a",
+      status: null,
+      note: "",
+    });
   });
 });

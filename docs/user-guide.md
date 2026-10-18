@@ -35,8 +35,8 @@ folds it away.
 
 ### Favorites, categories and hidden games
 
-The chips above the games pick what you see: **All**, **Favorites**, each of your categories, and
-**Hidden** (once you've hidden a game). The numbers say how many games each holds.
+The chips above the games pick what you see: **All**, **Favorites**, each of your categories, the
+test results (once a game has one), and **Hidden** (once you've hidden a game). The numbers say how many games each holds.
 
 - **Favorites**: the star on a card or row marks a game as a favorite.
 - **Categories**: **+ Category** creates one, such as *Kinder* or *Koop*; the gear renames and
@@ -44,6 +44,12 @@ The chips above the games pick what you see: **All**, **Favorites**, each of you
   categories, see [Command line](cli.md#library-categories-and-favorites).
 - **Hidden**: hide a game in its details, say a store's giveaway you won't play. It then only shows
   under **Hidden**.
+- **Test status**: a small symbol at the top left of a cover says how the game ran when it was
+  tested: ✓ works, ! works with issues, ✕ broken. Hover it for the note and the date. Set it in
+  the card's ⋮ menu under **Test status**, or let an AI agent test your games and set it (see
+  [Testing games on screen](cli.md#testing-games-on-screen)). Once the game's runner or program
+  changes, the symbol fades: the result may no longer hold. Chips such as **✓ Works** show only
+  the games with that result.
 
 ### Game details
 

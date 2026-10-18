@@ -706,5 +706,15 @@
   ],
   "backup_confirmTitle": "Sicherung wiederherstellen?",
   "backup_confirmMessage": "Die Bibliothek und alle Einstellungen werden durch die Sicherung vom {when} ersetzt ({summary}). Der jetzige Stand wird vorher gesichert und steht dann unter „Automatische Sicherungen“.",
-  "backup_restored": "„{file}“ ist wiederhergestellt. Der Stand davor steht unten als erste Sicherung."
+  "backup_restored": "„{file}“ ist wiederhergestellt. Der Stand davor steht unten als erste Sicherung.",
+  "test_works": "Läuft",
+  "test_issues": "Mit Macken",
+  "test_broken": "Kaputt",
+  "test_testedOn": "getestet am {date}",
+  "test_outdated": "seitdem anderer Runner oder andere exe",
+  "test_menuTitle": "Teststatus",
+  "test_menuClear": "Teststatus entfernen",
+  "details_test": "Getestet",
+  "details_untested": "Noch nicht getestet. Setze das Ergebnis im ⋮-Menü, oder lass einen Agenten testen (prefixr library test-status).",
+  "details_testOutdated": "Getestet mit {runner}. Seitdem haben sich Runner oder exe geändert, das Ergebnis gilt vielleicht nicht mehr."
 }

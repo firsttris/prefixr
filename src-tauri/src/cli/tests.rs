@@ -291,6 +291,8 @@ fn only_commands_that_change_the_config_lock_it() {
     assert!(!changes("prefixr runner download proton-ge"));
     assert!(changes("prefixr library favorite quake"));
     assert!(changes("prefixr library hide quake --off"));
+    assert!(changes("prefixr library test-status quake works --note ok"));
+    assert!(!changes("prefixr library list --tested broken"));
     assert!(changes("prefixr category add Kinder"));
     assert!(changes("prefixr category rename Kinder Kids"));
     assert!(changes("prefixr category remove Kinder"));
@@ -323,6 +325,7 @@ fn library_and_category_commands_are_a_command_line() {
             favorites: true,
             hidden: true,
             category: None,
+            tested: None,
             compatibility: false,
         })
     ));

@@ -1,10 +1,12 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
-  import type { Compatibility, Game } from "$lib/types";
+  import type { Compatibility, Game, TestStatus } from "$lib/types";
   import { killGame, launchGame, type GameRunState } from "$lib/stores/games";
   import { exeIconUrl } from "$lib/stores/steamgriddb";
   import { storeName } from "$lib/stores/gameStores";
+  import type { GameTest } from "$lib/stores/libraryMeta";
   import GameActionsMenu from "./GameActionsMenu.svelte";
+  import TestDot from "./TestDot.svelte";
   import GameFallbackIcon from "./GameFallbackIcon.svelte";
   import CompatBadges from "./CompatBadges.svelte";
   import FavoriteStar from "./FavoriteStar.svelte";
@@ -25,6 +27,8 @@
     compat,
     onToggleFavorite,
     onOpenDetails,
+    test,
+    onSetTestStatus,
   }: {
     game: Game;
     runState?: GameRunState;
@@ -39,6 +43,8 @@
     compat?: Compatibility;
     onToggleFavorite: () => void;
     onOpenDetails: () => void;
+    test: GameTest | null;
+    onSetTestStatus: (status: TestStatus | null) => void;
   } = $props();
 
   const item = new GameItem(() => game);
@@ -66,9 +72,12 @@
 
   <FavoriteStar {favorite} onToggle={onToggleFavorite} />
   <div class="meta">
-    <button type="button" class="name" title={m.details_open()} onclick={onOpenDetails}
-      >{game.name}</button
-    >
+    <span class="name-line">
+      {#if test}<TestDot {test} />{/if}
+      <button type="button" class="name" title={m.details_open()} onclick={onOpenDetails}
+        >{game.name}</button
+      >
+    </span>
     <span class="runner"
       >{game.store ? `${storeName(game.store.store)} · ` : ""}{game.runner_id}</span
     >
@@ -96,6 +105,8 @@
       {onExportToSteam}
       {onRemoveFromSteam}
       onShowNotes={game.notes ? onShowNotes : undefined}
+      testStatus={test?.result.status ?? null}
+      {onSetTestStatus}
     >
       {#snippet trigger()}⋮{/snippet}
     </GameActionsMenu>
@@ -190,6 +201,13 @@
     width: 1.7em;
     height: 1.7em;
     object-fit: contain;
+  }
+
+  .name-line {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    min-width: 0;
   }
 
   .meta {

@@ -706,5 +706,15 @@
   ],
   "backup_confirmTitle": "Restore the backup?",
   "backup_confirmMessage": "The library and all settings are replaced with the backup from {when} ({summary}). What is now is backed up first and then shows up under “Automatic backups”.",
-  "backup_restored": "“{file}” is restored. What was before is the first backup below."
+  "backup_restored": "“{file}” is restored. What was before is the first backup below.",
+  "test_works": "Works",
+  "test_issues": "Works with issues",
+  "test_broken": "Broken",
+  "test_testedOn": "tested on {date}",
+  "test_outdated": "runner or exe changed since",
+  "test_menuTitle": "Test status",
+  "test_menuClear": "Clear test status",
+  "details_test": "Tested",
+  "details_untested": "Not tested yet. Set the result in the ⋮ menu, or let an agent test it (prefixr library test-status).",
+  "details_testOutdated": "Tested with {runner}. The runner or exe has changed since, so the result may no longer hold."
 }

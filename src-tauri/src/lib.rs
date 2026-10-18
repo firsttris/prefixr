@@ -31,7 +31,7 @@ use commands::graphics::{get_graphics_config, save_graphics_config};
 use commands::graphics_layers::{get_directx_layers_status, update_directx_layers};
 use commands::library::{
     create_category, delete_category, get_library, rename_category, set_favorite, set_hidden,
-    set_in_category,
+    set_in_category, set_test_status,
 };
 use commands::locale::set_ui_locale;
 use commands::logs::open_log;
@@ -368,6 +368,7 @@ pub fn run() {
             rename_category,
             delete_category,
             set_in_category,
+            set_test_status,
             get_compatibility
         ])
         .run(context)

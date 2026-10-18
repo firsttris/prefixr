@@ -1,5 +1,5 @@
-import type { Game, LibraryConfig, StoreGame, StoreKind } from "$lib/types";
-import { gameKey, storeEntryKey } from "$lib/stores/libraryMeta";
+import type { Game, LibraryConfig, StoreGame, StoreKind, TestStatus } from "$lib/types";
+import { TEST_STATUSES, gameKey, storeEntryKey, testOf } from "$lib/stores/libraryMeta";
 
 // What the library shows: every game, installed or not, filtered by the
 // toolbar's choices, sorted, and split into the installed ones and the
@@ -14,8 +14,13 @@ export type SortBy =
 
 export type Source = "all" | "local" | StoreKind;
 
-/** Which games: all, favorites, one category (`category:<id>`), or hidden ones. */
-export type Collection = "all" | "favorites" | "hidden" | `category:${string}`;
+/**
+ * Which games: all, favorites, one category (`category:<id>`), the ones a
+ * test found to work, have issues or be broken (`tested:<status>`), or the
+ * hidden ones.
+ */
+export type Collection =
+  "all" | "favorites" | "hidden" | `category:${string}` | `tested:${TestStatus}`;
 
 export interface ViewOptions {
   query: string;
@@ -51,6 +56,12 @@ function inCollection(entry: Entry, collection: Collection, meta: LibraryConfig)
   if (hidden) return false;
   if (collection === "all") return true;
   if (collection === "favorites") return meta.favorites.includes(entry.key);
+  if (collection.startsWith("tested:")) {
+    // A result for another setup than the game has now doesn't count, as
+    // `library list --tested`.
+    const test = testOf(meta, entry.key, entry.kind === "game" ? entry.game : undefined);
+    return !!test?.current && `tested:${test.result.status}` === collection;
+  }
   const id = collection.slice("category:".length);
   return meta.categories.some((c) => c.id === id && c.games.includes(entry.key));
 }
@@ -126,6 +137,7 @@ export function collectionCounts(
     "favorites",
     "hidden",
     ...meta.categories.map((c) => `category:${c.id}` as const),
+    ...TEST_STATUSES.map((status) => `tested:${status}` as const),
   ];
   const fromSource = entries.filter((e) => source === "all" || sourceOf(e) === source);
   for (const collection of collections) {
