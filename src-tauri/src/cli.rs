@@ -45,8 +45,10 @@ use crate::lock::LockExt;
 use crate::models::{ArtworkKind, Game, GameInput, RunnerKind};
 use crate::tray::WindowVisible;
 
+mod backup;
 mod library;
 mod store;
+use backup::BackupCommand;
 use library::{CategoryCommand, LibraryCommand};
 use store::StoreCommand;
 
@@ -61,6 +63,7 @@ const CLI_ARGS: &[&str] = &[
     "prefix",
     "runner",
     "umu",
+    "backup",
     "help",
     "--help",
     "-h",
@@ -114,6 +117,9 @@ enum Command {
     /// umu-launcher, and the UMU ids that select a game's protonfixes
     #[command(subcommand)]
     Umu(UmuCommand),
+    /// Back up and restore the library, its settings and artwork
+    #[command(subcommand)]
+    Backup(BackupCommand),
 }
 
 #[derive(Subcommand, Debug)]
@@ -366,6 +372,7 @@ fn changes_config(command: &Command) -> bool {
                 | GameCommand::Artwork(_)
         ) | Command::Prefix(PrefixCommand::Add { .. } | PrefixCommand::Remove { .. })
     ) || match command {
+        Command::Backup(command) => backup::changes_config(command),
         Command::Library(command) => library::changes_config(command),
         Command::Category(command) => library::category_changes_config(command),
         Command::Store(command) => store::changes_config(command),
@@ -449,6 +456,7 @@ async fn execute(app: &AppHandle, cli: Cli) -> Result<(), AppError> {
         Command::Prefix(command) => prefix_command(app, out, command).await,
         Command::Runner(command) => runner_command(app, out, command).await,
         Command::Umu(command) => umu_command(app, out, command).await,
+        Command::Backup(command) => backup::backup_command(app, out, command).await,
     }
 }
 

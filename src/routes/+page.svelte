@@ -14,6 +14,8 @@
   import InstallDialog from "$lib/components/InstallDialog.svelte";
   import StoreInstallDialog from "$lib/components/StoreInstallDialog.svelte";
   import StoresSettings from "$lib/components/StoresSettings.svelte";
+  import BackupSettings from "$lib/components/BackupSettings.svelte";
+  import { takeRestoredBackup } from "$lib/stores/backup";
   import DownloadsView from "$lib/components/DownloadsView.svelte";
   import Modal from "$lib/components/Modal.svelte";
   import { getLocale, setLocale, type Locale } from "$lib/i18n/index.svelte";
@@ -46,8 +48,12 @@
     | "proton"
     | "stores"
     | "downloads"
-    | "steamgriddb";
-  let view = $state<View>("library");
+    | "steamgriddb"
+    | "backup";
+  // Right after a restore (which reloads the window), back on the Backup
+  // page, saying what was restored.
+  const restoredBackup = takeRestoredBackup();
+  let view = $state<View>(restoredBackup ? "backup" : "library");
   // The prefix the prefixes page opens at, when a game's details sent us there.
   let prefixFocus = $state<string | null>(null);
 
@@ -188,6 +194,14 @@
     >
       {m.nav_steamgriddb()}
     </button>
+    <button
+      type="button"
+      class="nav-item"
+      class:active={view === "backup"}
+      onclick={() => (view = "backup")}
+    >
+      {m.nav_backup()}
+    </button>
     <div class="nav-spacer"></div>
     <div class="lang-switch" role="group" aria-label={m.nav_languageSwitcher()}>
       {#each ["de", "en"] as const as lng (lng)}
@@ -288,6 +302,11 @@
         <h1>{m.library_storesHeading()}</h1>
       </div>
       <StoresSettings />
+    {:else if view === "backup"}
+      <div class="page-header">
+        <h1>{m.library_backupHeading()}</h1>
+      </div>
+      <BackupSettings restored={restoredBackup} />
     {:else}
       <div class="page-header">
         <h1>{m.library_steamgriddbHeading()}</h1>

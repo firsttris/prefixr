@@ -73,7 +73,7 @@ impl AppConfig {
 /// as `State<ConfigState>`.
 pub type ConfigState = Mutex<AppConfig>;
 
-fn config_file_path(app: &AppHandle) -> Result<PathBuf, String> {
+pub(crate) fn config_file_path(app: &AppHandle) -> Result<PathBuf, String> {
     let config_dir = app
         .path()
         .app_config_dir()
@@ -156,7 +156,7 @@ fn load_icons(app: &AppHandle, config: &mut AppConfig) {
 
 /// The config as written to disk: everything but the games' exe icons,
 /// which live in files of their own (see `load_icons`).
-fn to_disk_json(config: &AppConfig) -> Result<String, String> {
+pub(crate) fn to_disk_json(config: &AppConfig) -> Result<String, String> {
     let mut value =
         serde_json::to_value(config).map_err(|e| format!("Could not serialize config: {e}"))?;
     let games = value.get_mut("games").and_then(Value::as_array_mut);

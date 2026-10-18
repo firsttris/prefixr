@@ -12,6 +12,7 @@ want, the agent does it, and you play.
 - [Stores](#stores)
 - [Prefixes](#prefixes)
 - [Runners and umu-launcher](#runners-and-umu-launcher)
+- [Backup and restore](#backup-and-restore)
 - [JSON output and exit codes](#json-output-and-exit-codes)
 - [Working with an AI agent](#working-with-an-ai-agent)
 
@@ -161,6 +162,16 @@ Without `--runner`, a prefix command uses the runner all of the prefix's games u
 | `umu status` / `umu install` | Shows or installs/updates umu-launcher |
 | `umu search <name>` | Finds the UMU ID (protonfixes match) for a game |
 
+## Backup and restore
+
+| Command | Does |
+| --- | --- |
+| `backup create [<file>] [--with-secrets]` | Backs up the library, all settings, categories, play times and artwork to one file: the one given, or `prefixr-backup-<UTC date>-<time>.tar.gz` in the current folder. The API keys only with `--with-secrets` |
+| `backup list` | Lists the automatic backups (daily, and before every restore), newest first and numbered. A `backup create` file isn't among them |
+| `backup restore <file or number>` | Restores a backup: a file, or a number from `backup list`. What is now is backed up first, so `prefixr backup restore 1` undoes it |
+
+See [Backup and restore](user-guide.md#backup-and-restore) for what a backup holds.
+
 ## JSON output and exit codes
 
 Add `--json` to any command to get its result as JSON on stdout, for example
@@ -235,6 +246,10 @@ before you install it, and stay near the computer while the agent tests. Games t
 login or a controller still need you.
 
 ### Setting games up
+
+**Back up first.** Before a larger change, have the agent run `prefixr backup create`. If
+something goes wrong, `prefixr backup restore <file>` brings everything back (and a restore can be
+undone too).
 
 A good way to work with an agent:
 

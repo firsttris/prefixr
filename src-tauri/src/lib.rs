@@ -18,6 +18,7 @@ use tauri::{Emitter, Manager, WebviewWindowBuilder, WindowEvent};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
 use commands::about::open_release_notes;
+use commands::backup::{create_backup, inspect_backup, list_backups, restore_backup};
 use commands::compatibility::get_compatibility;
 use commands::games::{
     add_game, create_desktop_shortcut, create_menu_shortcut, ensure_install_desktop_entry,
@@ -237,6 +238,12 @@ pub fn run() {
                 WebviewWindowBuilder::from_config(app.handle(), &window)?.build()?;
             }
             watch_config_file(app.handle());
+            // Best-effort and off the startup path: once a day, so a change
+            // (the user's, an agent's) can always be undone.
+            let backup_app = app.handle().clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                commands::backup::daily_backup(&backup_app)
+            });
             check_tray_host(app.handle());
             setup_tray(app.handle())?;
             // Best-effort: a file manager's "Öffnen mit" context menu working
@@ -350,6 +357,10 @@ pub fn run() {
             list_store_installs,
             cancel_store_install,
             uninstall_store_game,
+            create_backup,
+            list_backups,
+            inspect_backup,
+            restore_backup,
             get_library,
             set_favorite,
             set_hidden,
