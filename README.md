@@ -81,6 +81,8 @@ You say what you want, the agent does it, and you watch the window update and pl
 - **Move games over:** it carries over the fixes from old launch scripts or other launchers and
   copies your save games.
 - **Fix games:** when a game doesn't start, it reads the log and changes the setup until it does.
+- **Test games:** with a computer-use tool for the Linux desktop (see the tip below), it starts
+  each game, looks at the screen, and tells you which ones work.
 - **Organize the library:** it creates categories such as *Kids* and *Adults* and sorts every game
   into them, marks favorites and hides what you won't play.
 - **Keep notes:** it writes down what it found (an offline login, why a setting is needed) with
@@ -107,7 +109,17 @@ Agent: prefixr library list --json
 ```
 
 When a game doesn't start, the agent reads its log with `prefixr game log <game> --print` and fixes
-the setup. See [Working with an AI agent](https://firsttris.github.io/prefixr/cli.html#working-with-an-ai-agent).
+the setup.
+
+> **Tip: let the agent check that your games work.** Give the agent a computer-use tool for the
+> Linux desktop, an MCP server that lets it take screenshots and use the mouse and keyboard (for
+> example [Computer Use MCP Server](https://conare.ai/marketplace/mcp/computer-use) for X11, or
+> [codex-computer-use-linux](https://glama.ai/mcp/servers/maxionice/codex-computer-use-linux),
+> which also works on Wayland). Then ask: *"Add all games under `/mnt/games/` and check whether
+> each one starts."* The agent launches every game, looks at what's on screen (the menu, a black
+> window, an error dialog), stops it, and fixes or reports the ones that don't run. These are
+> community projects that get full control of your desktop: read what they do before you install
+> one. See [Working with an AI agent](https://firsttris.github.io/prefixr/cli.html#working-with-an-ai-agent).
 
 ## 📦 Installation
 

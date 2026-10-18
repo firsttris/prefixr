@@ -178,6 +178,7 @@ What you can hand over:
 | **Install from your stores** | *"Connect my GOG account and install all my GOG games that are rated Gold or better on ProtonDB."* |
 | **Move games over** | *"These games come with their own Wine and start scripts. Move each game out of its bundled prefix, add it to Prefixr with Proton, and carry over the fixes from the scripts and my save games."* |
 | **Fix games** | *"Fallout 4 crashes on start. Read its latest Prefixr log and fix it."* |
+| **Test games** | *"Add all games under `/mnt/games/` and check whether each one starts."* (needs a computer-use tool, see [Testing games on screen](#testing-games-on-screen)) |
 | **Organize the library** | *"Create the categories Kids and Adults and sort all my games into them. Hide the store giveaways I've never played."* |
 | **Tidy up** | *"Give every game without artwork a cover, and add my favorites to Steam."* |
 
@@ -198,6 +199,31 @@ prefixr library hide amazon:amzn1.adg.product.1234
 
 It can decide by the names it knows, or look games up first (their age ratings, genres, co-op
 modes). The categories show up as chips above the library right away.
+
+### Testing games on screen
+
+The command line tells an agent whether a game's process started and ended, and the log tells it
+what Wine and Proton printed. Whether the game actually shows its menu, a black window or an error
+dialog, the agent can only see on the screen. A **computer-use tool** for the Linux desktop lets
+it: an MCP server that gives the agent screenshots, mouse and keyboard. For example:
+
+- [Computer Use MCP Server](https://conare.ai/marketplace/mcp/computer-use): xdotool and scrot,
+  X11 only.
+- [codex-computer-use-linux](https://glama.ai/mcp/servers/maxionice/codex-computer-use-linux): a
+  small set of tools, also on Wayland (through ydotool).
+
+With one connected, the agent can test a whole library on its own:
+
+1. Start a game in the background: `prefixr game launch <game> &` (it waits until the game exits).
+2. Wait a little, then take a screenshot and judge it: the game's menu, a launcher window to click
+   through, a black screen, an error dialog.
+3. Stop it with `prefixr game stop <game>` and read `prefixr game log <game> --print` if it looked
+   wrong.
+4. Fix the setup and try again, or note the result with `--notes` and move on.
+
+These tools are community projects and get full control of your desktop: check what one does
+before you install it, and stay near the computer while the agent tests. Games that need an online
+login or a controller still need you.
 
 ### Setting games up
 
