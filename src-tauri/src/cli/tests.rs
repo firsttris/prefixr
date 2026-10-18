@@ -322,7 +322,8 @@ fn library_and_category_commands_are_a_command_line() {
         Command::Library(LibraryCommand::List {
             favorites: true,
             hidden: true,
-            category: None
+            category: None,
+            compatibility: false,
         })
     ));
 }
