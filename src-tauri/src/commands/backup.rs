@@ -12,6 +12,7 @@
 
 use std::fs;
 use std::io::Read;
+use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Component, Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
@@ -22,7 +23,9 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::commands::library::now_secs;
-use crate::config::{load_config, lock_config, save_config, to_disk_json, AppConfig, ConfigState};
+use crate::config::{
+    config_file_path, load_config, lock_config, save_config, to_disk_json, AppConfig, ConfigState,
+};
 use crate::error::AppError;
 use crate::lock::LockExt;
 
@@ -34,6 +37,18 @@ const CONFIG: &str = "config.json";
 /// The data dir's folders a backup holds, as they're named in it too.
 const FOLDERS: [&str; 2] = ["artwork", "exe-icons"];
 const KEEP_AUTOMATIC: usize = 7;
+/// The automatic backups' file name prefixes; other files in `backups/`
+/// (a backup the user saved there) are never pruned.
+const AUTOMATIC_PREFIXES: [&str; 2] = ["daily-", "before-restore-"];
+/// More than a backup's own small files may hold is no backup's: a crafted
+/// archive can't fill the memory with them.
+const MAX_META_BYTES: u64 = 64 * 1024 * 1024;
+/// More than any library's artwork comes to: a crafted archive can't fill
+/// the disk the config is saved on.
+const MAX_UNPACKED_BYTES: u64 = 16 * 1024 * 1024 * 1024;
+/// Leftovers of a restore or backup that was cut off (a crash) are cleaned
+/// up once they're this old, so a running one is never touched.
+const LEFTOVER_AGE: Duration = Duration::from_secs(60 * 60);
 const DAILY: Duration = Duration::from_secs(24 * 60 * 60);
 
 /// Why a backup was made.
@@ -172,8 +187,16 @@ pub fn write_backup(
     // leaves a broken file under the real name.
     let tmp = dest.with_extension("partial");
     let write = || -> std::io::Result<()> {
-        let file = fs::File::create(&tmp)?;
-        let mut archive = tar::Builder::new(GzEncoder::new(file, Compression::default()));
+        // Only for this user: it can hold the API keys.
+        let file = fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&tmp)?;
+        // Fast rather than small: covers are compressed already, and the
+        // daily backup shouldn't hold the start up.
+        let mut archive = tar::Builder::new(GzEncoder::new(file, Compression::fast()));
         let mut add = |name: &str, bytes: &[u8]| -> std::io::Result<()> {
             let mut header = tar::Header::new_gnu();
             header.set_size(bytes.len() as u64);
@@ -247,8 +270,13 @@ fn read_backup(path: &Path) -> Result<(Manifest, AppConfig), String> {
         if name != MANIFEST && name != CONFIG {
             continue;
         }
+        if entry.header().size().unwrap_or(u64::MAX) > MAX_META_BYTES {
+            return Err(not_a_backup(path));
+        }
         let mut bytes = Vec::new();
         entry
+            .by_ref()
+            .take(MAX_META_BYTES)
             .read_to_end(&mut bytes)
             .map_err(|_| not_a_backup(path))?;
         if name == MANIFEST {
@@ -289,39 +317,97 @@ fn safe_folder_entry(path: &Path) -> bool {
     first_ok && components.all(|c| matches!(c, Component::Normal(_)))
 }
 
-/// Unpacks a backup's folders into `staging` (made fresh).
-fn unpack_folders(path: &Path, staging: &Path) -> Result<(), String> {
+/// Unpacks a backup's folders into `staging` (made fresh), at most
+/// `max_bytes` of them; on any failure nothing is left behind.
+fn unpack_folders(path: &Path, staging: &Path, max_bytes: u64) -> Result<(), String> {
     let _ = fs::remove_dir_all(staging);
     fs::create_dir_all(staging)
         .map_err(|e| format!("Could not create {}: {e}", staging.display()))?;
-    for entry in open(path)?.entries().map_err(|_| not_a_backup(path))? {
-        let mut entry = entry.map_err(|_| not_a_backup(path))?;
-        let name = entry.path().map_err(|_| not_a_backup(path))?.into_owned();
-        if !safe_folder_entry(&name) {
-            continue;
+    let unpack = || -> Result<(), String> {
+        let mut total = 0u64;
+        for entry in open(path)?.entries().map_err(|_| not_a_backup(path))? {
+            let mut entry = entry.map_err(|_| not_a_backup(path))?;
+            let name = entry.path().map_err(|_| not_a_backup(path))?.into_owned();
+            let kind = entry.header().entry_type();
+            // No links of any kind: they could point anywhere.
+            if !safe_folder_entry(&name) || !(kind.is_file() || kind.is_dir()) {
+                continue;
+            }
+            total = total.saturating_add(entry.header().size().unwrap_or(u64::MAX));
+            if total > max_bytes {
+                return Err(format!(
+                    "{} unpacks to more than any backup holds",
+                    path.display()
+                ));
+            }
+            entry
+                .unpack_in(staging)
+                .map_err(|e| format!("Could not unpack {}: {e}", name.display()))?;
         }
-        let kind = entry.header().entry_type();
-        if !(kind.is_file() || kind.is_dir()) {
-            continue;
-        }
-        entry
-            .unpack_in(staging)
-            .map_err(|e| format!("Could not unpack {}: {e}", name.display()))?;
-    }
-    Ok(())
+        Ok(())
+    };
+    unpack().inspect_err(|_| {
+        let _ = fs::remove_dir_all(staging);
+    })
 }
 
-/// Puts the unpacked folders in place of the data dir's, keeping the old
-/// ones until the new ones are in.
-fn swap_folders(staging: &Path, data_dir: &Path) -> Result<(), String> {
+/// The backup's folders put in place of the data dir's, the old ones kept
+/// aside until the restore is through: `commit` drops them, `roll_back`
+/// puts them back.
+pub(crate) struct Swapped {
+    /// Each folder, and where its old one was moved (`None`: there was none).
+    folders: Vec<(PathBuf, Option<PathBuf>)>,
+    /// The folders this put in, to take out again on a roll-back.
+    put_in: Vec<PathBuf>,
+}
+
+impl Swapped {
+    pub(crate) fn roll_back(&self) {
+        for target in &self.put_in {
+            let _ = fs::remove_dir_all(target);
+        }
+        for (target, old) in &self.folders {
+            if let Some(old) = old {
+                let _ = fs::rename(old, target);
+            }
+        }
+    }
+
+    pub(crate) fn commit(self) {
+        for (_, old) in self.folders {
+            if let Some(old) = old {
+                let _ = fs::remove_dir_all(old);
+            }
+        }
+    }
+}
+
+/// Moves all of the data dir's folders aside first, then puts all of the
+/// unpacked ones in: a failure on the way puts everything back as it was.
+pub(crate) fn put_folders_in(
+    staging: &Path,
+    data_dir: &Path,
+    tag: &str,
+) -> Result<Swapped, String> {
+    let mut swapped = Swapped {
+        folders: Vec::new(),
+        put_in: Vec::new(),
+    };
     for folder in FOLDERS {
         let target = data_dir.join(folder);
-        let old = data_dir.join(format!("{folder}.old"));
-        let _ = fs::remove_dir_all(&old);
-        if target.exists() {
-            fs::rename(&target, &old)
-                .map_err(|e| format!("Could not move {}: {e}", target.display()))?;
+        if !target.exists() {
+            swapped.folders.push((target, None));
+            continue;
         }
+        let old = data_dir.join(format!("{folder}.{tag}.old"));
+        if let Err(e) = fs::rename(&target, &old) {
+            swapped.roll_back();
+            return Err(format!("Could not move {} aside: {e}", target.display()));
+        }
+        swapped.folders.push((target, Some(old)));
+    }
+    for folder in FOLDERS {
+        let target = data_dir.join(folder);
         let new = staging.join(folder);
         let moved = if new.is_dir() {
             fs::rename(&new, &target)
@@ -329,19 +415,20 @@ fn swap_folders(staging: &Path, data_dir: &Path) -> Result<(), String> {
             fs::create_dir_all(&target)
         };
         if let Err(e) = moved {
-            // Back as it was.
-            let _ = fs::rename(&old, &target);
+            swapped.roll_back();
             return Err(format!("Could not put {} in place: {e}", target.display()));
         }
-        let _ = fs::remove_dir_all(&old);
+        swapped.put_in.push(target);
     }
-    let _ = fs::remove_dir_all(staging);
-    Ok(())
+    Ok(swapped)
 }
 
-/// The restored config, keeping this machine's secrets where the backup
-/// left them out.
-fn merge_secrets(mut restored: AppConfig, current: &AppConfig) -> AppConfig {
+/// The restored config, keeping what belongs to this machine: its secrets
+/// where the backup left them out, and its runners folder (the runners
+/// aren't in a backup, and another computer's path may not even be
+/// writable here).
+fn merge_local(mut restored: AppConfig, current: &AppConfig) -> AppConfig {
+    restored.runners_dir = current.runners_dir.clone();
     if restored.steamgriddb.api_key.is_none() {
         restored.steamgriddb.api_key = current.steamgriddb.api_key.clone();
     }
@@ -351,6 +438,17 @@ fn merge_secrets(mut restored: AppConfig, current: &AppConfig) -> AppConfig {
     restored
 }
 
+fn is_automatic(path: &Path) -> bool {
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    name.ends_with(".tar.gz")
+        && AUTOMATIC_PREFIXES
+            .iter()
+            .any(|prefix| name.starts_with(prefix))
+}
+
 /// The automatic backups (daily and before restores), newest first.
 pub fn automatic_backups(backups_dir: &Path) -> Vec<PathBuf> {
     let mut found: Vec<(SystemTime, PathBuf)> = fs::read_dir(backups_dir)
@@ -358,7 +456,7 @@ pub fn automatic_backups(backups_dir: &Path) -> Vec<PathBuf> {
         .flatten()
         .flatten()
         .map(|entry| entry.path())
-        .filter(|path| path.to_string_lossy().ends_with(".tar.gz"))
+        .filter(|path| is_automatic(path))
         .map(|path| {
             let modified = fs::metadata(&path)
                 .and_then(|m| m.modified())
@@ -388,6 +486,49 @@ pub fn daily_due(backups_dir: &Path, now: SystemTime) -> bool {
     })
 }
 
+/// Whether any of `paths` changed after `since` (a file's or a folder's
+/// own change time: a folder's changes when a file is added or removed in
+/// it). One that can't be read counts as changed.
+pub(crate) fn changed_since(since: SystemTime, paths: &[PathBuf]) -> bool {
+    paths.iter().any(|path| {
+        fs::metadata(path)
+            .and_then(|m| m.modified())
+            .map_or(path.exists(), |modified| modified > since)
+    })
+}
+
+/// Removes what a cut-off restore or backup left behind (older than
+/// `LEFTOVER_AGE`, so never a running one's).
+pub(crate) fn clean_leftovers(locations: &Locations, now: SystemTime) {
+    let old_enough = |path: &Path| {
+        fs::metadata(path)
+            .and_then(|m| m.modified())
+            .is_ok_and(|modified| {
+                now.duration_since(modified)
+                    .is_ok_and(|age| age > LEFTOVER_AGE)
+            })
+    };
+    for dir in [&locations.data_dir, &locations.backups_dir] {
+        for path in fs::read_dir(dir)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .map(|e| e.path())
+        {
+            let name = path
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            let leftover = name.ends_with(".partial")
+                || (name.ends_with(".old")
+                    && FOLDERS.iter().any(|f| name.starts_with(&format!("{f}."))));
+            if leftover && old_enough(&path) {
+                let _ = fs::remove_dir_all(&path).or_else(|_| fs::remove_file(&path));
+            }
+        }
+    }
+}
+
 fn app_version(app: &AppHandle) -> String {
     app.package_info().version.to_string()
 }
@@ -410,15 +551,32 @@ fn automatic_backup(
     Ok(info)
 }
 
-/// The daily backup, when the window opens. Best-effort.
+/// The daily backup, when the window opens, unless nothing changed since
+/// the last automatic one. Best-effort; the window's Backup page is told.
 pub fn daily_backup(app: &AppHandle) {
     let Ok(locations) = Locations::of(app) else {
         return;
     };
-    if daily_due(&locations.backups_dir, SystemTime::now()) {
-        if let Err(e) = automatic_backup(app, BackupReason::Daily, None) {
-            eprintln!("Could not make the daily backup: {e}");
+    let now = SystemTime::now();
+    clean_leftovers(&locations, now);
+    if !daily_due(&locations.backups_dir, now) {
+        return;
+    }
+    let newest = automatic_backups(&locations.backups_dir)
+        .first()
+        .and_then(|path| fs::metadata(path).and_then(|m| m.modified()).ok());
+    let mut watched: Vec<PathBuf> = FOLDERS.iter().map(|f| locations.data_dir.join(f)).collect();
+    if let Ok(config) = config_file_path(app) {
+        watched.push(config);
+    }
+    if newest.is_some_and(|newest| !changed_since(newest, &watched)) {
+        return;
+    }
+    match automatic_backup(app, BackupReason::Daily, None) {
+        Ok(_) => {
+            let _ = app.emit("backups-changed", ());
         }
+        Err(e) => eprintln!("Could not make the daily backup: {e}"),
     }
 }
 
@@ -436,14 +594,33 @@ pub fn create(app: &AppHandle, path: &Path, include_secrets: bool) -> Result<Bac
     )
 }
 
-/// Restores the backup at `path`: checks it, backs up what is now (to undo
-/// it), puts its artwork and icons in place and takes over its config, under
-/// the config lock. The window is told with `config-changed`.
+/// Removes a restore's staging folder however the restore ends.
+struct Staging(PathBuf);
+
+impl Drop for Staging {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
+/// Restores the backup at `path`: checks it, unpacks it aside, backs up
+/// what is now (to undo it), then under the config lock puts its folders in
+/// and takes over its config; a failure on the way puts the folders back.
+/// The window is told with `config-changed` and `backups-changed`.
 pub fn restore(app: &AppHandle, path: &Path) -> Result<BackupInfo, String> {
     let (manifest, restored) = read_backup(path)?;
     let locations = Locations::of(app)?;
-    let staging = locations.data_dir.join("restore.partial");
-    unpack_folders(path, &staging)?;
+    // A folder of its own, so two restores at once (the window and the
+    // command line) can't mix.
+    let tag = format!(
+        "{}-{}",
+        std::process::id(),
+        SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map_or(0, |d| d.as_nanos())
+    );
+    let staging = Staging(locations.data_dir.join(format!("restore-{tag}.partial")));
+    unpack_folders(path, &staging.0, MAX_UNPACKED_BYTES)?;
 
     let _lock = lock_config(app)?;
     let state = app.state::<ConfigState>();
@@ -463,12 +640,17 @@ pub fn restore(app: &AppHandle, path: &Path) -> Result<BackupInfo, String> {
     )?;
     prune(&locations.backups_dir, KEEP_AUTOMATIC, Some(path));
 
-    swap_folders(&staging, &locations.data_dir)?;
-    save_config(app, &merge_secrets(restored, &now))?;
+    let swapped = put_folders_in(&staging.0, &locations.data_dir, &tag)?;
+    if let Err(e) = save_config(app, &merge_local(restored, &now)) {
+        swapped.roll_back();
+        return Err(e);
+    }
+    swapped.commit();
     // Read back, so the games' icon paths are filled in as on a start.
     *current = load_config(app)?;
     drop(current);
     let _ = app.emit("config-changed", ());
+    let _ = app.emit("backups-changed", ());
     info(path, manifest)
 }
 

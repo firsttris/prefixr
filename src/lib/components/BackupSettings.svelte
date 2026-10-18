@@ -13,6 +13,7 @@
     defaultBackupName,
     inspectBackup,
     listBackups,
+    listenForBackups,
     restoreBackup,
   } from "$lib/stores/backup";
   import { backendError, getLocale } from "$lib/i18n/index.svelte";
@@ -26,6 +27,7 @@
   let created = $state<BackupInfo | null>(null);
   // The backup waiting for the user's OK to be restored.
   let confirming = $state<BackupInfo | null>(null);
+  let { restored = null }: { restored?: string | null } = $props();
 
   async function refresh() {
     try {
@@ -35,7 +37,15 @@
     }
   }
 
-  onMount(refresh);
+  // Also when Prefixr made one meanwhile: the daily one right after the
+  // start, or the one before a restore that then failed.
+  onMount(() => {
+    refresh();
+    const unlisten = listenForBackups(refresh);
+    return () => {
+      unlisten.then((stop) => stop());
+    };
+  });
 
   async function attempt(kind: "create" | "restore", action: () => Promise<void>) {
     busy = kind;
@@ -46,6 +56,7 @@
       error = e;
     } finally {
       busy = null;
+      refresh();
     }
   }
 
@@ -107,6 +118,10 @@
 </script>
 
 <p class="intro">{m.backup_intro()}</p>
+
+{#if restored}
+  <p class="done banner" role="status">{m.backup_restored({ file: restored })}</p>
+{/if}
 
 <div class="panels">
   <section class="panel">
@@ -237,6 +252,14 @@
   .done {
     color: var(--success);
     font-size: 0.85em;
+  }
+
+  .banner {
+    max-width: 780px;
+    margin-bottom: 1em;
+    padding: 0.6em 0.9em;
+    border-radius: 8px;
+    background: var(--success-bg);
   }
 
   .backups {

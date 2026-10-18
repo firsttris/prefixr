@@ -36,6 +36,15 @@ pub(super) fn changes_config(_command: &BackupCommand) -> bool {
     false
 }
 
+/// The automatic backups `backup list` shows, newest first: the ones it can
+/// read. Numbers count these, so they always match the list.
+pub(crate) fn readable_backups(backups_dir: &std::path::Path) -> Vec<BackupInfo> {
+    automatic_backups(backups_dir)
+        .iter()
+        .filter_map(|path| backup_info(path).ok())
+        .collect()
+}
+
 /// The backup `query` names: a number from `backup list` (1 is the newest),
 /// or a file.
 pub(crate) fn resolve(query: &str, automatic: &[PathBuf]) -> Result<PathBuf, AppError> {
@@ -89,10 +98,7 @@ pub(super) async fn backup_command(
             out.print(&info, || format!("Backed up to {}", info.path))
         }
         BackupCommand::List => {
-            let backups: Vec<BackupInfo> = automatic_backups(&locations.backups_dir)
-                .iter()
-                .filter_map(|path| backup_info(path).ok())
-                .collect();
+            let backups = readable_backups(&locations.backups_dir);
             out.print(&backups, || {
                 if backups.is_empty() {
                     return "No automatic backups yet".to_string();
@@ -113,7 +119,11 @@ pub(super) async fn backup_command(
             })
         }
         BackupCommand::Restore { backup } => {
-            let path = resolve(&backup, &automatic_backups(&locations.backups_dir))?;
+            let listed: Vec<PathBuf> = readable_backups(&locations.backups_dir)
+                .into_iter()
+                .map(|b| PathBuf::from(b.path))
+                .collect();
+            let path = resolve(&backup, &listed)?;
             let info = restore(app, &path)?;
             out.print(&info, || {
                 format!(

@@ -2,6 +2,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const invoke = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({ invoke: (...args: unknown[]) => invoke(...args) }));
+const listen = vi.fn(async (name: string, handler: () => void) => {
+  void name;
+  void handler;
+  return () => {};
+});
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: (name: string, handler: () => void) => listen(name, handler),
+}));
+
+const session = new Map<string, string>();
+globalThis.sessionStorage = {
+  getItem: (key: string) => session.get(key) ?? null,
+  setItem: (key: string, value: string) => void session.set(key, value),
+  removeItem: (key: string) => void session.delete(key),
+} as Storage;
 
 const reload = vi.fn();
 globalThis.location = { reload } as unknown as Location;
@@ -35,10 +50,19 @@ describe("backups", () => {
     await backup.restoreBackup("/b/x.tar.gz");
     expect(invoke).toHaveBeenLastCalledWith("restore_backup", { path: "/b/x.tar.gz" });
     expect(reload).toHaveBeenCalledOnce();
+    // The reloaded window says what was restored, once.
+    expect(backup.takeRestoredBackup()).toBe("x.tar.gz");
+    expect(backup.takeRestoredBackup()).toBeNull();
 
     invoke.mockRejectedValueOnce(new Error("not a Prefixr backup"));
     await expect(backup.restoreBackup("/b/y.tar.gz")).rejects.toThrow("not a Prefixr backup");
     expect(reload).toHaveBeenCalledOnce();
+  });
+
+  it("tell the page when Prefixr made one", async () => {
+    const onChange = vi.fn();
+    await backup.listenForBackups(onChange);
+    expect(listen).toHaveBeenCalledWith("backups-changed", onChange);
   });
 
   it("get a dated default name", () => {

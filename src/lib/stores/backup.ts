@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { BackupInfo } from "$lib/types";
 
 // Backups of the library and its settings (see `commands::backup`).
@@ -23,8 +24,34 @@ export async function inspectBackup(path: string): Promise<BackupInfo> {
  */
 export async function restoreBackup(path: string): Promise<BackupInfo> {
   const info = await invoke<BackupInfo>("restore_backup", { path });
+  try {
+    sessionStorage.setItem(RESTORED_KEY, info.file_name);
+  } catch {
+    // Then the restored window just doesn't say so.
+  }
   location.reload();
   return info;
+}
+
+const RESTORED_KEY = "prefixr-restored-backup";
+
+/**
+ * The backup just restored, once, after the reload the restore did: for the
+ * Backup page to open with a message about it.
+ */
+export function takeRestoredBackup(): string | null {
+  try {
+    const name = sessionStorage.getItem(RESTORED_KEY);
+    sessionStorage.removeItem(RESTORED_KEY);
+    return name;
+  } catch {
+    return null;
+  }
+}
+
+/** Calls `onChange` when an automatic backup was made (the daily one, or before a restore). */
+export function listenForBackups(onChange: () => void): Promise<UnlistenFn> {
+  return listen("backups-changed", onChange);
 }
 
 /** A file name for a backup made now, in local time: prefixr-backup-2026-10-18.tar.gz. */

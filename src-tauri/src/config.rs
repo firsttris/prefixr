@@ -73,7 +73,7 @@ impl AppConfig {
 /// as `State<ConfigState>`.
 pub type ConfigState = Mutex<AppConfig>;
 
-fn config_file_path(app: &AppHandle) -> Result<PathBuf, String> {
+pub(crate) fn config_file_path(app: &AppHandle) -> Result<PathBuf, String> {
     let config_dir = app
         .path()
         .app_config_dir()

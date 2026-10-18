@@ -474,11 +474,13 @@ back those up separately), nor are your store logins.
   SteamGridDB API key and the GitHub token only go in when you tick the box.
 - **Restore from file…** replaces the library and all settings with a backup's. Prefixr shows what's
   in it first and asks.
-- **Automatic backups**: Prefixr backs up by itself once a day when it starts, and right before every
-  restore. The last 7 are listed with **Restore**, so a restore, or a change an agent made, can
-  always be undone.
+- **Automatic backups**: Prefixr backs up by itself once a day when it starts (when something changed
+  since the last one), and right before every restore. The last 7 are listed with **Restore**, so a
+  restore, or a change an agent made, can always be undone. Each takes about as much space as your
+  covers and icons together.
 
-A restore keeps your API keys when the backup has none. On another computer, the prefixes and
+A restore keeps your API keys when the backup has none, and this computer's runners folder. On
+another computer, the prefixes and
 games have to be at the same paths for the games to start, and the stores need connecting again.
 
 ## Language

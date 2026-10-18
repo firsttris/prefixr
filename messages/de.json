@@ -684,12 +684,27 @@
   "backup_restore": "Wiederherstellen",
   "backup_restoreThis": "Sicherung vom {when} wiederherstellen",
   "backup_automaticHeading": "Automatische Sicherungen",
-  "backup_automaticHint": "Prefixr sichert einmal am Tag beim Start und vor jeder Wiederherstellung. Die letzten 7 bleiben erhalten, mit API-Schlüsseln, nur auf diesem Rechner.",
-  "backup_automaticEmpty": "Noch keine. Die erste entsteht beim nächsten Start.",
+  "backup_automaticHint": "Prefixr sichert einmal am Tag beim Start (wenn sich seit der letzten etwas geändert hat) und vor jeder Wiederherstellung. Die letzten 7 bleiben erhalten, mit API-Schlüsseln, nur auf diesem Rechner. Jede ist etwa so groß wie deine Cover und Icons zusammen.",
+  "backup_automaticEmpty": "Noch keine. Prefixr legt die erste kurz nach dem Start an, danach eine am Tag, wenn sich etwas geändert hat.",
   "backup_reasonDaily": "Täglich",
   "backup_reasonBeforeRestore": "Vor einer Wiederherstellung",
   "backup_reasonManual": "Von dir",
-  "backup_summary": "{games} Spiele, {categories} Kategorien, {size}",
+  "backup_summary": [
+    {
+      "declarations": [
+        "input games",
+        "input categories",
+        "input size",
+        "local gamesPlural = games: plural"
+      ],
+      "selectors": ["gamesPlural"],
+      "match": {
+        "gamesPlural=one": "{games} Spiel, {categories} Kategorien, {size}",
+        "gamesPlural=other": "{games} Spiele, {categories} Kategorien, {size}"
+      }
+    }
+  ],
   "backup_confirmTitle": "Sicherung wiederherstellen?",
-  "backup_confirmMessage": "Die Bibliothek und alle Einstellungen werden durch die Sicherung vom {when} ersetzt ({summary}). Der jetzige Stand wird vorher gesichert und steht dann unter „Automatische Sicherungen“."
+  "backup_confirmMessage": "Die Bibliothek und alle Einstellungen werden durch die Sicherung vom {when} ersetzt ({summary}). Der jetzige Stand wird vorher gesichert und steht dann unter „Automatische Sicherungen“.",
+  "backup_restored": "„{file}“ ist wiederhergestellt. Der Stand davor steht unten als erste Sicherung."
 }

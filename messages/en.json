@@ -684,12 +684,27 @@
   "backup_restore": "Restore",
   "backup_restoreThis": "Restore the backup from {when}",
   "backup_automaticHeading": "Automatic backups",
-  "backup_automaticHint": "Prefixr backs up once a day when it starts and before every restore. The last 7 are kept, with the API keys, only on this computer.",
-  "backup_automaticEmpty": "None yet. The first one is made on the next start.",
+  "backup_automaticHint": "Prefixr backs up once a day when it starts (when something changed since the last one) and before every restore. The last 7 are kept, with the API keys, only on this computer. Each is about the size of your covers and icons together.",
+  "backup_automaticEmpty": "None yet. Prefixr makes the first one shortly after it starts, then one a day when something changed.",
   "backup_reasonDaily": "Daily",
   "backup_reasonBeforeRestore": "Before a restore",
   "backup_reasonManual": "Yours",
-  "backup_summary": "{games} games, {categories} categories, {size}",
+  "backup_summary": [
+    {
+      "declarations": [
+        "input games",
+        "input categories",
+        "input size",
+        "local gamesPlural = games: plural"
+      ],
+      "selectors": ["gamesPlural"],
+      "match": {
+        "gamesPlural=one": "{games} game, {categories} categories, {size}",
+        "gamesPlural=other": "{games} games, {categories} categories, {size}"
+      }
+    }
+  ],
   "backup_confirmTitle": "Restore the backup?",
-  "backup_confirmMessage": "The library and all settings are replaced with the backup from {when} ({summary}). What is now is backed up first and then shows up under “Automatic backups”."
+  "backup_confirmMessage": "The library and all settings are replaced with the backup from {when} ({summary}). What is now is backed up first and then shows up under “Automatic backups”.",
+  "backup_restored": "“{file}” is restored. What was before is the first backup below."
 }

@@ -51,3 +51,25 @@ fn backup_commands_parse_and_take_the_lock_only_inside_a_restore() {
         "backup".to_string()
     ]));
 }
+
+#[test]
+fn numbers_count_only_the_backups_the_list_shows() {
+    use crate::commands::backup::{write_backup, BackupReason, Locations};
+    use crate::test_util::TestDir;
+    let dir = TestDir::new("cli-backup-numbers");
+    let locations = Locations {
+        data_dir: dir.join("data"),
+        backups_dir: dir.join("data/backups"),
+    };
+    let config: crate::config::AppConfig =
+        serde_json::from_value(serde_json::json!({ "runners_dir": "/r" })).unwrap();
+    let good = locations.backups_dir.join("daily-good.tar.gz");
+    write_backup(&good, &config, &locations, false, BackupReason::Daily, "1").unwrap();
+    // A newer, unreadable one that would otherwise be number 1.
+    std::fs::write(locations.backups_dir.join("daily-zzz.tar.gz"), b"broken").unwrap();
+    let listed: Vec<PathBuf> = readable_backups(&locations.backups_dir)
+        .into_iter()
+        .map(|b| PathBuf::from(b.path))
+        .collect();
+    assert_eq!(resolve("1", &listed).unwrap(), good);
+}

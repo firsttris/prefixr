@@ -15,6 +15,7 @@
   import StoreInstallDialog from "$lib/components/StoreInstallDialog.svelte";
   import StoresSettings from "$lib/components/StoresSettings.svelte";
   import BackupSettings from "$lib/components/BackupSettings.svelte";
+  import { takeRestoredBackup } from "$lib/stores/backup";
   import DownloadsView from "$lib/components/DownloadsView.svelte";
   import Modal from "$lib/components/Modal.svelte";
   import { getLocale, setLocale, type Locale } from "$lib/i18n/index.svelte";
@@ -49,7 +50,10 @@
     | "downloads"
     | "steamgriddb"
     | "backup";
-  let view = $state<View>("library");
+  // Right after a restore (which reloads the window), back on the Backup
+  // page, saying what was restored.
+  const restoredBackup = takeRestoredBackup();
+  let view = $state<View>(restoredBackup ? "backup" : "library");
   // The prefix the prefixes page opens at, when a game's details sent us there.
   let prefixFocus = $state<string | null>(null);
 
@@ -302,7 +306,7 @@
       <div class="page-header">
         <h1>{m.library_backupHeading()}</h1>
       </div>
-      <BackupSettings />
+      <BackupSettings restored={restoredBackup} />
     {:else}
       <div class="page-header">
         <h1>{m.library_steamgriddbHeading()}</h1>
