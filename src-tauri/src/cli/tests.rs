@@ -363,5 +363,9 @@ fn json_before_the_subcommand_is_the_command_line_too() {
     // Alone, or before the window's own options, it opens the window as before.
     assert!(!is_cli(&args("prefixr --json")));
     assert!(!is_cli(&args("prefixr --json --launch 1234")));
-    assert!(Cli::try_parse_from(args("prefixr --json game list")).unwrap().json);
+    assert!(
+        Cli::try_parse_from(args("prefixr --json game list"))
+            .unwrap()
+            .json
+    );
 }
