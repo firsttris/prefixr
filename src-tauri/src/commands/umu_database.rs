@@ -1,5 +1,5 @@
 use crate::error::AppError;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -11,6 +11,7 @@ use tauri::{AppHandle, Manager, State};
 use crate::commands::steamgriddb::{read_api_key, search_steam_apps, steam_apps, SteamApp};
 use crate::config::ConfigState;
 use crate::lock::LockExt;
+use crate::models::StoreKind;
 
 /// The umu-database (https://github.com/Open-Wine-Components/umu-database)
 /// maps games from other stores to the UMU id that umu-protonfixes keys its
@@ -37,6 +38,10 @@ struct DatabaseEntry {
     acronym: Option<String>,
     #[serde(default)]
     store: Option<String>,
+    /// The store's own id for the game: Legendary's app name, GOG's
+    /// product id, …
+    #[serde(default)]
+    codename: Option<String>,
 }
 
 /// Where a suggestion came from.
@@ -266,6 +271,47 @@ pub async fn search_umu_ids(
         Err(e) => return Err(e.into()),
     };
     Ok(merge(steam, database))
+}
+
+/// The umu-database's name for a store, as in its `store` column.
+fn database_store(store: StoreKind) -> &'static str {
+    match store {
+        StoreKind::Epic => "egs",
+        StoreKind::Gog => "gog",
+        StoreKind::Amazon => "amazon",
+    }
+}
+
+/// The umu-database's entry for a store's game, by its id there.
+fn find_store_entry<'a>(
+    entries: &'a [IndexedEntry],
+    store: StoreKind,
+    app_name: &str,
+) -> Option<&'a DatabaseEntry> {
+    let store = database_store(store);
+    entries.iter().map(|indexed| &indexed.entry).find(|entry| {
+        entry.codename.as_deref() == Some(app_name)
+            && crate::models::normalize_umu_store(entry.store.clone()).as_deref() == Some(store)
+    })
+}
+
+/// The UMU ids (and their store) the umu-database has for these store
+/// games, by `(store, app name)`; the ones it doesn't know are left out.
+pub(crate) async fn umu_ids_for_store_games(
+    app: &AppHandle,
+    games: &[(StoreKind, String)],
+) -> Result<HashMap<(StoreKind, String), (String, String)>, String> {
+    let entries = load_database(app).await?;
+    Ok(games
+        .iter()
+        .filter_map(|(store, app_name)| {
+            let entry = find_store_entry(&entries, *store, app_name)?;
+            Some((
+                (*store, app_name.clone()),
+                (entry.umu_id.clone(), database_store(*store).to_string()),
+            ))
+        })
+        .collect())
 }
 
 #[cfg(test)]

@@ -18,6 +18,7 @@ use tauri::{Emitter, Manager, WebviewWindowBuilder, WindowEvent};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
 use commands::about::open_release_notes;
+use commands::compatibility::get_compatibility;
 use commands::games::{
     add_game, create_desktop_shortcut, create_menu_shortcut, ensure_install_desktop_entry,
     kill_game, launch_game, launch_game_headless, list_active_games, list_games, remove_game,
@@ -354,7 +355,8 @@ pub fn run() {
             create_category,
             rename_category,
             delete_category,
-            set_game_categories
+            set_game_categories,
+            get_compatibility
         ])
         .run(context)
         .expect("error while running tauri application");

@@ -1,5 +1,6 @@
 pub mod about;
 pub mod binary_vdf;
+pub mod compatibility;
 pub mod games;
 pub mod github;
 pub mod graphics;
