@@ -128,9 +128,13 @@ VKD3D-Proton.
 
 ## Backing up and resetting
 
-- **To back up your library**, copy `~/.config/com.tristan.prefixr/config.json`. With
-  `~/.local/share/com.tristan.prefixr/artwork/`, your chosen artwork comes along too. Save games live
-  in the prefixes, so back those up separately.
+- **To back up your library**, use **Backup** in the sidebar or `prefixr backup create` (see
+  [Backup and restore](user-guide.md#backup-and-restore)): one file with `config.json`, the artwork
+  and the exe icons. Copying `~/.config/com.tristan.prefixr/config.json` and
+  `~/.local/share/com.tristan.prefixr/artwork/` by hand works too. Save games live in the prefixes,
+  so back those up separately.
+- **Automatic backups** are in `~/.local/share/com.tristan.prefixr/backups/`: one a day, and one
+  before every restore; the newest 7 are kept.
 - **To start over**, quit Prefixr and remove `~/.config/com.tristan.prefixr/`. To free the space
   runners and caches take, also remove `~/.local/share/com.tristan.prefixr/`. Neither touches your
   prefixes or games.

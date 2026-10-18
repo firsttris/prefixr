@@ -4,6 +4,8 @@
 // Rust types, not these.
 export type { ActiveGame } from "./bindings/ActiveGame";
 export type { AppError } from "./bindings/AppError";
+export type { BackupInfo } from "./bindings/BackupInfo";
+export type { BackupReason } from "./bindings/BackupReason";
 export type { Category } from "./bindings/Category";
 export type { Compatibility } from "./bindings/Compatibility";
 export type { ArtworkKind } from "./bindings/ArtworkKind";

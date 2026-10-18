@@ -18,6 +18,7 @@ A tour of everything Prefixr does. New to Prefixr? Start with [Getting started](
 - [Shortcuts](#shortcuts)
 - [The tray icon](#the-tray-icon)
 - [Logs](#logs)
+- [Backup and restore](#backup-and-restore)
 - [Language](#language)
 
 ## The library
@@ -436,6 +437,24 @@ Every game launch writes a log of everything the game and Wine/Proton print. Pre
 10 per game. Setup programs, winetricks and Wine tools write logs per prefix, also the last 10. Open
 the latest with **Show log** after an error. All logs are plain text files; see
 [Configuration & files](configuration.md#data) for where they are.
+
+## Backup and restore
+
+**Backup** in the sidebar keeps your library safe: the games, the prefix list, every setting, your
+categories, favorites and play times, and the covers and icons, in one `.tar.gz` file. The prefixes
+and the games' own files stay where they are and aren't in it (save games live in the prefixes, so
+back those up separately), nor are your store logins.
+
+- **Create backup…** saves one to a file you pick, to keep or to take to another computer. The
+  SteamGridDB API key and the GitHub token only go in when you tick the box.
+- **Restore from file…** replaces the library and all settings with a backup's. Prefixr shows what's
+  in it first and asks.
+- **Automatic backups**: Prefixr backs up by itself once a day when it starts, and right before every
+  restore. The last 7 are listed with **Restore**, so a restore, or a change an agent made, can
+  always be undone.
+
+A restore keeps your API keys when the backup has none. On another computer, the prefixes and
+games have to be at the same paths for the games to start, and the stores need connecting again.
 
 ## Language
 

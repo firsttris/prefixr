@@ -14,6 +14,7 @@
   import InstallDialog from "$lib/components/InstallDialog.svelte";
   import StoreInstallDialog from "$lib/components/StoreInstallDialog.svelte";
   import StoresSettings from "$lib/components/StoresSettings.svelte";
+  import BackupSettings from "$lib/components/BackupSettings.svelte";
   import DownloadsView from "$lib/components/DownloadsView.svelte";
   import Modal from "$lib/components/Modal.svelte";
   import { getLocale, setLocale, type Locale } from "$lib/i18n/index.svelte";
@@ -46,7 +47,8 @@
     | "proton"
     | "stores"
     | "downloads"
-    | "steamgriddb";
+    | "steamgriddb"
+    | "backup";
   let view = $state<View>("library");
 
   // The game settings categories: set globally here, overridable per game
@@ -183,6 +185,14 @@
     >
       {m.nav_steamgriddb()}
     </button>
+    <button
+      type="button"
+      class="nav-item"
+      class:active={view === "backup"}
+      onclick={() => (view = "backup")}
+    >
+      {m.nav_backup()}
+    </button>
     <div class="nav-spacer"></div>
     <div class="lang-switch" role="group" aria-label={m.nav_languageSwitcher()}>
       {#each ["de", "en"] as const as lng (lng)}
@@ -273,6 +283,11 @@
         <h1>{m.library_storesHeading()}</h1>
       </div>
       <StoresSettings />
+    {:else if view === "backup"}
+      <div class="page-header">
+        <h1>{m.library_backupHeading()}</h1>
+      </div>
+      <BackupSettings />
     {:else}
       <div class="page-header">
         <h1>{m.library_steamgriddbHeading()}</h1>
