@@ -45,4 +45,11 @@
     flex-direction: column;
     gap: 0.7em;
   }
+
+  @container settings-panel (min-width: 960px) {
+    .list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    }
+  }
 </style>

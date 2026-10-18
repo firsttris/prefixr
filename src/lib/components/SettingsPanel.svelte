@@ -54,7 +54,9 @@
     display: flex;
     flex-direction: column;
     gap: 1.4em;
-    max-width: 780px;
+    max-width: var(--page-max);
+    /* The editors inside lay themselves out in columns once the panel is wide. */
+    container: settings-panel / inline-size;
   }
 
   .hint {

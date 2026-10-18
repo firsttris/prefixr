@@ -173,7 +173,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.6em;
-    max-width: 780px;
+    max-width: var(--page-max);
   }
 
   .download {
@@ -271,7 +271,7 @@
     padding: 4em 1em;
     border: 1px dashed var(--border);
     border-radius: var(--radius);
-    max-width: 780px;
+    max-width: var(--page-max);
   }
 
   .empty-icon {

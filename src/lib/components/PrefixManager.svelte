@@ -510,7 +510,7 @@
     display: flex;
     flex-direction: column;
     gap: 1em;
-    max-width: 960px;
+    max-width: var(--page-max);
   }
 
   .toolbar {

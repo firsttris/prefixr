@@ -166,6 +166,14 @@
     gap: 0.7em;
   }
 
+  @container settings-panel (min-width: 960px) {
+    .list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: start;
+    }
+  }
+
   .field-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(8em, 1fr));

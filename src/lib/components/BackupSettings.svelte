@@ -208,7 +208,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.9em;
-    max-width: 780px;
+    max-width: var(--page-max);
   }
 
   .panel {
@@ -255,7 +255,7 @@
   }
 
   .banner {
-    max-width: 780px;
+    max-width: var(--page-max);
     margin-bottom: 1em;
     padding: 0.6em 0.9em;
     border-radius: 8px;
