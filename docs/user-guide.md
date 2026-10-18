@@ -155,9 +155,18 @@ distribution has installed; Nile brings its own.
 
 ### Connecting your account
 
-1. Open **Stores** in the sidebar and click **Connect** next to the store.
-2. Your browser opens the store's login page. Sign in.
-3. Bring the login back to Prefixr and click **Sign in**:
+Open **Stores** in the sidebar. There are two ways to sign in:
+
+- **Connect** opens the store's login page in a window of Prefixr's own. Sign in there; the window
+  takes the code by itself, closes, and the store is connected. Nothing to copy. The window keeps no
+  cookies, and the pages in it can't reach Prefixr itself. Password managers built into your
+  browser and "Sign in with Google" don't work in it, though (Google refuses embedded windows).
+- **Connect in the browser** signs you in in your own browser, with your password manager and any
+  sign-in option, and you copy the code back:
+
+1. Click **Connect in the browser** next to the store. Your browser opens the store's login page.
+   Sign in.
+2. Bring the login back to Prefixr and click **Sign in**:
    - **Epic** then shows a short page of text. Copy all of it (or only the value of
      `authorizationCode`).
    - **GOG** then shows an almost empty page whose address contains `on_login_success?…code=…`.
@@ -167,6 +176,8 @@ distribution has installed; Nile brings its own.
 
    The code works once and only for a few minutes; if it's refused, open the login page again for
    a new one.
+
+Either way, you sign in once: the store's tool renews the login by itself after that.
 
 Prefixr then loads your game list and the covers. **Refresh library** loads it again, for example
 after you bought a game. **Disconnect** signs you out; the games you installed stay installed.

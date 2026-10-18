@@ -9,6 +9,7 @@
     storeAccounts,
     refreshStoreAccounts,
     openStoreLogin,
+    loginStoreInApp,
     connectStore,
     disconnectStore,
     syncStoreLibrary,
@@ -21,7 +22,9 @@
   let loading = $state(true);
   let loadError = $state<unknown>(null);
   // Per store: what it's busy with, its last error, the login in progress.
-  let busy = $state<Partial<Record<StoreKind, "login" | "connect" | "sync" | "disconnect">>>({});
+  let busy = $state<
+    Partial<Record<StoreKind, "login" | "login-app" | "connect" | "sync" | "disconnect">>
+  >({});
   let errors = $state<Partial<Record<StoreKind, unknown>>>({});
   let loggingIn = $state<Partial<Record<StoreKind, boolean>>>({});
   let codes = $state<Partial<Record<StoreKind, string>>>({});
@@ -44,7 +47,7 @@
 
   async function run(
     store: StoreKind,
-    action: "login" | "connect" | "sync" | "disconnect",
+    action: "login" | "login-app" | "connect" | "sync" | "disconnect",
     work: () => Promise<void>,
   ) {
     busy[store] = action;
@@ -56,6 +59,14 @@
     } finally {
       busy[store] = undefined;
     }
+  }
+
+  // The window closes itself once it has the code; closing it by hand just
+  // ends the login.
+  function loginInApp(store: StoreKind) {
+    run(store, "login-app", async () => {
+      await loginStoreInApp(store);
+    });
   }
 
   function startLogin(store: StoreKind) {
@@ -76,6 +87,7 @@
 </script>
 
 <p class="intro">{m.stores_intro()}</p>
+<p class="intro hint">{m.stores_loginHint()}</p>
 
 {#if loadError}
   <p class="error">{backendError(loadError)}</p>
@@ -127,8 +139,24 @@
               {m.stores_disconnect()}
             </button>
           {:else if !loggingIn[store]}
-            <button type="button" class="primary" onclick={() => startLogin(store)}>
-              {m.stores_connect()}
+            <button
+              type="button"
+              class="primary"
+              disabled={busy[store] !== undefined}
+              onclick={() => loginInApp(store)}
+            >
+              {busy[store] === "login-app"
+                ? m.stores_loginWindowOpen()
+                : busy[store] === "connect"
+                  ? m.stores_connecting()
+                  : m.stores_connect()}
+            </button>
+            <button
+              type="button"
+              disabled={busy[store] !== undefined}
+              onclick={() => startLogin(store)}
+            >
+              {m.stores_connectInBrowser()}
             </button>
           {/if}
         </div>
@@ -207,6 +235,14 @@
     font-size: 0.9em;
     max-width: 65ch;
     margin-bottom: 1.4em;
+  }
+
+  .intro:has(+ .hint) {
+    margin-bottom: 0.6em;
+  }
+
+  .hint {
+    font-size: 0.82em;
   }
 
   .stores {

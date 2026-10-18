@@ -56,7 +56,7 @@ use commands::steamgriddb::{
 use commands::stores::{
     cancel_store_install, connect_store, disconnect_store, get_store_install_defaults,
     install_store_game, list_store_accounts, list_store_games, list_store_installs,
-    open_store_login, sync_store_library, uninstall_store_game, StoreInstalls,
+    login_store_in_app, open_store_login, sync_store_library, uninstall_store_game, StoreInstalls,
 };
 use commands::umu::{get_umu_status, install_umu, latest_umu_version};
 use commands::umu_database::search_umu_ids;
@@ -351,6 +351,7 @@ pub fn run() {
             open_release_notes,
             list_store_accounts,
             open_store_login,
+            login_store_in_app,
             connect_store,
             disconnect_store,
             sync_store_library,

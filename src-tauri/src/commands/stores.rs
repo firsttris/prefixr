@@ -43,6 +43,7 @@ pub mod amazon;
 pub mod epic;
 pub mod gog;
 pub mod helpers;
+pub mod login_window;
 
 use amazon::Nile;
 use epic::Legendary;
@@ -506,6 +507,20 @@ pub async fn open_store_login(app: AppHandle, store: StoreKind) -> Result<(), Ap
     let url = prepare_store_login(&app, store).await?;
     xdg_open(&url).await?;
     Ok(())
+}
+
+/// Signs in in a window of Prefixr's own, which takes the code itself (see
+/// `login_window`); `None` when the user closed the window.
+#[tauri::command]
+pub async fn login_store_in_app(
+    app: AppHandle,
+    store: StoreKind,
+) -> Result<Option<StoreAccount>, AppError> {
+    let url = prepare_store_login(&app, store).await?;
+    match login_window::sign_in(&app, store, &url).await? {
+        Some(code) => connect_store(app, store, code).await.map(Some),
+        None => Ok(None),
+    }
 }
 
 /// Logs in with the code from the store's login page.
