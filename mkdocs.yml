@@ -3,8 +3,9 @@
 # Locally: pip install -r requirements-docs.txt && mkdocs serve
 site_name: Prefixr
 site_description: >-
-  Prefixr runs Windows games on Linux: a native Wine and Proton prefix manager
-  and game launcher with Proton-GE downloads, umu-launcher, MangoHud, Gamescope
+  The agentic game launcher for Linux: let an AI agent add, fix and organize
+  your Windows games on Wine and Proton, or do it yourself in a few clicks.
+  Prefix manager with Proton-GE downloads, umu-launcher, MangoHud, Gamescope
   and Steam integration.
 site_url: https://firsttris.github.io/prefixr/
 repo_url: https://github.com/firsttris/prefixr

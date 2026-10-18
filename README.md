@@ -1,11 +1,14 @@
 <div align="center">
   <h1>Prefixr</h1>
 
-  <p><strong>Run Windows games on Linux with Wine and Proton, without the terminal.</strong></p>
+  <p><strong>The agentic game launcher for Linux: let an AI agent handle all your games.</strong></p>
 
   <p>
-    A native Linux game launcher that manages your Wine and Proton prefixes, downloads runners
-    like Proton-GE, and sets up each game with MangoHud, Gamescope, GameMode and Steam artwork.
+    Your agent adds your Windows games, picks Wine or Proton, fixes the ones that won't start and
+    sorts your library into categories, while you watch the window and play. Prefixr manages the
+    prefixes, downloads runners like Proton-GE, and sets up each game with MangoHud, Gamescope,
+    GameMode and Steam artwork. Everything an agent does through its command line also works with a
+    few clicks.
   </p>
 
   <img src="docs/Banner.jpeg" alt="Prefixr: a Linux game library for Windows games running on Wine and Proton" width="100%">
@@ -30,7 +33,10 @@
 
 ## What is Prefixr?
 
-Prefixr is a desktop app for playing **Windows games on Linux**. You add a game's `.exe`, pick a
+Prefixr is a desktop app for playing **Windows games on Linux**, made to be run by an **AI agent**
+as much as by you. Hand your game folders to an agent such as
+[Claude Code](https://claude.com/claude-code) and it does the setup through Prefixr's command line
+([see below](#-let-an-ai-agent-run-your-library)), or do it yourself: in the window you add a game's `.exe`, pick a
 **Wine or Proton prefix** and a **runner**, and Prefixr takes care of the rest: it creates the
 prefix, launches the game through [umu-launcher](https://github.com/Open-Wine-Components/umu-launcher)
 the way Steam launches Proton, applies [protonfixes](https://github.com/Open-Wine-Components/umu-protonfixes),
@@ -46,27 +52,37 @@ you can reuse an existing prefix from any of them as it is.
 
 | | |
 | --- | --- |
-| 🎮 **Game library** | Grid and list views with search and sorting, icons extracted from each `.exe`, launch arguments and environment variables per game, desktop and app menu shortcuts. |
+| 🎮 **Game library** | Grid and list views with search, a card size slider and sorting by name, last played, recently added or play time. Installed games and your stores' games to install in their own sections, a *Continue playing* row, a details panel per game with play time, size and settings, launch arguments and environment variables per game, desktop and app menu shortcuts. |
+| 🗂️ **Organizing** | Your own categories (*Kids*, *Co-op*, …), favorites and hidden games, as chips above the library. A game can be in several categories, and a store game keeps them when it's installed. An AI agent can sort a whole library into categories for you. |
+| 🩺 **Compatibility** | See before installing whether a game runs: its [ProtonDB](https://www.protondb.com) rating and whether umu-protonfixes has fixes for it, as badges on every card. |
 | 📦 **Installers** | Open a setup `.exe` with *Install Prefixr* from your file manager's *Open With* menu. The installer runs in the prefix you choose, and the shortcut it creates is offered as the game to add. |
 | 🍷 **Prefixes** | Create new Wine/Proton prefixes or import existing ones from Steam, Lutris, Bottles or PortProton. Install dependencies with [winetricks](https://github.com/Winetricks/winetricks) and open `winecfg`, `regedit` and Wine's other tools from the app. |
 | ⬇️ **Runners** | Download Proton-GE, Proton-CachyOS and Wine (Kron4ek) from their GitHub releases, checksum-verified. Any Proton or Wine build you place or symlink in the runners folder shows up as well. |
 | 🚀 **Launching** | Proton games run through umu-launcher in the Steam Linux Runtime, with an automatic UMU ID lookup for protonfixes. Wine games get DXVK, VKD3D-Proton and wine-mono set up automatically. |
 | 🎛️ **Per-game tuning** | [MangoHud](https://github.com/flightlessmango/MangoHud) with presets, [GameMode](https://github.com/FeralInteractive/gamemode), power profiles, [Gamescope](https://github.com/ValveSoftware/gamescope), [vkBasalt](https://github.com/DadSchoorse/vkBasalt) and every `PROTON_*` switch your runner supports. Set them once globally, override them per game. |
-| 🛒 **Stores** | Connect your Epic Games, GOG and Amazon Games accounts and their games show up in the library, ready to install with one click: a prefix of their own, your newest Proton, the store's cover. Epic's online games start with their login tokens. Powered by Heroic's [Legendary](https://github.com/Heroic-Games-Launcher/legendary) and [gogdl](https://github.com/Heroic-Games-Launcher/heroic-gogdl) and [Nile](https://github.com/imLinguin/nile), downloaded on connect at pinned, checksum-verified versions. |
+| 🛒 **Stores** | Connect your Epic Games, GOG and Amazon Games accounts and their games show up in the library, ready to install with one click: a prefix of their own, your newest Proton, the store's cover. A *Downloads* page shows the installs with their speed and time left. Epic's online games start with their login tokens. Powered by Heroic's [Legendary](https://github.com/Heroic-Games-Launcher/legendary) and [gogdl](https://github.com/Heroic-Games-Launcher/heroic-gogdl) and [Nile](https://github.com/imLinguin/nile), downloaded on connect at pinned, checksum-verified versions. |
 | 🖼️ **Artwork & Steam** | Covers, icons, heroes and logos from [SteamGridDB](https://www.steamgriddb.com/). Add any game to Steam as a non-Steam game, artwork included, so it shows up in Big Picture and Game Mode on the Steam Deck. |
-| ⌨️ **Command line** | Everything the window does is also a command: `prefixr game add`, `prefixr prefix winetricks`, `prefixr runner download` and more, with JSON output for scripts. An open window shows the changes right away. |
+| ⌨️ **Command line** | The window's work as commands: `prefixr game add`, `prefixr prefix winetricks`, `prefixr runner download`, `prefixr category assign` and more, with JSON output for scripts and agents. An open window shows the changes right away. |
 | 🧰 **Everyday comfort** | Tray icon with the running games and a way to stop a hung one, logs of the last 10 runs per game and prefix, a `vm.max_map_count` check, English and German UI. |
 
 See the [user guide](https://firsttris.github.io/prefixr/user-guide.html) for a tour of every feature.
 
-## 🤖 Set up your games with an AI agent
+## 🤖 Let an AI agent run your library
 
-Prefixr's [command line](https://firsttris.github.io/prefixr/cli.html) lets an AI coding agent such
-as [Claude Code](https://claude.com/claude-code) do the tedious part for you. It can look at your
-game folders, add each game with the right runner and prefix, find its
-[protonfixes](https://github.com/Open-Wine-Components/umu-protonfixes) match, install winetricks
-packages, carry over the fixes from old launch scripts or other launchers, copy your save games and
-pick the artwork, while you start each game from the window and say whether it works.
+Prefixr is built so that an AI coding agent such as [Claude Code](https://claude.com/claude-code)
+can do the work for you through its [command line](https://firsttris.github.io/prefixr/cli.html).
+You say what you want, the agent does it, and you watch the window update and play:
+
+- **Add games:** it looks at your game folders, adds each game with the right runner and prefix,
+  finds its [protonfixes](https://github.com/Open-Wine-Components/umu-protonfixes) match, installs
+  winetricks packages and picks the artwork.
+- **Move games over:** it carries over the fixes from old launch scripts or other launchers and
+  copies your save games.
+- **Fix games:** when a game doesn't start, it reads the log and changes the setup until it does.
+- **Organize the library:** it creates categories such as *Kids* and *Adults* and sorts every game
+  into them, marks favorites and hides what you won't play.
+- **Keep notes:** it writes down what it found (an offline login, why a setting is needed) with
+  the game, for the next time.
 
 ```text
 You:   Add all games under /mnt/games/ to Prefixr. Each one has its own Wine and a
@@ -79,8 +95,17 @@ Agent: prefixr runner download proton-ge
        …
 ```
 
+```text
+You:   Create the categories Kids and Adults and sort all my games into them.
+Agent: prefixr library list --json
+       prefixr category add Kids
+       prefixr category add Adults
+       prefixr category assign Kids epic:Fortnite gog:1207658924 "Stardew Valley"
+       prefixr category assign Adults "Fallout 4" "Cyberpunk 2077"
+```
+
 When a game doesn't start, the agent reads its log with `prefixr game log <game> --print` and fixes
-the setup. See [Setting up games with an AI agent](https://firsttris.github.io/prefixr/cli.html#setting-up-games-with-an-ai-agent).
+the setup. See [Working with an AI agent](https://firsttris.github.io/prefixr/cli.html#working-with-an-ai-agent).
 
 ## 📦 Installation
 
@@ -119,7 +144,7 @@ The documentation is also available as a website:
 | [Getting started](https://firsttris.github.io/prefixr/getting-started.html) | Install Prefixr and get your first game running |
 | [User guide](https://firsttris.github.io/prefixr/user-guide.html) | The library, prefixes, runners, per-game settings, artwork and Steam |
 | [Configuration & files](https://firsttris.github.io/prefixr/configuration.html) | Where Prefixr keeps its data, command-line options, API keys |
-| [Command line & AI agents](https://firsttris.github.io/prefixr/cli.html) | Every command, JSON output, and setting up games with an AI agent |
+| [Command line & AI agents](https://firsttris.github.io/prefixr/cli.html) | Every command, JSON output, and letting an AI agent set up, fix and organize your games |
 | [Troubleshooting & FAQ](https://firsttris.github.io/prefixr/troubleshooting.html) | Common problems and how to fix them |
 | [Development](https://firsttris.github.io/prefixr/development.html) | Building from source, architecture, tests and releases |
 
