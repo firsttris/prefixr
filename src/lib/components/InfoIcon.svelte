@@ -5,6 +5,13 @@
 
   let open = $state(false);
   let root: HTMLElement | undefined;
+  let popup: HTMLElement | undefined = $state();
+  // Opens to the right of the icon, unless that would run past the
+  // window's edge, as for an icon in the right column of a wide page.
+  // Measured once, as it opens (before it could be flipped).
+  const flip = $derived(
+    !!popup && popup.getBoundingClientRect().right > document.documentElement.clientWidth - 8,
+  );
 
   function toggle() {
     open = !open;
@@ -39,7 +46,7 @@
     ⓘ
   </button>
   {#if open}
-    <div class="info-popup" role="tooltip">{text}</div>
+    <div class="info-popup" class:flip role="tooltip" bind:this={popup}>{text}</div>
   {/if}
 </span>
 
@@ -92,5 +99,10 @@
     font-size: 0.8em;
     font-weight: 400;
     line-height: 1.45;
+  }
+
+  .info-popup.flip {
+    left: auto;
+    right: 0;
   }
 </style>
