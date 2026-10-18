@@ -354,3 +354,18 @@ fn finds_the_latest_log() {
     }
     assert_eq!(latest_log(&dir), Some(dir.join("1700000000123.txt")));
 }
+
+#[test]
+fn json_before_the_subcommand_is_the_command_line_too() {
+    assert!(is_cli(&args("prefixr --json game list")));
+    assert!(is_cli(&args("prefixr --json --json library list")));
+    assert!(is_cli(&args("prefixr game list --json")));
+    // Alone, or before the window's own options, it opens the window as before.
+    assert!(!is_cli(&args("prefixr --json")));
+    assert!(!is_cli(&args("prefixr --json --launch 1234")));
+    assert!(
+        Cli::try_parse_from(args("prefixr --json game list"))
+            .unwrap()
+            .json
+    );
+}
