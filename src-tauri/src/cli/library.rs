@@ -461,7 +461,12 @@ pub(super) async fn library_command(
             let game = entry
                 .game_id
                 .as_ref()
-                .and_then(|id| config(app).games.into_iter().find(|g| &g.id.to_string() == id))
+                .and_then(|id| {
+                    config(app)
+                        .games
+                        .into_iter()
+                        .find(|g| &g.id.to_string() == id)
+                })
                 .ok_or_else(|| format!("{} isn't installed, so it can't be tested", entry.name))?;
             let mut result = None;
             change(app, |library| {

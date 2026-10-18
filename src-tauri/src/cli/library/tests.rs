@@ -119,7 +119,9 @@ fn test_results_are_listed_and_filtered_while_they_hold() {
     config
         .library
         .set_tested(&hollow, Some(TestStatus::Works), "Menu reached", 5);
-    config.library.set_tested(&ferry, Some(TestStatus::Broken), "", 5);
+    config
+        .library
+        .set_tested(&ferry, Some(TestStatus::Broken), "", 5);
     // Since tested, Night Ferry got another runner.
     config.games[1].runner_id = "GE-Proton10-7".to_string();
     let list = entries(&config, &store_games());
@@ -164,5 +166,8 @@ fn a_test_result_is_listed_in_the_json_with_whether_it_holds() {
             "current": true,
         })
     );
-    assert_eq!(serde_json::to_value(&list[2]).unwrap()["tested"], serde_json::Value::Null);
+    assert_eq!(
+        serde_json::to_value(&list[2]).unwrap()["tested"],
+        serde_json::Value::Null
+    );
 }

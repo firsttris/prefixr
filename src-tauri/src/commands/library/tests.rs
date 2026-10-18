@@ -132,7 +132,12 @@ fn removing_a_store_game_keeps_its_organization_for_a_reinstall() {
 fn a_test_result_keeps_the_setup_it_was_found_with() {
     let mut library = LibraryConfig::default();
     let mut game = game(Some((StoreKind::Epic, "Ferry")));
-    library.set_tested(&game, Some(TestStatus::Issues), "  Videos stay black \n", 1_700);
+    library.set_tested(
+        &game,
+        Some(TestStatus::Issues),
+        "  Videos stay black \n",
+        1_700,
+    );
     let result = &library.tested["epic:Ferry"];
     assert_eq!(result.status, TestStatus::Issues);
     assert_eq!(result.note, "Videos stay black");
