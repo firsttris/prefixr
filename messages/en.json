@@ -712,9 +712,10 @@
   "test_broken": "Broken",
   "test_testedOn": "tested on {date}",
   "test_outdated": "runner or exe changed since",
-  "test_menuTitle": "Test status",
-  "test_menuClear": "Clear test status",
   "details_test": "Tested",
-  "details_untested": "Not tested yet. Set the result in the ⋮ menu, or let an agent test it (prefixr library test-status).",
-  "details_testOutdated": "Tested with {runner}. The runner or exe has changed since, so the result may no longer hold."
+  "details_untested": "Not tested yet. Pick the result above, or let an agent test it (prefixr library test-status).",
+  "details_testOutdated": "Tested with {runner}. The runner or exe has changed since, so the result may no longer hold.",
+  "details_testClear": "Click again to clear the test status",
+  "gameCard_menuShowInFileManager": "Show in file manager",
+  "gameCard_revealFailed": "The file manager couldn’t show the exe: {error}"
 }

@@ -4,8 +4,9 @@
   keys, Home and End move between entries, Escape closes it (back to the
   trigger), and Tab or a click anywhere else closes it without being
   swallowed. It opens downward, or upward when there's no room below. It's
-  placed on the window rather than in its parent, so a card's clipped cover
-  doesn't cut a long menu off; scrolling closes it.
+  put on the page's body, placed by its trigger, rather than in its parent:
+  that way a card's clipped cover doesn't cut a long menu off and the next
+  card's buttons can't end up on top of it. Scrolling closes it.
   `items` renders the entries (role="menuitem"); call the `close` it gets
   before acting on one.
 -->
@@ -44,9 +45,14 @@
     open = false;
   }
 
-  function placeMenu(up: boolean) {
+  // By its size and the trigger's place, not by where it is: that's still
+  // where it was the last time it was open.
+  function placeMenu(menu: HTMLElement) {
     const rect = triggerEl.getBoundingClientRect();
     const right = `right: ${document.documentElement.clientWidth - rect.right}px`;
+    const fitsBelow = rect.bottom + 4 + menu.offsetHeight <= window.innerHeight;
+    // Upward only where it fits better there.
+    const up = !fitsBelow && rect.top > window.innerHeight / 2;
     place = up
       ? `${right}; bottom: ${window.innerHeight - rect.top + 4}px`
       : `${right}; top: ${rect.bottom + 4}px`;
@@ -54,12 +60,15 @@
 
   $effect(() => {
     if (!menuEl) return;
-    placeMenu(false);
-    const below = menuEl.getBoundingClientRect().bottom > window.innerHeight;
-    // Upward only where it fits better there.
-    if (below && triggerEl.getBoundingClientRect().top > window.innerHeight / 2) placeMenu(true);
+    placeMenu(menuEl);
     entries()[0]?.focus();
   });
+
+  /** Moves the menu to the page's body while it's open. */
+  function onBody(node: HTMLElement) {
+    document.body.appendChild(node);
+    return { destroy: () => node.remove() };
+  }
 
   function handleScroll(event: Event) {
     if (!menuEl?.contains(event.target as Node)) open = false;
@@ -91,7 +100,8 @@
   }
 
   function handleWindowPointerdown(event: PointerEvent) {
-    if (!anchorEl.contains(event.target as Node)) open = false;
+    const target = event.target as Node;
+    if (!anchorEl.contains(target) && !menuEl?.contains(target)) open = false;
   }
 </script>
 
@@ -118,6 +128,7 @@
   {#if open}
     <div
       bind:this={menuEl}
+      use:onBody
       class="menu"
       style={place}
       role="menu"

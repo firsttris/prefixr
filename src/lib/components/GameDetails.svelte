@@ -25,9 +25,12 @@
     setFavorite,
     setInCategory,
     setHidden,
+    setTestStatus,
     testOf,
   } from "$lib/stores/libraryMeta";
-  import { TEST_SYMBOL, testLabel, testedOn } from "$lib/testStatus";
+  import { TEST_STATUSES, TEST_SYMBOL, testLabel, testedOn } from "$lib/testStatus";
+  import type { TestStatus } from "$lib/types";
+  import { revealItemInDir } from "@tauri-apps/plugin-opener";
   import { backendError, getLocale } from "$lib/i18n/index.svelte";
   import { isTopLayer, openLayer, trapTab } from "$lib/layers";
   import CompatBadges, { tierName } from "./CompatBadges.svelte";
@@ -102,6 +105,12 @@
     } catch (e) {
       error = e;
     }
+  }
+
+  // A note an agent wrote stays when the status is changed here.
+  function setTest(status: TestStatus | null, note = test?.result.note ?? "") {
+    const id = game?.id;
+    if (id) attempt(() => setTestStatus(id, status, note));
   }
 
   function toggleCategory(id: string) {
@@ -247,7 +256,17 @@
             {/if}
           </dd>
           <dt>{m.details_exe()}</dt>
-          <dd class="path">{game.exe_path}</dd>
+          <dd>
+            <span class="path">{game.exe_path}</span>
+            <button
+              type="button"
+              class="link link-button"
+              onclick={() => {
+                const exe = game?.exe_path;
+                if (exe) revealItemInDir(exe).catch((e) => (error = e));
+              }}>{m.gameCard_menuShowInFileManager()} →</button
+            >
+          </dd>
         {/if}
       </dl>
 
@@ -273,14 +292,24 @@
 
       {#if game}
         <h3>{m.details_test()}</h3>
-        {#if test}
-          <p class="test-line">
-            <span class="test-symbol {test.result.status}" aria-hidden="true"
-              >{TEST_SYMBOL[test.result.status]}</span
+        <div class="test-choice" role="group" aria-label={m.details_test()}>
+          {#each TEST_STATUSES as status (status)}
+            {@const chosen = test?.result.status === status}
+            <button
+              type="button"
+              class="test-option"
+              class:active={chosen}
+              aria-pressed={chosen}
+              title={chosen ? m.details_testClear() : undefined}
+              onclick={() => setTest(chosen ? null : status)}
             >
-            <strong>{testLabel(test.result.status)}</strong>
-            <span class="muted">· {testedOn(test.result.tested_at)}</span>
-          </p>
+              <span class="test-symbol {status}" aria-hidden="true">{TEST_SYMBOL[status]}</span>
+              {testLabel(status)}
+            </button>
+          {/each}
+        </div>
+        {#if test}
+          <p class="muted">{testedOn(test.result.tested_at)}</p>
           {#if test.result.note}
             <p class="notes">{test.result.note}</p>
           {/if}
@@ -524,10 +553,24 @@
     color: #fff;
   }
 
-  .test-line {
+  .test-choice {
     display: flex;
+    flex-wrap: wrap;
+    gap: 0.4em;
+  }
+
+  .test-option {
+    display: inline-flex;
     align-items: center;
-    gap: 0.45em;
+    gap: 0.4em;
+    padding: 0.35em 0.7em;
+    border-radius: 999px;
+    font-size: 0.85em;
+  }
+
+  .test-option.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
   }
 
   .test-symbol {

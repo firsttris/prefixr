@@ -1,6 +1,6 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
-  import type { Compatibility, Game, TestStatus } from "$lib/types";
+  import type { Compatibility, Game } from "$lib/types";
   import { killGame, launchGame, type GameRunState } from "$lib/stores/games";
   import { exeIconUrl } from "$lib/stores/steamgriddb";
   import { storeName } from "$lib/stores/gameStores";
@@ -28,7 +28,6 @@
     onToggleFavorite,
     onOpenDetails,
     test,
-    onSetTestStatus,
   }: {
     game: Game;
     runState?: GameRunState;
@@ -44,7 +43,6 @@
     onToggleFavorite: () => void;
     onOpenDetails: () => void;
     test: GameTest | null;
-    onSetTestStatus: (status: TestStatus | null) => void;
   } = $props();
 
   const item = new GameItem(() => game);
@@ -99,8 +97,6 @@
         {onExportToSteam}
         {onRemoveFromSteam}
         onShowNotes={game.notes ? onShowNotes : undefined}
-        testStatus={test?.result.status ?? null}
-        {onSetTestStatus}
       >
         {#snippet trigger()}⋮{/snippet}
       </GameActionsMenu>

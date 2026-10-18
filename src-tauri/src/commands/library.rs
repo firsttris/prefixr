@@ -386,7 +386,7 @@ pub fn delete_category(
 }
 
 /// Records how a library game ran when tested, or (`status` left out) takes
-/// the result away again.
+/// the result away again: what the details panel sets by hand.
 #[tauri::command(async)]
 pub fn set_test_status(
     app: AppHandle,

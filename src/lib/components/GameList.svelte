@@ -31,7 +31,6 @@
     refreshCompatibility,
     refreshLibraryMeta,
     setFavorite,
-    setTestStatus,
     TEST_STATUSES,
     testOf,
   } from "$lib/stores/libraryMeta";
@@ -56,7 +55,7 @@
   import NotesDialog from "./NotesDialog.svelte";
   import LibraryChips from "./LibraryChips.svelte";
   import GameDetails from "./GameDetails.svelte";
-  import type { Game, StoreGame, StoreKind, TestStatus } from "$lib/types";
+  import type { Game, StoreGame, StoreKind } from "$lib/types";
   import type { GameFormTab } from "./GameForm.svelte";
 
   let {
@@ -299,8 +298,6 @@
       onToggleFavorite: () => setFavorite(entry.key, !favorite),
       onOpenDetails: () => (detailsKey = entry.key),
       test: testOf($libraryMeta, entry.key, game),
-      onSetTestStatus: (status: TestStatus | null) =>
-        setTestStatus(game.id, status).catch((e) => notify(backendError(e), "error")),
     }}
     {#if asRow}
       <GameListRow {...props} />

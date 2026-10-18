@@ -45,9 +45,8 @@ test results (once a game has one), and **Hidden** (once you've hidden a game). 
 - **Hidden**: hide a game in its details, say a store's giveaway you won't play. It then only shows
   under **Hidden**.
 - **Test status**: a small symbol at the top left of a cover says how the game ran when it was
-  tested: ✓ works, ! works with issues, ✕ broken. Hover it for the note and the date. Set it in
-  the card's ⋮ menu under **Test status**, or let an AI agent test your games and set it (see
-  [Testing games on screen](cli.md#testing-games-on-screen)). Once the game's runner or program
+  tested: ✓ works, ! works with issues, ✕ broken. Hover it for the note and the date. An AI agent
+  sets it when it tests your games (see [Testing games on screen](cli.md#testing-games-on-screen)). Once the game's runner or program
   changes, the symbol fades: the result may no longer hold. Chips such as **✓ Works** show only
   the games with that result.
 
@@ -93,6 +92,8 @@ The **⋮** menu on a card or in a list row (where editing, artwork and removing
 - **Show notes**: only for a game with notes; see [Adding and editing games](#adding-and-editing-games).
 - **Select artwork**: see [Artwork](#artwork).
 - **Edit game**: the same dialog as when adding it.
+- **Show in file manager**: opens the game's folder in your file manager, its `.exe` selected. Also
+  in the game's details, next to its program.
 - **To desktop** / **To start menu**: see [Shortcuts](#shortcuts).
 - **Add to Steam** / **Update in Steam** / **Remove from Steam**: see
   [Steam integration](#steam-integration).

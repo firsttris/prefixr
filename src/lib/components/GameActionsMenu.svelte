@@ -1,13 +1,11 @@
 <!--
   A library entry's menu. The card puts every action in it; the list row
   has buttons of its own for editing and removing, and only needs the
-  test status, shortcut and Steam entries (`full` off).
+  file manager, shortcut and Steam entries (`full` off).
 -->
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
   import type { Snippet } from "svelte";
-  import type { TestStatus } from "$lib/types";
-  import { TEST_STATUSES, TEST_SYMBOL, testLabel } from "$lib/testStatus";
   import Menu from "./Menu.svelte";
   import type { GameItem } from "./gameItem.svelte";
 
@@ -23,8 +21,6 @@
     onExportToSteam,
     onRemoveFromSteam,
     onShowNotes,
-    testStatus,
-    onSetTestStatus,
   }: {
     item: GameItem;
     inSteam: boolean;
@@ -38,9 +34,6 @@
     onRemoveFromSteam: () => void;
     // Only given for a game that has notes.
     onShowNotes?: () => void;
-    // The game's current test result, if it was tested.
-    testStatus: TestStatus | null;
-    onSetTestStatus: (status: TestStatus | null) => void;
   } = $props();
 </script>
 
@@ -135,36 +128,24 @@
       </button>
       <span class="divider" role="separator"></span>
     {/if}
-    <span class="menu-label">{m.test_menuTitle()}</span>
-    {#each TEST_STATUSES as status (status)}
-      <button
-        type="button"
-        role="menuitem"
-        aria-current={testStatus === status}
-        onclick={() => {
-          close();
-          if (testStatus !== status) onSetTestStatus(status);
-        }}
-      >
-        <span class="test-symbol {status}" aria-hidden="true">{TEST_SYMBOL[status]}</span>
-        {testLabel(status)}
-        {#if testStatus === status}<span class="current" aria-hidden="true">●</span>{/if}
-      </button>
-    {/each}
-    {#if testStatus}
-      <button
-        type="button"
-        role="menuitem"
-        onclick={() => {
-          close();
-          onSetTestStatus(null);
-        }}
-      >
-        <span class="test-symbol" aria-hidden="true"></span>
-        {m.test_menuClear()}
-      </button>
-    {/if}
-    <span class="divider" role="separator"></span>
+    <button
+      type="button"
+      role="menuitem"
+      onclick={() => {
+        close();
+        item.showInFileManager();
+      }}
+    >
+      <svg class="menu-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path
+          d="M2.5 5.5a1.5 1.5 0 011.5-1.5h3.6l1.6 1.8H16a1.5 1.5 0 011.5 1.5v7.2a1.5 1.5 0 01-1.5 1.5H4a1.5 1.5 0 01-1.5-1.5V5.5z"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linejoin="round"
+        />
+      </svg>
+      {m.gameCard_menuShowInFileManager()}
+    </button>
     <button
       type="button"
       role="menuitem"
@@ -259,48 +240,6 @@
 </Menu>
 
 <style>
-  .menu-label {
-    padding: 0.45em 0.6em 0.2em;
-    font-size: 0.72em;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--text-muted);
-  }
-
-  .test-symbol {
-    display: inline-grid;
-    place-items: center;
-    width: 1.05em;
-    height: 1.05em;
-    flex-shrink: 0;
-    border-radius: 50%;
-    font-size: 0.8em;
-    font-weight: 700;
-  }
-
-  .test-symbol.works {
-    background: var(--success);
-    color: #08130d;
-  }
-
-  .test-symbol.issues {
-    background: #f5b43c;
-    color: #1d1404;
-  }
-
-  .test-symbol.broken {
-    background: var(--danger);
-    color: #fff;
-  }
-
-  .current {
-    margin-left: auto;
-    padding-left: 0.8em;
-    font-size: 0.6em;
-    color: var(--accent);
-  }
-
   .menu-icon {
     width: 1.05em;
     height: 1.05em;

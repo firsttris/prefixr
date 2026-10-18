@@ -1,3 +1,4 @@
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { createDesktopShortcut, createMenuShortcut } from "$lib/stores/games";
 import { getGameCover } from "$lib/stores/steamgriddb";
 import type { Game } from "$lib/types";
@@ -6,13 +7,16 @@ export type ShortcutState = "idle" | "creating" | "done" | { error: unknown };
 
 /**
  * What a library entry shows and does the same way in either view
- * (GameCard, GameListRow): its cover, creating its shortcuts, and asking
- * before it's removed. Create it while the component initializes.
+ * (GameCard, GameListRow): its cover, creating its shortcuts, showing its
+ * exe in the file manager, and asking before it's removed. Create it while the component initializes.
  */
 export class GameItem {
   coverSrc = $state<string | null>(null);
   shortcutState = $state<ShortcutState>("idle");
   confirmingRemove = $state(false);
+  // Why the file manager couldn't show the exe (moved, on a drive not
+  // mounted), until the next try.
+  revealError = $state<unknown>(null);
   #game: () => Game;
   #doneTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -50,6 +54,16 @@ export class GameItem {
   /** Installed from a store: removing it uninstalls its files. */
   get fromStore(): boolean {
     return this.#game().store != null;
+  }
+
+  /** Opens the game's folder in the file manager, its exe selected. */
+  async showInFileManager(): Promise<void> {
+    this.revealError = null;
+    try {
+      await revealItemInDir(this.#game().exe_path);
+    } catch (e) {
+      this.revealError = e;
+    }
   }
 
   async createShortcut(target: "desktop" | "menu"): Promise<void> {
