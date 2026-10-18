@@ -159,6 +159,23 @@ textarea {
   width: 100%;
 }
 
+/* WebKitGTK draws selects as native GTK widgets (grey, taller, its own arrow)
+   unless appearance is off, so draw the chevron ourselves to match inputs. */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 2.2em;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%239aa1ac' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.8em center;
+  cursor: pointer;
+}
+
+select option {
+  background: var(--surface);
+  color: var(--text);
+}
+
 /* Fields show focus on their own border, thickened by a ring right on it. */
 input:focus,
 select:focus,
