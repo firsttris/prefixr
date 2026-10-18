@@ -11,10 +11,10 @@ use std::collections::BTreeMap;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, State};
 use uuid::Uuid;
 
-use crate::config::{load_config, lock_config, save_config, AppConfig, ConfigState};
+use crate::config::{save_config, update_config, AppConfig, ConfigState};
 use crate::error::AppError;
 use crate::lock::LockExt;
 use crate::models::{Game, StoreKind};
@@ -225,25 +225,16 @@ impl LibraryConfig {
     }
 }
 
-/// Records a session of a game that just ended. The config is read from
-/// disk under the config lock first: the Prefixr Steam started a game
-/// through (`--run`) has held its copy since the game started, and the
-/// window or the command line may well have changed the library meanwhile.
-/// This process's own state is locked before the file is read, so a change
-/// the window makes meanwhile waits for the session and is kept, rather
-/// than lands between the read and the write and is lost.
+/// Records a session of a game that just ended, in the config as it is on
+/// disk (see `update_config`): the Prefixr Steam started a game through
+/// (`--run`) has held its copy since the game started, and the window or
+/// the command line may well have changed the library meanwhile.
 /// Best-effort, a lost session is no reason to fail the game's exit.
 pub fn record_play_session(app: &AppHandle, key: &str, played: Duration) {
-    let result = (|| -> Result<(), String> {
-        let _lock = lock_config(app)?;
-        let state = app.state::<ConfigState>();
-        let mut current = state.locked();
-        let mut config = load_config(app)?;
+    let result = update_config(app, |config| {
         config.library.record_session(key, now_secs(), played);
-        save_config(app, &config)?;
-        *current = config;
         Ok(())
-    })();
+    });
     if let Err(e) = result {
         eprintln!("Could not record the play time of {key}: {e}");
     }

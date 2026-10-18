@@ -138,3 +138,38 @@ fn a_game_from_before_stores_has_none() {
     assert!(link.prerequisites.is_empty());
     assert_eq!(link.install_path, None);
 }
+
+#[test]
+fn an_installed_store_game_is_added_once() {
+    let mut config: AppConfig =
+        serde_json::from_value(serde_json::json!({ "runners_dir": "/r" })).unwrap();
+    let first = game(
+        "3f1c2a52-9a43-4f53-9a8e-1b2c3d4e5f60",
+        Some((StoreKind::Gog, "1")),
+    );
+    add_installed(&mut config, &first).unwrap();
+    assert_eq!(config.games.len(), 1);
+    assert!(config.library.activity["gog:1"].added_at.is_some());
+    // The same store entry, installed by another Prefixr meanwhile.
+    let second = game(
+        "9b0e8a11-0000-4000-8000-000000000001",
+        Some((StoreKind::Gog, "1")),
+    );
+    assert!(add_installed(&mut config, &second).is_err());
+    assert_eq!(config.games.len(), 1);
+}
+
+#[test]
+fn a_stores_install_lock_is_held_across_processes_and_names_the_game() {
+    let dir = TestDir::new("install-lock");
+    let path = dir.join("stores/gog/install.lock");
+    let held = claim_install_lock(&path, "1207658924").unwrap().unwrap();
+    // A second open file stands for another process: flock locks are per
+    // open file, so it can't take it either.
+    assert_eq!(
+        claim_install_lock(&path, "other").unwrap().unwrap_err(),
+        "1207658924"
+    );
+    drop(held);
+    assert!(claim_install_lock(&path, "other").unwrap().is_ok());
+}

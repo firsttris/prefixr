@@ -8,6 +8,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Manager};
 
 use super::{config, table, Out};
+use crate::commands::compatibility::{get_compatibility, Compatibility};
 use crate::commands::library::{game_key, store_key, LibraryConfig};
 use crate::commands::stores::list_store_games;
 use crate::config::{save_config, AppConfig, ConfigState};
@@ -28,6 +29,10 @@ pub(super) enum LibraryCommand {
         /// Also list hidden games
         #[arg(long)]
         hidden: bool,
+        /// Also look up each game's ProtonDB rating and umu-protonfixes match
+        /// (a request per game ProtonDB isn't cached for)
+        #[arg(long)]
+        compatibility: bool,
     },
     /// Mark games as favorites (`--off` unmarks them)
     Favorite {
@@ -93,6 +98,10 @@ pub(crate) struct LibraryEntry {
     pub hidden: bool,
     pub playtime_secs: u64,
     pub last_played: Option<u64>,
+    /// Only with `library list --compatibility`, for a game something is
+    /// known about.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compatibility: Option<Compatibility>,
 }
 
 /// Every game, installed ones first in library order, then the stores'
@@ -110,6 +119,7 @@ pub(crate) fn entries(
             hidden: library.hidden.contains(&key),
             playtime_secs: activity.playtime_secs,
             last_played: activity.last_played,
+            compatibility: None,
             installed: game_id.is_some(),
             key,
             name,
@@ -195,7 +205,7 @@ pub(crate) fn find_entry<'a>(
         .unwrap_or_else(|| Err(format!("No game matches \"{query}\"")))
 }
 
-fn all_entries(app: &AppHandle) -> Result<Vec<LibraryEntry>, AppError> {
+pub(super) fn all_entries(app: &AppHandle) -> Result<Vec<LibraryEntry>, AppError> {
     let store_games: Vec<_> = list_store_games(app.clone(), app.state())?
         .into_iter()
         .map(|game| {
@@ -240,16 +250,40 @@ fn duration(secs: u64) -> String {
     }
 }
 
+/// The games `library list` shows: hidden ones only when asked for, then
+/// only favorites or one category's games if asked.
+pub(crate) fn filter_entries(
+    entries: Vec<LibraryEntry>,
+    hidden: bool,
+    favorites: bool,
+    category: Option<&str>,
+) -> Vec<LibraryEntry> {
+    entries
+        .into_iter()
+        .filter(|e| hidden || !e.hidden)
+        .filter(|e| !favorites || e.favorite)
+        .filter(|e| category.is_none_or(|name| e.categories.iter().any(|c| c == name)))
+        .collect()
+}
+
 fn entry_rows(entries: &[&LibraryEntry]) -> Vec<Vec<String>> {
     entries
         .iter()
         .map(|e| {
             let mut flags = Vec::new();
             if e.favorite {
-                flags.push("favorite");
+                flags.push("favorite".to_string());
             }
             if e.hidden {
-                flags.push("hidden");
+                flags.push("hidden".to_string());
+            }
+            if let Some(compat) = &e.compatibility {
+                if let Some(tier) = &compat.protondb_tier {
+                    flags.push(format!("protondb:{tier}"));
+                }
+                if compat.umu_id.is_some() {
+                    flags.push("umu-fix".to_string());
+                }
             }
             vec![
                 match &e.game_id {
@@ -278,21 +312,24 @@ pub(super) async fn library_command(
             category,
             favorites,
             hidden,
+            compatibility,
         } => {
             let category = match category {
                 Some(query) => Some(config(app).library.find_category(&query)?.name.clone()),
                 None => None,
             };
-            let shown: Vec<&LibraryEntry> = entries
-                .iter()
-                .filter(|e| hidden || !e.hidden)
-                .filter(|e| !favorites || e.favorite)
-                .filter(|e| {
-                    category
-                        .as_ref()
-                        .is_none_or(|name| e.categories.contains(name))
-                })
-                .collect();
+            let mut shown = filter_entries(entries, hidden, favorites, category.as_deref());
+            // Only for the games listed: a request per game ProtonDB isn't
+            // cached for.
+            if compatibility {
+                let keys = shown.iter().map(|e| e.key.clone()).collect();
+                let mut known =
+                    get_compatibility(app.clone(), app.state(), keys, Some(true)).await?;
+                for entry in &mut shown {
+                    entry.compatibility = known.remove(&entry.key);
+                }
+            }
+            let shown: Vec<&LibraryEntry> = shown.iter().collect();
             out.print(&shown, || {
                 if shown.is_empty() {
                     return "No games".to_string();
