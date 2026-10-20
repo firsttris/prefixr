@@ -103,16 +103,16 @@
     </div>
 
     <div class="overlay">
+      <!-- The title spans the card's full width; only the pills share their
+           row with the play button, so long names aren't cut off early. -->
+      <h3 title={game.name}>{game.name}</h3>
       <div class="bottom-row">
-        <div class="info">
-          <h3 title={game.name}>{game.name}</h3>
-          <div class="pills">
-            {#if game.store}
-              <span class="runner">{storeName(game.store.store)}</span>
-            {/if}
-            <span class="runner">{game.runner_id}</span>
-            <CompatBadges {compat} onImage />
-          </div>
+        <div class="pills">
+          {#if game.store}
+            <span class="runner">{storeName(game.store.store)}</span>
+          {/if}
+          <span class="runner">{game.runner_id}</span>
+          <CompatBadges {compat} onImage />
         </div>
 
         <button
@@ -269,7 +269,7 @@
     z-index: 2;
     display: flex;
     flex-direction: column;
-    gap: 0.5em;
+    gap: 0.3em;
     padding: 2.6em 0.65em 0.65em;
     background: linear-gradient(
       to top,
@@ -280,14 +280,8 @@
     );
   }
 
-  .info {
-    display: flex;
-    flex-direction: column;
-    gap: 0.3em;
-    text-align: left;
-  }
-
   h3 {
+    text-align: left;
     font-size: 0.92em;
     color: #fff;
     text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
@@ -389,7 +383,7 @@
     gap: 0.6em;
   }
 
-  .bottom-row .info {
+  .bottom-row .pills {
     flex: 1;
     min-width: 0;
   }
