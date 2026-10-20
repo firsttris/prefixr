@@ -8,6 +8,10 @@
 //! ("No module named 'encodings'"), and Wine, Steam or winetricks load the
 //! AppImage's libraries instead of the system's. So every program Prefixr
 //! starts gets the environment without them, through `host_command`.
+//!
+//! The same goes for variables that only mean something on Windows: Wine
+//! hands the whole environment on to the Windows programs it runs, where
+//! they take effect (see `WINDOWS_ONLY_VARS`).
 
 use std::ffi::{OsStr, OsString};
 use std::os::unix::ffi::{OsStrExt, OsStringExt};
@@ -20,6 +24,22 @@ pub type EnvFix = (OsString, Option<OsString>);
 /// The AppImage runtime's own variables, which describe the AppImage rather
 /// than point into it, and mean nothing to another program.
 const APPIMAGE_VARS: &[&str] = &["APPDIR", "APPIMAGE", "ARGV0", "OWD"];
+
+/// Variables a Windows program acts on that some Linux tools set in their own
+/// environment. `NoDefaultCurrentDirectoryInExePath` (set by e.g. Claude
+/// Code's shell) stops `CreateProcess` and `SearchPath` from looking in the
+/// current directory, so a program that starts a helper exe sitting next to
+/// it by its bare name can't find it anymore: installers that unpack with
+/// external decompressors then fail right at the start.
+const WINDOWS_ONLY_VARS: &[&str] = &["NoDefaultCurrentDirectoryInExePath"];
+
+/// The changes that remove `WINDOWS_ONLY_VARS` from `vars`.
+pub fn windows_fixes(vars: impl IntoIterator<Item = (OsString, OsString)>) -> Vec<EnvFix> {
+    vars.into_iter()
+        .filter(|(key, _)| WINDOWS_ONLY_VARS.iter().any(|name| key == *name))
+        .map(|(key, _)| (key, None))
+        .collect()
+}
 
 /// The changes that take an AppImage's setup back out of `vars`: every
 /// entry of a variable that points into the AppImage's mount (`APPDIR`) is
@@ -71,10 +91,15 @@ fn inside(entry: &[u8], appdir: &[u8]) -> bool {
     entry.starts_with(appdir) && entry.get(appdir.len()).is_none_or(|&b| b == b'/')
 }
 
-/// `appimage_fixes` for this process's own environment, worked out once.
+/// `appimage_fixes` and `windows_fixes` for this process's own environment,
+/// worked out once.
 fn process_fixes() -> &'static [EnvFix] {
     static FIXES: OnceLock<Vec<EnvFix>> = OnceLock::new();
-    FIXES.get_or_init(|| appimage_fixes(std::env::vars_os()))
+    FIXES.get_or_init(|| {
+        let mut fixes = appimage_fixes(std::env::vars_os());
+        fixes.extend(windows_fixes(std::env::vars_os()));
+        fixes
+    })
 }
 
 /// A command for `program` with the environment Prefixr itself was started
