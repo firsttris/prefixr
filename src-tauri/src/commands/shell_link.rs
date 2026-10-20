@@ -96,7 +96,7 @@ pub fn find_recently_created_shortcuts(
         let Some(target) = read_shell_link_target(&lnk_path) else {
             continue;
         };
-        if !target.to_lowercase().ends_with(".exe") {
+        if !target.to_lowercase().ends_with(".exe") || is_uninstaller(&target) {
             continue;
         }
         let Some(resolved) = resolve_windows_path(prefix_path, &target) else {
@@ -117,6 +117,19 @@ pub fn find_recently_created_shortcuts(
     }
 
     results
+}
+
+/// Whether a shortcut's target is an uninstaller (Inno Setup's
+/// `unins000.exe`, `uninstall.exe`, …). Its shortcut's name says so only in
+/// the installer's language ("… entfernen", "Désinstaller …"), which
+/// `NOISE_PATTERNS` can't cover, but the exe's own name is the same in all.
+fn is_uninstaller(target: &str) -> bool {
+    let name = target
+        .rsplit(['\\', '/'])
+        .next()
+        .unwrap_or(target)
+        .to_lowercase();
+    name.starts_with("unins") || name.contains("uninstall")
 }
 
 fn collect_lnk_files(dir: &Path, depth: u32, out: &mut Vec<PathBuf>) {
