@@ -1,4 +1,6 @@
-use super::{parse_link_info, read_ascii_cstr, read_utf16_cstr, resolve_windows_path};
+use super::{
+    is_uninstaller, parse_link_info, read_ascii_cstr, read_utf16_cstr, resolve_windows_path,
+};
 use crate::test_util::TestDir;
 use std::fs;
 use std::os::unix::fs::symlink;
@@ -108,4 +110,13 @@ fn resolves_windows_paths_ignoring_case() {
     // A part that doesn't exist in any case stays as written.
     let missing = resolve_windows_path(&prefix, r"C:\Games\Bar\x.exe").unwrap();
     assert!(missing.ends_with("Games/Bar/x.exe"));
+}
+
+#[test]
+fn recognizes_uninstallers_by_their_exe_whatever_the_shortcut_says() {
+    assert!(is_uninstaller(r"X:\Games\Foo\game\unins000.exe"));
+    assert!(is_uninstaller(r"C:\Program Files\Foo\Uninstall.exe"));
+    assert!(is_uninstaller("C:/Foo/uninstall_foo.exe"));
+    assert!(!is_uninstaller(r"X:\Games\Foo\game\Foo.exe"));
+    assert!(!is_uninstaller(r"C:\Uninstalled Games\Foo\Foo.exe"));
 }
