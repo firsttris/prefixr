@@ -87,7 +87,25 @@ fn only_paths_inside_the_mount_count() {
 }
 
 #[test]
+fn removes_variables_only_windows_acts_on() {
+    let fixes = windows_fixes(vars(&[
+        ("NoDefaultCurrentDirectoryInExePath", "1"),
+        ("HOME", "/home/u"),
+    ]));
+    assert_eq!(
+        fix(&fixes, "NoDefaultCurrentDirectoryInExePath"),
+        Some(None)
+    );
+    assert_eq!(fix(&fixes, "HOME"), None);
+    assert!(windows_fixes(vars(&[("HOME", "/home/u")])).is_empty());
+}
+
+#[test]
 fn outside_an_appimage_a_command_keeps_the_environment() {
     let command = host_std_command("true");
-    assert_eq!(command.get_envs().count(), 0);
+    // Only removals of Windows-only variables, if the test's own
+    // environment has any.
+    assert!(command
+        .get_envs()
+        .all(|(key, value)| value.is_none() && WINDOWS_ONLY_VARS.iter().any(|name| key == *name)));
 }
