@@ -8,7 +8,6 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::time::SystemTime;
 
 use clap::Args;
@@ -25,6 +24,7 @@ use crate::commands::runners::{find_runner, runner_command, scan_runners, winese
 use crate::commands::shell_link::{find_recently_created_shortcuts, DetectedShortcut};
 use crate::config::{load_config, lock_config, ConfigState};
 use crate::error::AppError;
+use crate::host_env::host_std_command;
 use crate::lock::LockExt;
 use crate::models::{Game, GameInput};
 
@@ -282,8 +282,11 @@ impl Drop for Disc {
 }
 
 /// Runs `udisksctl` without asking for a password, returning its output.
+/// With the host's environment (see `host_env`): under the AppImage's
+/// `LD_LIBRARY_PATH` it loads the bundled GLib, older than the system's
+/// libudisks2 needs, and dies with "undefined symbol".
 fn udisksctl(args: &[&str]) -> Result<String, String> {
-    let output = Command::new("udisksctl")
+    let output = host_std_command("udisksctl")
         .args(args)
         .arg("--no-user-interaction")
         .output()
