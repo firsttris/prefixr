@@ -116,6 +116,21 @@ fn umu_local_dir_uses_home_when_xdg_data_home_is_missing() {
     assert_eq!(umu_local_dir(&crate::env::fake(&[])), None);
 }
 #[test]
+fn umu_local_dir_in_a_flatpak_is_the_hosts() {
+    let env = crate::env::fake(&[
+        ("container", "flatpak"),
+        (
+            "XDG_DATA_HOME",
+            "/home/u/.var/app/io.github.firsttris.Prefixr/data",
+        ),
+        ("HOME", "/home/u"),
+    ]);
+    assert_eq!(
+        umu_local_dir(&env),
+        Some(PathBuf::from("/home/u/.local/share/umu"))
+    );
+}
+#[test]
 fn runtime_present_parses_real_manifest() {
     let dir = temp_path();
     fs::create_dir_all(&dir).unwrap();

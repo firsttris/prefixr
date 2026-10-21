@@ -12,6 +12,8 @@ use crate::commands::binary_vdf::{self, Map, Value};
 use crate::commands::games::{command_on_path, own_executable_path, write_shortcut_icon};
 use crate::commands::steamgriddb::{artwork_dir, asset_cache_path, image_extension};
 use crate::config::ConfigState;
+use crate::env;
+use crate::host_env::host_data_home;
 use crate::lock::LockExt;
 use crate::models::{ArtworkKind, Game};
 
@@ -36,9 +38,8 @@ fn home_dir() -> Result<PathBuf, String> {
 /// it; the others are fallbacks for setups where that link is missing.
 fn steam_root() -> Result<PathBuf, AppError> {
     let home = home_dir()?;
-    let data_home = std::env::var_os("XDG_DATA_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| home.join(".local/share"));
+    // The host's, also in a Flatpak, where `XDG_DATA_HOME` is the app's own.
+    let data_home = host_data_home(&env::process).unwrap_or_else(|| home.join(".local/share"));
     let candidates = [
         home.join(".steam/root"),
         home.join(".steam/steam"),

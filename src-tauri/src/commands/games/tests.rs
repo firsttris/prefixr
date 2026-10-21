@@ -161,6 +161,21 @@ fn applications_directory_falls_back_to_local_share() {
     );
 }
 #[test]
+fn applications_directory_in_a_flatpak_is_the_hosts() {
+    let env = crate::env::fake(&[
+        ("FLATPAK_ID", "io.github.firsttris.Prefixr"),
+        ("HOME", "/home/u"),
+        (
+            "XDG_DATA_HOME",
+            "/home/u/.var/app/io.github.firsttris.Prefixr/data",
+        ),
+    ]);
+    assert_eq!(
+        applications_directory(&env).unwrap(),
+        PathBuf::from("/home/u/.local/share/applications")
+    );
+}
+#[test]
 fn own_executable_path_prefers_appimage_env() {
     let env = crate::env::fake(&[("APPIMAGE", "/opt/Prefixr.AppImage")]);
     assert_eq!(
@@ -576,4 +591,38 @@ fn finds_a_store_games_install_folder_from_its_exe() {
         Some(dir.as_ref())
     );
     assert_eq!(store_install_dir(&exe, "Missing/setup.exe"), None);
+}
+
+/// A fake `/proc` entry for `marked_processes_in`.
+fn fake_process(proc_dir: &Path, pid: u32, environ: &[&str], state: char) {
+    let dir = proc_dir.join(pid.to_string());
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(dir.join("environ"), environ.join("\0") + "\0").unwrap();
+    fs::write(
+        dir.join("stat"),
+        format!("{pid} (wine (stub)) {state} 1 1 1"),
+    )
+    .unwrap();
+}
+
+#[test]
+fn marked_processes_are_found_by_their_environment() {
+    let proc_dir = temp_path("marked-processes");
+    let id = Uuid::parse_str("248930e7-2809-4558-adb4-21bc7bb85fd6").unwrap();
+    let other = Uuid::parse_str("db98268d-118a-4a13-85ef-8d5d222e3b6d").unwrap();
+    let marker = format!("{GAME_ID_VAR}={id}");
+    fake_process(&proc_dir, 10, &["HOME=/home/u", &marker], 'S');
+    fake_process(&proc_dir, 11, &[&marker, "WINEPREFIX=/p"], 'R');
+    // Exited, not reaped yet.
+    fake_process(&proc_dir, 12, &[&marker], 'Z');
+    // Another game, and the marker's name only as part of a value.
+    fake_process(&proc_dir, 13, &[&format!("{GAME_ID_VAR}={other}")], 'S');
+    fake_process(&proc_dir, 14, &[&format!("NOTE={marker}")], 'S');
+    // Not a process.
+    fs::create_dir_all(proc_dir.join("self")).unwrap();
+
+    let mut pids = marked_processes_in(&proc_dir, id);
+    pids.sort();
+    assert_eq!(pids, vec![10, 11]);
+    assert!(marked_processes_in(&proc_dir.join("missing"), id).is_empty());
 }

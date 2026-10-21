@@ -19,7 +19,8 @@ use tauri::{AppHandle, Listener, Manager, State};
 
 use crate::commands::games::{
     add_game, create_desktop_shortcut, create_menu_shortcut, end_game_session, launch_game,
-    remove_game, run_in_prefix, update_game, LaunchingGames, RunningGames,
+    remove_game, run_in_prefix, stop_game_from_cli_flatpak, update_game, LaunchingGames,
+    RunningGames,
 };
 use crate::commands::library::game_key;
 use crate::commands::logs::game_log_dir;
@@ -40,6 +41,7 @@ use crate::commands::wine_tools::launch_wine_tool;
 use crate::commands::winetricks::{install_winetricks_verbs, list_installed_winetricks_verbs};
 use crate::config::{load_config, lock_config, AppConfig, ConfigFileStamp, ConfigState};
 use crate::error::AppError;
+use crate::host_env::is_flatpak;
 use crate::locale::{self, LocaleState};
 use crate::lock::LockExt;
 use crate::models::{ArtworkKind, Game, GameInput, RunnerKind};
@@ -936,6 +938,10 @@ async fn game_command(app: &AppHandle, out: Out, command: GameCommand) -> Result
         GameCommand::Launch { game } => launch(app, out, &game).await,
         GameCommand::Stop { game } => {
             let game = lookup_game(app, &game)?;
+            if is_flatpak() {
+                stop_game_from_cli_flatpak(game.id, &game.name).await?;
+                return out.print(&game.id, || format!("Stopped \"{}\"", game.name));
+            }
             let runners = scan_runners(&config(app).runners_dir)?;
             let runner = runners
                 .iter()

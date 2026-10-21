@@ -10,6 +10,7 @@ use crate::commands::github::read_token;
 use crate::commands::runner_downloads::{replace_dir, restore_replaced_dir, with_optional_auth};
 use crate::config::ConfigState;
 use crate::env::{self, Env};
+use crate::host_env::host_data_home;
 
 /// umu-launcher (https://github.com/Open-Wine-Components/umu-launcher) is
 /// what every Proton runner is launched through — see `launch_game`. It runs
@@ -222,15 +223,13 @@ pub async fn ensure_umu(app: &AppHandle, token: Option<&str>) -> Result<PathBuf,
 /// umu's own data directory, where it keeps the Steam Runtime(s) it
 /// downloads — shared with every other umu-based launcher on the system
 /// (Lutris, Heroic, ...), so a runtime any of them already fetched is reused
-/// as-is. Mirrors `UMU_LOCAL` in umu's `umu_consts.py`.
+/// as-is. Mirrors `UMU_LOCAL` in umu's `umu_consts.py`, which in a Flatpak
+/// also uses the host's data directory rather than the app's own.
 fn umu_local_dir(env: Env) -> Option<PathBuf> {
     if let Some(folders) = env("UMU_FOLDERS_PATH") {
         return Some(PathBuf::from(folders).join("umu"));
     }
-    let data_home = env("XDG_DATA_HOME")
-        .map(PathBuf::from)
-        .or_else(|| env("HOME").map(|h| PathBuf::from(h).join(".local/share")))?;
-    Some(data_home.join("umu"))
+    Some(host_data_home(env)?.join("umu"))
 }
 
 /// Whether the Steam Runtime a Proton runner requires (its
