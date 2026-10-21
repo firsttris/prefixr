@@ -585,23 +585,35 @@ exists, the Flatpak points to this. An automatic import can come later.
 
 ## Phase 5: building from source and releasing
 
-Flathub requires a build from source without network access, as Cinny does:
+Flathub requires a build from source without network access, as Cinny does. The manifest is
+[`flatpak/io.github.firsttris.Prefixr.yml`](https://github.com/firsttris/prefixr/blob/main/flatpak/io.github.firsttris.Prefixr.yml)
+(#55); the spike manifest stays for repackaging a local `.deb`.
 
-- **Rust:** `cargo-sources.json` from `flatpak-cargo-generator.py src-tauri/Cargo.lock`, SDK
-  extension `rust-stable`.
+- **Rust:** `flatpak/cargo-sources.json` from `flatpak-cargo-generator.py src-tauri/Cargo.lock`,
+  SDK extension `rust-stable`, `cargo --offline fetch`.
 - **Frontend:** `flatpak-node-generator` supports npm, yarn and pnpm, but not `bun.lock`, and
   Flathub makes no exceptions for uncommon build setups. So a `package-lock.json` is kept next to
-  `bun.lock` (`npm install --package-lock-only`), and CI checks that both stay in step. In the
-  Flatpak build, `npm ci --offline`, SDK extension `node24`.
+  `bun.lock`, with exactly bun's versions: npm writes the tree bun installed, and
+  `flatpak/lock-from-bun.py` adds the download URLs and checksums from `bun.lock`, failing on any
+  difference. (A fresh `npm install --package-lock-only` resolved 77 packages to other versions.)
+  `flatpak/node-sources.json` comes from that lock. In the Flatpak build, `npm ci --offline`, SDK
+  extension `node24`.
+- **One script for all three:** `flatpak/update-sources.sh`. The `Flatpak` workflow runs it on every
+  pull request that touches a lock file or `flatpak/`, and fails when the committed files differ.
+  bump.yml's shared workflow already raises the version in `package-lock.json` along with
+  `package.json`.
 - **Build:** `tauri build --no-bundle` with `beforeBuildCommand` overridden to `npm run build`
-  (`tauri.conf.json` calls `bun run build`), then install the binary, icons, desktop files and
-  metainfo into `/app` (as Cinny does).
-- **Metainfo:** `io.github.firsttris.Prefixr.metainfo.xml` with description, screenshots, releases
-  and content rating. Flathub checks it.
-- **CI:** a job with [flatpak-github-actions](https://github.com/flatpak/flatpak-github-actions)
-  that builds a `.flatpak` bundle. `release.yml` attaches it to the release, next to the AppImage,
-  `.deb` and `.rpm`. Installation:
-  `flatpak install --user ./prefixr.flatpak`.
+  (`tauri.conf.json` calls `bun run build`). `npm run build` no longer calls bun itself. Then the
+  binary, icons, desktop file and metainfo go into `/app` (as Cinny does).
+- **Modules:** libayatana-appindicator from flathub/shared-modules; 7zip, cabextract and unrar as
+  Heroic builds them, for winetricks with a Wine runner.
+- **Metainfo:** `flatpak/io.github.firsttris.Prefixr.metainfo.xml` with description, links, content
+  rating, branding and releases. Screenshots are still missing; Flathub needs them (phase 6).
+- **CI:** `.github/workflows/flatpak.yml` builds the bundle with
+  [flatpak-github-actions](https://github.com/flatpak/flatpak-github-actions) in the `gnome-51`
+  image. `release.yml` calls it and attaches `prefixr_<version>_x86_64.flatpak` to the release, next
+  to the AppImage, `.deb` and `.rpm`. Installation: `flatpak install --user
+  ./prefixr_<version>_x86_64.flatpak`.
 
 ## Phase 6: Flathub
 

@@ -1,0 +1,106 @@
+name: Flatpak
+
+# Builds the Flatpak bundle from source (flatpak/io.github.firsttris.Prefixr.yml, see
+# docs/flatpak.md) and checks that package-lock.json and the offline sources still match bun.lock
+# and Cargo.lock (regenerate them with flatpak/update-sources.sh). Runs on pull requests that touch
+# the Flatpak or a lock file, by hand, and from release.yml, which attaches the bundle.
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "flatpak/**"
+      - "package.json"
+      - "package-lock.json"
+      - "bun.lock"
+      - "src-tauri/Cargo.lock"
+      - ".github/workflows/flatpak.yml"
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      artifact-name:
+        description: Name of the uploaded artifact with the .flatpak bundle
+        type: string
+        default: flatpak-bundle
+      check-sources:
+        description: Also check the generated sources (needs the npm registry); off for releases
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flatpak-${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+env:
+  # flatpak-builder-tools, pinned: the generators' output format is part of what's checked.
+  FBT_COMMIT: 74697c75b630d7330e77250fc13cb5ea688d9479
+
+jobs:
+  sources:
+    name: Flatpak sources match the lock files
+    # Already checked on the pull request; a release mustn't fail because the npm registry
+    # does (the check asks it for every package).
+    if: ${{ !github.event.pull_request.draft && inputs.check-sources != false }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install flatpak-builder-tools
+        run: |
+          git init -q "$RUNNER_TEMP/fbt"
+          git -C "$RUNNER_TEMP/fbt" fetch -q --depth 1 https://github.com/flatpak/flatpak-builder-tools.git "$FBT_COMMIT"
+          git -C "$RUNNER_TEMP/fbt" checkout -q FETCH_HEAD
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install -q "$RUNNER_TEMP/fbt/node" aiohttp tomlkit PyYAML
+          echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
+          echo "FBT=$RUNNER_TEMP/fbt" >> "$GITHUB_ENV"
+
+      - name: Regenerate the sources
+        run: flatpak/update-sources.sh
+
+      - name: Compare with the committed files
+        run: |
+          if ! git diff --exit-code -- package-lock.json flatpak/cargo-sources.json flatpak/node-sources.json; then
+            echo "::error::Out of date. Run flatpak/update-sources.sh and commit the result."
+            exit 1
+          fi
+
+  bundle:
+    name: Build the Flatpak bundle
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-51
+      options: --privileged
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Bundle name
+        id: name
+        run: |
+          version=$(sed -n 's/^  "version": "\(.*\)",$/\1/p' package.json)
+          echo "bundle=prefixr_${version}_x86_64.flatpak" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          manifest-path: flatpak/io.github.firsttris.Prefixr.yml
+          bundle: ${{ steps.name.outputs.bundle }}
+          artifact-name: ${{ inputs.artifact-name || 'flatpak-bundle' }}
+          cache-key: flatpak-builder-${{ hashFiles('flatpak/**', 'package-lock.json', 'src-tauri/Cargo.lock') }}

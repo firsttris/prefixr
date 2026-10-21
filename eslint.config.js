@@ -33,6 +33,9 @@ export default ts.config(
       "src/lib/paraglide/",
       "src/lib/bindings/",
       "src-tauri/",
+      // flatpak-builder's state and build output.
+      ".flatpak-builder/",
+      "flatpak/",
     ],
   },
 );
