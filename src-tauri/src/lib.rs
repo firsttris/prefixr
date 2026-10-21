@@ -13,6 +13,7 @@ mod single_instance;
 #[cfg(test)]
 mod test_util;
 mod tray;
+mod udisks;
 
 use std::path::Path;
 

@@ -24,9 +24,10 @@ use crate::commands::runners::{find_runner, runner_command, scan_runners, winese
 use crate::commands::shell_link::{find_recently_created_shortcuts, DetectedShortcut};
 use crate::config::{load_config, lock_config, ConfigState};
 use crate::error::AppError;
-use crate::host_env::host_std_command;
+use crate::host_env::{host_std_command, is_flatpak};
 use crate::lock::LockExt;
 use crate::models::{Game, GameInput};
+use crate::udisks::LoopMount;
 
 #[derive(Args, Debug)]
 pub(super) struct InstallGame {
@@ -241,12 +242,27 @@ fn is_disc_image(path: &Path) -> bool {
 /// A disc image mounted read-only through udisks, which needs no root. It's
 /// unmounted and its loop device removed again when dropped.
 struct Disc {
-    loop_device: String,
     mount_point: PathBuf,
+    backend: DiscBackend,
+}
+
+enum DiscBackend {
+    /// Natively, through `udisksctl`.
+    Udisksctl { loop_device: String },
+    /// In a Flatpak, which has no `udisksctl`: UDisks2 over D-Bus (the
+    /// `LoopMount` cleans up itself).
+    DBus(#[allow(dead_code)] LoopMount),
 }
 
 impl Disc {
     fn mount(image: &Path) -> Result<Disc, String> {
+        if is_flatpak() {
+            let mount = LoopMount::new(image)?;
+            return Ok(Disc {
+                mount_point: mount.mount_point.clone(),
+                backend: DiscBackend::DBus(mount),
+            });
+        }
         let output = udisksctl(&[
             "loop-setup",
             "--read-only",
@@ -256,14 +272,16 @@ impl Disc {
         let loop_device = parse_loop_device(&output)
             .ok_or_else(|| format!("udisksctl didn't name a loop device: {output}"))?;
         let mut disc = Disc {
-            loop_device,
             mount_point: PathBuf::new(),
+            backend: DiscBackend::Udisksctl {
+                loop_device: loop_device.clone(),
+            },
         };
         // A desktop may have mounted it on its own already, which makes
         // this fail; where it's mounted is read from the mount table.
-        let mounted = udisksctl(&["mount", "--block-device", &disc.loop_device]);
+        let mounted = udisksctl(&["mount", "--block-device", &loop_device]);
         let mounts = fs::read_to_string("/proc/self/mounts").unwrap_or_default();
-        disc.mount_point = mount_point_of(&mounts, &disc.loop_device).ok_or_else(|| {
+        disc.mount_point = mount_point_of(&mounts, &loop_device).ok_or_else(|| {
             format!(
                 "Could not mount {}: {}",
                 image.display(),
@@ -276,8 +294,10 @@ impl Disc {
 
 impl Drop for Disc {
     fn drop(&mut self) {
-        let _ = udisksctl(&["unmount", "--block-device", &self.loop_device]);
-        let _ = udisksctl(&["loop-delete", "--block-device", &self.loop_device]);
+        if let DiscBackend::Udisksctl { loop_device } = &self.backend {
+            let _ = udisksctl(&["unmount", "--block-device", loop_device]);
+            let _ = udisksctl(&["loop-delete", "--block-device", loop_device]);
+        }
     }
 }
 
