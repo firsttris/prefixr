@@ -114,6 +114,7 @@ jobs:
     uses: ./.github/workflows/flatpak.yml
     with:
       artifact-name: release-flatpak
+      check-sources: false
     permissions:
       contents: read
 

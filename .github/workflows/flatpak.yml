@@ -23,6 +23,10 @@ on:
         description: Name of the uploaded artifact with the .flatpak bundle
         type: string
         default: flatpak-bundle
+      check-sources:
+        description: Also check the generated sources (needs the npm registry); off for releases
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -38,7 +42,9 @@ env:
 jobs:
   sources:
     name: Flatpak sources match the lock files
-    if: ${{ !github.event.pull_request.draft }}
+    # Already checked on the pull request; a release mustn't fail because the npm registry
+    # does (the check asks it for every package).
+    if: ${{ !github.event.pull_request.draft && inputs.check-sources != false }}
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
