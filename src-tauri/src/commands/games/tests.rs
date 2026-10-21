@@ -635,3 +635,25 @@ fn handed_over_stop_waits_longer_than_the_longest_stop() {
     assert_eq!(GRACEFUL_STOP_MAX, Duration::from_secs(25));
     assert!(HANDED_OVER_STOP_WAIT > GRACEFUL_STOP_MAX);
 }
+
+#[test]
+fn shortcuts_start_the_flatpak_through_flatpak_run() {
+    let env = crate::env::fake(&[
+        ("FLATPAK_ID", "io.github.firsttris.Prefixr"),
+        ("HOME", "/home/u"),
+    ]);
+    let launch = own_launch(&env).unwrap();
+    assert_eq!(
+        desktop_exec_prefix(&launch),
+        "\"flatpak\" \"run\" \"io.github.firsttris.Prefixr\""
+    );
+    assert_eq!(launch.start_dir, PathBuf::from("/home/u"));
+}
+
+#[test]
+fn shortcuts_start_the_appimage_by_its_path_as_before() {
+    let env = crate::env::fake(&[("APPIMAGE", "/opt/Prefixr.AppImage")]);
+    let launch = own_launch(&env).unwrap();
+    assert_eq!(desktop_exec_prefix(&launch), "\"/opt/Prefixr.AppImage\"");
+    assert_eq!(launch.start_dir, PathBuf::from("/opt"));
+}

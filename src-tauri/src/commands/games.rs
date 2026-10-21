@@ -32,7 +32,7 @@ use crate::commands::stores;
 use crate::commands::umu::{ensure_umu, runtime_present};
 use crate::config::{save_config, ConfigState};
 use crate::env::{self, Env};
-use crate::host_env::{host_command, host_data_home, host_std_command, is_flatpak};
+use crate::host_env::{flatpak_id, host_command, host_data_home, host_std_command, is_flatpak};
 use crate::locale::LocaleState;
 use crate::lock::LockExt;
 use crate::models::{
@@ -2125,6 +2125,55 @@ pub(crate) fn own_executable_path(env: Env) -> Result<PathBuf, String> {
     std::env::current_exe().map_err(|e| format!("Could not resolve own executable path: {e}"))
 }
 
+/// How a shortcut (desktop, start menu, "Open with", Steam) starts Prefixr.
+pub(crate) struct OwnLaunch {
+    pub program: PathBuf,
+    /// Arguments before Prefixr's own (`--launch <id>` and the like).
+    pub args: Vec<String>,
+    /// The folder Steam starts the program in.
+    pub start_dir: PathBuf,
+}
+
+/// `OwnLaunch` for this build. Natively its own executable (see
+/// `own_executable_path`). In a Flatpak `flatpak run <app ID>`, as Lutris,
+/// Bottles, Faugus and Heroic write theirs: `/app/bin/prefixr` doesn't exist
+/// on the host.
+pub(crate) fn own_launch(env: Env) -> Result<OwnLaunch, String> {
+    if let Some(id) = env("FLATPAK_ID").and_then(|id| id.into_string().ok()) {
+        if !id.is_empty() {
+            let home = env("HOME")
+                .map(PathBuf::from)
+                .ok_or_else(|| "HOME is not set".to_string())?;
+            return Ok(OwnLaunch {
+                program: PathBuf::from("flatpak"),
+                args: vec!["run".to_string(), id],
+                start_dir: home,
+            });
+        }
+    }
+    let program = own_executable_path(env)?;
+    let start_dir = program.parent().unwrap_or(&program).to_path_buf();
+    Ok(OwnLaunch {
+        program,
+        args: Vec::new(),
+        start_dir,
+    })
+}
+
+/// The start of an `Exec=` line for `launch`: the program and its arguments,
+/// each quoted (see `desktop_exec_arg`). Prefixr's own arguments follow.
+fn desktop_exec_prefix(launch: &OwnLaunch) -> String {
+    std::iter::once(desktop_exec_arg(&launch.program))
+        .chain(
+            launch
+                .args
+                .iter()
+                .map(|arg| desktop_exec_arg(Path::new(arg))),
+        )
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 /// Escapes a value for a `.desktop` file: a backslash starts an escape
 /// sequence there, and a line break would end the entry — e.g. a game name
 /// pasted with a trailing newline.
@@ -2210,7 +2259,7 @@ fn write_game_shortcut(
         .map_err(|e| format!("Could not access {}: {e}", target_dir.display()))?;
 
     let icon_path = write_shortcut_icon(app, &game)?;
-    let exe_path = own_executable_path(&env::process)?;
+    let launch = own_launch(&env::process)?;
 
     let mut contents = String::new();
     contents.push_str("[Desktop Entry]\n");
@@ -2218,7 +2267,7 @@ fn write_game_shortcut(
     contents.push_str(&format!("Name={}\n", desktop_string(&game.name)));
     contents.push_str(&format!(
         "Exec={} --launch {}\n",
-        desktop_exec_arg(&exe_path),
+        desktop_exec_prefix(&launch),
         game.id
     ));
     if let Some(icon_path) = &icon_path {
@@ -2327,7 +2376,7 @@ pub fn ensure_install_desktop_entry(app: &AppHandle) -> Result<(), String> {
     fs::write(&icon_path, APP_ICON_PNG)
         .map_err(|e| format!("Could not write install icon: {e}"))?;
 
-    let exe_path = own_executable_path(&env::process)?;
+    let launch = own_launch(&env::process)?;
     let mut contents = String::new();
     contents.push_str("[Desktop Entry]\n");
     contents.push_str("Type=Application\n");
@@ -2340,7 +2389,7 @@ pub fn ensure_install_desktop_entry(app: &AppHandle) -> Result<(), String> {
     contents.push_str("Name[en]=Install Prefixr\n");
     contents.push_str(&format!(
         "Exec={} --install %f\n",
-        desktop_exec_arg(&exe_path)
+        desktop_exec_prefix(&launch)
     ));
     contents.push_str(&format!(
         "Icon={}\n",
@@ -2350,7 +2399,13 @@ pub fn ensure_install_desktop_entry(app: &AppHandle) -> Result<(), String> {
     contents.push_str("NoDisplay=true\n");
     contents.push_str(&format!("MimeType={EXE_MIME_TYPES}\n"));
 
-    let desktop_path = applications_dir.join("com.tristan.prefixr.install.desktop");
+    // The Flatpak writes into the same folder as a native build (see
+    // `host_data_home`); each keeps its own entry.
+    let entry_name = match flatpak_id() {
+        Some(id) => format!("{id}.install.desktop"),
+        None => "com.tristan.prefixr.install.desktop".to_string(),
+    };
+    let desktop_path = applications_dir.join(entry_name);
     fs::write(&desktop_path, contents)
         .map_err(|e| format!("Could not write install desktop entry: {e}"))?;
 
