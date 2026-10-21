@@ -47,6 +47,10 @@ pub fn serve(app: &AppHandle, app_id: &str, id: Uuid) -> Option<GameName> {
         .ok()?
         .name(bus_name(app_id, id))
         .ok()?
+        // Never take the name from an instance that already runs the game
+        // (zbus would by default), which `game stop` then couldn't reach.
+        .replace_existing_names(false)
+        .allow_name_replacements(false)
         .serve_at(
             PATH,
             GameControl {
