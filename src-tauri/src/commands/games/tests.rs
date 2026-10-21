@@ -626,3 +626,12 @@ fn marked_processes_are_found_by_their_environment() {
     assert_eq!(pids, vec![10, 11]);
     assert!(marked_processes_in(&proc_dir.join("missing"), id).is_empty());
 }
+
+/// Review of #51: with a hung wineserver and a game that ignores SIGTERM,
+/// a stop takes all of `GRACEFUL_STOP_MAX`, and the CLI must not give up
+/// (and report the game as running elsewhere) before the window is done.
+#[test]
+fn handed_over_stop_waits_longer_than_the_longest_stop() {
+    assert_eq!(GRACEFUL_STOP_MAX, Duration::from_secs(25));
+    assert!(HANDED_OVER_STOP_WAIT > GRACEFUL_STOP_MAX);
+}

@@ -42,6 +42,9 @@ base64 = "0.22"
 sha2 = "0.10"
 libc = "0.2"
 clap = { version = "4", features = ["derive"] }
+# Already in the tree through tauri-plugin-single-instance; used directly to
+# hand `prefixr game stop` to the window in a Flatpak (`single_instance`).
+zbus = "5"
 
 [dev-dependencies]
 tempfile = "3"

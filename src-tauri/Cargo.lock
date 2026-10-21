@@ -2880,6 +2880,7 @@ dependencies = [
  "ts-rs",
  "uuid",
  "xz2",
+ "zbus",
  "zstd",
 ]
 
