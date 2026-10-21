@@ -32,6 +32,7 @@ use crate::commands::stores;
 use crate::commands::umu::{ensure_umu, runtime_present};
 use crate::config::{save_config, ConfigState};
 use crate::env::{self, Env};
+use crate::game_control::{request_stop, serve as serve_game_name};
 use crate::host_env::{flatpak_id, host_command, host_data_home, host_std_command, is_flatpak};
 use crate::locale::LocaleState;
 use crate::lock::LockExt;
@@ -40,7 +41,6 @@ use crate::models::{
     StorePrerequisites,
 };
 use crate::portal::Inhibition;
-use crate::single_instance::forward_to_window;
 use crate::tray::rebuild_tray_menu;
 
 /// Checks whether `name` resolves to an executable file somewhere on `PATH`,
@@ -498,9 +498,10 @@ const END_WINE_SESSION_TIMEOUT: Duration = Duration::from_secs(10);
 const GRACEFUL_STOP_MAX: Duration =
     END_WINE_SESSION_TIMEOUT.saturating_add(STOP_STEP.saturating_mul(3));
 
-/// How long `prefixr game stop` waits for the window to finish a stop it
-/// handed over: the longest stop, plus time for the window's `run_game` to
-/// see the game's process exit, record the session and release the lock.
+/// How long `prefixr game stop` waits for the instance that runs the game to
+/// finish a stop it handed over: the longest stop, plus time for that
+/// instance's `run_game` to see the game's process exit, record the session
+/// and release the lock.
 const HANDED_OVER_STOP_WAIT: Duration =
     GRACEFUL_STOP_MAX.saturating_add(STOP_STEP.saturating_mul(2));
 
@@ -650,22 +651,24 @@ fn launch_locked_elsewhere(id: Uuid) -> bool {
 
 /// `prefixr game stop` in a Flatpak, for a game whose processes it can't
 /// see: every `flatpak run` is its own PID namespace. The game's lock file
-/// tells whether another Prefixr process runs it; the window, if that's the
-/// one, gets the stop handed over (`--stop`, see `run()` in `lib.rs`), and
-/// this waits until the game's lock is released. Says so when the game runs
-/// in a Prefixr without a window (a Steam `--run`, a CLI `game launch`), or
-/// not at all, instead of reporting a stop that didn't happen.
-pub async fn stop_game_in_window(dbus_id: &str, id: Uuid, game_name: &str) -> Result<(), AppError> {
+/// tells whether another Prefixr process runs it. That process owns the
+/// game's D-Bus name (see `game_control`), whether it's the window, a CLI
+/// `game launch` or a Steam `--run`; it gets the stop, and this waits until
+/// the game's lock is released. Instead of reporting a stop that didn't
+/// happen, says so when the game isn't running, or when its process didn't
+/// take the stop (still preparing the launch, or an older Prefixr).
+pub async fn stop_game_in_other_instance(id: Uuid, game_name: &str) -> Result<(), AppError> {
     let game_name = game_name.to_string();
     if !launch_locked_elsewhere(id) {
         return Err(AppError::GameNotRunning { game_name });
     }
-    let argv = ["prefixr".to_string(), "--stop".to_string(), id.to_string()];
-    let dbus_id = dbus_id.to_string();
-    let forwarded = tokio::task::spawn_blocking(move || forward_to_window(&dbus_id, &argv))
-        .await
-        .unwrap_or(false);
-    if forwarded {
+    let requested = match flatpak_id() {
+        Some(app_id) => tokio::task::spawn_blocking(move || request_stop(&app_id, id))
+            .await
+            .unwrap_or(false),
+        None => false,
+    };
+    if requested {
         let deadline = Instant::now() + HANDED_OVER_STOP_WAIT;
         while Instant::now() < deadline {
             if !launch_locked_elsewhere(id) {
@@ -1884,6 +1887,17 @@ async fn run_game(
         },
     );
     rebuild_tray_menu(app);
+    // In a Flatpak, so `prefixr game stop` from another instance reaches it.
+    let game_name = match flatpak_id() {
+        Some(app_id) => {
+            let app = app.clone();
+            tokio::task::spawn_blocking(move || serve_game_name(&app, &app_id, game_id))
+                .await
+                .ok()
+                .flatten()
+        }
+        None => None,
+    };
 
     let _ = app.emit(
         "game-started",
@@ -1908,6 +1922,9 @@ async fn run_game(
         let _ = tokio::task::spawn_blocking(move || drop(inhibition)).await;
     }
 
+    if let Some(name) = game_name {
+        let _ = tokio::task::spawn_blocking(move || drop(name)).await;
+    }
     running.0.locked().remove(&game_id);
     rebuild_tray_menu(app);
     let (session_app, key) = (app.clone(), game_key(&game));
