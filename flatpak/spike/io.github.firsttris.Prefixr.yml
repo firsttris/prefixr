@@ -88,4 +88,4 @@ modules:
       - install -Dm644 usr/share/icons/hicolor/128x128/apps/prefixr.png /app/share/icons/hicolor/128x128/apps/io.github.firsttris.Prefixr.png
       - install -Dm644 usr/share/icons/hicolor/256x256@2/apps/prefixr.png /app/share/icons/hicolor/256x256/apps/io.github.firsttris.Prefixr.png
       - install -Dm644 usr/share/applications/prefixr.desktop /app/share/applications/io.github.firsttris.Prefixr.desktop
-      - desktop-file-edit --set-icon=io.github.firsttris.Prefixr --set-name=Prefixr /app/share/applications/io.github.firsttris.Prefixr.desktop
+      - desktop-file-edit --set-icon=io.github.firsttris.Prefixr --set-name=Prefixr --set-key=StartupWMClass --set-value=io.github.firsttris.Prefixr /app/share/applications/io.github.firsttris.Prefixr.desktop

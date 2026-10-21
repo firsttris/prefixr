@@ -8,6 +8,8 @@ use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use uuid::Uuid;
 
 use crate::commands::games::{kill_running_game, LaunchingGames, RunningGames};
+use crate::env;
+use crate::host_env::flatpak_shared_runtime_dir;
 use crate::locale::{text, Locale, LocaleState};
 use crate::lock::LockExt;
 
@@ -333,6 +335,12 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
         });
     if let Some(icon) = icon {
         builder = builder.icon(icon);
+    }
+    // The icon is written to a file the desktop's tray host reads by path;
+    // in a Flatpak only this folder has the same path on the host (seen in
+    // the spike: the default `$XDG_RUNTIME_DIR/tray-icon` is the sandbox's).
+    if let Some(dir) = flatpak_shared_runtime_dir(&env::process) {
+        builder = builder.temp_dir_path(dir.join("tray-icon"));
     }
     builder.build(app)?;
     Ok(())

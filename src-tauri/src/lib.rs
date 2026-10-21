@@ -139,6 +139,13 @@ pub fn run() {
         cli::run(&args, context);
     }
     let run_game_id = find_run_arg(&args);
+    // GTK names the window after the program: its Wayland app_id and X11
+    // WM_CLASS. In a Flatpak that has to be the app ID, or the desktop can't
+    // match the window to the Flatpak's desktop file (taskbar icon, pinning).
+    // Lutris does the same (`GLib.set_prgname`). Natively the name stays.
+    if let Some(id) = flatpak_id() {
+        glib::set_prgname(Some(id.as_str()));
+    }
 
     let mut builder = tauri::Builder::default();
     // A `--run` game runs in a process of its own, next to an open Prefixr,
