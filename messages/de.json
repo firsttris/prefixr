@@ -401,6 +401,8 @@
   "performanceEditor_inhibit_sleep_enabled_info": "Empfehlung: Praktisch immer sinnvoll — verhindert, dass der Bildschirmschoner oder der Energiesparmodus mitten im Spiel zuschlägt. Braucht systemd-inhibit; ohne das passiert einfach nichts.",
   "graphicsSettings_title": "Bild",
   "graphicsSettings_hint": "Was mit dem Bild des Spiels passiert, bevor es auf dem Bildschirm landet. Gilt für alle Spiele und lässt sich pro Spiel überschreiben (Spiel bearbeiten → Bild).",
+  "flatpakExtension_hint": "Im Flatpak braucht {tool} seine Erweiterung von Flathub; ohne sie hat diese Einstellung keine Wirkung. Installieren mit:",
+  "flatpakExtension_unavailable": "Im Flatpak braucht {tool} seine Erweiterung von Flathub, die es für diese Runtime noch nicht gibt; hier hat diese Einstellung deshalb keine Wirkung.",
   "graphicsEditor_gamescopeLabel": "Gamescope",
   "graphicsEditor_gamescopeDescription": "Startet das Spiel in einer eigenen, verschachtelten Compositor-Session.",
   "graphicsEditor_gamescopeInfo": "Empfehlung: Für Handhelds/TV-Setups oder um Auflösung und FPS-Limit unabhängig vom Spiel zu erzwingen. Braucht das gamescope-Paket; ohne das passiert einfach nichts. Wird übersprungen, wenn prefixr selbst schon in einer Gamescope-Session läuft.",

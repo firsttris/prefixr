@@ -28,6 +28,7 @@ use commands::backup::{
     save_backup_config,
 };
 use commands::compatibility::get_compatibility;
+use commands::flatpak_extensions::missing_flatpak_extensions;
 use commands::games::{
     add_game, create_desktop_shortcut, create_menu_shortcut, ensure_install_desktop_entry,
     kill_game, launch_game, launch_game_headless, list_active_games, list_games, remove_game,
@@ -338,6 +339,7 @@ pub fn run() {
             get_graphics_config,
             save_graphics_config,
             get_directx_layers_status,
+            missing_flatpak_extensions,
             update_directx_layers,
             get_proton_config,
             save_proton_config,
