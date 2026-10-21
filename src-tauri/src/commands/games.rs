@@ -39,6 +39,7 @@ use crate::models::{
     normalize_umu_id, normalize_umu_store, split_launch_args, Game, GameInput, Runner, RunnerKind,
     StorePrerequisites,
 };
+use crate::portal::Inhibition;
 use crate::single_instance::forward_to_window;
 use crate::tray::rebuild_tray_menu;
 
@@ -1757,7 +1758,10 @@ async fn run_game(
         launch_chain = wrapped;
     }
 
+    // In a Flatpak there's no systemd-inhibit; the Inhibit portal does the
+    // same there (see `screen_inhibition` below).
     let use_inhibit_sleep = performance.inhibit_sleep_enabled
+        && !is_flatpak()
         && command_on_path("systemd-inhibit")
         && Path::new("/run/dbus/system_bus_socket").exists();
     if use_inhibit_sleep {
@@ -1889,8 +1893,20 @@ async fn run_game(
         },
     );
 
+    let screen_inhibition = if performance.inhibit_sleep_enabled && is_flatpak() {
+        tokio::task::spawn_blocking(|| Inhibition::new("A game is running"))
+            .await
+            .ok()
+            .flatten()
+    } else {
+        None
+    };
+
     let started_at = Instant::now();
     let wait_result = child.wait().await;
+    if let Some(inhibition) = screen_inhibition {
+        let _ = tokio::task::spawn_blocking(move || drop(inhibition)).await;
+    }
 
     running.0.locked().remove(&game_id);
     rebuild_tray_menu(app);
