@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.firsttris.Prefixr</id>
+  <name>Prefixr</name>
+  <summary>Run Windows games with Wine and Proton</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-only</project_license>
+  <developer id="io.github.firsttris">
+    <name>Tristan Teufel</name>
+  </developer>
+  <description>
+    <p>
+      Prefixr manages Wine and Proton prefixes for Windows games on Linux: add a game, pick a
+      runner, and start it. It downloads Proton-GE, Wine and umu-launcher itself, applies the
+      game's protonfixes, and sets up DXVK, MangoHud, Gamescope and GameMode per game.
+    </p>
+    <ul>
+      <li>A library with artwork from SteamGridDB, categories and play time</li>
+      <li>Games from Epic Games, GOG and Amazon Games</li>
+      <li>Shortcuts for the desktop, the start menu and Steam</li>
+      <li>A command line for scripts and AI agents</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">io.github.firsttris.Prefixr.desktop</launchable>
+  <url type="homepage">https://github.com/firsttris/prefixr</url>
+  <url type="bugtracker">https://github.com/firsttris/prefixr/issues</url>
+  <url type="vcs-browser">https://github.com/firsttris/prefixr</url>
+  <categories>
+    <category>Game</category>
+  </categories>
+  <content_rating type="oars-1.1"/>
+  <branding>
+    <color type="primary" scheme_preference="light">#5b8cff</color>
+    <color type="primary" scheme_preference="dark">#4576f0</color>
+  </branding>
+  <releases>
+    <release version="0.1.10" date="2026-10-21"/>
+  </releases>
+</component>
