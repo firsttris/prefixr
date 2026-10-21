@@ -86,8 +86,6 @@ jobs:
             src-tauri/target/release/bundle/**/*.AppImage.tar.gz
             src-tauri/target/release/bundle/**/*.deb
             src-tauri/target/release/bundle/**/*.rpm
-            src-tauri/target/release/bundle/**/*.tar.gz
-            src-tauri/target/release/bundle/**/*.zip
             src-tauri/target/release/bundle/**/*.sig
 
   release:
