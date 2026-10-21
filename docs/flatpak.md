@@ -171,11 +171,40 @@ The most important result. Host view while Quake runs, started from the window:
   proton script, whose command lines contain the exe path, and `wineserver -k9` kills the
   wineserver. Natively `pv-adverb` runs as PID 1 of its own namespace, and killing it takes the
   whole container down. In the Flatpak the container shares the app's namespace, so the Wine
-  processes survive without their wineserver and hang. A plain SIGTERM to `umu-run`, without the
-  rest, ended the same game cleanly in under a second: umu passes it to
-  `steam-runtime-launch-client`, which ends the sub-sandbox through the portal. Far Cry 5 (Wine)
-  leaves the same orphaned Wine services behind, and so does the native build: on the test machine
-  `services.exe` and `explorer.exe` from native Far Cry sessions were still running hours later.
+  processes survive without their wineserver and hang. Far Cry 5 (Wine) leaves the same orphaned
+  Wine services behind, and so does the native build: on the test machine `services.exe` and
+  `explorer.exe` from native Far Cry sessions were still running hours later. Which stop sequence
+  works instead is in [Stopping, measured](#stopping-measured).
+
+### Stopping, measured
+
+After the first results, the stop sequences of Lutris and Bottles were tried by hand on a game
+started from the window, without changing Prefixr. A script sampled every process with the game's
+marker every 0.5 s while one step ran (`flatpak enter <instance> …`, so the step runs inside the
+app's sandbox). "Clean" means: no marked process left, no zombie, no window left.
+
+| Test | Step | Result |
+| --- | --- | --- |
+| P1 (Lutris) | `umu-run wineboot -k` with `PROTON_VERB=runinprefix`, `GAMEID`, `PROTONPATH`, `WINEPREFIX` of the game | Clean: 16 processes, 0 after about 1.5 s. Same result twice |
+| P1b | The same, after `umu-run` was already gone | Clean after about 1 s |
+| P2 (Bottles) | SIGTERM to `umu-run` only | **Not enough:** `umu-run` and `steam-runtime-launch-client` end, the container with the game keeps running (14 processes after 15 s). Prefixr shows "Game exited with status 143" while the game still runs |
+| P3 | SIGTERM to every marked process | Clean after about 2 s |
+| W1 | SIGTERM to the Wine game's process (Prefixr's child) | Clean after about 4 s: `wineserver` ends the Wine services itself |
+| W2 (Lutris) | `wineserver -k`, without `-9` | Clean after about 1 s |
+| today | `wineserver -k9` and `pkill -9 -f <exe>` | Hangs (point 3) |
+
+Conclusions:
+
+- The hang comes from the hard kills, not from the sandbox. The soft steps of Lutris all work.
+- For Proton, the reliable first step is `umu-run wineboot -k` (Lutris). Signalling `umu-run`
+  (Bottles) isn't enough in the Flatpak, because the portal, not umu, owns the container. That
+  P2 result differs from the very first run in point 3, where the outer `flatpak run` had been
+  ended before. P2 is the clean measurement.
+- When `umu-run` ends but marked processes remain, the game still runs. The end of a game has to
+  look at the marked processes, not only at Prefixr's child.
+- `wineboot -k` has to run with the game's `WINEPREFIX`, `GAMEID` and `PROTONPATH`. Without them
+  umu falls back to `umu-default` and downloads UMU-Proton (happened once during the test; the
+  download was removed).
 
 ### 4. A second `flatpak run` instance
 
@@ -229,9 +258,9 @@ sandbox unchanged.
 
 ### Side findings
 
-- The play button on the *Weiterspielen* card of Far Cry 5 didn't react (three clicks, no launch,
-  no log), while *Spielen* in the details panel started it at once. Probably not Flatpak-specific;
-  check in the native build.
+- Clicks on the *Weiterspielen* row sometimes started nothing, or a different game. The row sorts
+  itself by last played after every launch, so a card moves while the pointer stays. *Spielen* in
+  the details panel always worked. Not Flatpak-specific.
 - `--socket=fallback-x11` only falls back when the host has no Wayland session. To test X11 on a
   Wayland desktop, add `--socket=x11`.
 
@@ -394,9 +423,10 @@ The spike settled how this works (see [Spike results](#spike-results), points 3 
 - An environment marker in the game's environment is readable in every game process.
 - Prefixr's own child (`umu-run`, or the Wine process) stays alive until the game ends, so waiting
   on it still gives the end of the game and the play time.
-- A SIGTERM to `umu-run` alone ends a Proton game cleanly. Today's `kill_running_game` adds
-  `wineserver -k9` and `pkill -9 -f <exe>` straight away. The `pkill` also kills `pv-adverb`, and
-  the game hangs.
+- Today's `kill_running_game` uses `wineserver -k9` and `pkill -9 -f <exe>`. The `pkill` also
+  kills `pv-adverb`, and the game hangs. The soft steps of Lutris (`umu-run wineboot -k`,
+  `wineserver -k`, SIGTERM to the marked processes) each end the game cleanly. A SIGTERM to
+  `umu-run` alone does not: the container keeps running ([Stopping, measured](#stopping-measured)).
 - A second `flatpak run` instance sees none of this.
 
 **What the others do:**
@@ -418,20 +448,22 @@ The spike settled how this works (see [Spike results](#spike-results), points 3 
 - **umu** itself sets `PR_SET_CHILD_SUBREAPER`, starts a new session and passes SIGTERM and SIGINT
   on to its process tree (`umu_run.py`).
 
-**Plan (Lutris for finding, Lutris and Bottles for stopping):**
+**Plan (Lutris for finding and stopping, measured in the spike):**
 
 1. `run_game` sets `PREFIXR_GAME_ID=<id>` in the game's environment, in both builds. It is only an
    extra variable, so the native build behaves as before.
 2. A game's processes are those whose `/proc/<pid>/environ` holds that marker, plus the process
    group.
 3. Stopping in the Flatpak (`is_flatpak()`), in this order:
-   1. SIGTERM to `umu-run` (Proton) or to the Wine process Prefixr started (Bottles).
+   1. Proton: `umu-run wineboot -k` with `PROTON_VERB=runinprefix` and the game's `WINEPREFIX`,
+      `GAMEID` and `PROTONPATH` (Lutris; test P1). Wine: `wineserver -k` without `-9` (Lutris;
+      test W2).
    2. Wait up to 5 s for the marked processes to end (Lutris, Bottles).
-   3. If any are left: `umu-run wineboot -k` with `PROTON_VERB=runinprefix` in the game's prefix
-      (Lutris), or `wineserver -k` without `-9` for a Wine game. Wait again.
-   4. SIGTERM, and after 5 s SIGKILL, to the marked processes that are still left.
+   3. SIGTERM to the marked processes that are left (test P3), wait 5 s.
+   4. Only then SIGKILL to what's still left.
 
-   No `pkill -f <exe>` in the Flatpak: it hits `pv-adverb`.
+   Not first: a SIGTERM to `umu-run` (Bottles). In the Flatpak it ends umu but not the container
+   (test P2). No `pkill -f <exe>` and no `wineserver -k9`: they cause the hang.
 4. The native build keeps today's `kill_running_game` and `end_game_session` unchanged, so the
    AppImage doesn't change. The native build leaves orphaned Wine services behind too (spike, point
    3), so it may move to the same sequence later, but only as a change of its own, tested natively.
