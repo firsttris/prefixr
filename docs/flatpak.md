@@ -454,7 +454,7 @@ The spike settled how this works (see [Spike results](#spike-results), points 3 
    extra variable, so the native build behaves as before.
 2. A game's processes are those whose `/proc/<pid>/environ` holds that marker, plus the process
    group.
-3. Stopping in the Flatpak (`is_flatpak()`), in this order:
+3. Stopping, in this order (done in #49 for the Flatpak and #50 natively):
    1. Proton: `umu-run wineboot -k` with `PROTON_VERB=runinprefix` and the game's `WINEPREFIX`,
       `GAMEID` and `PROTONPATH` (Lutris; test P1). Wine: `wineserver -k` without `-9` (Lutris;
       test W2).
@@ -464,9 +464,10 @@ The spike settled how this works (see [Spike results](#spike-results), points 3 
 
    Not first: a SIGTERM to `umu-run` (Bottles). In the Flatpak it ends umu but not the container
    (test P2). No `pkill -f <exe>` and no `wineserver -k9`: they cause the hang.
-4. The native build keeps today's `kill_running_game` and `end_game_session` unchanged, so the
-   AppImage doesn't change. The native build leaves orphaned Wine services behind too (spike, point
-   3), so it may move to the same sequence later, but only as a change of its own, tested natively.
+4. The native build uses the same sequence whenever it can see the marked processes (#50, after
+   the [third decision](#decisions) changed). Today's `kill_running_game` and `end_game_session`
+   stay as the fallback where it can't: a distrobox, whose rootless container can't read the host's
+   `/proc/<pid>/environ`, and games started by an older Prefixr.
 5. The game has ended when Prefixr's child has exited and no marked process is left (Lutris'
    heartbeat). Play time is counted until then. Leftover daemons no longer keep the game "running"
    after a stop.
@@ -619,10 +620,12 @@ Made on 2026-10-21, after the spike.
    only one of the four with it.
 2. **`--filesystem=home`.** Games and prefixes can be anywhere, and an agent passes any path
    (Lutris, Faugus).
-3. **The marker in both builds, the new stop sequence only in the Flatpak.** `PREFIXR_GAME_ID` is
-   set and used to find processes in both builds; an extra variable doesn't change the native
-   behaviour. The stop sequence from phase 3 runs behind `is_flatpak()`; the AppImage keeps
-   today's. Moving the native build over is a separate decision, after testing it natively.
+3. **The marker and the Lutris stop in both builds** (changed on the same day). First the new stop
+   sequence was meant for the Flatpak only. The native build turned out to leave orphaned wine
+   services behind too (`services.exe` from killed sessions still running 18 hours later), and the
+   Lutris sequence tested clean natively as well. So it runs wherever the game's marked processes
+   can be seen; the old sequence stays as the fallback where they can't (a distrobox, games started
+   by an older Prefixr). Done in #49 (Flatpak) and #50 (native).
 4. **Releases first, Flathub later.** A `.flatpak` bundle in the GitHub releases next to the
    AppImage, so sandbox issues show up with users who installed it on purpose before Flathub's
    review.
