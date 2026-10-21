@@ -13,11 +13,13 @@
   const missing = $derived($missingExtensions.find((extension) => extension.tool === tool));
 </script>
 
-{#if missing}
+{#if missing?.command}
   <p class="hint">
     {m.flatpakExtension_hint({ tool: name })}
     <code>{missing.command}</code>
   </p>
+{:else if missing}
+  <p class="hint">{m.flatpakExtension_unavailable({ tool: name })}</p>
 {/if}
 
 <style>

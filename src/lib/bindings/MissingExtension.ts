@@ -6,6 +6,7 @@ export type MissingExtension = {
  */
 tool: string, 
 /**
- * The command that installs its extension.
+ * The command that installs its extension; `None` when Flathub has no
+ * build of it for the runtime's branch yet.
  */
-command: string, };
+command: string | null, };

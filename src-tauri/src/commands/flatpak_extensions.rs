@@ -17,11 +17,13 @@ const EXTENSIONS_DIR: &str = "/usr/lib/extensions/vulkan";
 /// (GNOME 51), the same as the manifests' `version: "26.08"`.
 const EXTENSION_BRANCH: &str = "26.08";
 
-/// The tools, by the name the frontend uses and their extension's name.
-const TOOLS: &[(&str, &str)] = &[
-    ("gamescope", "gamescope"),
-    ("mangohud", "MangoHud"),
-    ("vkbasalt", "vkBasalt"),
+/// The tools: the name the frontend uses, their extension's name, and
+/// whether Flathub has a build of it for `EXTENSION_BRANCH` (vkBasalt only
+/// goes up to 25.08, which the 26.08 runtime doesn't load).
+const TOOLS: &[(&str, &str, bool)] = &[
+    ("gamescope", "gamescope", true),
+    ("mangohud", "MangoHud", true),
+    ("vkbasalt", "vkBasalt", false),
 ];
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -29,8 +31,9 @@ const TOOLS: &[(&str, &str)] = &[
 pub struct MissingExtension {
     /// `gamescope`, `mangohud` or `vkbasalt`.
     pub tool: String,
-    /// The command that installs its extension.
-    pub command: String,
+    /// The command that installs its extension; `None` when Flathub has no
+    /// build of it for the runtime's branch yet.
+    pub command: Option<String>,
 }
 
 /// The tools whose extension isn't installed, in a Flatpak; empty natively.
@@ -45,12 +48,14 @@ pub fn missing_flatpak_extensions() -> Vec<MissingExtension> {
 fn missing_in(extensions_dir: &Path) -> Vec<MissingExtension> {
     TOOLS
         .iter()
-        .filter(|(_, name)| !extensions_dir.join(name).is_dir())
-        .map(|(tool, name)| MissingExtension {
+        .filter(|(_, name, _)| !extensions_dir.join(name).is_dir())
+        .map(|(tool, name, on_flathub)| MissingExtension {
             tool: tool.to_string(),
-            command: format!(
-                "flatpak install flathub org.freedesktop.Platform.VulkanLayer.{name}//{EXTENSION_BRANCH}"
-            ),
+            command: on_flathub.then(|| {
+                format!(
+                    "flatpak install flathub org.freedesktop.Platform.VulkanLayer.{name}//{EXTENSION_BRANCH}"
+                )
+            }),
         })
         .collect()
 }
@@ -70,11 +75,15 @@ mod tests {
             vec![
                 MissingExtension {
                     tool: "gamescope".into(),
-                    command: "flatpak install flathub org.freedesktop.Platform.VulkanLayer.gamescope//26.08".into(),
+                    command: Some(
+                        "flatpak install flathub org.freedesktop.Platform.VulkanLayer.gamescope//26.08"
+                            .into()
+                    ),
                 },
+                // Not on Flathub for 26.08 (review of #60).
                 MissingExtension {
                     tool: "vkbasalt".into(),
-                    command: "flatpak install flathub org.freedesktop.Platform.VulkanLayer.vkBasalt//26.08".into(),
+                    command: None,
                 },
             ]
         );

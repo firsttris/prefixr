@@ -402,6 +402,7 @@
   "graphicsSettings_title": "Graphics",
   "graphicsSettings_hint": "What happens to the game's picture before it reaches the screen. Applies to all games and can be overridden per game (edit game → Graphics).",
   "flatpakExtension_hint": "In the Flatpak, {tool} needs its extension from Flathub; without it this setting does nothing. Install it with:",
+  "flatpakExtension_unavailable": "In the Flatpak, {tool} needs its extension from Flathub, which doesn't exist for this runtime yet, so this setting does nothing here.",
   "graphicsEditor_gamescopeLabel": "Gamescope",
   "graphicsEditor_gamescopeDescription": "Launches the game in its own, nested compositor session.",
   "graphicsEditor_gamescopeInfo": "Recommendation: for handhelds/TV setups, or to force resolution and FPS limit independent of the game. Needs the gamescope package; without it, nothing happens. Skipped when Prefixr itself is already running inside a Gamescope session.",
