@@ -488,6 +488,21 @@ pub fn game_processes_visible(id: Uuid) -> bool {
 /// How long each step of `stop_game_gracefully` gives the game to end.
 const STOP_STEP: Duration = Duration::from_secs(5);
 
+/// The longest `end_wine_session` waits for umu or wineserver.
+const END_WINE_SESSION_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// The longest `stop_game_gracefully` takes: `end_wine_session`, then a
+/// `STOP_STEP` for the session to end, one after SIGTERM and one after
+/// SIGKILL.
+const GRACEFUL_STOP_MAX: Duration =
+    END_WINE_SESSION_TIMEOUT.saturating_add(STOP_STEP.saturating_mul(3));
+
+/// How long `prefixr game stop` waits for the window to finish a stop it
+/// handed over: the longest stop, plus time for the window's `run_game` to
+/// see the game's process exit, record the session and release the lock.
+const HANDED_OVER_STOP_WAIT: Duration =
+    GRACEFUL_STOP_MAX.saturating_add(STOP_STEP.saturating_mul(2));
+
 /// Waits up to `timeout` for the game's last marked process to end; whether
 /// it did.
 async fn marked_processes_end(id: Uuid, timeout: Duration) -> bool {
@@ -593,7 +608,7 @@ async fn end_wine_session(session: &WineSession, log_path: Option<&Path>) {
         Some(Ok((out, err))) => command.stdout(out).stderr(err),
         _ => command.stdout(Stdio::null()).stderr(Stdio::null()),
     };
-    let _ = tokio::time::timeout(STOP_STEP * 2, command.status()).await;
+    let _ = tokio::time::timeout(END_WINE_SESSION_TIMEOUT, command.status()).await;
 }
 
 /// The wine session of `game` under `runner`, for `prefixr game stop`,
@@ -650,9 +665,7 @@ pub async fn stop_game_in_window(dbus_id: &str, id: Uuid, game_name: &str) -> Re
         .await
         .unwrap_or(false);
     if forwarded {
-        // `stop_game_gracefully` takes at most three `STOP_STEP`s, then the
-        // window's `run_game` ends and releases the lock.
-        let deadline = Instant::now() + STOP_STEP * 4;
+        let deadline = Instant::now() + HANDED_OVER_STOP_WAIT;
         while Instant::now() < deadline {
             if !launch_locked_elsewhere(id) {
                 return Ok(());
