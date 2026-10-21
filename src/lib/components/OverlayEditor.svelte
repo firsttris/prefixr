@@ -2,6 +2,7 @@
   import * as m from "$lib/paraglide/messages";
   import { msgGroup } from "$lib/i18n/msg-groups";
   import SettingToggle from "$lib/components/SettingToggle.svelte";
+  import ExtensionHint from "$lib/components/ExtensionHint.svelte";
   import { COLORS, POSITIONS, PRESETS, type MangoHudPreset } from "$lib/mangohudPresets";
   import type { OverrideHooks } from "$lib/settings";
   import type { MangoHudConfig, MangoHudLayout } from "$lib/types";
@@ -40,6 +41,9 @@
     resetTitle={overrides?.resetTitle("enabled")}
     onReset={overrides && (() => overrides.reset("enabled"))}
   />
+  {#if value.enabled}
+    <ExtensionHint tool="mangohud" name="MangoHud" />
+  {/if}
 
   <div class="look" class:overridden={overrides?.isOverridden("layout")}>
     <div class="look-header">

@@ -2,6 +2,7 @@ pub mod about;
 pub mod backup;
 pub mod binary_vdf;
 pub mod compatibility;
+pub mod flatpak_extensions;
 pub mod games;
 pub mod github;
 pub mod graphics;

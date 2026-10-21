@@ -2,6 +2,7 @@
   import * as m from "$lib/paraglide/messages";
   import InfoIcon from "$lib/components/InfoIcon.svelte";
   import SettingToggle from "$lib/components/SettingToggle.svelte";
+  import ExtensionHint from "$lib/components/ExtensionHint.svelte";
   import type { OverrideHooks } from "$lib/settings";
   import type { GamescopeSettings, GraphicsConfig, VkBasaltSettings } from "$lib/types";
 
@@ -53,6 +54,7 @@
     onReset={overrides && (() => overrides.reset("gamescope"))}
   >
     {#if value.gamescope.enabled}
+      <ExtensionHint tool="gamescope" name="Gamescope" />
       <div class="field-grid">
         <label>
           {m.graphicsEditor_widthLabel()}
@@ -107,6 +109,7 @@
     onReset={overrides && (() => overrides.reset("vkbasalt"))}
   >
     {#if value.vkbasalt.enabled}
+      <ExtensionHint tool="vkbasalt" name="vkBasalt" />
       <div class="vkbasalt" class:compact>
         {#if !compact}
           <div class="preview">
