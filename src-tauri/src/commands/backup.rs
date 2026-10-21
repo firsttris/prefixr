@@ -28,6 +28,7 @@ use crate::config::{
     config_file_path, load_config, lock_config, save_config, to_disk_json, AppConfig, ConfigState,
 };
 use crate::error::AppError;
+use crate::host_env::{host_config_home, is_flatpak};
 use crate::lock::LockExt;
 use crate::models::BackupConfig;
 
@@ -713,6 +714,25 @@ pub fn list_backups(app: AppHandle) -> Result<Vec<BackupInfo>, AppError> {
         .iter()
         .filter_map(|path| backup_info(path).ok())
         .collect())
+}
+
+/// The native build's config file (AppImage, .deb, .rpm), when Prefixr
+/// runs as a Flatpak and that file exists on the host: the Flatpak keeps its
+/// library in `~/.var/app/<id>` and starts empty, so the empty library says
+/// how to bring the native one over with a backup. `None` natively.
+#[tauri::command]
+pub fn native_library(app: AppHandle) -> Option<String> {
+    if !is_flatpak() {
+        return None;
+    }
+    let identifier = &app.config().identifier;
+    native_config_file(&crate::env::process, identifier)
+        .filter(|path| path.is_file())
+        .map(|path| path.to_string_lossy().into_owned())
+}
+
+fn native_config_file(env: crate::env::Env, identifier: &str) -> Option<PathBuf> {
+    Some(host_config_home(env)?.join(identifier).join("config.json"))
 }
 
 #[tauri::command]

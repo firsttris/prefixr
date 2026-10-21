@@ -189,3 +189,21 @@ fn flatpak_shared_runtime_dir_is_below_the_app_id() {
     let no_runtime_dir = crate::env::fake(&[("FLATPAK_ID", "io.github.firsttris.Prefixr")]);
     assert_eq!(flatpak_shared_runtime_dir(&no_runtime_dir), None);
 }
+
+#[test]
+fn host_config_home_in_a_flatpak_is_the_hosts() {
+    let env = crate::env::fake(&[
+        ("FLATPAK_ID", "io.github.firsttris.Prefixr"),
+        (
+            "XDG_CONFIG_HOME",
+            "/home/u/.var/app/io.github.firsttris.Prefixr/config",
+        ),
+        ("HOME", "/home/u"),
+    ]);
+    assert_eq!(
+        host_config_home(&env),
+        Some(PathBuf::from("/home/u/.config"))
+    );
+    let native = crate::env::fake(&[("XDG_CONFIG_HOME", "/cfg"), ("HOME", "/home/u")]);
+    assert_eq!(host_config_home(&native), Some(PathBuf::from("/cfg")));
+}

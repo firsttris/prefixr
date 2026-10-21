@@ -398,8 +398,8 @@ async fn change_steam(
 ) -> Result<SteamChange, AppError> {
     // Heroic's Flatpak checks `steam.pid` with `kill(pid, 0)`, which can't
     // see the host's processes and always says "not running" (the spike).
-    // Without the permission to run commands on the host (the first
-    // decision in docs/flatpak.md), the user closes Steam.
+    // Without the permission to run commands on the host (see the Flatpak
+    // section in docs/development.md), the user closes Steam.
     if is_flatpak() {
         if !shutdown_steam {
             return Ok(SteamChange::CloseSteamFirst);

@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 
 use super::Out;
 use crate::error::AppError;
+use crate::host_env::flatpak_id;
 
 pub(crate) const SKILL: &str = include_str!("../../../skills/prefixr/SKILL.md");
 
@@ -36,8 +37,29 @@ fn default_dir() -> Result<PathBuf, AppError> {
 pub(crate) fn install(dir: &Path) -> Result<PathBuf, String> {
     fs::create_dir_all(dir).map_err(|e| format!("Could not create {}: {e}", dir.display()))?;
     let path = dir.join("SKILL.md");
-    fs::write(&path, SKILL).map_err(|e| format!("Could not write {}: {e}", path.display()))?;
+    let text = skill_text(flatpak_id().as_deref());
+    fs::write(&path, text).map_err(|e| format!("Could not write {}: {e}", path.display()))?;
     Ok(path)
+}
+
+/// The skill, for a Flatpak with a note right below its title: there the
+/// command is `flatpak run <app ID>`, and an agent should use that from the
+/// start rather than find out that `prefixr` isn't on PATH.
+fn skill_text(flatpak_id: Option<&str>) -> String {
+    let Some(id) = flatpak_id else {
+        return SKILL.to_string();
+    };
+    let note = format!(
+        "\n> **This Prefixr is a Flatpak.** Run `flatpak run {id}` wherever this file says \
+         `prefixr`, e.g. `flatpak run {id} game list --json`.\n"
+    );
+    match SKILL.find("\n# Prefixr\n") {
+        Some(title) => {
+            let end = title + "\n# Prefixr\n".len();
+            format!("{}{note}{}", &SKILL[..end], &SKILL[end..])
+        }
+        None => format!("{SKILL}{note}"),
+    }
 }
 
 #[derive(serde::Serialize)]
