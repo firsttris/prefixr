@@ -97,28 +97,13 @@ pub struct RunningGame {
     /// `kill_running_game` takes down. `None` only if the OS didn't report
     /// one.
     pub pid: Option<u32>,
-    /// Path to the `wineserver` binary belonging to the runner this game was
-    /// launched with, and the `WINEPREFIX` it's managing that game's session
-    /// under — the fallback half of `kill_running_game`. When a runner is
-    /// invoked through `distrobox-host-exec` (see `runner_command`), the
-    /// process actually runs on the host, in a different PID namespace than
-    /// this app, so `pid` above only ever reaches the local relay, not the
-    /// real process. Running `wineserver -k` through the same
-    /// `runner_command` reaches the real session either way, because
-    /// wineserver finds it via the prefix's socket file rather than by PID.
-    pub wineserver: PathBuf,
-    pub wineprefix: String,
+    /// How to reach the game's wine session, for `kill_running_game`.
+    pub session: WineSession,
     /// The game's own exe path, as passed to wine/umu-run. Present verbatim
     /// in the command line of the process we spawned and the ones below it,
     /// so it doubles as a `pkill -f` pattern — see `kill_running_game`.
     pub exe_path: PathBuf,
-    /// The runner binary (umu-run or wine) and the environment the game
-    /// was started with. In a Flatpak, `stop_game_flatpak` asks umu to end
-    /// the game's wine session with exactly these (`umu-run wineboot -k`).
-    pub runner_binary: PathBuf,
-    pub runner_kind: RunnerKind,
-    pub runner_env: Vec<(String, String)>,
-    /// The launch's log, where `stop_game_flatpak` notes its steps.
+    /// The launch's log, where `stop_game_gracefully` notes its steps.
     pub log_path: PathBuf,
     /// Set by `kill_running_game`, so `run_game` doesn't report the exit
     /// status of a game the user ended as a launch error.
@@ -127,6 +112,31 @@ pub struct RunningGame {
 
 #[derive(Default)]
 pub struct RunningGames(pub Mutex<HashMap<Uuid, RunningGame>>);
+
+/// What it takes to reach a game's wine session from outside: to ask it to
+/// end (`end_wine_session`) or, as a fallback, to kill it
+/// (`end_game_session`).
+#[derive(Clone)]
+pub struct WineSession {
+    pub kind: RunnerKind,
+    /// umu-run, for a Proton game.
+    pub umu_run: PathBuf,
+    /// The game's environment. umu needs at least `WINEPREFIX`, `PROTONPATH`
+    /// and the game's `GAMEID`: without `PROTONPATH` it picks its default
+    /// Proton and downloads it.
+    pub env: Vec<(String, String)>,
+    /// Path to the `wineserver` binary belonging to the runner this game was
+    /// launched with, and the `WINEPREFIX` it's managing that game's session
+    /// under. When a runner is invoked through `distrobox-host-exec` (see
+    /// `runner_command`), the process actually runs on the host, in a
+    /// different PID namespace than this app, so `RunningGame::pid` only
+    /// ever reaches the local relay, not the real process. Running
+    /// `wineserver -k` through the same `runner_command` reaches the real
+    /// session either way, because wineserver finds it via the prefix's
+    /// socket file rather than by PID.
+    pub wineserver: PathBuf,
+    pub wineprefix: String,
+}
 
 /// Games with a `launch_game` in progress, from the click until the game
 /// exits. Unlike `RunningGames`, this also covers the preparation before
@@ -344,10 +354,15 @@ fn pkill_pattern(text: &str) -> String {
     pattern
 }
 
-/// Kills a running game's whole session, used by both the `kill_game`
+/// Ends a running game's whole session, used by both the `kill_game`
 /// command and the tray menu's per-game "beenden" entries. The tracked entry
 /// itself is removed once `launch_game`'s `child.wait()` observes the
 /// process actually exiting, not here.
+///
+/// `stop_game_gracefully` whenever the game's processes can be seen by
+/// their marker (`GAME_ID_VAR`), so natively and in a Flatpak. Otherwise —
+/// a game whose processes run on the host while Prefixr runs in a distrobox,
+/// where their environment can't be read — the hard kills below:
 ///
 /// 1. `kill_process_tree` on the process `launch_game` spawned — for a
 ///    Proton game, this takes down the whole umu container session.
@@ -361,10 +376,7 @@ fn pkill_pattern(text: &str) -> String {
 ///    via wineserver's own IPC) and `pkill -9 -f` on the game's exe path.
 ///    These cover a Wine game's wineserver, which detaches from the process
 ///    tree, and a game started through `distrobox-host-exec`, where the tree
-///    visible to us only contains the relay (see `RunningGame::wineserver`).
-///
-/// In a Flatpak, `stop_game_flatpak` instead: the hard kills above leave a
-/// hung game behind there.
+///    visible to us only contains the relay (see `WineSession::wineserver`).
 pub async fn kill_running_game(running: &RunningGames, id: Uuid) -> Result<(), String> {
     let game = running
         .0
@@ -374,19 +386,20 @@ pub async fn kill_running_game(running: &RunningGames, id: Uuid) -> Result<(), S
         .ok_or_else(|| "Game is not running".to_string())?;
     game.killed.store(true, Ordering::SeqCst);
 
-    if is_flatpak() {
-        stop_game_flatpak(id, &game).await;
+    if is_flatpak() || game_processes_visible(id) {
+        stop_game_gracefully(id, &game.session, Some(&game.log_path)).await;
         return Ok(());
     }
     if let Some(pid) = game.pid {
         kill_process_tree(pid).await;
     }
-    end_game_session(&game.wineserver, &game.wineprefix, &game.exe_path).await
+    let session = &game.session;
+    end_game_session(&session.wineserver, &session.wineprefix, &game.exe_path).await
 }
 
-/// Steps 2 and 3 of `kill_running_game`, which need nothing from the process
-/// that started the game: also how `prefixr game stop` ends a game another
-/// Prefixr process launched.
+/// Steps 2 and 3 of `kill_running_game`'s fallback, which need nothing from
+/// the process that started the game: also how `prefixr game stop` ends a
+/// game whose processes it can't see.
 pub async fn end_game_session(
     wineserver: &Path,
     wineprefix: &str,
@@ -463,8 +476,16 @@ fn marked_processes_in(proc_dir: &Path, id: Uuid) -> Vec<u32> {
         .collect()
 }
 
-/// How long each step of `stop_game_flatpak` gives the game to end.
-const FLATPAK_STOP_STEP: Duration = Duration::from_secs(5);
+/// Whether this process can see any of the game's processes by their
+/// marker. Not in a distrobox, where the game runs on the host and its
+/// environment can't be read from inside the container; not from another
+/// Flatpak instance, which has a PID namespace of its own.
+pub fn game_processes_visible(id: Uuid) -> bool {
+    !marked_processes(id).is_empty()
+}
+
+/// How long each step of `stop_game_gracefully` gives the game to end.
+const STOP_STEP: Duration = Duration::from_secs(5);
 
 /// Waits up to `timeout` for the game's last marked process to end; whether
 /// it did.
@@ -482,28 +503,33 @@ async fn marked_processes_end(id: Uuid, timeout: Duration) -> bool {
 }
 
 /// Sends `signal` to the game's marked processes, then gives them
-/// `FLATPAK_STOP_STEP` to end; whether they did.
+/// `STOP_STEP` to end; whether they did.
 async fn signal_marked_processes(id: Uuid, signal: libc::c_int) -> bool {
     for pid in marked_processes(id) {
         send_signal(pid, signal);
     }
-    marked_processes_end(id, FLATPAK_STOP_STEP).await
+    marked_processes_end(id, STOP_STEP).await
 }
 
-/// Ends a game in a Flatpak, the way Lutris does (`Game.force_stop`): first
-/// ask its wine session to end, then SIGTERM what's left, and only then
-/// SIGKILL. Measured in the Flatpak spike (docs/flatpak.md): each soft step
-/// ends a game cleanly on its own, while the hard kills of the native
-/// `kill_running_game` leave a hung game behind — pressure-vessel's
-/// container shares the app's PID namespace there, so killing `pv-adverb`
-/// no longer takes the container down with it. A SIGTERM to umu-run alone
-/// (Bottles) isn't enough either: the portal, not umu, owns the container.
-async fn stop_game_flatpak(id: Uuid, game: &RunningGame) {
+/// Ends a game the way Lutris does (`Game.force_stop`): first ask its wine
+/// session to end, then SIGTERM what's left of its marked processes, and
+/// only then SIGKILL. Measured in the Flatpak spike (docs/flatpak.md): each
+/// soft step ends a game cleanly on its own. The hard kills of the fallback
+/// in `kill_running_game` leave a hung game behind in a Flatpak, where
+/// pressure-vessel's container shares the app's PID namespace, and orphaned
+/// wine services natively, where `wineserver -k9` kills the wineserver
+/// before it can end them. A SIGTERM to umu-run alone (Bottles) isn't enough
+/// in a Flatpak either: the portal, not umu, owns the container there. Its
+/// steps go to `log_path`, if given.
+pub async fn stop_game_gracefully(id: Uuid, session: &WineSession, log_path: Option<&Path>) {
     let started = Instant::now();
     let note = |text: String| {
+        let Some(log_path) = log_path else {
+            return;
+        };
         let _ = fs::OpenOptions::new()
             .append(true)
-            .open(&game.log_path)
+            .open(log_path)
             .and_then(|mut f| {
                 use std::io::Write;
                 writeln!(f, "[prefixr] Stop: {text}")
@@ -513,8 +539,8 @@ async fn stop_game_flatpak(id: Uuid, game: &RunningGame) {
         "ending the wine session, {} processes",
         marked_processes(id).len()
     ));
-    end_wine_session(game).await;
-    let mut ended = marked_processes_end(id, FLATPAK_STOP_STEP).await;
+    end_wine_session(session, log_path).await;
+    let mut ended = marked_processes_end(id, STOP_STEP).await;
     for (signal, name) in [(libc::SIGTERM, "SIGTERM"), (libc::SIGKILL, "SIGKILL")] {
         if ended {
             break;
@@ -536,37 +562,67 @@ async fn stop_game_flatpak(id: Uuid, game: &RunningGame) {
 
 /// Asks the game's wine session to end: `umu-run wineboot -k` for a Proton
 /// game (Lutris' `winekill`; `runinprefix`, so it doesn't wait for the game
-/// to exit), `wineserver -k` without `-9` for a Wine game. The umu call gets
-/// the game's own environment, without which umu would pick its default
-/// Proton and download it. Bounded, so a hanging call can't block the stop.
-async fn end_wine_session(game: &RunningGame) {
-    let mut command = match game.runner_kind {
+/// to exit), `wineserver -k` without `-9` for a Wine game. Its output goes to
+/// `log_path`, if given. Bounded, so a hanging call can't block the stop.
+async fn end_wine_session(session: &WineSession, log_path: Option<&Path>) {
+    let mut command = match session.kind {
         RunnerKind::Proton => {
             // Not marked itself, so waiting for the game's processes
             // doesn't wait for this call too.
-            let env: Vec<(&str, &str)> = env_pairs(&game.runner_env)
+            let env: Vec<(&str, &str)> = env_pairs(&session.env)
                 .into_iter()
                 .filter(|(key, _)| *key != GAME_ID_VAR)
                 .chain([("PROTON_VERB", "runinprefix"), ("UMU_RUNTIME_UPDATE", "0")])
                 .collect();
-            let mut command = runner_command(&game.runner_binary, env);
+            let mut command = runner_command(&session.umu_run, env);
             command.args(["wineboot", "-k"]);
             command
         }
         RunnerKind::Wine => {
-            let mut command =
-                runner_command(&game.wineserver, [("WINEPREFIX", game.wineprefix.as_str())]);
+            let mut command = runner_command(
+                &session.wineserver,
+                [("WINEPREFIX", session.wineprefix.as_str())],
+            );
             command.arg("-k");
             command
         }
     };
     command.stdin(Stdio::null()).kill_on_drop(true);
-    if let Ok((out, err)) = log_stdio(&game.log_path) {
-        command.stdout(out).stderr(err);
-    } else {
-        command.stdout(Stdio::null()).stderr(Stdio::null());
-    }
-    let _ = tokio::time::timeout(FLATPAK_STOP_STEP * 2, command.status()).await;
+    match log_path.map(log_stdio) {
+        Some(Ok((out, err))) => command.stdout(out).stderr(err),
+        _ => command.stdout(Stdio::null()).stderr(Stdio::null()),
+    };
+    let _ = tokio::time::timeout(STOP_STEP * 2, command.status()).await;
+}
+
+/// The wine session of `game` under `runner`, for `prefixr game stop`,
+/// which didn't start the game itself: the same values `run_game` uses.
+pub async fn game_wine_session(
+    app: &AppHandle,
+    state: &State<'_, ConfigState>,
+    game: &Game,
+    runner: &Runner,
+) -> Result<WineSession, String> {
+    let wineprefix = game.prefix_path.to_string_lossy().into_owned();
+    let mut env = vec![("WINEPREFIX".to_string(), wineprefix.clone())];
+    let umu_run = match runner.kind {
+        RunnerKind::Proton => {
+            env.push((
+                "PROTONPATH".to_string(),
+                runner.path.to_string_lossy().into_owned(),
+            ));
+            env.extend(game.umu_env());
+            ensure_umu(app, read_token(state).as_deref()).await?
+        }
+        RunnerKind::Wine => PathBuf::new(),
+    };
+    Ok(WineSession {
+        kind: runner.kind,
+        umu_run,
+        env,
+        wineserver: wineserver_binary(&runner.path)?,
+        wineprefix,
+    })
 }
 
 /// Whether another Prefixr process holds the game's lock file, i.e. is
@@ -575,25 +631,18 @@ fn launch_locked_elsewhere(id: Uuid) -> bool {
     lock_launch_file(id).is_err()
 }
 
-/// `prefixr game stop` in a Flatpak. Every `flatpak run` is its own PID
-/// namespace, so the game's processes are usually out of sight for this
-/// process: then it says so instead of reporting a stop that didn't happen.
-/// The game's lock file only tells that some other Prefixr process runs it
-/// (the window, a Steam `--run` or a CLI `game launch`), not which.
-/// Visible ones (`flatpak enter`, or a future handoff) get the same SIGTERM,
-/// then SIGKILL, as `stop_game_flatpak`.
-pub async fn stop_game_from_cli_flatpak(id: Uuid, game_name: &str) -> Result<(), AppError> {
-    if !marked_processes(id).is_empty() {
-        if !signal_marked_processes(id, libc::SIGTERM).await {
-            signal_marked_processes(id, libc::SIGKILL).await;
-        }
-        return Ok(());
-    }
+/// Why `prefixr game stop` in a Flatpak can't stop a game whose processes it
+/// can't see: every `flatpak run` is its own PID namespace, so the game runs
+/// in another Prefixr instance (the window, a Steam shortcut's `--run` or a
+/// CLI `game launch`; the lock file doesn't tell which), or not at all. Said
+/// instead of reporting a stop that didn't happen.
+pub fn stop_refusal(id: Uuid, game_name: &str) -> AppError {
     let game_name = game_name.to_string();
     if launch_locked_elsewhere(id) {
-        return Err(AppError::GameRunsInOtherInstance { game_name });
+        AppError::GameRunsInOtherInstance { game_name }
+    } else {
+        AppError::GameNotRunning { game_name }
     }
-    Err(AppError::GameNotRunning { game_name })
 }
 
 /// A game this Prefixr is launching or running, for the frontend to pick
@@ -1787,12 +1836,14 @@ async fn run_game(
         RunningGame {
             name: game.name.clone(),
             pid: child.id(),
-            wineserver: wineserver.clone(),
-            wineprefix: wineprefix.clone(),
+            session: WineSession {
+                kind: runner.kind,
+                umu_run: runner_binary.clone(),
+                env: runner_env,
+                wineserver: wineserver.clone(),
+                wineprefix: wineprefix.clone(),
+            },
             exe_path: exe_path.clone(),
-            runner_binary: runner_binary.clone(),
-            runner_kind: runner.kind,
-            runner_env,
             log_path: log_path.to_path_buf(),
             killed: killed.clone(),
         },
