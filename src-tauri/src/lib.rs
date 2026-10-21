@@ -3,13 +3,13 @@ mod commands;
 mod config;
 mod env;
 mod error;
+mod game_control;
 mod host_env;
 mod http;
 mod locale;
 mod lock;
 mod models;
 mod portal;
-mod single_instance;
 #[cfg(test)]
 mod test_util;
 mod tray;
@@ -30,9 +30,9 @@ use commands::compatibility::get_compatibility;
 use commands::flatpak_extensions::missing_flatpak_extensions;
 use commands::games::{
     add_game, create_desktop_shortcut, create_menu_shortcut, ensure_install_desktop_entry,
-    kill_game, kill_running_game, launch_game, launch_game_headless, list_active_games, list_games,
-    remove_game, run_installer, take_pending_install, take_pending_launch, update_game,
-    LaunchingGames, PendingInstall, PendingLaunch, RunningGames,
+    kill_game, launch_game, launch_game_headless, list_active_games, list_games, remove_game,
+    run_installer, take_pending_install, take_pending_launch, update_game, LaunchingGames,
+    PendingInstall, PendingLaunch, RunningGames,
 };
 use commands::github::{get_github_config, save_github_config};
 use commands::graphics::{get_graphics_config, save_graphics_config};
@@ -118,13 +118,6 @@ fn find_install_arg(args: &[String]) -> Option<String> {
     find_flag_arg(args, "--install")
 }
 
-/// Looks for `--stop <game-id>` among the args a second instance handed
-/// over: `prefixr game stop` in a Flatpak, which can't see the game's
-/// processes itself (see `commands::games::stop_game_in_window`).
-fn find_stop_arg(args: &[String]) -> Option<String> {
-    find_flag_arg(args, "--stop")
-}
-
 fn find_flag_arg(args: &[String], flag: &str) -> Option<String> {
     args.windows(2)
         .find(|pair| pair[0] == flag)
@@ -165,16 +158,6 @@ pub fn run() {
         // takes it on the event, so it's handled exactly once either way.
         let single_instance =
             tauri_plugin_single_instance::Builder::new().callback(|app, argv, _cwd| {
-                if let Some(game_id) = find_stop_arg(&argv) {
-                    let app = app.clone();
-                    tauri::async_runtime::spawn(async move {
-                        if let Ok(id) = uuid::Uuid::parse_str(&game_id) {
-                            let running = app.state::<RunningGames>();
-                            let _ = kill_running_game(&running, id).await;
-                        }
-                    });
-                    return;
-                }
                 if let Some(game_id) = find_launch_arg(&argv) {
                     if let Some(state) = app.try_state::<PendingLaunch>() {
                         *state.0.locked() = Some(game_id);
@@ -194,7 +177,9 @@ pub fn run() {
                 show_and_focus(app);
                 rebuild_tray_menu(app);
             });
-        // In a Flatpak, a name below the app ID (see `single_instance::dbus_id`).
+        // In a Flatpak, a name below the app ID: an app may only own those, and
+        // the default (the Tauri identifier, `com.tristan.prefixr`) isn't one, so
+        // a second start opened a second window (seen in the Flatpak spike).
         let single_instance = match flatpak_id() {
             Some(id) => single_instance.dbus_id(id),
             None => single_instance,

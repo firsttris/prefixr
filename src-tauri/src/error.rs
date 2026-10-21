@@ -24,13 +24,13 @@ pub enum AppError {
     GameAlreadyRunning,
     /// games::remove_game — the game is still starting or running.
     GameRunning,
-    /// games::stop_game_from_cli_flatpak — the game runs in another Prefixr
-    /// process (in a Flatpak, out of sight of this one): the window, a Steam
-    /// shortcut's `--run` or a CLI `game launch`.
+    /// games::stop_game_in_other_instance — another Prefixr process runs the
+    /// game (in a Flatpak, out of sight of this one) and didn't take the stop:
+    /// it's still preparing the launch, or it's an older Prefixr.
     GameRunsInOtherInstance {
         game_name: String,
     },
-    /// games::stop_game_from_cli_flatpak — no Prefixr process runs the game.
+    /// games::stop_game_in_other_instance — no Prefixr process runs the game.
     GameNotRunning {
         game_name: String,
     },
