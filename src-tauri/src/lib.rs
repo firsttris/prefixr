@@ -8,6 +8,7 @@ mod http;
 mod locale;
 mod lock;
 mod models;
+mod portal;
 mod single_instance;
 #[cfg(test)]
 mod test_util;
