@@ -14,3 +14,8 @@ vite.config.ts.timestamp-*
 
 # MkDocs output (mkdocs build)
 /site
+
+# Flatpak spike (flatpak/spike)
+.flatpak-builder/
+/flatpak/spike/build-dir
+/flatpak/spike/repo
