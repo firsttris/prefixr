@@ -44,7 +44,9 @@ jobs:
     name: Flatpak sources match the lock files
     # Already checked on the pull request; a release mustn't fail because the npm registry
     # does (the check asks it for every package).
-    if: ${{ !github.event.pull_request.draft && inputs.check-sources != false }}
+    # `inputs` is empty outside workflow_call, and `null != false` is false in a workflow
+    # expression, so the input is compared as text.
+    if: ${{ !github.event.pull_request.draft && format('{0}', inputs.check-sources) != 'false' }}
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout

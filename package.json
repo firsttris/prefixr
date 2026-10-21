@@ -14,7 +14,8 @@
     "tauri": "tauri",
     "test": "bun run i18n && vitest run",
     "lint": "prettier --check . && eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "screenshots": "bash scripts/screenshots.sh"
   },
   "license": "GPL-3.0-only",
   "dependencies": {
@@ -26,6 +27,7 @@
     "@eslint/js": "^10.0.1",
     "@inlang/paraglide-js": "^2.25.4",
     "@inlang/plugin-message-format": "^4.4.4",
+    "@playwright/test": "^1.64.1",
     "@sveltejs/adapter-static": "^3.0.10",
     "@sveltejs/kit": "^2.65.1",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",

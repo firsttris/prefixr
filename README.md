@@ -66,6 +66,8 @@ you can reuse an existing prefix from any of them as it is.
 | 💾 **Backup** | Back up the library, every setting, categories, play times and artwork to one file, and restore it. Prefixr always backs up before a restore, and on request automatically every few days, so a change can be undone. |
 | 🧰 **Everyday comfort** | Tray icon with the running games and a way to stop a hung one, logs of the last 10 runs per game and prefix, a `vm.max_map_count` check, English and German UI. |
 
+![The library with covers, categories and compatibility badges](docs/screenshot-library.png)
+
 See the [user guide](https://firsttris.github.io/prefixr/user-guide.html) for a tour of every feature.
 
 ## 🤖 Let an AI agent run your library

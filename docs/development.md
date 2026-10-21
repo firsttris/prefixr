@@ -61,6 +61,7 @@ bun run tauri build   # release binary and bundles
 | `bun run lint` | Prettier format check and ESLint |
 | `bun run format` | Formats the frontend with Prettier |
 | `bun run test` | Frontend tests (Vitest) |
+| `bun run screenshots` | Takes the screenshots in `docs/` from a demo library (see [Screenshots](#screenshots)) |
 | `cargo test` | Backend tests; also regenerates `src/lib/bindings` |
 | `cargo clippy --all-targets -- -D warnings` | Backend lints, as CI runs them |
 | `cargo fmt` | Formats the backend |
@@ -225,6 +226,20 @@ sometimes very slow.
 
 CI uses the latest stable Rust, so a new Clippy lint can turn a pull request red even if nothing
 else changed.
+
+### Screenshots
+
+The pictures in `docs/screenshot-*.png` (README, the Flatpak's metainfo) are taken by
+`bun run screenshots`: it builds the frontend and runs `scripts/screenshots.mjs`, which serves
+`build/` and opens it in a headless Chromium with [Playwright](https://playwright.dev/). There is no
+Rust backend: a stand-in for Tauri's IPC (`scripts/screenshots-demo.mjs`) answers every command
+from a made-up library with drawn covers, so the pictures never show anyone's real games. A
+command without an answer is logged and fails the run; add its demo data there.
+
+The first run needs Playwright's browser: `bunx playwright install --only-shell chromium`. After a
+change to the look, run *Actions → Screenshots → Run workflow*: it takes the pictures in the
+official Playwright image, so fonts and rendering are the same every time, and commits the ones
+that changed.
 
 ## Flatpak
 

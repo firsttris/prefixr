@@ -1,0 +1,18 @@
+name: Screenshots
+
+# Takes the pictures in docs/ (README, documentation, the Flatpak's metainfo) from the demo library
+# with scripts/screenshots.sh and commits the ones that changed. Run it after a change to the look.
+on:
+  workflow_dispatch:
+
+jobs:
+  screenshots:
+    uses: firsttris/workflows/.github/workflows/screenshots.yml@v1
+    with:
+      bun: true
+      install: bun install --frozen-lockfile
+      lockfile: bun.lock
+      command: bun run screenshots
+      paths: docs/screenshot-*.png
+    permissions:
+      contents: write
