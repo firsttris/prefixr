@@ -6,6 +6,6 @@ Comment[de]=Wine- und Proton-Prefixe verwalten, um Windows-Spiele zu spielen
 Exec=prefixr
 Icon=io.github.firsttris.Prefixr
 Terminal=false
-Categories=Game;Utility;
+Categories=Game;
 Keywords=wine;proton;umu;windows;games;prefix;
 StartupWMClass=io.github.firsttris.Prefixr
