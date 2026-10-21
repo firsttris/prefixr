@@ -32,6 +32,7 @@ nav:
       - Development: development.md
       - Rust test coverage: rust-test-coverage.md
       - "Ideas: upscaling": roadmap.md
+      - "Plan: Flatpak": flatpak.md
 
 theme:
   name: material
