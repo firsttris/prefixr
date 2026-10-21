@@ -256,6 +256,9 @@ export function demoData(version) {
       ],
       list_steam_games: [games[0].id],
       list_active_games: [],
+      // Flatpak-only answers; natively the app gets these.
+      missing_flatpak_extensions: [],
+      native_library: null,
       take_pending_launch: null,
       take_pending_install: null,
       get_library: library,
