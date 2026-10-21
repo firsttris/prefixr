@@ -1,4 +1,4 @@
-# Phase 0 spike (docs/flatpak.md). Not for releases.
+# Repackages a local .deb for trying a change quickly (docs/development.md#flatpak). Not for releases.
 #
 # Repackages the .deb from `bun run tauri build --bundles deb`, the "closed source" route in Tauri's
 # Flatpak guide. Build and install:

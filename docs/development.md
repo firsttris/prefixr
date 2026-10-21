@@ -226,6 +226,74 @@ sometimes very slow.
 CI uses the latest stable Rust, so a new Clippy lint can turn a pull request red even if nothing
 else changed.
 
+## Flatpak
+
+Prefixr is also built as a Flatpak, `io.github.firsttris.Prefixr`, on the GNOME 51 runtime.
+`release.yml` attaches `prefixr_<version>_x86_64.flatpak` to every release. The launchers already
+on Flathub ([Lutris](https://github.com/flathub/net.lutris.Lutris),
+[Heroic](https://github.com/flathub/com.heroicgameslauncher.hgl),
+[Bottles](https://github.com/flathub/com.usebottles.bottles)) were the model for every decision
+below; when something in the sandbox needs a new answer, look at how they solve it first. The native
+builds (AppImage, `.deb`, `.rpm`) must keep working as before: Flatpak-only behaviour goes behind
+`host_env::is_flatpak()`.
+
+### Building it
+
+```bash
+flatpak run org.flatpak.Builder --user --install --force-clean --disable-rofiles-fuse \
+  flatpak/build-dir flatpak/io.github.firsttris.Prefixr.yml
+```
+
+(`flatpak-builder` instead of `flatpak run org.flatpak.Builder` where it's installed on the host.)
+The manifest builds from the checkout without network access, as Flathub requires. That needs:
+
+- `flatpak/cargo-sources.json` (from `Cargo.lock`) and `flatpak/node-sources.json` (from
+  `package-lock.json`). `flatpak-node-generator` can't read `bun.lock`, so `package-lock.json` is
+  kept with exactly bun's versions: `flatpak/lock-from-bun.py` fills in the download URLs and
+  checksums from `bun.lock` and fails on any difference.
+- After changing `bun.lock` or `Cargo.lock`, run `flatpak/update-sources.sh` (with
+  [flatpak-builder-tools](https://github.com/flatpak/flatpak-builder-tools) in `FBT`) and commit the
+  results. The `Flatpak` workflow checks that they match.
+- `flatpak/spike/io.github.firsttris.Prefixr.yml` repackages a local `.deb` instead
+  (`bun run tauri build --bundles deb` first). It's quicker for trying a change, not for releases.
+
+Running it: `flatpak run io.github.firsttris.Prefixr`, and the CLI as
+`flatpak run io.github.firsttris.Prefixr game list`.
+
+### What works differently in the sandbox
+
+- **Paths:** the library and settings live in `~/.var/app/io.github.firsttris.Prefixr`. umu's
+  runtime, the app menu and Steam are the host's (`host_data_home`). With an empty library, the
+  window points to a native library in `~/.config/com.tristan.prefixr` and explains moving it over
+  with *Backup*.
+- **Stopping games:** pressure-vessel's container runs below the Flatpak portal, in the app's PID
+  namespace, so the `PPid` chain from umu-run breaks. Every game gets `PREFIXR_GAME_ID` in its
+  environment, and `stop_game_gracefully` ends its marked processes as Lutris does:
+  `umu-run wineboot -k` or `wineserver -k`, then SIGTERM, then SIGKILL. The native build does the
+  same wherever it can see the marked processes. Hard kills (`pkill -9`, `wineserver -k9`) left hung
+  games and orphaned Wine services behind.
+- **Other instances:** every `flatpak run` is its own PID namespace. The window owns the
+  single-instance name below the app ID (`--launch`, `--install`), and whichever instance runs a
+  game owns `io.github.firsttris.Prefixr.Game.g<id>`, whose `Stop` method `game stop` calls.
+- **No host commands:** the Flatpak doesn't get `--talk-name=org.freedesktop.Flatpak`. So Prefixr
+  asks the user to close Steam before changing its shortcuts, and shows the `sysctl` command for
+  `vm.max_map_count` instead of running `pkexec`. A user can add the permission with
+  `flatpak override`.
+- **Portals and D-Bus instead of tools:** keeping the system awake goes through the Inhibit portal,
+  mounting a disc image through UDisks2. MangoHud and Gamescope are Flathub extensions
+  (`org.freedesktop.Platform.VulkanLayer.<Name>//26.08`); the settings show the install command
+  when one is missing. vkBasalt has no 26.08 build on Flathub yet.
+- **Desktop:** shortcuts and the Steam entry run `flatpak run io.github.firsttris.Prefixr`. The tray
+  icon goes to `$XDG_RUNTIME_DIR/app/<id>`, the one folder with the same path on the host, and the
+  program name is the app ID, so the window matches the desktop file.
+
+### Still open
+
+- Flathub: a `<release>` entry in the metainfo per version, then the submission (screenshots come
+  from `bun run screenshots`).
+- Not tested yet: GNOME, NVIDIA, the Steam Deck, GameMode with `gamemoded`, and what Steam does when
+  it stops a Prefixr shortcut (ending the outer `flatpak run` doesn't reach Prefixr inside).
+
 ## Releases
 
 Releases are built by CI from a tag `vX.Y.Z`, with the shared workflows from
