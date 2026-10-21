@@ -238,8 +238,9 @@ Releases are built by CI from a tag `vX.Y.Z`, with the shared workflows from
    since the release commit only changes versions), builds the AppImage, `.deb` and `.rpm` on
    Ubuntu 24.04, and attaches them to a GitHub release.
 
-The AppImage is published as `*-ubuntu-compat.AppImage`. It bundles WebKitGTK from its build
-environment, which can clash with very new graphics drivers; see
+The AppImage is published as `prefixr_<version>_amd64.AppImage` (up to 0.1.10 as
+`…_amd64-ubuntu-compat.AppImage`). It bundles WebKitGTK from its build environment, which can clash
+with very new graphics drivers; see
 [Troubleshooting](troubleshooting.md#appimage-crashes-egl_bad_parameter-or-shows-a-blank-window).
 
 ## Documentation website

@@ -77,24 +77,6 @@ jobs:
       - name: Build Tauri release bundles
         run: bun run tauri build
 
-      - name: Mark AppImage as Ubuntu compatibility build
-        shell: bash
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          for app in src-tauri/target/release/bundle/appimage/*.AppImage; do
-            base="${app%.AppImage}"
-            new="${base}-ubuntu-compat.AppImage"
-            mv "$app" "$new"
-
-            if [ -f "${app}.sig" ]; then
-              mv "${app}.sig" "${new}.sig"
-            fi
-            if [ -f "${app}.tar.gz" ]; then
-              mv "${app}.tar.gz" "${new}.tar.gz"
-            fi
-          done
-
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
