@@ -20,7 +20,7 @@ use tauri::{AppHandle, Listener, Manager, State};
 use crate::commands::games::{
     add_game, create_desktop_shortcut, create_menu_shortcut, end_game_session,
     game_processes_visible, game_wine_session, launch_game, remove_game, run_in_prefix,
-    stop_game_gracefully, stop_refusal, update_game, LaunchingGames, RunningGames,
+    stop_game_gracefully, stop_game_in_window, update_game, LaunchingGames, RunningGames,
 };
 use crate::commands::library::game_key;
 use crate::commands::logs::game_log_dir;
@@ -45,6 +45,7 @@ use crate::host_env::is_flatpak;
 use crate::locale::{self, LocaleState};
 use crate::lock::LockExt;
 use crate::models::{ArtworkKind, Game, GameInput, RunnerKind};
+use crate::single_instance;
 use crate::tray::WindowVisible;
 
 mod backup;
@@ -947,7 +948,8 @@ async fn game_command(app: &AppHandle, out: Out, command: GameCommand) -> Result
                 let session = game_wine_session(app, &app.state(), &game, runner).await?;
                 stop_game_gracefully(game.id, &session, None).await;
             } else if is_flatpak() {
-                return Err(stop_refusal(game.id, &game.name));
+                let dbus_id = single_instance::dbus_id(&app.config().identifier);
+                stop_game_in_window(&dbus_id, game.id, &game.name).await?;
             } else {
                 // Its processes run where this one can't read them (a
                 // distrobox), or it was started without the marker.

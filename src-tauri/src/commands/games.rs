@@ -39,6 +39,7 @@ use crate::models::{
     normalize_umu_id, normalize_umu_store, split_launch_args, Game, GameInput, Runner, RunnerKind,
     StorePrerequisites,
 };
+use crate::single_instance::forward_to_window;
 use crate::tray::rebuild_tray_menu;
 
 /// Checks whether `name` resolves to an executable file somewhere on `PATH`,
@@ -631,18 +632,35 @@ fn launch_locked_elsewhere(id: Uuid) -> bool {
     lock_launch_file(id).is_err()
 }
 
-/// Why `prefixr game stop` in a Flatpak can't stop a game whose processes it
-/// can't see: every `flatpak run` is its own PID namespace, so the game runs
-/// in another Prefixr instance (the window, a Steam shortcut's `--run` or a
-/// CLI `game launch`; the lock file doesn't tell which), or not at all. Said
-/// instead of reporting a stop that didn't happen.
-pub fn stop_refusal(id: Uuid, game_name: &str) -> AppError {
+/// `prefixr game stop` in a Flatpak, for a game whose processes it can't
+/// see: every `flatpak run` is its own PID namespace. The game's lock file
+/// tells whether another Prefixr process runs it; the window, if that's the
+/// one, gets the stop handed over (`--stop`, see `run()` in `lib.rs`), and
+/// this waits until the game's lock is released. Says so when the game runs
+/// in a Prefixr without a window (a Steam `--run`, a CLI `game launch`), or
+/// not at all, instead of reporting a stop that didn't happen.
+pub async fn stop_game_in_window(dbus_id: &str, id: Uuid, game_name: &str) -> Result<(), AppError> {
     let game_name = game_name.to_string();
-    if launch_locked_elsewhere(id) {
-        AppError::GameRunsInOtherInstance { game_name }
-    } else {
-        AppError::GameNotRunning { game_name }
+    if !launch_locked_elsewhere(id) {
+        return Err(AppError::GameNotRunning { game_name });
     }
+    let argv = ["prefixr".to_string(), "--stop".to_string(), id.to_string()];
+    let dbus_id = dbus_id.to_string();
+    let forwarded = tokio::task::spawn_blocking(move || forward_to_window(&dbus_id, &argv))
+        .await
+        .unwrap_or(false);
+    if forwarded {
+        // `stop_game_gracefully` takes at most three `STOP_STEP`s, then the
+        // window's `run_game` ends and releases the lock.
+        let deadline = Instant::now() + STOP_STEP * 4;
+        while Instant::now() < deadline {
+            if !launch_locked_elsewhere(id) {
+                return Ok(());
+            }
+            tokio::time::sleep(Duration::from_millis(250)).await;
+        }
+    }
+    Err(AppError::GameRunsInOtherInstance { game_name })
 }
 
 /// A game this Prefixr is launching or running, for the frontend to pick

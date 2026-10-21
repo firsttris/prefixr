@@ -36,6 +36,14 @@ pub fn is_flatpak_in(env: Env) -> bool {
         || env("container").is_some_and(|value| value == "flatpak")
 }
 
+/// The Flatpak's app ID, e.g. `io.github.firsttris.Prefixr`; `None` outside
+/// a Flatpak.
+pub fn flatpak_id() -> Option<String> {
+    env::process("FLATPAK_ID")
+        .and_then(|id| id.into_string().ok())
+        .filter(|id| !id.is_empty())
+}
+
 /// The host's data directory, which the other launchers, Steam and the
 /// desktop share. Natively `$XDG_DATA_HOME`, falling back to
 /// `~/.local/share`. In a Flatpak `$XDG_DATA_HOME` points into the app's own
