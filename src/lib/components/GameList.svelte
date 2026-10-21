@@ -221,10 +221,17 @@
     }
   }
 
-  async function runSteamAction(game: Game, action: SteamAction, shutdownSteam = false) {
+  // `steamClosed`: the user confirmed in the Flatpak that Steam is closed, so
+  // the backend writes the change without quitting Steam (`close_steam_first`).
+  async function runSteamAction(
+    game: Game,
+    action: SteamAction,
+    shutdownSteam = false,
+    steamClosed = false,
+  ) {
     steamConfirm = null;
     notify(
-      shutdownSteam
+      shutdownSteam && !steamClosed
         ? m.gameList_steam_busyQuitting()
         : action === "export"
           ? m.gameList_steam_busyExporting({ name: game.name })
@@ -537,7 +544,9 @@
   confirmLabel={steamConfirm?.closeFirst
     ? m.gameList_steam_closeFirstButton()
     : m.gameList_steam_confirmButton()}
-  onConfirm={() => steamConfirm && runSteamAction(steamConfirm.game, steamConfirm.action, true)}
+  onConfirm={() =>
+    steamConfirm &&
+    runSteamAction(steamConfirm.game, steamConfirm.action, true, steamConfirm.closeFirst)}
   onCancel={() => (steamConfirm = null)}
 />
 
