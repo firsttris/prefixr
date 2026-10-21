@@ -32,7 +32,7 @@ use crate::commands::stores;
 use crate::commands::umu::{ensure_umu, runtime_present};
 use crate::config::{save_config, ConfigState};
 use crate::env::{self, Env};
-use crate::host_env::{host_command, host_std_command};
+use crate::host_env::{host_command, host_data_home, host_std_command, is_flatpak};
 use crate::locale::LocaleState;
 use crate::lock::LockExt;
 use crate::models::{
@@ -112,6 +112,14 @@ pub struct RunningGame {
     /// in the command line of the process we spawned and the ones below it,
     /// so it doubles as a `pkill -f` pattern — see `kill_running_game`.
     pub exe_path: PathBuf,
+    /// The runner binary (umu-run or wine) and the environment the game
+    /// was started with. In a Flatpak, `stop_game_flatpak` asks umu to end
+    /// the game's wine session with exactly these (`umu-run wineboot -k`).
+    pub runner_binary: PathBuf,
+    pub runner_kind: RunnerKind,
+    pub runner_env: Vec<(String, String)>,
+    /// The launch's log, where `stop_game_flatpak` notes its steps.
+    pub log_path: PathBuf,
     /// Set by `kill_running_game`, so `run_game` doesn't report the exit
     /// status of a game the user ended as a launch error.
     pub killed: Arc<AtomicBool>,
@@ -354,6 +362,9 @@ fn pkill_pattern(text: &str) -> String {
 ///    These cover a Wine game's wineserver, which detaches from the process
 ///    tree, and a game started through `distrobox-host-exec`, where the tree
 ///    visible to us only contains the relay (see `RunningGame::wineserver`).
+///
+/// In a Flatpak, `stop_game_flatpak` instead: the hard kills above leave a
+/// hung game behind there.
 pub async fn kill_running_game(running: &RunningGames, id: Uuid) -> Result<(), String> {
     let game = running
         .0
@@ -363,6 +374,10 @@ pub async fn kill_running_game(running: &RunningGames, id: Uuid) -> Result<(), S
         .ok_or_else(|| "Game is not running".to_string())?;
     game.killed.store(true, Ordering::SeqCst);
 
+    if is_flatpak() {
+        stop_game_flatpak(id, &game).await;
+        return Ok(());
+    }
     if let Some(pid) = game.pid {
         kill_process_tree(pid).await;
     }
@@ -409,6 +424,174 @@ pub async fn end_game_session(
         (Err(e), Err(_)) => Err(format!("Could not run wineserver: {e}")),
         _ => Ok(()),
     }
+}
+
+/// Set in every game's environment, with the game's id. Every process of
+/// the game inherits it, so `marked_processes` finds all of them by reading
+/// `/proc/<pid>/environ` — also the ones `process_descendants` can't reach:
+/// in a Flatpak, pressure-vessel's container runs below the Flatpak portal,
+/// not below umu-run, and wine's daemons below the sandbox's PID 1. The
+/// same as Lutris' `LUTRIS_GAME_UUID`.
+pub(crate) const GAME_ID_VAR: &str = "PREFIXR_GAME_ID";
+
+/// The game's running processes, by `GAME_ID_VAR` in their environment.
+fn marked_processes(id: Uuid) -> Vec<u32> {
+    marked_processes_in(Path::new("/proc"), id)
+}
+
+/// `marked_processes`, with `/proc` at `proc_dir`. Zombies don't count: a
+/// process that exited but wasn't reaped yet is gone for the game.
+fn marked_processes_in(proc_dir: &Path, id: Uuid) -> Vec<u32> {
+    let marker = format!("{GAME_ID_VAR}={id}");
+    let Ok(entries) = fs::read_dir(proc_dir) else {
+        return Vec::new();
+    };
+    entries
+        .flatten()
+        .filter_map(|entry| {
+            let pid = entry.file_name().to_str()?.parse::<u32>().ok()?;
+            let environ = fs::read(entry.path().join("environ")).ok()?;
+            let marked = environ
+                .split(|&b| b == 0)
+                .any(|var| var == marker.as_bytes());
+            let stat = fs::read_to_string(entry.path().join("stat")).ok()?;
+            let zombie = stat
+                .rsplit_once(')')
+                .is_some_and(|(_, rest)| rest.trim_start().starts_with('Z'));
+            (marked && !zombie).then_some(pid)
+        })
+        .collect()
+}
+
+/// How long each step of `stop_game_flatpak` gives the game to end.
+const FLATPAK_STOP_STEP: Duration = Duration::from_secs(5);
+
+/// Waits up to `timeout` for the game's last marked process to end; whether
+/// it did.
+async fn marked_processes_end(id: Uuid, timeout: Duration) -> bool {
+    let deadline = Instant::now() + timeout;
+    loop {
+        if marked_processes(id).is_empty() {
+            return true;
+        }
+        if Instant::now() >= deadline {
+            return false;
+        }
+        tokio::time::sleep(Duration::from_millis(250)).await;
+    }
+}
+
+/// Sends `signal` to the game's marked processes, then gives them
+/// `FLATPAK_STOP_STEP` to end; whether they did.
+async fn signal_marked_processes(id: Uuid, signal: libc::c_int) -> bool {
+    for pid in marked_processes(id) {
+        send_signal(pid, signal);
+    }
+    marked_processes_end(id, FLATPAK_STOP_STEP).await
+}
+
+/// Ends a game in a Flatpak, the way Lutris does (`Game.force_stop`): first
+/// ask its wine session to end, then SIGTERM what's left, and only then
+/// SIGKILL. Measured in the Flatpak spike (docs/flatpak.md): each soft step
+/// ends a game cleanly on its own, while the hard kills of the native
+/// `kill_running_game` leave a hung game behind — pressure-vessel's
+/// container shares the app's PID namespace there, so killing `pv-adverb`
+/// no longer takes the container down with it. A SIGTERM to umu-run alone
+/// (Bottles) isn't enough either: the portal, not umu, owns the container.
+async fn stop_game_flatpak(id: Uuid, game: &RunningGame) {
+    let started = Instant::now();
+    let note = |text: String| {
+        let _ = fs::OpenOptions::new()
+            .append(true)
+            .open(&game.log_path)
+            .and_then(|mut f| {
+                use std::io::Write;
+                writeln!(f, "[prefixr] Stop: {text}")
+            });
+    };
+    note(format!(
+        "ending the wine session, {} processes",
+        marked_processes(id).len()
+    ));
+    end_wine_session(game).await;
+    let mut ended = marked_processes_end(id, FLATPAK_STOP_STEP).await;
+    for (signal, name) in [(libc::SIGTERM, "SIGTERM"), (libc::SIGKILL, "SIGKILL")] {
+        if ended {
+            break;
+        }
+        let left = marked_processes(id).len();
+        note(format!("{name} to {left} processes left"));
+        ended = signal_marked_processes(id, signal).await;
+    }
+    let outcome = if ended {
+        "done"
+    } else {
+        "processes still left"
+    };
+    note(format!(
+        "{outcome} after {:.1} s",
+        started.elapsed().as_secs_f32()
+    ));
+}
+
+/// Asks the game's wine session to end: `umu-run wineboot -k` for a Proton
+/// game (Lutris' `winekill`; `runinprefix`, so it doesn't wait for the game
+/// to exit), `wineserver -k` without `-9` for a Wine game. The umu call gets
+/// the game's own environment, without which umu would pick its default
+/// Proton and download it. Bounded, so a hanging call can't block the stop.
+async fn end_wine_session(game: &RunningGame) {
+    let mut command = match game.runner_kind {
+        RunnerKind::Proton => {
+            // Not marked itself, so waiting for the game's processes
+            // doesn't wait for this call too.
+            let env: Vec<(&str, &str)> = env_pairs(&game.runner_env)
+                .into_iter()
+                .filter(|(key, _)| *key != GAME_ID_VAR)
+                .chain([("PROTON_VERB", "runinprefix"), ("UMU_RUNTIME_UPDATE", "0")])
+                .collect();
+            let mut command = runner_command(&game.runner_binary, env);
+            command.args(["wineboot", "-k"]);
+            command
+        }
+        RunnerKind::Wine => {
+            let mut command =
+                runner_command(&game.wineserver, [("WINEPREFIX", game.wineprefix.as_str())]);
+            command.arg("-k");
+            command
+        }
+    };
+    command.stdin(Stdio::null()).kill_on_drop(true);
+    if let Ok((out, err)) = log_stdio(&game.log_path) {
+        command.stdout(out).stderr(err);
+    } else {
+        command.stdout(Stdio::null()).stderr(Stdio::null());
+    }
+    let _ = tokio::time::timeout(FLATPAK_STOP_STEP * 2, command.status()).await;
+}
+
+/// Whether another Prefixr process holds the game's lock file, i.e. is
+/// launching or running it.
+fn launch_locked_elsewhere(id: Uuid) -> bool {
+    lock_launch_file(id).is_err()
+}
+
+/// `prefixr game stop` in a Flatpak. Every `flatpak run` is its own PID
+/// namespace, so the game's processes are usually out of sight for this
+/// process: then it says so instead of reporting a stop that didn't happen.
+/// Visible ones (`flatpak enter`, or a future handoff) get the same SIGTERM,
+/// then SIGKILL, as `stop_game_flatpak`.
+pub async fn stop_game_from_cli_flatpak(id: Uuid, game_name: &str) -> Result<(), AppError> {
+    if !marked_processes(id).is_empty() {
+        if !signal_marked_processes(id, libc::SIGTERM).await {
+            signal_marked_processes(id, libc::SIGKILL).await;
+        }
+        return Ok(());
+    }
+    let game_name = game_name.to_string();
+    if launch_locked_elsewhere(id) {
+        return Err(AppError::GameRunsInOtherInstance { game_name });
+    }
+    Err(AppError::GameNotRunning { game_name })
 }
 
 /// A game this Prefixr is launching or running, for the frontend to pick
@@ -1445,6 +1628,11 @@ async fn run_game(
     }
     add_game_env(&mut env, &game.env_vars);
     keep_inherited_preload(&mut env, std::env::var("LD_PRELOAD").ok());
+    // Last, so a hand-written entry can't replace it: finding the game's
+    // processes depends on it (see `GAME_ID_VAR`).
+    env.retain(|(key, _)| key != GAME_ID_VAR);
+    env.push((GAME_ID_VAR.to_string(), game_id.to_string()));
+    let runner_env = env.clone();
 
     // Builds the actual launch as a chain of wrappers around the runner
     // binary (umu-run or wine), each one prepended in outer-to-inner order
@@ -1600,6 +1788,10 @@ async fn run_game(
             wineserver: wineserver.clone(),
             wineprefix: wineprefix.clone(),
             exe_path: exe_path.clone(),
+            runner_binary: runner_binary.clone(),
+            runner_kind: runner.kind,
+            runner_env,
+            log_path: log_path.to_path_buf(),
             killed: killed.clone(),
         },
     );
@@ -1615,6 +1807,14 @@ async fn run_game(
 
     let started_at = Instant::now();
     let wait_result = child.wait().await;
+    // In a Flatpak, umu-run can end while pressure-vessel's container, which
+    // the portal owns, still runs the game (seen in the spike). The game
+    // ends with its last marked process, as in Lutris (`Game.beat`).
+    if is_flatpak() {
+        while !marked_processes(game_id).is_empty() {
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
+    }
 
     running.0.locked().remove(&game_id);
     rebuild_tray_menu(app);
@@ -1789,17 +1989,14 @@ fn desktop_directory(env: Env) -> Result<PathBuf, String> {
 }
 
 /// The user's XDG applications directory (`$XDG_DATA_HOME/applications`,
-/// falling back to `~/.local/share/applications`) — where a `.desktop` file
-/// needs to live for the desktop environment's start menu / app launcher to
-/// pick it up, as opposed to `desktop_directory` for an icon on the Desktop.
+/// falling back to `~/.local/share/applications`; the host's in a Flatpak,
+/// see `host_data_home`) — where a `.desktop` file needs to live for the
+/// desktop environment's start menu / app launcher to pick it up, as opposed
+/// to `desktop_directory` for an icon on the Desktop.
 fn applications_directory(env: Env) -> Result<PathBuf, String> {
-    if let Some(data_home) = env("XDG_DATA_HOME") {
-        return Ok(PathBuf::from(data_home).join("applications"));
-    }
-    let home = env("HOME")
-        .map(PathBuf::from)
-        .ok_or_else(|| "HOME is not set".to_string())?;
-    Ok(home.join(".local/share/applications"))
+    host_data_home(env)
+        .map(|data_home| data_home.join("applications"))
+        .ok_or_else(|| "HOME is not set".to_string())
 }
 
 /// Keeps a filename safe across filesystems by replacing anything but

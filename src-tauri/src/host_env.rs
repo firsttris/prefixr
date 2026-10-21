@@ -15,7 +15,44 @@
 
 use std::ffi::{OsStr, OsString};
 use std::os::unix::ffi::{OsStrExt, OsStringExt};
+use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
+
+use crate::env::{self, Env};
+
+/// Whether Prefixr runs as a Flatpak. Every Flatpak-specific branch goes
+/// through this (or `is_flatpak_in`), so the native builds (AppImage, .deb,
+/// .rpm) keep behaving exactly as before.
+pub fn is_flatpak() -> bool {
+    static FLATPAK: OnceLock<bool> = OnceLock::new();
+    *FLATPAK.get_or_init(|| is_flatpak_in(&env::process) || Path::new("/.flatpak-info").exists())
+}
+
+/// `is_flatpak` from the environment alone: Flatpak sets `FLATPAK_ID` and
+/// `container=flatpak` in every sandbox. umu checks the latter
+/// (`umu_consts.py`), Heroic and Bottles the former.
+pub fn is_flatpak_in(env: Env) -> bool {
+    env("FLATPAK_ID").is_some_and(|id| !id.is_empty())
+        || env("container").is_some_and(|value| value == "flatpak")
+}
+
+/// The host's data directory, which the other launchers, Steam and the
+/// desktop share. Natively `$XDG_DATA_HOME`, falling back to
+/// `~/.local/share`. In a Flatpak `$XDG_DATA_HOME` points into the app's own
+/// `~/.var/app/<id>/data`, so it's `$HOST_XDG_DATA_HOME` there instead
+/// (Flatpak passes on the host's value), falling back to `~/.local/share`
+/// — the same choice umu makes (`umu_consts.py`).
+pub fn host_data_home(env: Env) -> Option<PathBuf> {
+    let key = if is_flatpak_in(env) {
+        "HOST_XDG_DATA_HOME"
+    } else {
+        "XDG_DATA_HOME"
+    };
+    env(key)
+        .filter(|dir| !dir.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| env("HOME").map(|home| PathBuf::from(home).join(".local/share")))
+}
 
 /// A change to a child's environment: the variable's new value, or `None`
 /// to remove it.

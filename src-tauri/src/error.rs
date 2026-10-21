@@ -24,6 +24,15 @@ pub enum AppError {
     GameAlreadyRunning,
     /// games::remove_game — the game is still starting or running.
     GameRunning,
+    /// games::stop_game_from_cli_flatpak — the game runs in another Prefixr
+    /// process (in a Flatpak, out of sight of this one), e.g. the window.
+    GameRunsInOtherInstance {
+        game_name: String,
+    },
+    /// games::stop_game_from_cli_flatpak — no Prefixr process runs the game.
+    GameNotRunning {
+        game_name: String,
+    },
     /// prefixes::delete_prefix — a game using this prefix is still running.
     PrefixInUse {
         game_name: String,
