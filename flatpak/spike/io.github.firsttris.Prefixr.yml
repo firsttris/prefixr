@@ -1,0 +1,91 @@
+# Phase 0 spike (docs/flatpak.md). Not for releases.
+#
+# Repackages the .deb from `bun run tauri build --bundles deb`, the "closed source" route in Tauri's
+# Flatpak guide. Build and install:
+#
+#   flatpak-builder --user --install --force-clean flatpak/spike/build-dir \
+#     flatpak/spike/io.github.firsttris.Prefixr.yml
+#
+# Left out on purpose: cabextract, 7zip and unrar (phase 1).
+id: io.github.firsttris.Prefixr
+runtime: org.gnome.Platform
+runtime-version: '51'
+sdk: org.gnome.Sdk
+command: prefixr
+
+finish-args:
+  - --share=ipc
+  - --share=network
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --socket=pulseaudio
+  - --device=all
+  - --allow=multiarch
+  - --allow=devel
+  - --allow=per-app-dev-shm
+  - --filesystem=home
+  - --filesystem=/mnt
+  - --filesystem=/media
+  - --filesystem=/run/media
+  - --filesystem=/run/udev:ro
+  - --filesystem=xdg-data/umu:create
+  - --filesystem=~/.var/app/com.valvesoftware.Steam
+  - --filesystem=xdg-config/MangoHud:ro
+  - --filesystem=xdg-run/gamescope-0
+  - --talk-name=org.kde.StatusNotifierWatcher
+  - --talk-name=org.freedesktop.Notifications
+  - --system-talk-name=org.freedesktop.UDisks2
+  - --env=XDG_DATA_DIRS=/app/share:/usr/lib/extensions/vulkan/share:/usr/share:/usr/share/runtime/share:/run/host/user-share:/run/host/share:/usr/lib/pressure-vessel/overrides/share
+  - --env=PATH=/app/bin:/usr/bin:/usr/lib/extensions/vulkan/MangoHud/bin:/usr/lib/extensions/vulkan/gamescope/bin
+  - --env=LD_LIBRARY_PATH=/usr/lib/extensions/vulkan/gamescope/lib
+  - --unset-env=STEAM_RUNTIME
+  - --unset-env=STEAM_RUNTIME_PREFER_HOST_LIBRARIES
+  - --unset-env=SDL_VIDEODRIVER
+  - --env=WEBKIT_DISABLE_DMABUF_RENDERER=1
+
+add-extensions:
+  org.freedesktop.Platform.Compat.i386:
+    directory: lib/i386-linux-gnu
+    version: '26.08'
+  org.freedesktop.Platform.GL32:
+    directory: lib/i386-linux-gnu/GL
+    version: '1.4'
+    versions: 26.08;26.08-extra;1.4
+    subdirectories: true
+    no-autodownload: true
+    autodelete: false
+    add-ld-path: lib
+    merge-dirs: vulkan/icd.d;glvnd/egl_vendor.d;egl/egl_external_platform.d;OpenCL/vendors;lib/dri;lib/d3d;lib/gbm;vulkan/explicit_layer.d;vulkan/implicit_layer.d
+    download-if: active-gl-driver
+    enable-if: active-gl-driver
+    autoprune-unless: active-gl-driver
+
+modules:
+  - name: bundle-setup
+    buildsystem: simple
+    build-commands:
+      - mkdir -p /app/lib/i386-linux-gnu/GL
+      - install -Dm644 ld.so.conf /app/etc/ld.so.conf
+    sources:
+      - type: inline
+        dest-filename: ld.so.conf
+        contents: |
+          /app/lib/i386-linux-gnu
+
+  - ../shared-modules/libayatana-appindicator/libayatana-appindicator-gtk3.json
+
+  - name: prefixr
+    buildsystem: simple
+    sources:
+      - type: file
+        path: ../../src-tauri/target/release/bundle/deb/prefixr_0.1.10_amd64.deb
+        dest-filename: prefixr.deb
+    build-commands:
+      - ar -x prefixr.deb
+      - tar -xf data.tar.*
+      - install -Dm755 usr/bin/prefixr /app/bin/prefixr
+      - install -Dm644 usr/share/icons/hicolor/32x32/apps/prefixr.png /app/share/icons/hicolor/32x32/apps/io.github.firsttris.Prefixr.png
+      - install -Dm644 usr/share/icons/hicolor/128x128/apps/prefixr.png /app/share/icons/hicolor/128x128/apps/io.github.firsttris.Prefixr.png
+      - install -Dm644 usr/share/icons/hicolor/256x256@2/apps/prefixr.png /app/share/icons/hicolor/512x512/apps/io.github.firsttris.Prefixr.png
+      - install -Dm644 usr/share/applications/prefixr.desktop /app/share/applications/io.github.firsttris.Prefixr.desktop
+      - desktop-file-edit --set-icon=io.github.firsttris.Prefixr --set-name=Prefixr /app/share/applications/io.github.firsttris.Prefixr.desktop

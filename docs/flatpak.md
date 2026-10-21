@@ -11,12 +11,22 @@ launchers already on Flathub solve it, and picks the same solution where it fits
 [Steam Flatpak](https://github.com/flathub/com.valvesoftware.Steam), plus
 [Cinny](https://github.com/flathub/in.cinny.Cinny), a Tauri app on Flathub.
 
-Nothing here is built yet. Points marked **to verify** are assumptions the spike (phase 0) has to
-confirm before the work that depends on them starts.
+The spike (phase 0) is done, see [Spike results](#spike-results): **go**. Points still marked
+**open** need a setup the spike didn't have.
+
+Two rules for all phases:
+
+- **Bottles, Lutris and Heroic are the best sources.** They already run Wine, Proton and umu
+  inside a Flatpak on Flathub. For every problem, look first at how they solve it, in their Flathub
+  manifests and their code, and do the same where it fits. The plan names the launcher it copies.
+- **The native builds must not break.** The AppImage, `.deb` and `.rpm` keep working exactly as
+  today. Flatpak-only behaviour goes behind `is_flatpak()`; a shared code path only where the spike
+  showed it is safe for both.
 
 - [Why Flatpak](#why-flatpak)
 - [The phases](#the-phases)
 - [Phase 0: spike](#phase-0-spike)
+- [Spike results](#spike-results)
 - [Phase 1: the manifest](#phase-1-the-manifest)
 - [Phase 2: Prefixr knows it runs as a Flatpak](#phase-2-prefixr-knows-it-runs-as-a-flatpak)
 - [Phase 3: launching and stopping games](#phase-3-launching-and-stopping-games)
@@ -72,6 +82,158 @@ released. With it, test:
    `python3`, `pkill`, `unzip`, `curl`, `perl`, `xdg-open`, `gdbus`, `update-desktop-database`.
 
 If 1 or 3 fails and can't be fixed, stop here: Flatpak would then lose what Prefixr is for.
+
+## Spike results
+
+**Go.** Proton and Wine games run in the sandbox, and Prefixr can see every process of a game it
+started. The biggest problem is *Stop*: today's kill sequence leaves a hung game behind in the
+Flatpak. Phase 3 below is adjusted for it.
+
+| | |
+| --- | --- |
+| Date | 2026-10-21 |
+| Distribution | Bazzite 44.20260902 (Fedora 44 base, kernel 7.2.1-ogc4.1.fc44) |
+| Desktop | KDE Plasma 6.7.4, Wayland |
+| GPU / driver | AMD Navi 32 (`1002:747e`), amdgpu, Mesa from `GL.default` 26.08 |
+| Flatpak | 1.18.1, `bwrap` not setuid, unprivileged user namespaces on |
+| Prefixr | 0.1.10, `.deb` repackaged by [`flatpak/spike/io.github.firsttris.Prefixr.yml`](../flatpak/spike/io.github.firsttris.Prefixr.yml) |
+| Tested with | umu-launcher 1.4.4, GE-Proton11-7 (steamrt4), Wine 11.20 (Kron4ek) with DXVK 3.1.1 |
+
+How it was built: Bazzite has no `flatpak-builder` on the host, so the Flathub app
+`org.flatpak.Builder` does it (`flatpak run org.flatpak.Builder --user --install --force-clean
+flatpak/spike/build-dir flatpak/spike/io.github.firsttris.Prefixr.yml`). The `.deb` came from an
+Ubuntu 24.04 distrobox and runs on the GNOME 51 runtime without problems. The library was copied
+over with `prefixr backup create` (native) and `backup restore` (Flatpak). The Flatpak downloaded
+umu, GE-Proton11-7 and Wine 11.20 itself (`prefixr runner download …`), which works.
+
+### 1. A Proton game through umu
+
+Works, started from the window and with `flatpak run io.github.firsttris.Prefixr game launch
+<id>`. pressure-vessel starts its sub-sandbox through the Flatpak portal, the log is normal:
+
+```
+INFO: umu-launcher version 1.4.4
+INFO: steamrt4 is up to date
+INFO: Running 'GE-Proton11-7-x86_64' using runtime 'steamrt4'
+```
+
+umu uses the **host's** `~/.local/share/umu` (it detects the Flatpak itself). The existing
+`steamrt4` from the native build was reused, nothing was downloaded again. `~/.var/app/<id>/data/umu`
+stays empty. `HOST_XDG_DATA_HOME` isn't set on Bazzite (the host doesn't set `XDG_DATA_HOME`), so
+the fallback to `~/.local/share/umu` in phase 2 is needed.
+
+### 2. A Wine game
+
+Works (Far Cry 5, Wine 11.20, DXVK). DXVK and the 32-bit extensions load. No Wine-specific problem.
+
+### 3. Which game processes Prefixr can see
+
+The most important result. Host view while Quake runs, started from the window:
+
+```
+2576388    1455 4026531836  \_ bwrap --args 78 -- prefixr                       (app instance)
+2576399 2576398 4026535006  |   \_ prefixr
+2599357 2576399 4026535006  |       \_ python3 …/umu-run …
+2599370 2599357 4026535006  |           \_ steam-runtime-launch-client …
+   3417    1455 4026531836  \_ /usr/libexec/flatpak-portal
+2599438 2599428 4026535006      \_ bwrap --args 90 -- pv-adverb …              (sub-sandbox)
+2599439 2599438 4026535006          \_ pv-adverb …
+2599463 2599439 4026535006              \_ python3 …/proton waitforexitandrun …
+2599496 2599439 4026535006              \_ …/GE-Proton11-7/files/bin/wineserver
+2599581 2599439 4026535006              \_ S:\Games\…\Quake_x64_steam.exe
+```
+
+- **Prefixr sees the game's processes.** The sub-sandbox shares the PID namespace of the instance
+  that started it (`4026535006`). From inside, all of them are in `/proc`.
+- **The `PPid` chain is broken.** Inside the sandbox, the sub-sandbox's `bwrap` has `PPid: 0`: its
+  real parent is `flatpak-portal` on the host. Walking down from `umu-run` (`process_descendants`)
+  only finds `steam-runtime-launch-client`, never the game.
+- **The environment marker works.** A per-game variable (`PREFIXR_GAME_ID=<id>`, set with `game
+  edit --env`) is readable in `/proc/<pid>/environ` of every game process: proton, wineserver,
+  the Wine services and the game itself.
+- **Wine games:** `wineserver`, `services.exe`, `explorer.exe` and so on daemonize and end up below
+  PID 1 of the app sandbox (`bwrap`), not below Prefixr. Natively they end up below the systemd
+  user manager, so this is the same behaviour.
+- **Play time and the running state work.** The card shows *läuft*, the tray lists the game, and
+  after the end *Weiterspielen* and *Zuletzt gespielt* are updated. Prefixr waits for its own child
+  (`umu-run` or the Wine process), which is still a real child.
+- **Stop leaves a hung game behind** (Proton and Wine). Trace of the processes around a click on
+  *Stop*, sampled every 0.5 s:
+
+  ```
+  08:41:31.997  umu-run, launch-client, pv-adverb, proton, wineserver, services.exe, Quake  running
+  08:41:32.539  umu-run, launch-client, bwrap, pv-adverb, proton, wineserver               gone
+  08:41:33.085  services.exe, explorer.exe … (PPid = app's bwrap)  stay
+                [Quake_x64_steam] <defunct>, window "(Reagiert nicht)"                       stays
+  ```
+
+  The cause is `end_game_session`: `pkill -9 -f <exe path>` also matches `pv-adverb` and the
+  proton script, whose command lines contain the exe path, and `wineserver -k9` kills the
+  wineserver. Natively `pv-adverb` runs as PID 1 of its own namespace, and killing it takes the
+  whole container down. In the Flatpak the container shares the app's namespace, so the Wine
+  processes survive without their wineserver and hang. A plain SIGTERM to `umu-run`, without the
+  rest, ended the same game cleanly in under a second: umu passes it to
+  `steam-runtime-launch-client`, which ends the sub-sandbox through the portal. Far Cry 5 (Wine)
+  leaves the same orphaned Wine services behind, and so does the native build: on the test machine
+  `services.exe` and `explorer.exe` from native Far Cry sessions were still running hours later.
+
+### 4. A second `flatpak run` instance
+
+- **Processes: no.** Every `flatpak run` gets its own PID namespace (`--command=sh` saw 4 processes).
+- **`/tmp` and `$XDG_RUNTIME_DIR`: yes, shared.** Inside, `XDG_RUNTIME_DIR` is `/run/user/1000`,
+  but it is not the host's: it is backed by `/run/user/1000/.flatpak/<id>/xdg-run` (and `…/tmp`),
+  shared by all instances of the app. The first instance's lock file
+  (`$XDG_RUNTIME_DIR/prefixr/<id>.lock`) is visible in a new one. Native and Flatpak locks don't
+  see each other.
+- **`prefixr game stop <id>` from a second instance does nothing, and says it worked:**
+  `Stopped "Quake Enhanced"` after 0.1 s, the game keeps running. Its `pkill` finds nothing in its
+  own namespace.
+- **`game list --json`** works (186 games), it has no running state.
+- **Ending the outer `flatpak run`** of a `game launch` (SIGTERM to the unit) doesn't reach Prefixr
+  inside: `prefixr game launch` and the game kept running.
+
+### 5. Tray, single instance, WebKitGTK
+
+Tested combination: **KDE Plasma 6.7 Wayland, AMD/Mesa** and the same with X11 forced (`flatpak run
+--nosocket=wayland --socket=x11`, XWayland). **Open:** GNOME and NVIDIA, which weren't available.
+
+- **WebKitGTK:** renders correctly on Wayland and X11, with `WEBKIT_DISABLE_DMABUF_RENDERER=1`.
+- **Window identity:** on Wayland the window's `app_id` is `prefixr`, on X11 the `WM_CLASS` is
+  `Prefixr`. Neither matches `io.github.firsttris.Prefixr.desktop`, so the desktop can't connect the
+  window to its desktop file (taskbar icon, pinning).
+- **Tray:** the item registers with `org.kde.StatusNotifierWatcher` and has a menu. Its `IconName`
+  is `/run/user/1000/tray-icon/tray-icon-main-tray-0.png`, a path inside the sandbox. KDE only
+  showed the right icon because the native build had left a file with the same name in the host's
+  `/run/user/1000/tray-icon`. On a clean system the icon would be missing. This confirms the
+  `temp_dir_path` change in phase 4.
+- **Single instance:** as expected, it doesn't work. A second start opens a second full app with a
+  second window and tray icon. No `…SingleInstance` name shows up on the session bus.
+
+### 6. Tools in the runtime
+
+`flatpak run --command=sh org.gnome.Platform//51`:
+
+| Present | Missing |
+| --- | --- |
+| `python3` (3.14), `pkill`, `pgrep`, `unzip`, `curl`, `wget`, `xdg-open` (the portal wrapper), `gdbus`, `update-desktop-database`, `gamemoderun`, `tar`, `xz`, `zstd` | `perl`, `powerprofilesctl`, `systemd-inhibit`, `systemctl`, `udisksctl`, `pkexec`, `7z`, `cabextract`, `unrar`, `git` |
+
+Prefixr itself never calls `perl`. In the app, `mangohud` and `gamescope` are found through the
+`PATH` from the manifest; `vkbasalt` isn't (its 26.08 extension wasn't installed). The portals
+`OpenURI` (v5), `Inhibit` (v3) and `GameMode` answer.
+
+### Steam Deck variables
+
+Simulated on the desktop (not on a Deck): `SteamDeck`, `SteamGamepadUI`, `SteamOS`,
+`XDG_CURRENT_DESKTOP=gamescope`, `GAMESCOPE_WAYLAND_DISPLAY` and `SteamAppId` all reach the
+sandbox unchanged.
+
+### Side findings
+
+- The play button on the *Weiterspielen* card of Far Cry 5 didn't react (three clicks, no launch,
+  no log), while *Spielen* in the details panel started it at once. Probably not Flatpak-specific;
+  check in the native build.
+- `--socket=fallback-x11` only falls back when the host has no Wayland session. To test X11 on a
+  Wayland desktop, add `--socket=x11`.
 
 ## Phase 1: the manifest
 
@@ -196,7 +358,7 @@ below. Every Flatpak-specific branch goes through these two.
 | umu's runtime (`umu_local_dir`, `umu.rs`) | `$XDG_DATA_HOME/umu` | `$HOST_XDG_DATA_HOME/umu`, otherwise `~/.local/share/umu` | umu itself, Lutris, Bottles |
 | App menu shortcuts (`applications_directory`, `games.rs`) | `$XDG_DATA_HOME/applications` | `~/.local/share/applications` | Lutris |
 | Steam (`steam_root`, `steam.rs`) | `$XDG_DATA_HOME/Steam` among others | `~/.local/share/Steam`, `~/.steam` | Heroic, Lutris |
-| Lock files (`games.rs`) | `$XDG_RUNTIME_DIR/prefixr` | `$XDG_RUNTIME_DIR/app/<id>/prefixr` (**to verify**: shared between instances) | Heroic's `heroic-run` |
+| Lock files (`games.rs`) | `$XDG_RUNTIME_DIR/prefixr` | Unchanged: the sandbox's `$XDG_RUNTIME_DIR` is shared by all instances of the app (spike, point 4). Native and Flatpak locks don't see each other | Heroic's `heroic-run` |
 
 Without the umu change Prefixr would look for the runtime in the sandbox while umu puts it on the
 host, and would show "setting up" before every launch.
@@ -206,53 +368,93 @@ host, and would show "setting up" before every launch.
 | Feature | In the sandbox | Plan | Done the same way by |
 | --- | --- | --- | --- |
 | `vm.max_map_count` fix (`performance.rs`) | `pkexec` doesn't exist | Read the value as before, but `can_fix = false`, show the command to copy | none of them touch it; Lutris only warns about its own limit |
-| Power profile (`powerprofilesctl`, `games.rs`) | not in the runtime (**to verify**) | First hide it in the Flatpak; later `HoldProfile` over D-Bus on `org.freedesktop.UPower.PowerProfiles` | none of them have it |
+| Power profile (`powerprofilesctl`, `games.rs`) | not in the runtime (spike, point 6) | First hide it in the Flatpak; later `HoldProfile` over D-Bus on `org.freedesktop.UPower.PowerProfiles` | none of them have it |
 | Keep the screen on (`systemd-inhibit`, `games.rs`) | no host systemd | The Inhibit portal (`org.freedesktop.portal.Inhibit`) | Faugus |
 | Check for a competing scheduler (`systemctl`, `games.rs`) | no host systemd | Skip it in the Flatpak | — |
-| GameMode (`gamemoderun`) | the runtime has it, talks to the GameMode portal | Unchanged (**to verify**) | Heroic, turned on by default |
+| GameMode (`gamemoderun`) | the runtime has it, and the GameMode portal answers (spike, point 6) | Unchanged. **Open:** whether GameMode really turns on; the test machine has no `gamemoded` | Heroic, turned on by default |
 | MangoHud, Gamescope, vkBasalt | only with the extension | `command_on_path` finds them through `PATH`; if missing, a hint with `flatpak install …VulkanLayer.<name>` for the runtime's version | Bottles, Heroic (reads the version from `/app/manifest.json`) |
 | Mounting a disc image (`udisksctl`, `cli/install.rs`) | not in the runtime | UDisks2 over D-Bus (`Loop.Setup`, `Filesystem.Mount`) | all four have the UDisks2 permission |
 | `distrobox-host-exec` (`runners.rs`) | not applicable | Skip it in the Flatpak | — |
 | `update-desktop-database` | may be missing | Best effort; ignore errors | — |
-| Opening links (`xdg_open`) | the runtime's `xdg-open` goes through the OpenURI portal | Unchanged (**to verify**) | — |
+| Opening links (`xdg_open`) | the runtime's `xdg-open` is the portal wrapper, OpenURI v5 answers (spike, point 6) | Unchanged | — |
 
 ## Phase 3: launching and stopping games
 
-This is the riskiest part, and the spike decides how it is done.
+The spike settled how this works (see [Spike results](#spike-results), points 3 and 4).
 
-**The problem.** Today `run_game` starts the game in its own process group, and `process_descendants`
-(`games.rs`) finds its processes along `PPid`. Inside the Flatpak, pressure-vessel starts the game
-through the portal in a sub-sandbox. Its processes are probably not children of umu-run any more,
-and the `PPid` chain is broken. Bottles says outright that such processes "run in a separate
-sandbox instance the host cannot see by scanning /proc" (`backend/managers/sandbox.py`).
+**What the spike showed.** Today `run_game` starts the game in its own process group, and
+`process_descendants` (`games.rs`) finds its processes along `PPid`. In the Flatpak:
+
+- pressure-vessel's sub-sandbox shares the PID namespace of the Prefixr instance that started it.
+  That instance sees every game process in `/proc`. (Bottles' remark that such processes "run in a
+  separate sandbox instance the host cannot see by scanning /proc" is about its own sandbox mode
+  with `flatpak-spawn`, not about pressure-vessel.)
+- The `PPid` chain breaks at the sub-sandbox's `bwrap` (`PPid: 0`). `process_descendants(umu-run)`
+  never reaches the game.
+- An environment marker in the game's environment is readable in every game process.
+- Prefixr's own child (`umu-run`, or the Wine process) stays alive until the game ends, so waiting
+  on it still gives the end of the game and the play time.
+- A SIGTERM to `umu-run` alone ends a Proton game cleanly. Today's `kill_running_game` adds
+  `wineserver -k9` and `pkill -9 -f <exe>` straight away. The `pkill` also kills `pv-adverb`, and
+  the game hangs.
+- A second `flatpak run` instance sees none of this.
 
 **What the others do:**
 
 - **Lutris** puts `LUTRIS_GAME_UUID` in the game's environment and finds the game's processes by
   reading `/proc/*/environ`, then keeps those whose command line contains the game folder or
-  `pressure-vessel` (`runners/wine.py`). It stops an umu game with `umu-run wineboot -k`
-  (`PROTON_VERB=runinprefix`) and only then SIGKILLs what's left (`game.py`).
+  `pressure-vessel` (`runners/wine.py`, `filter_game_pids`). To stop an umu game it runs `umu-run
+  wineboot -k` with `PROTON_VERB=runinprefix`, a Wine game gets `wineserver -k` (without `-9`). It
+  waits about 2 s, sends SIGTERM to what's left, polls for 5 s and only then sends SIGKILL
+  (`game.py`, `force_stop` and `force_kill_delayed`). The end of a game is its heartbeat: no
+  thread left and no marked process left (`Game.beat`).
+- **Bottles** starts `umu-run` in a session of its own and stops it with SIGTERM to that process
+  group, waits up to 5 s, then SIGKILL (`backend/umu/executor.py`, `_terminate`). For Wine it uses
+  `wineboot -k`. It also finds processes by `BOTTLE=<path>` in `/proc/*/environ`.
 - **Faugus** puts `FAUGUSID=<id>` in the environment and kills by `/proc/*/environ` too
   (`utils.py`). It detects the end with `GLib.child_watch_add`.
-- **Heroic** waits for its child to exit, optionally with `wineserver --wait`, and stops with `pkill
-  -f` plus `wineserver -k`.
+- **Heroic** waits for its child to exit and stops with `pkill -f` plus `wineserver -k`. It has the
+  same risk as Prefixr today, so it isn't the model here.
 - **umu** itself sets `PR_SET_CHILD_SUBREAPER`, starts a new session and passes SIGTERM and SIGINT
   on to its process tree (`umu_run.py`).
 
-**Plan (the Lutris approach, for the native build too):**
+**Plan (Lutris for finding, Lutris and Bottles for stopping):**
 
-1. `run_game` sets `PREFIXR_GAME_ID=<id>` in the game's environment.
-2. A game's processes are those whose `/proc/<pid>/environ` holds that marker, in addition to the
-   process group. This also works natively, so there is one code path, not two.
-3. Stopping a Proton game: first `umu-run wineboot -k` in the game's prefix, then SIGTERM and finally
-   SIGKILL to the marked processes. A Wine game keeps `wineserver -k`.
-4. The game has ended when umu-run has exited and no marked process is left. Play time is counted
-   until then.
+1. `run_game` sets `PREFIXR_GAME_ID=<id>` in the game's environment, in both builds. It is only an
+   extra variable, so the native build behaves as before.
+2. A game's processes are those whose `/proc/<pid>/environ` holds that marker, plus the process
+   group.
+3. Stopping in the Flatpak (`is_flatpak()`), in this order:
+   1. SIGTERM to `umu-run` (Proton) or to the Wine process Prefixr started (Bottles).
+   2. Wait up to 5 s for the marked processes to end (Lutris, Bottles).
+   3. If any are left: `umu-run wineboot -k` with `PROTON_VERB=runinprefix` in the game's prefix
+      (Lutris), or `wineserver -k` without `-9` for a Wine game. Wait again.
+   4. SIGTERM, and after 5 s SIGKILL, to the marked processes that are still left.
 
-**A second instance.** `prefixr game stop` or `--run` from a Steam shortcut starts a second
-`flatpak run` instance, possibly in a PID namespace of its own (spike, point 4). If it can't see the
-games, it hands the command to the instance with the window, like the existing single-instance
-handoff (`pending-launch`) does, instead of acting itself.
+   No `pkill -f <exe>` in the Flatpak: it hits `pv-adverb`.
+4. The native build keeps today's `kill_running_game` and `end_game_session` unchanged, so the
+   AppImage doesn't change. The native build leaves orphaned Wine services behind too (spike, point
+   3), so it may move to the same sequence later, but only as a change of its own, tested natively.
+5. The game has ended when Prefixr's child has exited and no marked process is left (Lutris'
+   heartbeat). Play time is counted until then. Leftover daemons no longer keep the game "running"
+   after a stop.
+
+**A second instance.** `prefixr game stop`, a desktop shortcut or `--run` from a Steam shortcut
+starts a second `flatpak run` instance with its own PID namespace (spike, point 4). It can't see the
+games, and today `game stop` from there even prints `Stopped` while nothing happened. So in the
+Flatpak:
+
+- The second instance hands `stop`, `launch` and `--run` to the instance with the window, over the
+  single-instance plugin with `dbus_id` set to the app ID (see [single instance](#tray-and-single-instance)).
+  Lutris and Bottles do the same with `GApplication` on their own app ID, Heroic with Electron's
+  single-instance lock.
+- If no instance holds the game's lock file, `game stop` says the game isn't running. If one does
+  but can't be reached, it reports an error instead of `Stopped`.
+- A game launched by a CLI `game launch` lives in that CLI instance. In the Flatpak, `game launch`
+  therefore also goes to the window instance, and starts it in the background if needed (like
+  Heroic's `--no-gui`).
+- Ending the outer `flatpak run` doesn't reach Prefixr inside (spike, point 4). **Open:** what
+  Steam does when it stops a Prefixr shortcut. Test this in phase 4.
 
 ## Phase 4: desktop, Steam and the command line
 
@@ -296,9 +498,12 @@ dialog (`add_prefix`). A prefix must never end up under `/run/user/…/doc`.
   the `steam` command and the host's processes, neither of which exists in the sandbox. Two ways, see
   the [first decision](#decisions-to-make):
   - Without extra permissions: Prefixr asks the user to close Steam, writes `shortcuts.vdf` and
-    tells them to start Steam again. Whether Steam is running can be read from `~/.steam/steam.pid`,
-    but probably not checked with `kill(pid, 0)` as Heroic does, since the host's PIDs aren't visible
-    in the sandbox; **to verify** what works instead.
+    tells them to start Steam again. Whether Steam is running can't be checked with `kill(pid, 0)`
+    on `~/.steam/steam.pid` as Heroic does: the spike confirmed that the sandbox only sees its own
+    PID namespace (point 4). Heroic's Flatpak has exactly this check and silently gets "not
+    running". Lutris uses `pgrep`, which doesn't see the host either. **Open:** whether anything
+    works without extra permissions. Steam wasn't running during the spike. Until then, Prefixr
+    treats the state as unknown in the Flatpak and always asks the user to close Steam.
   - With `--talk-name=org.freedesktop.Flatpak`, as Lutris has on Flathub: `flatpak-spawn --host
     steam -shutdown` and so on, exactly as today.
 
@@ -322,13 +527,22 @@ exists, the Flatpak points to this. An automatic import can come later.
 
 ### Tray and single instance
 
-- **Tray:** `TrayIconBuilder::temp_dir_path(app_cache_dir)` (`tray.rs`), so the icon file is
-  somewhere the tray host can read it without `xdg-run/tray-icon` (Tauri's guide).
+- **Tray:** in the Flatpak, `TrayIconBuilder::temp_dir_path($XDG_RUNTIME_DIR/app/$FLATPAK_ID)`
+  (`tray.rs`). That folder is the same path on the host, so the tray host can read the icon file.
+  The spike showed that the default (`$XDG_RUNTIME_DIR/tray-icon`) is private to the sandbox.
+  Heroic's `heroic-run` sets `TMPDIR` to the same folder. Lutris passes the app ID as an icon
+  name instead, which the `tray-icon` crate doesn't support. The native build keeps the default.
 - **Single instance:** the plugin takes the D-Bus name `<identifier>.SingleInstance`
   (`platform_impl/linux.rs`). An app may own names below its own ID without a permission, but
   `com.tristan.prefixr…` isn't below `io.github.firsttris.Prefixr`, and Flathub never grants an
-  `--own-name` outside the ID. So in the Flatpak: `Builder::new().dbus_id(flatpak_id())`. 2.4.5,
-  the version in `Cargo.lock`, has `dbus_id`.
+  `--own-name` outside the ID. The spike confirmed it: a second start opens a second app. So in the
+  Flatpak: `Builder::new().dbus_id(flatpak_id())`. 2.4.5, the version in `Cargo.lock`, has
+  `dbus_id`. The native build keeps its current name.
+- **Window identity:** the window reports `app_id` `prefixr` (Wayland) and `WM_CLASS` `Prefixr`
+  (X11), which doesn't match the Flatpak's desktop file (spike, point 5). As in Lutris: in the
+  Flatpak, `glib::set_prgname(FLATPAK_ID)` before the window is created, and
+  `StartupWMClass=io.github.firsttris.Prefixr` in the Flatpak's desktop file only. The native
+  desktop file and program name stay as they are.
 
 ## Phase 5: building from source and releasing
 
@@ -371,8 +585,11 @@ Flathub requires a build from source without network access, as Cinny does:
 2. **`--filesystem=home` or single folders?** Heroic lists folders, Lutris and Faugus take `home`.
    Prefixr's games and prefixes can be anywhere, and an agent passes any path. Recommendation:
    `home`.
-3. **Tracking processes by environment marker natively too?** Recommendation: yes, one code path
-   for both builds, if the spike shows it works.
+3. **Tracking processes by environment marker natively too?** The spike showed that it works in the
+   Flatpak. Recommendation: set the marker and use it to *find* processes in both builds (an extra
+   variable doesn't change the native behaviour). The new *stop* sequence only in the Flatpak at
+   first; the native build keeps today's, so the AppImage doesn't change. Moving the native build
+   over is a separate decision, after testing it natively.
 4. **Start with a `.flatpak` in the releases or go straight to Flathub?** Recommendation: releases
    first, so the sandbox issues show up with users who installed it on purpose before Flathub's
    review.
