@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Prefixr
+Comment=Manage Wine and Proton prefixes to run Windows games
+Comment[de]=Wine- und Proton-Prefixe verwalten, um Windows-Spiele zu spielen
+Exec=prefixr
+Icon=io.github.firsttris.Prefixr
+Terminal=false
+Categories=Game;Utility;
+Keywords=wine;proton;umu;windows;games;prefix;
+StartupWMClass=io.github.firsttris.Prefixr
