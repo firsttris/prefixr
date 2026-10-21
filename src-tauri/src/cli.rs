@@ -18,9 +18,9 @@ use serde_json::Value;
 use tauri::{AppHandle, Listener, Manager, State};
 
 use crate::commands::games::{
-    add_game, create_desktop_shortcut, create_menu_shortcut, end_game_session, launch_game,
-    remove_game, run_in_prefix, stop_game_from_cli_flatpak, update_game, LaunchingGames,
-    RunningGames,
+    add_game, create_desktop_shortcut, create_menu_shortcut, end_game_session,
+    game_processes_visible, game_wine_session, launch_game, remove_game, run_in_prefix,
+    stop_game_gracefully, stop_refusal, update_game, LaunchingGames, RunningGames,
 };
 use crate::commands::library::game_key;
 use crate::commands::logs::game_log_dir;
@@ -938,22 +938,27 @@ async fn game_command(app: &AppHandle, out: Out, command: GameCommand) -> Result
         GameCommand::Launch { game } => launch(app, out, &game).await,
         GameCommand::Stop { game } => {
             let game = lookup_game(app, &game)?;
-            if is_flatpak() {
-                stop_game_from_cli_flatpak(game.id, &game.name).await?;
-                return out.print(&game.id, || format!("Stopped \"{}\"", game.name));
-            }
             let runners = scan_runners(&config(app).runners_dir)?;
             let runner = runners
                 .iter()
                 .find(|r| r.id == game.runner_id)
                 .ok_or_else(|| format!("Runner '{}' not found", game.runner_id))?;
-            let wineserver = wineserver_binary(&runner.path)?;
-            end_game_session(
-                &wineserver,
-                &game.prefix_path.to_string_lossy(),
-                &game.exe_path,
-            )
-            .await?;
+            if game_processes_visible(game.id) {
+                let session = game_wine_session(app, &app.state(), &game, runner).await?;
+                stop_game_gracefully(game.id, &session, None).await;
+            } else if is_flatpak() {
+                return Err(stop_refusal(game.id, &game.name));
+            } else {
+                // Its processes run where this one can't read them (a
+                // distrobox), or it was started without the marker.
+                let wineserver = wineserver_binary(&runner.path)?;
+                end_game_session(
+                    &wineserver,
+                    &game.prefix_path.to_string_lossy(),
+                    &game.exe_path,
+                )
+                .await?;
+            }
             out.print(&game.id, || format!("Stopped \"{}\"", game.name))
         }
         GameCommand::Log { game, print } => {
