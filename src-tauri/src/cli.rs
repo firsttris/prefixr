@@ -1019,6 +1019,11 @@ fn steam_result(out: Out, change: SteamChange, done: &str) -> Result<(), AppErro
              Quit it, or pass --restart-steam."
             .to_string()
             .into()),
+        SteamChange::CloseSteamFirst => Err("Prefixr can't see or quit Steam from its Flatpak, \
+             and a running Steam would overwrite the change. Close Steam, then pass \
+             --restart-steam."
+            .to_string()
+            .into()),
         SteamChange::Done { .. } => out.print(&change, || done.to_string()),
     }
 }

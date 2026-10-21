@@ -454,7 +454,7 @@ The spike settled how this works (see [Spike results](#spike-results), points 3 
    extra variable, so the native build behaves as before.
 2. A game's processes are those whose `/proc/<pid>/environ` holds that marker, plus the process
    group.
-3. Stopping, in this order (done in #49 for the Flatpak and #50 natively):
+3. Stopping, in this order (done in #49 for the Flatpak and #52 natively):
    1. Proton: `umu-run wineboot -k` with `PROTON_VERB=runinprefix` and the game's `WINEPREFIX`,
       `GAMEID` and `PROTONPATH` (Lutris; test P1). Wine: `wineserver -k` without `-9` (Lutris;
       test W2).
@@ -464,7 +464,7 @@ The spike settled how this works (see [Spike results](#spike-results), points 3 
 
    Not first: a SIGTERM to `umu-run` (Bottles). In the Flatpak it ends umu but not the container
    (test P2). No `pkill -f <exe>` and no `wineserver -k9`: they cause the hang.
-4. The native build uses the same sequence whenever it can see the marked processes (#50, after
+4. The native build uses the same sequence whenever it can see the marked processes (#52, after
    the [third decision](#decisions) changed). Today's `kill_running_game` and `end_game_session`
    stay as the fallback where it can't: a distrobox, whose rootless container can't read the host's
    `/proc/<pid>/environ`, and games started by an older Prefixr.
@@ -510,16 +510,19 @@ by `--launch <id>`, so it keeps working, also for shortcuts from before. `deskto
 ### Open With for installers
 
 Prefixr writes the *Install Prefixr* entry with `Exec=… --install %f` itself at runtime
-(`ensure_install_desktop_entry`). In the Flatpak it is a second desktop file in the manifest
-instead, `io.github.firsttris.Prefixr.Install.desktop`, with the MIME types for `.exe` and `.msi`, as
-Bottles declares them in its own entry. Flatpak exports it and turns its `Exec=` into a
-`flatpak run --file-forwarding … @@ %f @@`.
+(`ensure_install_desktop_entry`). The Flatpak keeps doing that (#54), into the host's
+`~/.local/share/applications` (see `host_data_home`), with `Exec="flatpak" "run"
+"io.github.firsttris.Prefixr" --install %f` and a file name of its own,
+`io.github.firsttris.Prefixr.install.desktop`, so it doesn't replace the native build's entry. With
+access to home, `/mnt`, `/media` and `/run/media`, the path a file manager passes arrives as it is.
 
-Paths can then arrive through the document portal as `/run/user/<uid>/doc/…`, even with access to
-home. Bottles turns them back into real paths with `GetHostPaths` on
-`org.freedesktop.portal.Documents` (`resolve_portal_path` in `utils/manager.py`); Heroic rejects
-them. Prefixr does it like Bottles: in `find_install_arg` (`lib.rs`) and for folders from the file
-dialog (`add_prefix`). A prefix must never end up under `/run/user/…/doc`.
+Not done for now: a second desktop file in the manifest that Flatpak exports with `flatpak run
+--file-forwarding … @@ %f @@`, as Bottles has. Paths would then arrive through the document portal
+as `/run/user/<uid>/doc/…`, which Bottles turns back with `GetHostPaths` on
+`org.freedesktop.portal.Documents` (`resolve_portal_path` in `utils/manager.py`). If Flathub's
+review asks for an exported entry instead of one written at runtime, that is the way, and then
+`find_install_arg` (`lib.rs`) and `add_prefix` have to resolve such paths, since a prefix must never
+end up under `/run/user/…/doc`.
 
 ### Steam
 
@@ -627,7 +630,7 @@ Made on 2026-10-21, after the spike.
    services behind too (`services.exe` from killed sessions still running 18 hours later), and the
    Lutris sequence tested clean natively as well. So it runs wherever the game's marked processes
    can be seen; the old sequence stays as the fallback where they can't (a distrobox, games started
-   by an older Prefixr). Done in #49 (Flatpak) and #50 (native).
+   by an older Prefixr). Done in #49 (Flatpak) and #52 (native).
 4. **Releases first, Flathub later.** A `.flatpak` bundle in the GitHub releases next to the
    AppImage, so sandbox issues show up with users who installed it on purpose before Flathub's
    review.

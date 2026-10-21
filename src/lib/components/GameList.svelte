@@ -206,7 +206,9 @@
   // game out of Steam before removing it from the library.
   type SteamAction = "export" | "remove" | "remove-game";
 
-  let steamConfirm = $state<{ game: Game; action: SteamAction } | null>(null);
+  // `closeFirst`: in the Flatpak, where Prefixr can't see or quit Steam, the
+  // user closes it instead of Prefixr restarting it.
+  let steamConfirm = $state<{ game: Game; action: SteamAction; closeFirst: boolean } | null>(null);
   let steamNotice = $state<{ text: string; kind: "busy" | "done" | "error" } | null>(null);
   let noticeTimer: ReturnType<typeof setTimeout> | undefined;
   onDestroy(() => clearTimeout(noticeTimer));
@@ -234,9 +236,9 @@
         action === "export"
           ? await exportToSteam(game.id, shutdownSteam)
           : await removeFromSteam(game.id, shutdownSteam);
-      if (result.status === "steam_running") {
+      if (result.status === "steam_running" || result.status === "close_steam_first") {
         steamNotice = null;
-        steamConfirm = { game, action };
+        steamConfirm = { game, action, closeFirst: result.status === "close_steam_first" };
         return;
       }
       await refreshSteamGames();
@@ -514,16 +516,27 @@
 
 <ConfirmDialog
   open={steamConfirm !== null}
-  title={m.gameList_steam_confirmTitle()}
-  message={steamConfirm
-    ? m.gameList_steam_confirmMessage({
+  title={steamConfirm?.closeFirst
+    ? m.gameList_steam_closeFirstTitle()
+    : m.gameList_steam_confirmTitle()}
+  message={steamConfirm?.closeFirst
+    ? m.gameList_steam_closeFirstMessage({
         action:
           steamConfirm.action === "export"
-            ? m.gameList_steam_confirmActionExport({ name: steamConfirm.game.name })
-            : m.gameList_steam_confirmActionRemove({ name: steamConfirm.game.name }),
+            ? m.gameList_steam_closeFirstActionExport({ name: steamConfirm.game.name })
+            : m.gameList_steam_closeFirstActionRemove({ name: steamConfirm.game.name }),
       })
-    : ""}
-  confirmLabel={m.gameList_steam_confirmButton()}
+    : steamConfirm
+      ? m.gameList_steam_confirmMessage({
+          action:
+            steamConfirm.action === "export"
+              ? m.gameList_steam_confirmActionExport({ name: steamConfirm.game.name })
+              : m.gameList_steam_confirmActionRemove({ name: steamConfirm.game.name }),
+        })
+      : ""}
+  confirmLabel={steamConfirm?.closeFirst
+    ? m.gameList_steam_closeFirstButton()
+    : m.gameList_steam_confirmButton()}
   onConfirm={() => steamConfirm && runSteamAction(steamConfirm.game, steamConfirm.action, true)}
   onCancel={() => (steamConfirm = null)}
 />

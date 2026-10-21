@@ -9,11 +9,11 @@ use tauri::{AppHandle, State};
 use uuid::Uuid;
 
 use crate::commands::binary_vdf::{self, Map, Value};
-use crate::commands::games::{command_on_path, own_executable_path, write_shortcut_icon};
+use crate::commands::games::{command_on_path, own_launch, write_shortcut_icon, OwnLaunch};
 use crate::commands::steamgriddb::{artwork_dir, asset_cache_path, image_extension};
 use crate::config::ConfigState;
 use crate::env;
-use crate::host_env::host_data_home;
+use crate::host_env::{host_data_home, is_flatpak};
 use crate::lock::LockExt;
 use crate::models::{ArtworkKind, Game};
 
@@ -149,9 +149,16 @@ fn shortcut_app_id(game_id: Uuid) -> u32 {
 }
 
 /// `--run` rather than a desktop shortcut's `--launch`: the game runs in a
-/// windowless Prefixr that exits with it, so Steam sees when it ends.
-fn launch_options(game_id: Uuid) -> String {
-    format!("--run {game_id}")
+/// windowless Prefixr that exits with it, so Steam sees when it ends. After
+/// the arguments of `launch` itself (`run <app ID>` in a Flatpak).
+fn launch_options(launch: &OwnLaunch, game_id: Uuid) -> String {
+    launch
+        .args
+        .iter()
+        .map(String::as_str)
+        .chain(["--run", &game_id.to_string()])
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// The index of the game's existing shortcut, recognized by its launch
@@ -184,7 +191,13 @@ fn quoted(path: &Path) -> String {
 /// Adds the game's shortcut or updates the one from an earlier export. An
 /// update only touches the fields Prefixr owns, so what the user changed in
 /// Steam (collections, hidden, own launch settings) stays.
-fn upsert_shortcut(shortcuts: &mut Map, game: &Game, app_id: u32, exe: &Path, icon: Option<&Path>) {
+fn upsert_shortcut(
+    shortcuts: &mut Map,
+    game: &Game,
+    app_id: u32,
+    launch: &OwnLaunch,
+    icon: Option<&Path>,
+) {
     let index = find_shortcut(shortcuts, game.id).unwrap_or_else(|| {
         let s = |v: &str| Value::String(v.to_string());
         let defaults: Map = vec![
@@ -207,11 +220,10 @@ fn upsert_shortcut(shortcuts: &mut Map, game: &Game, app_id: u32, exe: &Path, ic
         unreachable!("find_shortcut only matches maps");
     };
 
-    let start_dir = exe.parent().unwrap_or(exe);
     binary_vdf::set(fields, "appid", Value::Int(app_id));
     binary_vdf::set(fields, "AppName", Value::String(game.name.clone()));
-    binary_vdf::set(fields, "Exe", Value::String(quoted(exe)));
-    binary_vdf::set(fields, "StartDir", Value::String(quoted(start_dir)));
+    binary_vdf::set(fields, "Exe", Value::String(quoted(&launch.program)));
+    binary_vdf::set(fields, "StartDir", Value::String(quoted(&launch.start_dir)));
     binary_vdf::set(
         fields,
         "icon",
@@ -220,7 +232,7 @@ fn upsert_shortcut(shortcuts: &mut Map, game: &Game, app_id: u32, exe: &Path, ic
     binary_vdf::set(
         fields,
         "LaunchOptions",
-        Value::String(launch_options(game.id)),
+        Value::String(launch_options(launch, game.id)),
     );
 
     renumber(shortcuts);
@@ -342,7 +354,7 @@ fn add_shortcut(app: &AppHandle, game: &Game, user: &SteamUser) -> Result<(), Ap
         shortcuts,
         game,
         app_id,
-        &own_executable_path(&crate::env::process)?,
+        &own_launch(&crate::env::process)?,
         icon.as_deref(),
     );
     write_shortcuts_file(vdf_path, &file).map_err(AppError::from)
@@ -371,6 +383,10 @@ pub enum SteamChange {
     Done { restarted_steam: bool },
     /// Steam runs and `shutdown_steam` wasn't set; nothing was changed.
     SteamRunning,
+    /// In a Flatpak, where Prefixr can neither see Steam's process nor run
+    /// `steam` to quit it, and `shutdown_steam` wasn't set: the user is asked
+    /// to close Steam. Called again with it set, that means Steam is closed.
+    CloseSteamFirst,
 }
 
 /// Applies a change to Steam's shortcuts. Steam has to be closed for that:
@@ -380,6 +396,18 @@ async fn change_steam(
     shutdown_steam: bool,
     change: impl FnOnce() -> Result<(), AppError>,
 ) -> Result<SteamChange, AppError> {
+    // Heroic's Flatpak checks `steam.pid` with `kill(pid, 0)`, which can't
+    // see the host's processes and always says "not running" (the spike).
+    // Without the permission to run commands on the host (the first
+    // decision in docs/flatpak.md), the user closes Steam.
+    if is_flatpak() {
+        if !shutdown_steam {
+            return Ok(SteamChange::CloseSteamFirst);
+        }
+        return change().map(|()| SteamChange::Done {
+            restarted_steam: false,
+        });
+    }
     let was_running = steam_running();
     if was_running {
         if !shutdown_steam {
