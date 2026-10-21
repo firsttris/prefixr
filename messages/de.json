@@ -528,7 +528,7 @@
   "backendErrors_other": "{message}",
   "backendErrors_game_already_running": "Das Spiel wird bereits gestartet oder läuft schon",
   "backendErrors_game_running": "Das Spiel läuft noch. Beende es zuerst.",
-  "backendErrors_game_runs_in_other_instance": "„{game_name}“ läuft in einem anderen Prefixr-Fenster. Beende es dort.",
+  "backendErrors_game_runs_in_other_instance": "„{game_name}“ läuft in einer anderen Prefixr-Instanz (im Fenster, über eine Steam-Verknüpfung oder `prefixr game launch`). Beende es dort.",
   "backendErrors_game_not_running": "„{game_name}“ läuft nicht.",
   "backendErrors_prefix_in_use": "„{game_name}“ läuft noch in diesem Prefix. Beende das Spiel zuerst.",
   "backendErrors_steam_command_not_found": "Steam läuft. Bitte beende Steam und versuche es erneut.",
