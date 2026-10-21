@@ -96,7 +96,7 @@ Flatpak. Phase 3 below is adjusted for it.
 | Desktop | KDE Plasma 6.7.4, Wayland |
 | GPU / driver | AMD Navi 32 (`1002:747e`), amdgpu, Mesa from `GL.default` 26.08 |
 | Flatpak | 1.18.1, `bwrap` not setuid, unprivileged user namespaces on |
-| Prefixr | 0.1.10, `.deb` repackaged by [`flatpak/spike/io.github.firsttris.Prefixr.yml`](../flatpak/spike/io.github.firsttris.Prefixr.yml) |
+| Prefixr | 0.1.10, `.deb` repackaged by [`flatpak/spike/io.github.firsttris.Prefixr.yml`](https://github.com/firsttris/prefixr/blob/main/flatpak/spike/io.github.firsttris.Prefixr.yml) |
 | Tested with | umu-launcher 1.4.4, GE-Proton11-7 (steamrt4), Wine 11.20 (Kron4ek) with DXVK 3.1.1 |
 
 How it was built: Bazzite has no `flatpak-builder` on the host, so the Flathub app
@@ -274,7 +274,7 @@ sandbox unchanged.
 - **App ID `io.github.firsttris.Prefixr`.** Flathub's rules: an app hosted on GitHub must use
   `io.github.<user>.<App>`, and `com.tristan.prefixr` would need the domain `tristan.com`. The Tauri
   `identifier` can stay `com.tristan.prefixr` for the native builds (see
-  [single instance](#single-instance)).
+  [single instance](#tray-and-single-instance)).
 
 ### Permissions
 
@@ -468,9 +468,11 @@ The spike settled how this works (see [Spike results](#spike-results), points 3 
    the [third decision](#decisions) changed). Today's `kill_running_game` and `end_game_session`
    stay as the fallback where it can't: a distrobox, whose rootless container can't read the host's
    `/proc/<pid>/environ`, and games started by an older Prefixr.
-5. The game has ended when Prefixr's child has exited and no marked process is left (Lutris'
-   heartbeat). Play time is counted until then. Leftover daemons no longer keep the game "running"
-   after a stop.
+5. The end of a game stays as today: when Prefixr's own child exits. umu waits for the game
+   (`waitforexitandrun`), so this is the end of the game. A first version also waited for the last
+   marked process (Lutris' heartbeat). Review of #50 showed that a Wine game sharing its prefix with
+   another running game then stays "running" for that whole game, because `wineserver` and the wine
+   services carry the first game's marker. It was removed again.
 
 **A second instance.** `prefixr game stop`, a desktop shortcut or `--run` from a Steam shortcut
 starts a second `flatpak run` instance with its own PID namespace (spike, point 4). It can't see the
