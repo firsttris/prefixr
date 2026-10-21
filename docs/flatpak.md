@@ -33,7 +33,7 @@ Two rules for all phases:
 - [Phase 4: desktop, Steam and the command line](#phase-4-desktop-steam-and-the-command-line)
 - [Phase 5: building from source and releasing](#phase-5-building-from-source-and-releasing)
 - [Phase 6: Flathub](#phase-6-flathub)
-- [Decisions to make](#decisions-to-make)
+- [Decisions](#decisions)
 
 ## Why Flatpak
 
@@ -322,8 +322,8 @@ finish-args:
 `org.freedesktop.portal.Flatpak`, the portal pressure-vessel uses for its sub-sandbox, needs no
 permission: every app may talk to portals. Heroic, Bottles and Faugus manage without
 `--talk-name=org.freedesktop.Flatpak` (the permission for `flatpak-spawn --host`, which leaves the
-sandbox entirely). Only Lutris has it. Whether Prefixr needs it is the
-[first decision](#decisions-to-make).
+sandbox entirely). Only Lutris has it. Prefixr doesn't get it either
+([first decision](#decisions)).
 
 ### 32-bit libraries
 
@@ -527,8 +527,8 @@ dialog (`add_prefix`). A prefix must never end up under `/run/user/…/doc`.
   `--talk-name=org.freedesktop.Flatpak` (Faugus documents that in its README; Steam's manifest
   doesn't have it). `SteamOnlyFlatpak` stays, with that hint added to the message.
 - **Closing and restarting Steam** (`stop_steam`, `start_steam`, `steam_running`, `steam.rs`) needs
-  the `steam` command and the host's processes, neither of which exists in the sandbox. Two ways, see
-  the [first decision](#decisions-to-make):
+  the `steam` command and the host's processes, neither of which exists in the sandbox. Prefixr
+  takes the first of these two ways ([first decision](#decisions)):
   - Without extra permissions: Prefixr asks the user to close Steam, writes `shortcuts.vdf` and
     tells them to start Steam again. Whether Steam is running can't be checked with `kill(pid, 0)`
     on `~/.steam/steam.pid` as Heroic does: the spike confirmed that the sandbox only sees its own
@@ -536,8 +536,9 @@ dialog (`add_prefix`). A prefix must never end up under `/run/user/…/doc`.
     running". Lutris uses `pgrep`, which doesn't see the host either. **Open:** whether anything
     works without extra permissions. Steam wasn't running during the spike. Until then, Prefixr
     treats the state as unknown in the Flatpak and always asks the user to close Steam.
-  - With `--talk-name=org.freedesktop.Flatpak`, as Lutris has on Flathub: `flatpak-spawn --host
-    steam -shutdown` and so on, exactly as today.
+  - Not chosen: with `--talk-name=org.freedesktop.Flatpak`, as Lutris has on Flathub,
+    `flatpak-spawn --host steam -shutdown` and so on would work exactly as today. A user who adds
+    the permission with `flatpak override` could get this later.
 
 ### Command line and the skill
 
@@ -608,20 +609,20 @@ Flathub requires a build from source without network access, as Cinny does:
 - Flathub doesn't accept apps that are only a "thin wrapper" around other tools. Prefixr's library,
   prefix management and store integration clearly go beyond that.
 
-## Decisions to make
+## Decisions
 
-1. **`--talk-name=org.freedesktop.Flatpak`, yes or no?** With it, Prefixr could restart Steam and
-   run `pkexec` for `vm.max_map_count` as it does today (Lutris). Without it, the sandbox stays
-   closed and Prefixr asks the user to do these two things themselves (Heroic, Bottles).
-   Recommendation: without, at least for Flathub. A user can add it later with `flatpak override`.
-2. **`--filesystem=home` or single folders?** Heroic lists folders, Lutris and Faugus take `home`.
-   Prefixr's games and prefixes can be anywhere, and an agent passes any path. Recommendation:
-   `home`.
-3. **Tracking processes by environment marker natively too?** The spike showed that it works in the
-   Flatpak. Recommendation: set the marker and use it to *find* processes in both builds (an extra
-   variable doesn't change the native behaviour). The new *stop* sequence only in the Flatpak at
-   first; the native build keeps today's, so the AppImage doesn't change. Moving the native build
-   over is a separate decision, after testing it natively.
-4. **Start with a `.flatpak` in the releases or go straight to Flathub?** Recommendation: releases
-   first, so the sandbox issues show up with users who installed it on purpose before Flathub's
+Made on 2026-10-21, after the spike.
+
+1. **No `--talk-name=org.freedesktop.Flatpak`.** The sandbox stays closed. Prefixr asks the user to
+   close and restart Steam themselves and shows the `sysctl` command for `vm.max_map_count` to copy
+   (Heroic, Bottles). A user can still add the permission with `flatpak override`. Lutris is the
+   only one of the four with it.
+2. **`--filesystem=home`.** Games and prefixes can be anywhere, and an agent passes any path
+   (Lutris, Faugus).
+3. **The marker in both builds, the new stop sequence only in the Flatpak.** `PREFIXR_GAME_ID` is
+   set and used to find processes in both builds; an extra variable doesn't change the native
+   behaviour. The stop sequence from phase 3 runs behind `is_flatpak()`; the AppImage keeps
+   today's. Moving the native build over is a separate decision, after testing it natively.
+4. **Releases first, Flathub later.** A `.flatpak` bundle in the GitHub releases next to the
+   AppImage, so sandbox issues show up with users who installed it on purpose before Flathub's
    review.
