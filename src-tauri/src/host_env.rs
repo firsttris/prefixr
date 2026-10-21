@@ -44,6 +44,17 @@ pub fn flatpak_id() -> Option<String> {
         .filter(|id| !id.is_empty())
 }
 
+/// The folder Flatpak shares between an app's sandbox and the host, at the
+/// same path in both: `$XDG_RUNTIME_DIR/app/<app ID>`. Files another program
+/// on the host has to read go there, e.g. the tray icon (Heroic's
+/// `heroic-run` points `TMPDIR` at it for the same reason). The sandbox's own
+/// `$XDG_RUNTIME_DIR` is private. `None` outside a Flatpak.
+pub fn flatpak_shared_runtime_dir(env: Env) -> Option<PathBuf> {
+    let id = env("FLATPAK_ID").filter(|id| !id.is_empty())?;
+    let runtime_dir = env("XDG_RUNTIME_DIR").filter(|dir| !dir.is_empty())?;
+    Some(PathBuf::from(runtime_dir).join("app").join(id))
+}
+
 /// The host's data directory, which the other launchers, Steam and the
 /// desktop share. Natively `$XDG_DATA_HOME`, falling back to
 /// `~/.local/share`. In a Flatpak `$XDG_DATA_HOME` points into the app's own

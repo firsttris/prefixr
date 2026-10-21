@@ -45,6 +45,9 @@ clap = { version = "4", features = ["derive"] }
 # Already in the tree through tauri-plugin-single-instance; used directly to
 # hand `prefixr game stop` to the window in a Flatpak (`single_instance`).
 zbus = "5"
+# Already in the tree through Tauri's GTK; sets the program name, which
+# becomes the window's Wayland app_id and X11 WM_CLASS, in a Flatpak.
+glib = "0.18"
 
 [dev-dependencies]
 tempfile = "3"

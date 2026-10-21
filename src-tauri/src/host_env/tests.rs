@@ -171,3 +171,21 @@ fn host_data_home_in_a_flatpak_skips_the_apps_own_data_dir() {
         Some(PathBuf::from("/home/u/.local/share"))
     );
 }
+
+#[test]
+fn flatpak_shared_runtime_dir_is_below_the_app_id() {
+    let env = crate::env::fake(&[
+        ("FLATPAK_ID", "io.github.firsttris.Prefixr"),
+        ("XDG_RUNTIME_DIR", "/run/user/1000"),
+    ]);
+    assert_eq!(
+        flatpak_shared_runtime_dir(&env),
+        Some(PathBuf::from(
+            "/run/user/1000/app/io.github.firsttris.Prefixr"
+        ))
+    );
+    let native = crate::env::fake(&[("XDG_RUNTIME_DIR", "/run/user/1000")]);
+    assert_eq!(flatpak_shared_runtime_dir(&native), None);
+    let no_runtime_dir = crate::env::fake(&[("FLATPAK_ID", "io.github.firsttris.Prefixr")]);
+    assert_eq!(flatpak_shared_runtime_dir(&no_runtime_dir), None);
+}

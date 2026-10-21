@@ -2862,6 +2862,7 @@ dependencies = [
  "editpe",
  "flate2",
  "futures-util",
+ "glib",
  "image",
  "libc",
  "reqwest 0.12.28",
