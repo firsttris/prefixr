@@ -578,6 +578,8 @@ fn launch_locked_elsewhere(id: Uuid) -> bool {
 /// `prefixr game stop` in a Flatpak. Every `flatpak run` is its own PID
 /// namespace, so the game's processes are usually out of sight for this
 /// process: then it says so instead of reporting a stop that didn't happen.
+/// The game's lock file only tells that some other Prefixr process runs it
+/// (the window, a Steam `--run` or a CLI `game launch`), not which.
 /// Visible ones (`flatpak enter`, or a future handoff) get the same SIGTERM,
 /// then SIGKILL, as `stop_game_flatpak`.
 pub async fn stop_game_from_cli_flatpak(id: Uuid, game_name: &str) -> Result<(), AppError> {
@@ -1807,14 +1809,6 @@ async fn run_game(
 
     let started_at = Instant::now();
     let wait_result = child.wait().await;
-    // In a Flatpak, umu-run can end while pressure-vessel's container, which
-    // the portal owns, still runs the game (seen in the spike). The game
-    // ends with its last marked process, as in Lutris (`Game.beat`).
-    if is_flatpak() {
-        while !marked_processes(game_id).is_empty() {
-            tokio::time::sleep(Duration::from_secs(1)).await;
-        }
-    }
 
     running.0.locked().remove(&game_id);
     rebuild_tray_menu(app);
