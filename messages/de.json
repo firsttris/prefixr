@@ -582,6 +582,7 @@
   "gameList_toolbar_searchShortcut": "Spiel suchen… ( / )",
   "gameList_chips_label": "Sammlungen",
   "gameList_chips_all": "Alle",
+  "gameList_chips_installed": "Installiert",
   "gameList_chips_favorites": "Favoriten",
   "gameList_chips_hidden": "Ausgeblendet",
   "gameList_chips_newCategory": "+ Kategorie",
