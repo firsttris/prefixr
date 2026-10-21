@@ -17,6 +17,12 @@ export default defineConfig(() => ({
     sveltekit(),
   ],
 
+  // Only the project's own tests: flatpak-builder keeps whole copies of the repo in
+  // .flatpak-builder/, which vitest would otherwise run again.
+  test: {
+    include: ["src/**/*.{test,spec}.{js,ts}", "tests/**/*.{test,spec}.{js,ts}"],
+  },
+
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors

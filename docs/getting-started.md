@@ -23,6 +23,15 @@ This guide takes you from a fresh install to a running game in a few minutes.
 
 Download a package from the [latest release](https://github.com/firsttris/prefixr/releases/latest):
 
+- **Flatpak** (any distribution with Flatpak, including immutable ones like Bazzite and SteamOS;
+  releases after 0.1.10). It brings its own WebKitGTK, and MangoHud and Gamescope come as Flathub
+  extensions; Prefixr shows the command when one is missing:
+
+  ```bash
+  flatpak install --user ./prefixr_*_x86_64.flatpak
+  flatpak run io.github.firsttris.Prefixr
+  ```
+
 - **AppImage** (works on any distribution, including immutable ones like Bazzite and SteamOS):
 
   ```bash

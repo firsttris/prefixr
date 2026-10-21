@@ -73,6 +73,21 @@ pub fn host_data_home(env: Env) -> Option<PathBuf> {
         .or_else(|| env("HOME").map(|home| PathBuf::from(home).join(".local/share")))
 }
 
+/// The host's config directory: natively `$XDG_CONFIG_HOME`, in a Flatpak
+/// `$HOST_XDG_CONFIG_HOME` (see `host_data_home`), falling back to
+/// `~/.config`.
+pub fn host_config_home(env: Env) -> Option<PathBuf> {
+    let key = if is_flatpak_in(env) {
+        "HOST_XDG_CONFIG_HOME"
+    } else {
+        "XDG_CONFIG_HOME"
+    };
+    env(key)
+        .filter(|dir| !dir.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| env("HOME").map(|home| PathBuf::from(home).join(".config")))
+}
+
 /// A change to a child's environment: the variable's new value, or `None`
 /// to remove it.
 pub type EnvFix = (OsString, Option<OsString>);

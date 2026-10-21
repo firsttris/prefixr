@@ -122,6 +122,7 @@
   "gameList_loadFailed": "Could not load the library: {error}",
   "gameList_emptyLibrary_title": "No games in your library yet",
   "gameList_emptyLibrary_hint": "Add your first game to get started.",
+  "gameList_emptyLibrary_nativeFound": "Prefixr found a library from its AppImage, .deb or .rpm ({path}). The Flatpak keeps its own. To bring yours over, create a backup there (Backup), then restore that file here (Backup → Restore).",
   "gameList_emptySearch_title": "No matches",
   "gameList_emptySearch_hint": "No game found for “{query}”.",
   "gameList_steam_busyQuitting": "Quitting Steam…",

@@ -19,7 +19,8 @@ open: it shows every change within a second, so they can watch and try a game ri
   `prefixr backup create`. `prefixr backup restore <file>` undoes it, and a restore is itself
   undoable with `prefixr backup restore 1`.
 - **Run it on the user's desktop**, not over SSH: launches and installers need the desktop session.
-  With the AppImage, call `./prefixr_*.AppImage` instead of `prefixr`.
+  With the AppImage, call `./prefixr_*.AppImage` instead of `prefixr`; with the Flatpak,
+  `flatpak run io.github.firsttris.Prefixr`.
 - **Long commands run in the background**: `game launch` (waits until the game exits),
   `game install`, `store install`, `runner download`. Ctrl+C or your timeout cancels them cleanly.
 - **Nothing here deletes game files or prefixes**, except `store uninstall` (deletes a store

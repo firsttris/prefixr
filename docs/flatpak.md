@@ -48,15 +48,15 @@ What it costs: a second build to maintain, a few features that need another way 
 
 ## The phases
 
-| Phase | What | Result |
-| --- | --- | --- |
-| 0 | Spike: repackage the `.deb`, test the risky parts | Go or no-go |
-| 1 | The manifest: runtime, permissions, extensions | A Flatpak that starts |
-| 2 | Flatpak detection and the paths that move | Library, umu, shortcuts in the right places |
-| 3 | Launching, tracking and stopping games | Games run and stop like in the native build |
-| 4 | Desktop shortcuts, Steam, Open With, CLI, migration | Feature parity, or a clear message where there is none |
-| 5 | Building from source, CI, `.flatpak` bundle in releases | Users can install it |
-| 6 | Flathub submission | Prefixr on Flathub |
+| Phase | What | Result | Status |
+| --- | --- | --- | --- |
+| 0 | Spike: repackage the `.deb`, test the risky parts | Go or no-go | Done: go (#48) |
+| 1 | The manifest: runtime, permissions, extensions | A Flatpak that starts | Done (#48, #55) |
+| 2 | Flatpak detection and the paths that move | Library, umu, shortcuts in the right places | Done (#49, #56, #59, #60) |
+| 3 | Launching, tracking and stopping games | Games run and stop like in the native build | Done (#49, #52, #58) |
+| 4 | Desktop shortcuts, Steam, Open With, CLI, migration | Feature parity, or a clear message where there is none | Done (#51, #53, #54), except the skill's command, the alias in the docs and the migration hint |
+| 5 | Building from source, CI, `.flatpak` bundle in releases | Users can install it | Done (#55); the first bundle comes with the next release |
+| 6 | Flathub submission | Prefixr on Flathub | Open: screenshots, a `<release>` per version, submission |
 
 ## Phase 0: spike
 
@@ -398,11 +398,11 @@ host, and would show "setting up" before every launch.
 | --- | --- | --- | --- |
 | `vm.max_map_count` fix (`performance.rs`) | `pkexec` doesn't exist | Read the value as before, but `can_fix = false`, show the command to copy | none of them touch it; Lutris only warns about its own limit |
 | Power profile (`powerprofilesctl`, `games.rs`) | not in the runtime (spike, point 6) | First hide it in the Flatpak; later `HoldProfile` over D-Bus on `org.freedesktop.UPower.PowerProfiles` | none of them have it |
-| Keep the screen on (`systemd-inhibit`, `games.rs`) | no host systemd | The Inhibit portal (`org.freedesktop.portal.Inhibit`) | Faugus |
+| Keep the screen on (`systemd-inhibit`, `games.rs`) | no host systemd | The Inhibit portal (`org.freedesktop.portal.Inhibit`), done in #56 | Faugus |
 | Check for a competing scheduler (`systemctl`, `games.rs`) | no host systemd | Skip it in the Flatpak | — |
 | GameMode (`gamemoderun`) | the runtime has it, and the GameMode portal answers (spike, point 6) | Unchanged. **Open:** whether GameMode really turns on; the test machine has no `gamemoded` | Heroic, turned on by default |
-| MangoHud, Gamescope, vkBasalt | only with the extension | `command_on_path` finds them through `PATH`; if missing, a hint with `flatpak install …VulkanLayer.<name>` for the runtime's version | Bottles, Heroic (reads the version from `/app/manifest.json`) |
-| Mounting a disc image (`udisksctl`, `cli/install.rs`) | not in the runtime | UDisks2 over D-Bus (`Loop.Setup`, `Filesystem.Mount`) | all four have the UDisks2 permission |
+| MangoHud, Gamescope, vkBasalt | only with the extension | `command_on_path` finds them through `PATH`; if missing, a hint with `flatpak install …VulkanLayer.<name>//26.08`, done in #60. vkBasalt has no 26.08 build on Flathub yet, so its hint says so | Bottles, Heroic (reads the version from `/app/manifest.json`) |
+| Mounting a disc image (`udisksctl`, `cli/install.rs`) | not in the runtime | UDisks2 over D-Bus (`Manager.LoopSetup`, `Filesystem.Mount`), done in #59 | all four have the UDisks2 permission |
 | `distrobox-host-exec` (`runners.rs`) | not applicable | Skip it in the Flatpak | — |
 | `update-desktop-database` | may be missing | Best effort; ignore errors | — |
 | Opening links (`xdg_open`) | the runtime's `xdg-open` is the portal wrapper, OpenURI v5 answers (spike, point 6) | Unchanged | — |
@@ -476,20 +476,21 @@ The spike settled how this works (see [Spike results](#spike-results), points 3 
 
 **A second instance.** `prefixr game stop`, a desktop shortcut or `--run` from a Steam shortcut
 starts a second `flatpak run` instance with its own PID namespace (spike, point 4). It can't see the
-games, and today `game stop` from there even prints `Stopped` while nothing happened. So in the
-Flatpak:
+games of another instance. In the Flatpak:
 
-- The second instance hands `stop`, `launch` and `--run` to the instance with the window, over the
-  single-instance plugin with `dbus_id` set to the app ID (see [single instance](#tray-and-single-instance)).
-  Lutris and Bottles do the same with `GApplication` on their own app ID, Heroic with Electron's
-  single-instance lock.
-- If no instance holds the game's lock file, `game stop` says the game isn't running. If one does
-  but can't be reached, it reports an error instead of `Stopped`.
-- A game launched by a CLI `game launch` lives in that CLI instance. In the Flatpak, `game launch`
-  therefore also goes to the window instance, and starts it in the background if needed (like
-  Heroic's `--no-gui`).
-- Ending the outer `flatpak run` doesn't reach Prefixr inside (spike, point 4). **Open:** what
-  Steam does when it stops a Prefixr shortcut. Test this in phase 4.
+- Desktop shortcuts (`--launch`) and "Open with" (`--install`) go to the window over the
+  single-instance plugin with `dbus_id` set to the app ID (#51, see
+  [single instance](#tray-and-single-instance)). Lutris and Bottles do the same with `GApplication`
+  on their own app ID, Heroic with Electron's single-instance lock.
+- Whichever instance runs a game (the window, a CLI `game launch`, a Steam `--run`) owns a D-Bus name
+  for it while it runs, `io.github.firsttris.Prefixr.Game.g<id>`, below the app ID (#58). `game stop`
+  calls its `Stop` method, which ends the game like the Stop button, and waits until the game's lock
+  is released. A first version handed the stop to the window only (#51), which missed games started
+  by `game launch` or Steam.
+- If no instance holds the game's lock file, `game stop` says the game isn't running. If one does but
+  doesn't take the stop (still preparing, or an older Prefixr), it says that instead of `Stopped`.
+- Ending the outer `flatpak run` doesn't reach Prefixr inside (spike, point 4). **Open:** what Steam
+  does when it stops a Prefixr shortcut.
 
 ## Phase 4: desktop, Steam and the command line
 

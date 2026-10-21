@@ -122,6 +122,7 @@
   "gameList_loadFailed": "Die Bibliothek konnte nicht geladen werden: {error}",
   "gameList_emptyLibrary_title": "Noch keine Spiele in deiner Bibliothek",
   "gameList_emptyLibrary_hint": "Füge dein erstes Spiel hinzu, um loszulegen.",
+  "gameList_emptyLibrary_nativeFound": "Prefixr hat eine Bibliothek aus der AppImage-, .deb- oder .rpm-Version gefunden ({path}). Das Flatpak hat eine eigene. Um sie zu übernehmen, erstelle dort eine Sicherung (Sicherung) und stelle die Datei hier wieder her (Sicherung → Wiederherstellen).",
   "gameList_emptySearch_title": "Keine Treffer",
   "gameList_emptySearch_hint": "Kein Spiel gefunden für „{query}“.",
   "gameList_steam_busyQuitting": "Steam wird beendet…",

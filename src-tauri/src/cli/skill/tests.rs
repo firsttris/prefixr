@@ -117,3 +117,19 @@ fn skill_commands_parse_and_make_it_a_command_line() {
         super::super::Cli::try_parse_from(line.split(' ')).unwrap();
     }
 }
+
+#[test]
+fn a_flatpak_skill_says_how_to_run_it() {
+    let text = skill_text(Some("io.github.firsttris.Prefixr"));
+    let title_end = SKILL.find("\n# Prefixr\n").unwrap() + "\n# Prefixr\n".len();
+    // Right below the title, with the rest of the skill unchanged.
+    assert!(text.starts_with(&SKILL[..title_end]));
+    assert!(text[title_end..].starts_with("\n> **This Prefixr is a Flatpak.**"));
+    assert!(text.ends_with(&SKILL[title_end..]));
+    assert!(text.contains("`flatpak run io.github.firsttris.Prefixr game list --json`"));
+}
+
+#[test]
+fn the_native_skill_is_unchanged() {
+    assert_eq!(skill_text(None), SKILL);
+}
