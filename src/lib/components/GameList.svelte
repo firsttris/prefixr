@@ -99,7 +99,7 @@
   const isSource = (value: unknown): value is Source =>
     isOneOf("all", "local", "epic", "gog", "amazon")(value);
   const isCollection = (value: unknown): value is Collection =>
-    isOneOf("all", "favorites", "hidden")(value) ||
+    isOneOf("all", "installed", "favorites", "hidden")(value) ||
     (typeof value === "string" &&
       (value.startsWith("category:") ||
         TEST_STATUSES.some((status) => value === `tested:${status}`)));

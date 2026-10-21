@@ -582,6 +582,7 @@
   "gameList_toolbar_searchShortcut": "Search games… ( / )",
   "gameList_chips_label": "Collections",
   "gameList_chips_all": "All",
+  "gameList_chips_installed": "Installed",
   "gameList_chips_favorites": "Favorites",
   "gameList_chips_hidden": "Hidden",
   "gameList_chips_newCategory": "+ Category",

@@ -70,6 +70,7 @@
 
 <div class="chips" role="group" aria-label={m.gameList_chips_label()}>
   {@render chip("all", m.gameList_chips_all())}
+  {@render chip("installed", m.gameList_chips_installed(), "✓")}
   {@render chip("favorites", m.gameList_chips_favorites(), "★")}
   {#each categories as category (category.id)}
     {@render chip(`category:${category.id}`, category.name)}

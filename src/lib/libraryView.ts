@@ -15,12 +15,12 @@ export type SortBy =
 export type Source = "all" | "local" | StoreKind;
 
 /**
- * Which games: all, favorites, one category (`category:<id>`), the ones a
+ * Which games: all, the installed ones, favorites, one category (`category:<id>`), the ones a
  * test found to work, have issues or be broken (`tested:<status>`), or the
  * hidden ones.
  */
 export type Collection =
-  "all" | "favorites" | "hidden" | `category:${string}` | `tested:${TestStatus}`;
+  "all" | "installed" | "favorites" | "hidden" | `category:${string}` | `tested:${TestStatus}`;
 
 export interface ViewOptions {
   query: string;
@@ -55,6 +55,7 @@ function inCollection(entry: Entry, collection: Collection, meta: LibraryConfig)
   if (collection === "hidden") return hidden;
   if (hidden) return false;
   if (collection === "all") return true;
+  if (collection === "installed") return entry.kind === "game";
   if (collection === "favorites") return meta.favorites.includes(entry.key);
   if (collection.startsWith("tested:")) {
     // A result for another setup than the game has now doesn't count, as
@@ -134,6 +135,7 @@ export function collectionCounts(
   const counts: Record<string, number> = {};
   const collections: Collection[] = [
     "all",
+    "installed",
     "favorites",
     "hidden",
     ...meta.categories.map((c) => `category:${c.id}` as const),

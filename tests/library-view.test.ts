@@ -67,6 +67,9 @@ describe("the library view", () => {
       "Pokémon: Blue",
     ]);
     expect(names(view({ source: "local" }).installed)).toEqual(["Quake"]);
+    const installedEpic = view({ source: "epic", collection: "installed" });
+    expect(names(installedEpic.installed)).toEqual(["Doom"]);
+    expect(installedEpic.available).toEqual([]);
     expect(names(view({ query: "pokemon blue" }).available)).toEqual(["Pokémon: Blue"]);
     expect(searchText("DOOM: Eternal")).toBe("doom eternal");
   });
@@ -82,6 +85,8 @@ describe("the library view", () => {
     const entries = entriesOf(games, store);
     const counts = collectionCounts(entries, meta, "all");
     expect(counts.all).toBe(3);
+    expect(counts.installed).toBe(2);
+    expect(collectionCounts(entries, meta, "epic").installed).toBe(1);
     expect(counts.favorites).toBe(1);
     expect(counts.hidden).toBe(1);
     expect(counts["category:k"]).toBe(2);
