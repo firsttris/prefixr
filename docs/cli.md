@@ -28,7 +28,15 @@ prefixr --help            # every command
 prefixr game add --help   # one command's options
 ```
 
-With the AppImage, that's `./prefixr_*.AppImage game list`.
+With the AppImage, that's `./prefixr_*.AppImage game list`. With the Flatpak, it's
+`flatpak run io.github.firsttris.Prefixr game list`; an alias saves typing it:
+
+```bash
+alias prefixr='flatpak run io.github.firsttris.Prefixr'
+```
+
+`prefixr skill install` from the Flatpak writes that form into the skill, so an agent uses it from
+the start.
 
 The commands do exactly what the matching buttons do: the same checks, the same prefix setup, the
 same launch. They work while Prefixr's window is open, too. The window notices the change within a

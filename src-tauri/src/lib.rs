@@ -24,7 +24,7 @@ use host_env::flatpak_id;
 
 use commands::about::open_release_notes;
 use commands::backup::{
-    create_backup, get_backup_config, inspect_backup, list_backups, restore_backup,
+    create_backup, get_backup_config, inspect_backup, list_backups, native_library, restore_backup,
     save_backup_config,
 };
 use commands::compatibility::get_compatibility;
@@ -340,6 +340,7 @@ pub fn run() {
             save_graphics_config,
             get_directx_layers_status,
             missing_flatpak_extensions,
+            native_library,
             update_directx_layers,
             get_proton_config,
             save_proton_config,

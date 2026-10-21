@@ -1,6 +1,7 @@
 <script lang="ts">
   import * as m from "$lib/paraglide/messages";
   import { onDestroy, onMount } from "svelte";
+  import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import {
     games,
@@ -185,7 +186,14 @@
   // A library that failed to load must not look like an empty one.
   let loadError = $state<unknown>(null);
 
+  // In the Flatpak, the native build's library, for the empty library's hint
+  // on moving it over (see `native_library`).
+  let nativeLibrary = $state<string | null>(null);
+
   onMount(() => {
+    invoke<string | null>("native_library")
+      .then((path) => (nativeLibrary = path))
+      .catch(() => {});
     initGameEvents();
     refreshGames().catch((e) => (loadError = e));
     // Only marks which games are in Steam; without it, none are.
@@ -462,6 +470,9 @@
     <span class="empty-icon">🎮</span>
     <h3>{m.gameList_emptyLibrary_title()}</h3>
     <p>{m.gameList_emptyLibrary_hint()}</p>
+    {#if nativeLibrary}
+      <p class="native-library">{m.gameList_emptyLibrary_nativeFound({ path: nativeLibrary })}</p>
+    {/if}
     {#if onAddNew}
       <button type="button" class="primary" onclick={onAddNew}>{m.library_addGame()}</button>
     {/if}
@@ -763,5 +774,10 @@
 
   .empty .primary {
     margin-top: 0.8em;
+  }
+
+  .native-library {
+    max-width: 60ch;
+    font-size: 0.9em;
   }
 </style>

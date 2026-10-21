@@ -138,8 +138,9 @@ Download the latest build from the [releases page](https://github.com/firsttris/
 | `.AppImage` | Any distribution | `chmod +x prefixr_*.AppImage && ./prefixr_*.AppImage` |
 | `.deb` | Debian, Ubuntu, Linux Mint, Pop!_OS | `sudo apt install ./prefixr_*_amd64.deb` |
 | `.rpm` | Fedora, openSUSE, Nobara | `sudo dnf install ./prefixr-*.x86_64.rpm` |
+| `.flatpak` | Any distribution with Flatpak (releases after 0.1.10) | `flatpak install --user ./prefixr_*_x86_64.flatpak` |
 
-On immutable distributions such as Bazzite or SteamOS, use the AppImage. If the AppImage shows a
+On immutable distributions such as Bazzite or SteamOS, use the Flatpak or the AppImage. If the AppImage shows a
 blank window or crashes with `EGL_BAD_PARAMETER`, see
 [Troubleshooting](https://firsttris.github.io/prefixr/troubleshooting.html#appimage-crashes-egl_bad_parameter-or-shows-a-blank-window).
 

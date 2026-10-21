@@ -1,7 +1,7 @@
 name: Flatpak
 
 # Builds the Flatpak bundle from source (flatpak/io.github.firsttris.Prefixr.yml, see
-# docs/flatpak.md) and checks that package-lock.json and the offline sources still match bun.lock
+# docs/development.md#flatpak) and checks that package-lock.json and the offline sources still match bun.lock
 # and Cargo.lock (regenerate them with flatpak/update-sources.sh). Runs on pull requests that touch
 # the Flatpak or a lock file, by hand, and from release.yml, which attaches the bundle.
 on:

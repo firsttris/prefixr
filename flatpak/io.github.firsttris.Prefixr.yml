@@ -1,4 +1,4 @@
-# Prefixr as a Flatpak, built from source without network access (docs/flatpak.md, phase 5).
+# Prefixr as a Flatpak, built from source without network access (docs/development.md#flatpak).
 #
 #   flatpak-builder --user --install --force-clean flatpak/build-dir \
 #     flatpak/io.github.firsttris.Prefixr.yml

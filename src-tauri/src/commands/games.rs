@@ -531,7 +531,7 @@ async fn signal_marked_processes(id: Uuid, signal: libc::c_int) -> bool {
 
 /// Ends a game the way Lutris does (`Game.force_stop`): first ask its wine
 /// session to end, then SIGTERM what's left of its marked processes, and
-/// only then SIGKILL. Measured in the Flatpak spike (docs/flatpak.md): each
+/// only then SIGKILL. Measured in the Flatpak spike (#48): each
 /// soft step ends a game cleanly on its own. The hard kills of the fallback
 /// in `kill_running_game` leave a hung game behind in a Flatpak, where
 /// pressure-vessel's container shares the app's PID namespace, and orphaned
