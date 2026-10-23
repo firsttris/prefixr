@@ -176,16 +176,11 @@
     box-shadow: 0 0 0 1px var(--success);
   }
 
-  /* A cover scrolled out of view isn't laid out or painted: with a large
-     library, that's most of them. Its size comes from the aspect ratio, so
-     the grid doesn't jump. On the cover only, not the card: the containment
-     would trap the remove dialog (fixed, in GameItemNotices) in the card. */
   .cover-wrap {
     position: relative;
     aspect-ratio: 2 / 3;
     overflow: hidden;
     background: var(--surface-raised);
-    content-visibility: auto;
   }
 
   .cover {

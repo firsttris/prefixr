@@ -126,13 +126,11 @@
     border-color: var(--accent);
   }
 
-  /* Not laid out or painted while scrolled out of view, as in GameCard. */
   .cover-wrap {
     position: relative;
     aspect-ratio: 2 / 3;
     overflow: hidden;
     background: var(--surface-raised);
-    content-visibility: auto;
   }
 
   .cover {
