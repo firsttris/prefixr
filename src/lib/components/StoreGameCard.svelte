@@ -73,7 +73,7 @@
 
     <div class="overlay">
       <h3 title={game.title}>{game.title}</h3>
-      <CompatBadges {compat} onImage />
+      <CompatBadges {compat} />
       {#if installing}
         <div class="progress-row">
           <span>{m.storeGame_installing()}</span>
@@ -126,11 +126,13 @@
     border-color: var(--accent);
   }
 
+  /* Not laid out or painted while scrolled out of view, as in GameCard. */
   .cover-wrap {
     position: relative;
     aspect-ratio: 2 / 3;
     overflow: hidden;
     background: var(--surface-raised);
+    content-visibility: auto;
   }
 
   .cover {
@@ -165,9 +167,8 @@
     left: 0.6em;
     font-size: 0.72em;
     color: #fff;
-    background: rgba(15, 16, 20, 0.62);
+    background: rgba(15, 16, 20, 0.75);
     border: 1px solid rgba(255, 255, 255, 0.2);
-    backdrop-filter: blur(6px);
     padding: 0.15em 0.6em;
     border-radius: 999px;
   }
