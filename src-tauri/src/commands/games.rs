@@ -37,10 +37,11 @@ use crate::host_env::{flatpak_id, host_command, host_data_home, host_std_command
 use crate::locale::LocaleState;
 use crate::lock::LockExt;
 use crate::models::{
-    normalize_umu_id, normalize_umu_store, split_launch_args, Game, GameInput, Runner, RunnerKind,
-    StorePrerequisites,
+    normalize_umu_id, normalize_umu_store, split_launch_args, Game, GameInput, LaunchMonitor,
+    Runner, RunnerKind, StorePrerequisites,
 };
 use crate::portal::Inhibition;
+use crate::primary_output;
 use crate::tray::rebuild_tray_menu;
 
 /// Checks whether `name` resolves to an executable file somewhere on `PATH`,
@@ -1846,6 +1847,27 @@ async fn run_game(
             .and_then(|mut f| std::io::Write::write_all(&mut f, note.as_bytes()));
     }
 
+    // Before the game starts: Wine reads the primary output once, at start.
+    let primary_switch = if graphics.launch_monitor == LaunchMonitor::Prefixr {
+        let app = app.clone();
+        tokio::task::spawn_blocking(move || primary_output::switch_to_active_output(&app))
+            .await
+            .ok()
+            .flatten()
+    } else {
+        None
+    };
+    if let Some(switch) = &primary_switch {
+        let note = format!(
+            "[prefixr] {} is the primary monitor while the game runs\n",
+            switch.name
+        );
+        let _ = fs::OpenOptions::new()
+            .append(true)
+            .open(log_path)
+            .and_then(|mut f| std::io::Write::write_all(&mut f, note.as_bytes()));
+    }
+
     let (log_out, log_err) = log_stdio(log_path)?;
 
     let mut command = runner_command(&launch_binary, env_pairs(&launch_env));
@@ -1920,6 +1942,9 @@ async fn run_game(
     let wait_result = child.wait().await;
     if let Some(inhibition) = screen_inhibition {
         let _ = tokio::task::spawn_blocking(move || drop(inhibition)).await;
+    }
+    if let Some(switch) = primary_switch {
+        let _ = tokio::task::spawn_blocking(move || drop(switch)).await;
     }
 
     if let Some(name) = game_name {

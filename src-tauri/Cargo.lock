@@ -2880,6 +2880,7 @@ dependencies = [
  "tokio",
  "ts-rs",
  "uuid",
+ "x11-dl",
  "xz2",
  "zbus",
  "zstd",

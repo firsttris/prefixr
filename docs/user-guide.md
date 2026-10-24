@@ -388,6 +388,14 @@ itself already runs inside a Gamescope session (as in Steam's Game Mode).
 **vkBasalt** adds post-processing: **Sharpen (CAS)**, with adjustable strength, and **Anti-aliasing
 (SMAA)**. Sharpening costs almost nothing and helps when rendering below native resolution.
 
+**Monitor for games** is for setups with several monitors. Wine opens fullscreen games on the
+**Primary monitor** (the default), wherever Prefixr's window is. With **Prefixr's monitor**, the
+monitor Prefixr is on becomes the primary one for X11 programs (Xwayland included) while the game
+runs, and the previous one comes back when it exits. A Wayland desktop's panels don't move. On KDE
+Plasma, when Prefixr's window is hidden, e.g. for a launch from the tray or the command line, the
+monitor with the active window counts. The choice applies to all games; Proton's Wayland driver
+ignores it.
+
 ### Overlay
 
 The [MangoHud](https://github.com/flightlessmango/MangoHud) overlay shows FPS, frame times, CPU and
