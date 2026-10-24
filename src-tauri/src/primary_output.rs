@@ -9,28 +9,89 @@
 
 use std::ffi::CStr;
 use std::ptr;
+use std::sync::Mutex;
 
 use tauri::{AppHandle, Manager};
 use x11_dl::xlib::{Display, Window, Xlib};
 use x11_dl::xrandr::{RROutput, RR_Connected, Xrandr};
 
-/// The primary output a launch switched away from, switched back when
-/// dropped — unless something else changed the primary in the meantime.
+/// One launch's part in the switch, ended when dropped. The primary goes
+/// back when the last running game that switched it exits.
 pub struct PrimaryOutputSwitch {
-    previous: RROutput,
-    target: RROutput,
     /// The output's name, e.g. `DP-2`, for the launch log.
     pub name: String,
 }
 
 impl Drop for PrimaryOutputSwitch {
     fn drop(&mut self) {
+        let mut switched = SWITCHED.lock().unwrap_or_else(|e| e.into_inner());
         let _ = with_display(|x| {
-            if x.primary() == self.target {
-                x.set_primary(self.previous);
+            if let Some(output) = end(&mut switched, x.primary()) {
+                x.set_primary(output);
             }
         });
     }
+}
+
+/// What the running games switched: shared, since their launches can
+/// overlap and each one would otherwise only know the primary it found,
+/// possibly another game's.
+#[derive(Debug, PartialEq)]
+struct Switched {
+    /// The primary before the first of them, to go back to.
+    original: RROutput,
+    /// The primary the latest of them set.
+    set: RROutput,
+    /// How many of them are still running.
+    games: usize,
+}
+
+static SWITCHED: Mutex<Option<Switched>> = Mutex::new(None);
+
+/// A launch that wants `target` as the primary, with `current` the primary
+/// now. Whether it takes part (and has to `end`), and the output to make the
+/// primary, if any.
+fn begin(
+    switched: &mut Option<Switched>,
+    current: RROutput,
+    target: RROutput,
+) -> (bool, Option<RROutput>) {
+    let change = (current != target).then_some(target);
+    match switched {
+        // Nothing to switch, and nothing to switch back later.
+        None if change.is_none() => (false, None),
+        None => {
+            *switched = Some(Switched {
+                original: current,
+                set: target,
+                games: 1,
+            });
+            (true, change)
+        }
+        Some(state) => {
+            // Someone else picked a primary since: that's the one to go
+            // back to.
+            if current != state.set {
+                state.original = current;
+            }
+            state.set = target;
+            state.games += 1;
+            (true, change)
+        }
+    }
+}
+
+/// A game that took part exited, with `current` the primary now. The output
+/// to make the primary again, once it's the last one — unless someone else
+/// picked one meanwhile.
+fn end(switched: &mut Option<Switched>, current: RROutput) -> Option<RROutput> {
+    let state = switched.as_mut()?;
+    state.games -= 1;
+    if state.games > 0 {
+        return None;
+    }
+    let state = switched.take()?;
+    (current == state.set && current != state.original).then_some(state.original)
 }
 
 /// Makes the monitor the user is on the X11 primary. `None` if it already
@@ -38,6 +99,7 @@ impl Drop for PrimaryOutputSwitch {
 pub fn switch_to_active_output(app: &AppHandle) -> Option<PrimaryOutputSwitch> {
     let window_monitor = window_monitor_name(app);
     let kwin_output = kwin_active_output();
+    let mut switched = SWITCHED.lock().unwrap_or_else(|e| e.into_inner());
     with_display(|x| {
         let outputs = x.connected_outputs();
         // GDK names a monitor by its RandR output on X11, but by its model
@@ -48,16 +110,11 @@ pub fn switch_to_active_output(app: &AppHandle) -> Option<PrimaryOutputSwitch> {
             .flatten()
             .find_map(|wanted| outputs.iter().find(|(_, name)| *name == wanted))?
             .clone();
-        let previous = x.primary();
-        if previous == target {
-            return None;
+        let (takes_part, change) = begin(&mut switched, x.primary(), target);
+        if let Some(output) = change {
+            x.set_primary(output);
         }
-        x.set_primary(target);
-        Some(PrimaryOutputSwitch {
-            previous,
-            target,
-            name,
-        })
+        takes_part.then_some(PrimaryOutputSwitch { name })
     })
     .flatten()
 }
@@ -155,3 +212,6 @@ fn with_display<T>(f: impl FnOnce(&X11) -> T) -> Option<T> {
     unsafe { (x.xlib.XCloseDisplay)(x.display) };
     Some(result)
 }
+
+#[cfg(test)]
+mod tests;
