@@ -24,6 +24,7 @@ export type { GamescopeSettings } from "./bindings/GamescopeSettings";
 export type { GitHubConfig } from "./bindings/GitHubConfig";
 export type { GraphicsConfig } from "./bindings/GraphicsConfig";
 export type { GraphicsOverrides } from "./bindings/GraphicsOverrides";
+export type { LaunchMonitor } from "./bindings/LaunchMonitor";
 export type { InstallerResult } from "./bindings/InstallerResult";
 export type { LibraryConfig } from "./bindings/LibraryConfig";
 export type { MangoHudConfig } from "./bindings/MangoHudConfig";

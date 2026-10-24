@@ -159,13 +159,13 @@
     $graphicsConfig ?? {
       gamescope: { enabled: false, width: null, height: null, fps_limit: null, fullscreen: false },
       vkbasalt: { enabled: false, sharpen: true, sharpness: 0.4, smaa: false },
-      launch_on_active_monitor: false,
+      launch_monitor: "primary",
     },
   );
   const gfxShown = $derived<GraphicsConfig>({
     gamescope: gfx.gamescope ?? globalGfx.gamescope,
     vkbasalt: gfx.vkbasalt ?? globalGfx.vkbasalt,
-    launch_on_active_monitor: globalGfx.launch_on_active_monitor,
+    launch_monitor: globalGfx.launch_monitor,
   });
   const gfxCount = $derived([gfx.gamescope, gfx.vkbasalt].filter((o) => o !== null).length);
 

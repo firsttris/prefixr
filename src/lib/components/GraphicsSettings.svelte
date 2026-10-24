@@ -21,7 +21,7 @@
       draft = {
         gamescope: { ...$graphicsConfig.gamescope },
         vkbasalt: { ...$graphicsConfig.vkbasalt },
-        launch_on_active_monitor: $graphicsConfig.launch_on_active_monitor,
+        launch_monitor: $graphicsConfig.launch_monitor,
       };
     }
   });
@@ -57,8 +57,7 @@
         draft = {
           gamescope: { ...draft!.gamescope, ...patch.gamescope },
           vkbasalt: { ...draft!.vkbasalt, ...patch.vkbasalt },
-          launch_on_active_monitor:
-            patch.launch_on_active_monitor ?? draft!.launch_on_active_monitor,
+          launch_monitor: patch.launch_monitor ?? draft!.launch_monitor,
         };
         saved = false;
       }}

@@ -37,8 +37,8 @@ use crate::host_env::{flatpak_id, host_command, host_data_home, host_std_command
 use crate::locale::LocaleState;
 use crate::lock::LockExt;
 use crate::models::{
-    normalize_umu_id, normalize_umu_store, split_launch_args, Game, GameInput, Runner, RunnerKind,
-    StorePrerequisites,
+    normalize_umu_id, normalize_umu_store, split_launch_args, Game, GameInput, LaunchMonitor,
+    Runner, RunnerKind, StorePrerequisites,
 };
 use crate::portal::Inhibition;
 use crate::primary_output;
@@ -1848,7 +1848,7 @@ async fn run_game(
     }
 
     // Before the game starts: Wine reads the primary output once, at start.
-    let primary_switch = if graphics.launch_on_active_monitor {
+    let primary_switch = if graphics.launch_monitor == LaunchMonitor::Prefixr {
         let app = app.clone();
         tokio::task::spawn_blocking(move || primary_output::switch_to_active_output(&app))
             .await

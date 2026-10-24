@@ -8,6 +8,7 @@
     GamescopeSettings,
     GraphicsConfig,
     GraphicsOverrides,
+    LaunchMonitor,
     VkBasaltSettings,
   } from "$lib/types";
 
@@ -25,12 +26,17 @@
     onchange: (patch: {
       gamescope?: Partial<GamescopeSettings>;
       vkbasalt?: Partial<VkBasaltSettings>;
-      launch_on_active_monitor?: boolean;
+      launch_monitor?: LaunchMonitor;
     }) => void;
     overrides?: OverrideHooks<keyof GraphicsOverrides>;
     // Leaves out the vkBasalt preview, for the narrower game dialog.
     compact?: boolean;
   } = $props();
+
+  const monitorChoices: { value: LaunchMonitor; label: string }[] = [
+    { value: "primary", label: m.graphicsEditor_monitorPrimary() },
+    { value: "prefixr", label: m.graphicsEditor_monitorPrefixr() },
+  ];
 
   // Emptied number inputs read as NaN; 0 is no valid size or limit either.
   function numberOrNull(input: HTMLInputElement): number | null {
@@ -169,17 +175,89 @@
   </SettingToggle>
 
   {#if !overrides}
-    <SettingToggle
-      label={m.graphicsEditor_activeMonitorLabel()}
-      description={m.graphicsEditor_activeMonitorDescription()}
-      info={m.graphicsEditor_activeMonitorInfo()}
-      checked={value.launch_on_active_monitor}
-      onToggle={(launch_on_active_monitor) => onchange({ launch_on_active_monitor })}
-    />
+    <div class="setting">
+      <span class="label">
+        {m.graphicsEditor_monitorLabel()}
+        <InfoIcon text={m.graphicsEditor_monitorInfo()} />
+      </span>
+      <p class="desc">{m.graphicsEditor_monitorDescription()}</p>
+      <div class="choice" role="radiogroup" aria-label={m.graphicsEditor_monitorLabel()}>
+        {#each monitorChoices as choice (choice.value)}
+          <label class:active={value.launch_monitor === choice.value}>
+            <input
+              type="radio"
+              name="launch-monitor"
+              checked={value.launch_monitor === choice.value}
+              onchange={() => onchange({ launch_monitor: choice.value })}
+            />
+            {choice.label}
+          </label>
+        {/each}
+      </div>
+    </div>
   {/if}
 </div>
 
 <style>
+  .setting {
+    border-radius: 10px;
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    padding: 0.7em 0.9em;
+  }
+
+  .label {
+    font-weight: 600;
+    color: var(--text);
+    display: block;
+  }
+
+  .desc {
+    color: var(--text-muted);
+    font-size: 0.82em;
+    margin: 0.25em 0 0;
+    max-width: 52ch;
+  }
+
+  .choice {
+    display: inline-flex;
+    margin-top: 0.7em;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .choice label {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0.35em 0.9em;
+    font-size: 0.9em;
+    cursor: pointer;
+    color: var(--text-muted);
+  }
+
+  .choice label + label {
+    border-left: 1px solid var(--border);
+  }
+
+  .choice label.active {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .choice label:has(input:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+
+  .choice input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+  }
+
   .list {
     display: flex;
     flex-direction: column;

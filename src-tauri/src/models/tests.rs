@@ -23,7 +23,7 @@ fn globals() -> (
                 enabled: true,
                 ..VkBasaltSettings::default()
             },
-            launch_on_active_monitor: true,
+            launch_monitor: LaunchMonitor::Prefixr,
         },
         MangoHudConfig {
             enabled: true,
@@ -36,6 +36,15 @@ fn globals() -> (
             ]),
         },
     )
+}
+
+#[test]
+fn games_start_on_the_primary_monitor_by_default() {
+    let graphics: GraphicsConfig = serde_json::from_str("{}").unwrap();
+    assert_eq!(graphics.launch_monitor, LaunchMonitor::Primary);
+    let graphics: GraphicsConfig =
+        serde_json::from_str(r#"{"launch_monitor": "prefixr"}"#).unwrap();
+    assert_eq!(graphics.launch_monitor, LaunchMonitor::Prefixr);
 }
 
 #[test]
@@ -84,7 +93,7 @@ fn overrides_replace_only_their_own_settings() {
     // doesn't leak through.
     assert_eq!(settings.graphics.gamescope.height, None);
     // Global only: no game overrides it.
-    assert!(settings.graphics.launch_on_active_monitor);
+    assert_eq!(settings.graphics.launch_monitor, LaunchMonitor::Prefixr);
     assert!(!settings.mangohud.enabled);
     assert_eq!(settings.mangohud.layout.preset, "standard");
     let env: Vec<_> = settings.proton_env().collect();
