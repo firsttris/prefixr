@@ -23,6 +23,7 @@ fn globals() -> (
                 enabled: true,
                 ..VkBasaltSettings::default()
             },
+            launch_on_active_monitor: true,
         },
         MangoHudConfig {
             enabled: true,
@@ -82,6 +83,8 @@ fn overrides_replace_only_their_own_settings() {
     // The gamescope block is replaced as a whole, so the global height
     // doesn't leak through.
     assert_eq!(settings.graphics.gamescope.height, None);
+    // Global only: no game overrides it.
+    assert!(settings.graphics.launch_on_active_monitor);
     assert!(!settings.mangohud.enabled);
     assert_eq!(settings.mangohud.layout.preset, "standard");
     let env: Vec<_> = settings.proton_env().collect();

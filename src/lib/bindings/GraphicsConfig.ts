@@ -5,4 +5,10 @@ import type { VkBasaltSettings } from "./VkBasaltSettings";
 /**
  * Bild: what the game's output goes through on its way to the screen.
  */
-export type GraphicsConfig = { gamescope: GamescopeSettings, vkbasalt: VkBasaltSettings, };
+export type GraphicsConfig = { gamescope: GamescopeSettings, vkbasalt: VkBasaltSettings, 
+/**
+ * Starts games on the monitor Prefixr's window is on, rather than the
+ * primary one Wine picks. Global only, as it's about the desk, not the
+ * game. See `primary_output`.
+ */
+launch_on_active_monitor: boolean, };

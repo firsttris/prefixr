@@ -449,6 +449,7 @@ impl GameOverrides {
                 .vkbasalt
                 .clone()
                 .unwrap_or_else(|| graphics.vkbasalt.clone()),
+            launch_on_active_monitor: graphics.launch_on_active_monitor,
         };
         let mangohud = MangoHudConfig {
             enabled: self.overlay.enabled.unwrap_or(mangohud.enabled),
@@ -512,6 +513,11 @@ pub struct GraphicsConfig {
     pub gamescope: GamescopeSettings,
     #[serde(default)]
     pub vkbasalt: VkBasaltSettings,
+    /// Starts games on the monitor Prefixr's window is on, rather than the
+    /// primary one Wine picks. Global only, as it's about the desk, not the
+    /// game. See `primary_output`.
+    #[serde(default)]
+    pub launch_on_active_monitor: bool,
 }
 
 /// Wraps the game in `gamescope`, giving it its own nested compositor

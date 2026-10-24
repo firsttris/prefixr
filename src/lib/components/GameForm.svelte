@@ -159,11 +159,13 @@
     $graphicsConfig ?? {
       gamescope: { enabled: false, width: null, height: null, fps_limit: null, fullscreen: false },
       vkbasalt: { enabled: false, sharpen: true, sharpness: 0.4, smaa: false },
+      launch_on_active_monitor: false,
     },
   );
   const gfxShown = $derived<GraphicsConfig>({
     gamescope: gfx.gamescope ?? globalGfx.gamescope,
     vkbasalt: gfx.vkbasalt ?? globalGfx.vkbasalt,
+    launch_on_active_monitor: globalGfx.launch_on_active_monitor,
   });
   const gfxCount = $derived([gfx.gamescope, gfx.vkbasalt].filter((o) => o !== null).length);
 
@@ -181,7 +183,7 @@
     }
   }
 
-  const gfxHooks: OverrideHooks<keyof GraphicsConfig> = {
+  const gfxHooks: OverrideHooks<keyof GraphicsOverrides> = {
     isOverridden: (key) => gfx[key] !== null,
     reset: (key) => (gfx[key] = null),
     resetTitle: (key) => m.gameForm_resetToGlobal({ state: onOff(globalGfx[key].enabled) }),

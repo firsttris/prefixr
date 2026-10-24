@@ -4,11 +4,17 @@
   import SettingToggle from "$lib/components/SettingToggle.svelte";
   import ExtensionHint from "$lib/components/ExtensionHint.svelte";
   import type { OverrideHooks } from "$lib/settings";
-  import type { GamescopeSettings, GraphicsConfig, VkBasaltSettings } from "$lib/types";
+  import type {
+    GamescopeSettings,
+    GraphicsConfig,
+    GraphicsOverrides,
+    VkBasaltSettings,
+  } from "$lib/types";
 
   // Bild — see settings.ts for how the editors are shared between the global
   // page and the game dialog. gamescope and vkBasalt are each overridden as
-  // a whole block (see `GraphicsOverrides` in models.rs).
+  // a whole block (see `GraphicsOverrides` in models.rs). The monitor choice
+  // is global only, so the game dialog (with `overrides`) leaves it out.
   let {
     value,
     onchange,
@@ -19,8 +25,9 @@
     onchange: (patch: {
       gamescope?: Partial<GamescopeSettings>;
       vkbasalt?: Partial<VkBasaltSettings>;
+      launch_on_active_monitor?: boolean;
     }) => void;
-    overrides?: OverrideHooks<keyof GraphicsConfig>;
+    overrides?: OverrideHooks<keyof GraphicsOverrides>;
     // Leaves out the vkBasalt preview, for the narrower game dialog.
     compact?: boolean;
   } = $props();
@@ -160,6 +167,16 @@
       </div>
     {/if}
   </SettingToggle>
+
+  {#if !overrides}
+    <SettingToggle
+      label={m.graphicsEditor_activeMonitorLabel()}
+      description={m.graphicsEditor_activeMonitorDescription()}
+      info={m.graphicsEditor_activeMonitorInfo()}
+      checked={value.launch_on_active_monitor}
+      onToggle={(launch_on_active_monitor) => onchange({ launch_on_active_monitor })}
+    />
+  {/if}
 </div>
 
 <style>
