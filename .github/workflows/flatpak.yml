@@ -67,6 +67,13 @@ jobs:
           git -C "$RUNNER_TEMP/fbt" checkout -q FETCH_HEAD
           python3 -m venv "$RUNNER_TEMP/venv"
           "$RUNNER_TEMP/venv/bin/pip" install -q "$RUNNER_TEMP/fbt/node" aiohttp tomlkit PyYAML
+          # The node generator reads Playwright's browsers.json through github.com/…/raw/, whose
+          # response headers outgrew aiohttp's 8190-byte limit (HTTP 400). The same file from
+          # raw.githubusercontent.com; the URL itself isn't part of the output.
+          sed -i 's#https://github.com/microsoft/playwright/raw/#https://raw.githubusercontent.com/microsoft/playwright/#' \
+            "$RUNNER_TEMP"/venv/lib/python3*/site-packages/flatpak_node_generator/providers/special.py
+          grep -q 'raw.githubusercontent.com/microsoft/playwright/' \
+            "$RUNNER_TEMP"/venv/lib/python3*/site-packages/flatpak_node_generator/providers/special.py
           echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
           echo "FBT=$RUNNER_TEMP/fbt" >> "$GITHUB_ENV"
 
