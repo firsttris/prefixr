@@ -66,9 +66,8 @@
   }
 
   .star.on-image {
-    background: rgba(15, 16, 20, 0.55);
+    background: rgba(15, 16, 20, 0.7);
     border-color: rgba(255, 255, 255, 0.18);
-    backdrop-filter: blur(8px);
     color: #fff;
   }
 

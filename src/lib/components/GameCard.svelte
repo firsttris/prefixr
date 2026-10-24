@@ -112,7 +112,7 @@
             <span class="runner">{storeName(game.store.store)}</span>
           {/if}
           <span class="runner">{game.runner_id}</span>
-          <CompatBadges {compat} onImage />
+          <CompatBadges {compat} />
         </div>
 
         <button
@@ -216,7 +216,6 @@
     font-weight: 600;
     padding: 0.3em 0.65em;
     border-radius: 999px;
-    backdrop-filter: blur(6px);
   }
 
   .test-corner {
@@ -227,14 +226,18 @@
     display: flex;
   }
 
+  /* No backdrop blur on the cards: one per pill and button over a
+     thousand covers makes scrolling stutter. Tints sit on a dark base
+     instead, so they still read on bright cover art. */
   .status-badge.running {
-    background: var(--success-bg);
+    background: linear-gradient(var(--success-bg), var(--success-bg)) rgba(15, 16, 20, 0.75);
     color: var(--success);
     border: 1px solid rgba(62, 207, 142, 0.4);
   }
 
   .status-badge.init {
-    background: rgba(91, 140, 255, 0.18);
+    background: linear-gradient(rgba(91, 140, 255, 0.18), rgba(91, 140, 255, 0.18))
+      rgba(15, 16, 20, 0.75);
     color: var(--accent);
     border: 1px solid rgba(91, 140, 255, 0.4);
   }
@@ -304,7 +307,6 @@
     color: #fff;
     background: rgba(255, 255, 255, 0.14);
     border: 1px solid rgba(255, 255, 255, 0.18);
-    backdrop-filter: blur(6px);
     padding: 0.15em 0.6em;
     border-radius: 999px;
   }
@@ -314,13 +316,12 @@
     font-weight: 700;
   }
 
-  /* Icon buttons need their own translucent + blurred background here
-     since they float directly on cover art instead of a themed surface. */
+  /* Icon buttons need their own dark translucent background here since
+     they float directly on cover art instead of a themed surface. */
   .menu-corner :global(.icon-btn.on-image) {
-    background: rgba(15, 16, 20, 0.55);
+    background: rgba(15, 16, 20, 0.7);
     border-color: rgba(255, 255, 255, 0.18);
     color: #fff;
-    backdrop-filter: blur(8px);
   }
 
   .menu-corner :global(.icon-btn.on-image:hover:not(:disabled)) {
@@ -399,9 +400,8 @@
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    background: rgba(20, 20, 24, 0.45);
+    background: rgba(20, 20, 24, 0.6);
     border: 1px solid rgba(255, 255, 255, 0.4);
-    backdrop-filter: blur(8px);
     color: #fff;
     transition:
       background-color 0.15s,

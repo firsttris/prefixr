@@ -26,11 +26,11 @@
 <script lang="ts">
   import type { Compatibility } from "$lib/types";
 
-  let { compat, onImage = false }: { compat?: Compatibility; onImage?: boolean } = $props();
+  let { compat }: { compat?: Compatibility } = $props();
 </script>
 
 {#if compat}
-  <span class="badges" class:on-image={onImage}>
+  <span class="badges">
     {#if compat.protondb_tier}
       <span
         class="tier tier-{compat.protondb_tier}"
@@ -60,11 +60,6 @@
     border-radius: 999px;
     border: 1px solid transparent;
     white-space: nowrap;
-  }
-
-  .on-image .tier,
-  .on-image .umu {
-    backdrop-filter: blur(6px);
   }
 
   /* ProtonDB's own tier colors, softened for the dark theme. */
