@@ -297,6 +297,7 @@ export function demoData(version) {
       get_graphics_config: {
         gamescope: { enabled: false, width: 2560, height: 1440, fps_limit: 120, fullscreen: true },
         vkbasalt: { enabled: true, sharpen: true, sharpness: 0.4, smaa: false },
+        launch_monitor: "primary",
       },
       get_mangohud_config: {
         enabled: true,

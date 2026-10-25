@@ -10,6 +10,7 @@ mod locale;
 mod lock;
 mod models;
 mod portal;
+mod primary_output;
 #[cfg(test)]
 mod test_util;
 mod tray;
