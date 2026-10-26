@@ -36,7 +36,11 @@ jobs:
     name: Checks, tests and build
     # Draft pull requests do not build; "Ready for review" starts the run
     if: ${{ !github.event.pull_request.draft }}
-    runs-on: ubuntu-latest
+    # GTK 4.14 or newer for the CEF runtime (tauri-winit-gtk4): Ubuntu 24.04
+    runs-on: ubuntu-24.04
+    env:
+      # Chromium (CEF, about 1 GB) is downloaded here once and kept in the Actions cache
+      CEF_PATH: ${{ github.workspace }}/.cef
 
     steps:
       - name: Checkout
@@ -55,18 +59,26 @@ jobs:
         with:
           workspaces: src-tauri
 
+      # GTK 4 for the packages' CEF build, WebKitGTK for the Flatpak's (src-tauri/Cargo.toml).
       # The packages come from the Actions cache: the Ubuntu mirror is sometimes very slow (this
       # step once took 12 minutes)
       - name: Install Linux system dependencies for Tauri
         uses: firsttris/workflows/actions/apt-install@ccr-161f105b-9ns022
         with:
           packages: |
+            libgtk-4-dev
             libwebkit2gtk-4.1-dev
             libxdo-dev
             libssl-dev
-            libayatana-appindicator3-dev
             librsvg2-dev
             patchelf
+
+      - name: Cache Chromium (CEF)
+        uses: actions/cache@v4
+        with:
+          path: .cef
+          key: cef-linux-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: cef-linux-
 
       - name: Install frontend dependencies
         run: bun install --frozen-lockfile
@@ -85,6 +97,9 @@ jobs:
 
       - name: Rust lints
         run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
+
+      - name: Rust lints (the Flatpak's WebKitGTK build)
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets --no-default-features --features webkit -- -D warnings
 
       - name: Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --locked

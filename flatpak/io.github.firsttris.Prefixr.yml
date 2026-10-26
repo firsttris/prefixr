@@ -73,9 +73,6 @@ modules:
         contents: |
           /app/lib/i386-linux-gnu
 
-  # Tray icon (tauri's tray-icon loads it at runtime).
-  - shared-modules/libayatana-appindicator/libayatana-appindicator-gtk3.json
-
   # winetricks needs these for a Wine runner (Heroic builds the same three).
   - name: 7zip
     buildsystem: simple
@@ -144,8 +141,10 @@ modules:
     build-commands:
       - npm ci --offline
       - cargo --offline fetch --manifest-path src-tauri/Cargo.toml
-      # tauri.conf.json builds the frontend with bun, which the SDK doesn't have.
-      - npx tauri build --no-bundle --config '{"build":{"beforeBuildCommand":"npm run build"}}'
+      # tauri.conf.json builds the frontend with bun, which the SDK doesn't have. WebKitGTK, not
+      # the packages' Chromium (src-tauri/Cargo.toml): CEF would be a download, and its sandbox
+      # has no user namespaces or setuid helper in a Flatpak.
+      - npx tauri build --no-bundle --features webkit --config '{"build":{"beforeBuildCommand":"npm run build"}}' -- --no-default-features
       - install -Dm755 src-tauri/target/release/prefixr /app/bin/prefixr
       - install -Dm644 src-tauri/icons/32x32.png /app/share/icons/hicolor/32x32/apps/io.github.firsttris.Prefixr.png
       - install -Dm644 src-tauri/icons/64x64.png /app/share/icons/hicolor/64x64/apps/io.github.firsttris.Prefixr.png

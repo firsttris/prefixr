@@ -14,26 +14,31 @@ How to build Prefixr, how the code is organized, and what CI checks before a cha
 
 ## Building from source
 
-Prefixr is a [Tauri 2](https://v2.tauri.app/) app: a Rust backend with a
-[SvelteKit](https://svelte.dev/docs/kit) frontend (Svelte 5, TypeScript) rendered by WebKitGTK.
+Prefixr is a [Tauri 3](https://github.com/tauri-apps/tauri) (alpha) app: a Rust backend with a
+[SvelteKit](https://svelte.dev/docs/kit) frontend (Svelte 5, TypeScript). The AppImage, `.deb` and
+`.rpm` render it with Chromium, which they bring along (CEF); the Flatpak with WebKitGTK (see
+[Browser engine](#browser-engine)).
 
 **You need:**
 
-- Rust 1.89 or newer, via [rustup](https://rustup.rs/):
+- Rust 1.95 or newer, via [rustup](https://rustup.rs/):
 
   ```bash
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
   ```
 
 - [Bun](https://bun.sh/) as the package manager and script runner
-- Tauri's system libraries. On Debian/Ubuntu:
+- GTK 4.14 or newer (Ubuntu 24.04, Debian 13, Fedora 40) and Tauri's other system libraries. On
+  Debian/Ubuntu:
 
   ```bash
-  sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file \
-    libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+  sudo apt install libgtk-4-dev build-essential curl wget file \
+    libxdo-dev libssl-dev librsvg2-dev patchelf
   ```
 
-  For Fedora, Arch and others, see [Tauri's prerequisites](https://v2.tauri.app/start/prerequisites/#linux).
+  The Flatpak's WebKitGTK build (`--no-default-features --features webkit`) needs
+  `libwebkit2gtk-4.1-dev` as well. Chromium (CEF, about 1 GB) is downloaded by the first build, to
+  `CEF_PATH` if set.
 
 **Then:**
 
@@ -45,7 +50,35 @@ bun run tauri build   # release binary and bundles
 
 `bun run tauri build` writes the binary to `src-tauri/target/release/prefixr` and the AppImage,
 `.deb` and `.rpm` to `src-tauri/target/release/bundle/`. Use it rather than
-`cargo build --release`, which doesn't embed the frontend.
+`cargo build --release`, which doesn't embed the frontend. The first run builds the Tauri CLI from
+source (see [Patched Tauri CLI](#patched-tauri-cli)).
+
+### Browser engine
+
+One engine per build, chosen by a Cargo feature (`src-tauri/Cargo.toml`, `src-tauri/src/engine.rs`):
+Tauri's wry runtime builds on GTK 3, its CEF runtime on GTK 4, and both in one process crash.
+
+- **`cef`** (the default, for the AppImage, `.deb` and `.rpm`): Chromium, through Tauri 3's
+  `tauri-runtime-cef`. WebKitGTK scrolls the library slowly, and the AppImage's bundled WebKitGTK
+  clashes with new graphics drivers. It makes the packages about 170 MB larger.
+  Chromium as CEF builds it talks to Google on its own (secure DNS probes, sign-in state, the
+  translation model, network time, component updates); `engine.rs` switches all of that off. The
+  file dialogs go through the XDG desktop portal instead of GTK 3. In the `.deb` and `.rpm`, the
+  bundler moves the binary to `/usr/share/prefixr/` and links it from `/usr/bin/prefixr`; shortcuts
+  point to the real path.
+- **`webkit`** (the Flatpak): WebKitGTK as before. CEF in a Flatpak would be an offline download of
+  its own, and Chromium's sandbox finds neither user namespaces nor a setuid helper there.
+
+Tauri 3 and its CEF runtime are alpha releases, pinned exactly.
+
+### Patched Tauri CLI
+
+Temporary, until Tauri fixes it: the bundler of Tauri 3 alpha copies `libEGL.so` and `libGLESv2.so`
+from CEF into every Linux package, and CEF 154 no longer ships them, so every package fails.
+`scripts/tauri.mjs` therefore builds the Tauri CLI of the version in `package.json` from Tauri's
+sources with `patches/*.patch` applied (once, into `src-tauri/target/patched-cli/`), and
+`bun run tauri …` uses it. The script stops when a patch no longer applies to a new version: then
+check whether that release fixes it and remove the patch as described in `patches/README.md`.
 
 **Recommended editor setup:** [VS Code](https://code.visualstudio.com/) with the
 [Svelte](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode),
@@ -322,9 +355,10 @@ Releases are built by CI from a tag `vX.Y.Z`, with the shared workflows from
    Ubuntu 24.04, and attaches them to a GitHub release.
 
 The AppImage is published as `prefixr_<version>_amd64.AppImage` (up to 0.1.10 as
-`…_amd64-ubuntu-compat.AppImage`). It bundles WebKitGTK from its build environment, which can clash
-with very new graphics drivers; see
-[Troubleshooting](troubleshooting.md#appimage-crashes-egl_bad_parameter-or-shows-a-blank-window).
+`…_amd64-ubuntu-compat.AppImage`). Up to 0.2.2 it bundled WebKitGTK from its build environment,
+which can clash with very new graphics drivers (see
+[Troubleshooting](troubleshooting.md#appimage-crashes-egl_bad_parameter-or-shows-a-blank-window));
+since then it brings Chromium.
 
 ## Documentation website
 

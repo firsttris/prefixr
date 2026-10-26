@@ -5,8 +5,8 @@ description = "A native Linux app for managing Wine and Proton prefixes to run W
 authors = ["Tristan Teufel"]
 license = "GPL-3.0-only"
 edition = "2021"
-# `File::try_lock` (see `lock_launch_file`) is stable since 1.89.
-rust-version = "1.89"
+# Tauri 3 (alpha) and its CEF runtime need 1.95.
+rust-version = "1.95"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -18,14 +18,30 @@ name = "prefixr_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = "=3.0.0-alpha.4"
+
+# The browser engine, one per build: wry builds on GTK 3, CEF on GTK 4, and both in one process
+# crash. The packages (AppImage, .deb, .rpm) bring Chromium (CEF): WebKitGTK scrolls the library
+# slowly, and the AppImage's bundled one stays blank or crashes on new graphics drivers
+# (docs/troubleshooting.md). The Flatpak keeps WebKitGTK
+# (`--no-default-features --features webkit`): it builds offline, and Chromium's sandbox has no
+# user namespaces or setuid helper in there.
+[features]
+default = ["cef"]
+cef = ["dep:tauri-runtime-cef", "tauri-plugin-dialog/xdg-portal"]
+webkit = ["dep:tauri-runtime-wry", "dep:glib", "tauri-plugin-dialog/gtk3"]
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon", "protocol-asset"] }
-tauri-plugin-opener = "2"
-tauri-plugin-dialog = "2"
-tauri-plugin-single-instance = "2"
-tauri-plugin-window-state = "2"
+tauri = { version = "=3.0.0-alpha.5", features = ["tray-icon", "protocol-asset"] }
+# Depending on tauri-runtime-cef is also what makes tauri-build and the CLI ship CEF.
+tauri-runtime-cef = { version = "=3.0.0-alpha.6", optional = true }
+tauri-runtime-wry = { version = "=3.0.0-alpha.5", optional = true }
+tauri-plugin-opener = "=3.0.0-alpha.3"
+# GTK 3 by default, which cannot share a process with CEF's GTK 4: the `cef` feature takes the
+# XDG desktop portal (the desktop's own dialog) instead.
+tauri-plugin-dialog = { version = "=3.0.0-alpha.4", default-features = false }
+tauri-plugin-single-instance = "=3.0.0-alpha.3"
+tauri-plugin-window-state = "=3.0.0-alpha.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 uuid = { version = "1", features = ["v4", "serde"] }
@@ -45,11 +61,11 @@ clap = { version = "4", features = ["derive"] }
 # Already in the tree through tauri-plugin-single-instance; used directly to
 # hand `prefixr game stop` to the window in a Flatpak (`single_instance`).
 zbus = "5"
-# Already in the tree through Tauri's GTK; sets the program name, which
-# becomes the window's Wayland app_id and X11 WM_CLASS, in a Flatpak.
-glib = "0.18"
-# Already in the tree through Tauri's tao; switches the X11 primary output so
-# a game starts on Prefixr's monitor (`primary_output`).
+# Already in the tree through WebKitGTK's GTK 3; sets the program name, which
+# becomes the window's Wayland app_id and X11 WM_CLASS, in the Flatpak.
+glib = { version = "0.18", optional = true }
+# Switches the X11 primary output so a game starts on Prefixr's monitor
+# (`primary_output`).
 x11-dl = "2"
 
 [dev-dependencies]

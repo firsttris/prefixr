@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { revealItemsInDir } from "@tauri-apps/plugin-opener";
 
 // Opens a log file with the system's default app for it (the backend runs
 // xdg-open outside the AppImage's environment); falls back to just revealing
@@ -10,7 +10,7 @@ export async function showLog(path: string): Promise<void> {
     await invoke("open_log", { path });
   } catch {
     try {
-      await revealItemInDir(path);
+      await revealItemsInDir(path);
     } catch (e) {
       console.error("Could not open or reveal log file", e);
     }

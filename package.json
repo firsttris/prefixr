@@ -11,7 +11,7 @@
     "prepare": "svelte-kit sync || echo ''",
     "check": "bun run i18n && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-    "tauri": "tauri",
+    "tauri": "node scripts/tauri.mjs",
     "test": "bun run i18n && vitest run",
     "lint": "prettier --check . && eslint .",
     "format": "prettier --write .",
@@ -19,9 +19,9 @@
   },
   "license": "GPL-3.0-only",
   "dependencies": {
-    "@tauri-apps/api": "^2.12.0",
-    "@tauri-apps/plugin-dialog": "^2.7.3",
-    "@tauri-apps/plugin-opener": "^2"
+    "@tauri-apps/api": "3.0.0-alpha.3",
+    "@tauri-apps/plugin-dialog": "3.0.0-alpha.4",
+    "@tauri-apps/plugin-opener": "3.0.0-alpha.3"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -31,7 +31,7 @@
     "@sveltejs/adapter-static": "^3.0.10",
     "@sveltejs/kit": "^2.65.1",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
-    "@tauri-apps/cli": "^2.12.0",
+    "@tauri-apps/cli": "3.0.0-alpha.5",
     "@types/node": "^26.6.4",
     "eslint": "^10.12.0",
     "eslint-config-prettier": "^10.1.8",

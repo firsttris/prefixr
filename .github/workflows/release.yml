@@ -30,6 +30,8 @@ jobs:
     name: Build release bundles
     needs: tested
     runs-on: ubuntu-24.04
+    env:
+      CEF_PATH: ${{ github.workspace }}/.cef
 
     steps:
       - name: Checkout
@@ -52,12 +54,26 @@ jobs:
         uses: firsttris/workflows/actions/apt-install@ccr-161f105b-9ns022
         with:
           packages: |
-            libwebkit2gtk-4.1-dev
+            libgtk-4-dev
             libxdo-dev
             libssl-dev
-            libayatana-appindicator3-dev
             librsvg2-dev
             patchelf
+
+      # Chromium (CEF, about 1 GB), which the packages bring (src-tauri/Cargo.toml)
+      - name: Cache Chromium (CEF)
+        uses: actions/cache@v4
+        with:
+          path: .cef
+          key: cef-linux-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: cef-linux-
+
+      # The patched Tauri CLI (patches/README.md), built once per version and patch set
+      - name: Cache the patched Tauri CLI
+        uses: actions/cache@v4
+        with:
+          path: src-tauri/target/patched-cli
+          key: patched-tauri-cli-${{ hashFiles('package.json', 'patches/*.patch') }}
 
       - name: Install frontend dependencies
         run: bun install --frozen-lockfile

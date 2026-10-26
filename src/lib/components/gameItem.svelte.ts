@@ -1,4 +1,4 @@
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { revealItemsInDir } from "@tauri-apps/plugin-opener";
 import { createDesktopShortcut, createMenuShortcut } from "$lib/stores/games";
 import { getGameCover } from "$lib/stores/steamgriddb";
 import type { Game } from "$lib/types";
@@ -60,7 +60,7 @@ export class GameItem {
   async showInFileManager(): Promise<void> {
     this.revealError = null;
     try {
-      await revealItemInDir(this.#game().exe_path);
+      await revealItemsInDir(this.#game().exe_path);
     } catch (e) {
       this.revealError = e;
     }

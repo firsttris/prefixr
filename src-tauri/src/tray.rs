@@ -212,7 +212,7 @@ fn quit_dialog_copy(active: usize, locale: Locale) -> (String, String, String, S
 /// Builds the tray's menu from scratch: a show/hide toggle, one "quit this
 /// game" entry per currently running game (so a hung Proton process can be
 /// killed without needing the main window), and quit.
-fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
+fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::DynRuntime>> {
     let locale = tray_locale(app);
     let toggle_text = toggle_label(is_main_window_visible(app), locale);
 

@@ -1,0 +1,48 @@
+diff --git a/crates/tauri-bundler/src/bundle/linux/appimage/sharun_cef.rs b/crates/tauri-bundler/src/bundle/linux/appimage/sharun_cef.rs
+index 3e94e02..35010a2 100644
+--- a/crates/tauri-bundler/src/bundle/linux/appimage/sharun_cef.rs
++++ b/crates/tauri-bundler/src/bundle/linux/appimage/sharun_cef.rs
+@@ -165,6 +165,11 @@ pub fn bundle_project(settings: &Settings) -> crate::Result<Vec<PathBuf>> {
+     ];
+ 
+     for f in cef_files {
++      // CEF 154 and newer no longer ship ANGLE's libraries on Linux; Chromium then uses the
++      // system's libEGL.so.1 and libGLESv2.so.2.
++      if matches!(f, "libEGL.so" | "libGLESv2.so") && !cef_path.join(f).exists() {
++        continue;
++      }
+       let dest = app_dir_bin.join(f);
+       fs::copy(cef_path.join(f), &dest)
+         .with_context(|| format!("Failed to copy cef file {f} to {}", dest.display()))?;
+diff --git a/crates/tauri-bundler/src/bundle/linux/debian.rs b/crates/tauri-bundler/src/bundle/linux/debian.rs
+index d163415..3162c19 100644
+--- a/crates/tauri-bundler/src/bundle/linux/debian.rs
++++ b/crates/tauri-bundler/src/bundle/linux/debian.rs
+@@ -137,6 +137,11 @@ pub fn bundle_project(settings: &Settings) -> crate::Result<Vec<PathBuf>> {
+     ];
+ 
+     for f in cef_files {
++      // CEF 154 and newer no longer ship ANGLE's libraries on Linux; Chromium then uses the
++      // system's libEGL.so.1 and libGLESv2.so.2.
++      if matches!(f, "libEGL.so" | "libGLESv2.so") && !cef_path.join(f).exists() {
++        continue;
++      }
+       let file_dest = share_dir.join(f);
+       fs::copy(cef_path.join(f), &file_dest)?;
+       if f.ends_with(".so") {
+diff --git a/crates/tauri-bundler/src/bundle/linux/rpm.rs b/crates/tauri-bundler/src/bundle/linux/rpm.rs
+index 3a800a8..00a14f9 100644
+--- a/crates/tauri-bundler/src/bundle/linux/rpm.rs
++++ b/crates/tauri-bundler/src/bundle/linux/rpm.rs
+@@ -277,6 +277,11 @@ pub fn bundle_project(settings: &Settings) -> crate::Result<Vec<PathBuf>> {
+     ];
+ 
+     for f in cef_files {
++      // CEF 154 and newer no longer ship ANGLE's libraries on Linux; Chromium then uses the
++      // system's libEGL.so.1 and libGLESv2.so.2.
++      if matches!(f, "libEGL.so" | "libGLESv2.so") && !cef_path.join(f).exists() {
++        continue;
++      }
+       let temp_file = cef_temp_dir.join(f);
+       fs::copy(cef_path.join(f), &temp_file)?;
+       if f.ends_with(".so") {

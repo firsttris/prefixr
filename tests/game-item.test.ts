@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 const reveal = vi.fn();
 vi.mock("@tauri-apps/plugin-opener", () => ({
-  revealItemInDir: (...args: unknown[]) => reveal(...args),
+  revealItemsInDir: (...args: unknown[]) => reveal(...args),
 }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(), convertFileSrc: (p: string) => p }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn() }));

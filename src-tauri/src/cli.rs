@@ -405,7 +405,7 @@ static EXIT_CODE: AtomicI32 = AtomicI32::new(0);
 
 /// Runs the command line in `args` and exits. Usage errors exit with 2, a
 /// failed command with 1.
-pub fn run(args: &[String], context: tauri::Context<tauri::Wry>) -> ! {
+pub fn run(args: &[String], context: tauri::Context) -> ! {
     let cli = Cli::try_parse_from(args).unwrap_or_else(|e| e.exit());
     let locale = LocaleState::default().get();
     // Needs neither the config nor the desktop session.
@@ -428,6 +428,7 @@ pub fn run(args: &[String], context: tauri::Context<tauri::Wry>) -> ! {
     }
 
     let result = tauri::Builder::default()
+        .runtime(crate::engine::runtime())
         .setup(move |app| {
             app.manage(LocaleState::default());
             // Taken before the config is read, and kept until the process

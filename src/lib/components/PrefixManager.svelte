@@ -12,7 +12,7 @@
   import { onDestroy, onMount, tick } from "svelte";
   import { loadAll } from "$lib/load";
   import { open } from "@tauri-apps/plugin-dialog";
-  import { revealItemInDir } from "@tauri-apps/plugin-opener";
+  import { revealItemsInDir } from "@tauri-apps/plugin-opener";
   import {
     prefixes,
     prefixStates,
@@ -431,7 +431,7 @@
             disabled={entry.state === "missing"}
             onclick={() => {
               close();
-              revealItemInDir(entry.path).catch(() => {});
+              revealItemsInDir(entry.path).catch(() => {});
             }}
           >
             {m.prefixManager_showFolder()}

@@ -30,7 +30,7 @@
   } from "$lib/stores/libraryMeta";
   import { TEST_STATUSES, TEST_SYMBOL, testLabel, testedOn } from "$lib/testStatus";
   import type { TestStatus } from "$lib/types";
-  import { revealItemInDir } from "@tauri-apps/plugin-opener";
+  import { revealItemsInDir } from "@tauri-apps/plugin-opener";
   import { backendError, getLocale } from "$lib/i18n/index.svelte";
   import { isTopLayer, openLayer, trapTab } from "$lib/layers";
   import CompatBadges, { tierName } from "./CompatBadges.svelte";
@@ -263,7 +263,7 @@
               class="link link-button"
               onclick={() => {
                 const exe = game?.exe_path;
-                if (exe) revealItemInDir(exe).catch((e) => (error = e));
+                if (exe) revealItemsInDir(exe).catch((e) => (error = e));
               }}>{m.gameCard_menuShowInFileManager()} →</button
             >
           </dd>
