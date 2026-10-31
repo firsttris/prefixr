@@ -165,5 +165,12 @@
       automerge: false,
       dependencyDashboardApproval: false,
     },
+    {
+      // Used directly, but it must stay the glib of Tauri's GTK: a second glib-sys (links =
+      // "glib-2.0") cannot be built into the same program. It moves with Tauri's lock file.
+      matchManagers: ["cargo"],
+      matchPackageNames: ["glib"],
+      enabled: false,
+    },
   ],
 }

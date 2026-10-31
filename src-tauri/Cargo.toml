@@ -30,7 +30,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 uuid = { version = "1", features = ["v4", "serde"] }
 tokio = { version = "1", features = ["process", "io-util", "fs", "rt", "signal", "sync", "time"] }
-reqwest = { version = "0.13", default-features = false, features = ["json", "stream", "rustls-tls"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "stream", "rustls"] }
 futures-util = "0.3"
 flate2 = "1"
 xz2 = "0.1"
@@ -39,6 +39,8 @@ tar = "0.4"
 editpe = "0.2"
 image = { version = "0.25", default-features = false, features = ["png", "bmp", "ico"] }
 base64 = "0.23"
+# Digests as lowercase hex (sha2 0.11 output has no LowerHex); already in the tree.
+hex = "0.4"
 sha2 = "0.11"
 libc = "0.2"
 clap = { version = "4", features = ["derive"] }
@@ -47,7 +49,7 @@ clap = { version = "4", features = ["derive"] }
 zbus = "5"
 # Already in the tree through Tauri's GTK; sets the program name, which
 # becomes the window's Wayland app_id and X11 WM_CLASS, in a Flatpak.
-glib = "0.22"
+glib = "0.18"
 # Already in the tree through Tauri's tao; switches the X11 primary output so
 # a game starts on Prefixr's monitor (`primary_output`).
 x11-dl = "2"

@@ -152,7 +152,7 @@ async fn install_latest(app: &AppHandle, token: Option<&str>) -> Result<UmuStatu
     .await
     .map_err(|e| format!("Could not download {}: {e}", asset.name))?;
 
-    let actual = format!("{:x}", Sha256::digest(&bytes));
+    let actual = hex::encode(Sha256::digest(&bytes));
     if !actual.eq_ignore_ascii_case(&expected) {
         return Err(format!(
             "Checksum mismatch for {}: expected {expected}, got {actual} — \
