@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { WinetricksVerbMeta } from "$lib/types";
+import type { WinetricksVerbMeta } from "#lib/types.ts";
 
 export interface WinetricksVerb {
   id: string;

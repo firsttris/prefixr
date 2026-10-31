@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { writable } from "svelte/store";
-import type { PrefixInfo, PrefixState, PrefixStatus } from "$lib/types";
+import type { PrefixInfo, PrefixState, PrefixStatus } from "#lib/types.ts";
 
 export const prefixes = writable<PrefixInfo[]>([]);
 

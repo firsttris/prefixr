@@ -1,18 +1,18 @@
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
+  import * as m from "#lib/paraglide/messages.js";
   import { onMount } from "svelte";
-  import { loadAll } from "$lib/load";
-  import ProtonEditor from "$lib/components/ProtonEditor.svelte";
-  import SettingsPanel from "$lib/components/SettingsPanel.svelte";
+  import { loadAll } from "#lib/load.ts";
+  import ProtonEditor from "#lib/components/ProtonEditor.svelte";
+  import SettingsPanel from "#lib/components/SettingsPanel.svelte";
   import {
     listProtonOptions,
     protonConfig,
     refreshProtonConfig,
     saveProtonConfig,
-  } from "$lib/stores/proton";
-  import { refreshRunners, runners } from "$lib/stores/runners";
-  import type { ProtonOption } from "$lib/types";
-  import { backendError } from "$lib/i18n/index.svelte";
+  } from "#lib/stores/proton.ts";
+  import { refreshRunners, runners } from "#lib/stores/runners.ts";
+  import type { ProtonOption } from "#lib/types.ts";
+  import { backendError } from "#lib/i18n/index.svelte.ts";
 
   let draft = $state<Record<string, boolean> | null>(null);
   let saving = $state(false);

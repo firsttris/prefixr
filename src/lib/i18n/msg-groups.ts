@@ -1,5 +1,5 @@
 /** Messages picked by a runtime id (tool, option, preset …), for pickMsg(). */
-import * as m from "$lib/paraglide/messages";
+import * as m from "#lib/paraglide/messages.js";
 
 export const msgGroup = {
   performanceEditor_label: {

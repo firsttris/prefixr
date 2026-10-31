@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { writable } from "svelte/store";
-import type { DirectXLayerStatus } from "$lib/types";
+import type { DirectXLayerStatus } from "#lib/types.ts";
 
 export const directXLayers = writable<DirectXLayerStatus[]>([]);
 

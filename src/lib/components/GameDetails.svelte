@@ -6,17 +6,17 @@
   a card or row; Escape or a click beside it closes it.
 -->
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
-  import type { Entry } from "$lib/libraryView";
-  import type { Game, StoreGame, StoreInstallInfo } from "$lib/types";
-  import { gameRunState, killGame, launchGame } from "$lib/stores/games";
+  import * as m from "#lib/paraglide/messages.js";
+  import type { Entry } from "#lib/libraryView.ts";
+  import type { Game, StoreGame, StoreInstallInfo } from "#lib/types.ts";
+  import { gameRunState, killGame, launchGame } from "#lib/stores/games.ts";
   import {
     formatBytes,
     getStoreInstallDefaults,
     storeCoverUrl,
     storeName,
-  } from "$lib/stores/gameStores";
-  import { getGameCover } from "$lib/stores/steamgriddb";
+  } from "#lib/stores/gameStores.ts";
+  import { getGameCover } from "#lib/stores/steamgriddb.ts";
   import {
     categoryIdsOf,
     compatibility,
@@ -27,12 +27,12 @@
     setHidden,
     setTestStatus,
     testOf,
-  } from "$lib/stores/libraryMeta";
-  import { TEST_STATUSES, TEST_SYMBOL, testLabel, testedOn } from "$lib/testStatus";
-  import type { TestStatus } from "$lib/types";
+  } from "#lib/stores/libraryMeta.ts";
+  import { TEST_STATUSES, TEST_SYMBOL, testLabel, testedOn } from "#lib/testStatus.ts";
+  import type { TestStatus } from "#lib/types.ts";
   import { revealItemInDir } from "@tauri-apps/plugin-opener";
-  import { backendError, getLocale } from "$lib/i18n/index.svelte";
-  import { isTopLayer, openLayer, trapTab } from "$lib/layers";
+  import { backendError, getLocale } from "#lib/i18n/index.svelte.ts";
+  import { isTopLayer, openLayer, trapTab } from "#lib/layers.ts";
   import CompatBadges, { tierName } from "./CompatBadges.svelte";
   import FavoriteStar from "./FavoriteStar.svelte";
   import GameFallbackIcon from "./GameFallbackIcon.svelte";

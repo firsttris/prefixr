@@ -5,10 +5,10 @@
   one click.
 -->
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
+  import * as m from "#lib/paraglide/messages.js";
   import { onMount } from "svelte";
   import { open, save } from "@tauri-apps/plugin-dialog";
-  import type { BackupConfig, BackupInfo } from "$lib/types";
+  import type { BackupConfig, BackupInfo } from "#lib/types.ts";
   import {
     createBackup,
     defaultBackupName,
@@ -18,9 +18,9 @@
     listenForBackups,
     restoreBackup,
     saveBackupConfig,
-  } from "$lib/stores/backup";
-  import { backendError, getLocale } from "$lib/i18n/index.svelte";
-  import { formatBytes } from "$lib/stores/gameStores";
+  } from "#lib/stores/backup.ts";
+  import { backendError, getLocale } from "#lib/i18n/index.svelte.ts";
+  import { formatBytes } from "#lib/stores/gameStores.ts";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import SettingToggle from "./SettingToggle.svelte";
 

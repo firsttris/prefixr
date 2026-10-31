@@ -1,5 +1,5 @@
 <script lang="ts" module>
-  import * as m from "$lib/paraglide/messages";
+  import * as m from "#lib/paraglide/messages.js";
 
   export function tierName(tier: string): string {
     switch (tier) {
@@ -24,7 +24,7 @@
   row: its ProtonDB rating and whether umu-protonfixes has fixes for it.
 -->
 <script lang="ts">
-  import type { Compatibility } from "$lib/types";
+  import type { Compatibility } from "#lib/types.ts";
 
   let { compat }: { compat?: Compatibility } = $props();
 </script>

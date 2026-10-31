@@ -11,7 +11,7 @@ import type {
   GameStartedPayload,
   InstallerResult,
   SteamChange,
-} from "$lib/types";
+} from "#lib/types.ts";
 
 export const games = writable<Game[]>([]);
 

@@ -1,11 +1,11 @@
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
-  import Message from "$lib/components/Message.svelte";
+  import * as m from "#lib/paraglide/messages.js";
+  import Message from "#lib/components/Message.svelte";
   import { onMount, untrack } from "svelte";
-  import { searchUmuIds } from "$lib/stores/umu";
-  import { prettifyExeName } from "$lib/gameName";
-  import type { UmuMatch } from "$lib/types";
-  import { backendError } from "$lib/i18n/index.svelte";
+  import { searchUmuIds } from "#lib/stores/umu.ts";
+  import { prettifyExeName } from "#lib/gameName.ts";
+  import type { UmuMatch } from "#lib/types.ts";
+  import { backendError } from "#lib/i18n/index.svelte.ts";
 
   // The game's UMU id, which umu gets as `GAMEID` so umu-protonfixes
   // applies this game's own fixes — see `Game::umu_id` in models.rs.

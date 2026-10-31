@@ -1,7 +1,7 @@
 <!-- The runner picker, as every form that runs something in a prefix has it. -->
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
-  import { runners } from "$lib/stores/runners";
+  import * as m from "#lib/paraglide/messages.js";
+  import { runners } from "#lib/stores/runners.ts";
 
   let {
     value = $bindable(),

@@ -1,24 +1,24 @@
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
+  import * as m from "#lib/paraglide/messages.js";
   import { onMount } from "svelte";
-  import GameList from "$lib/components/GameList.svelte";
-  import GameForm, { type GameFormTab } from "$lib/components/GameForm.svelte";
-  import RunnerList from "$lib/components/RunnerList.svelte";
-  import PrefixManager from "$lib/components/PrefixManager.svelte";
-  import PerformanceSettings from "$lib/components/PerformanceSettings.svelte";
-  import GraphicsSettings from "$lib/components/GraphicsSettings.svelte";
-  import OverlaySettings from "$lib/components/OverlaySettings.svelte";
-  import ProtonSettings from "$lib/components/ProtonSettings.svelte";
-  import SteamGridDbSettings from "$lib/components/SteamGridDbSettings.svelte";
-  import ArtworkPicker from "$lib/components/ArtworkPicker.svelte";
-  import InstallDialog from "$lib/components/InstallDialog.svelte";
-  import StoreInstallDialog from "$lib/components/StoreInstallDialog.svelte";
-  import StoresSettings from "$lib/components/StoresSettings.svelte";
-  import BackupSettings from "$lib/components/BackupSettings.svelte";
-  import { takeRestoredBackup } from "$lib/stores/backup";
-  import DownloadsView from "$lib/components/DownloadsView.svelte";
-  import Modal from "$lib/components/Modal.svelte";
-  import { getLocale, setLocale, type Locale } from "$lib/i18n/index.svelte";
+  import GameList from "#lib/components/GameList.svelte";
+  import GameForm, { type GameFormTab } from "#lib/components/GameForm.svelte";
+  import RunnerList from "#lib/components/RunnerList.svelte";
+  import PrefixManager from "#lib/components/PrefixManager.svelte";
+  import PerformanceSettings from "#lib/components/PerformanceSettings.svelte";
+  import GraphicsSettings from "#lib/components/GraphicsSettings.svelte";
+  import OverlaySettings from "#lib/components/OverlaySettings.svelte";
+  import ProtonSettings from "#lib/components/ProtonSettings.svelte";
+  import SteamGridDbSettings from "#lib/components/SteamGridDbSettings.svelte";
+  import ArtworkPicker from "#lib/components/ArtworkPicker.svelte";
+  import InstallDialog from "#lib/components/InstallDialog.svelte";
+  import StoreInstallDialog from "#lib/components/StoreInstallDialog.svelte";
+  import StoresSettings from "#lib/components/StoresSettings.svelte";
+  import BackupSettings from "#lib/components/BackupSettings.svelte";
+  import { takeRestoredBackup } from "#lib/stores/backup.ts";
+  import DownloadsView from "#lib/components/DownloadsView.svelte";
+  import Modal from "#lib/components/Modal.svelte";
+  import { getLocale, setLocale, type Locale } from "#lib/i18n/index.svelte.ts";
   import {
     games,
     initGameEvents,
@@ -27,16 +27,16 @@
     takePendingInstall,
     takePendingLaunch,
     listenForPendingLaunch,
-  } from "$lib/stores/games";
-  import { listenForConfigChanges } from "$lib/stores/library";
+  } from "#lib/stores/games.ts";
+  import { listenForConfigChanges } from "#lib/stores/library.ts";
   import {
     notInstalled,
     storeGames,
     storeInstallErrors,
     storeInstalls,
-  } from "$lib/stores/gameStores";
-  import { appVersion, openReleaseNotes, refreshAppVersion } from "$lib/stores/system";
-  import type { Game, StoreGame } from "$lib/types";
+  } from "#lib/stores/gameStores.ts";
+  import { appVersion, openReleaseNotes, refreshAppVersion } from "#lib/stores/system.ts";
+  import type { Game, StoreGame } from "#lib/types.ts";
 
   type View =
     | "library"

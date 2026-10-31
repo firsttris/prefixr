@@ -6,8 +6,8 @@ import type {
   SteamGridDbConfig,
   SteamGridDbGameMatch,
   SteamGridDbGrid,
-} from "$lib/types";
-import { refreshGames } from "$lib/stores/games";
+} from "#lib/types.ts";
+import { refreshGames } from "#lib/stores/games.ts";
 
 export const steamGridDbConfig = writable<SteamGridDbConfig | null>(null);
 

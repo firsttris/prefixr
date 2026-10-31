@@ -7,8 +7,8 @@ vi.mock("@tauri-apps/plugin-opener", () => ({
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(), convertFileSrc: (p: string) => p }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn() }));
 
-const { GameItem } = await import("$lib/components/gameItem.svelte");
-import type { Game } from "$lib/types";
+const { GameItem } = await import("#lib/components/gameItem.svelte.ts");
+import type { Game } from "#lib/types.ts";
 
 const game = { id: "a", exe_path: "/games/Quake/quake.exe", cover_url: null } as Game;
 

@@ -8,7 +8,7 @@ import type {
   RunnerDownloadProgressPayload,
   RunnerRelease,
   RunnerSourceInfo,
-} from "$lib/types";
+} from "#lib/types.ts";
 
 export const runners = writable<Runner[]>([]);
 

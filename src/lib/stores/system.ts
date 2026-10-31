@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { writable } from "svelte/store";
-import type { MaxMapCountStatus } from "$lib/types";
+import type { MaxMapCountStatus } from "#lib/types.ts";
 
 export const maxMapCountStatus = writable<MaxMapCountStatus | null>(null);
 

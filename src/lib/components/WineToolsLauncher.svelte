@@ -1,13 +1,13 @@
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
-  import RunnerSelect from "$lib/components/RunnerSelect.svelte";
-  import Message from "$lib/components/Message.svelte";
-  import { msgGroup } from "$lib/i18n/msg-groups";
+  import * as m from "#lib/paraglide/messages.js";
+  import RunnerSelect from "#lib/components/RunnerSelect.svelte";
+  import Message from "#lib/components/Message.svelte";
+  import { msgGroup } from "#lib/i18n/msg-groups.ts";
   import { onMount, untrack } from "svelte";
-  import { prefixRunner, refreshRunners } from "$lib/stores/runners";
-  import { games } from "$lib/stores/games";
-  import { WINE_TOOLS, launchWineTool } from "$lib/stores/wineTools";
-  import { backendError, pickMsg } from "$lib/i18n/index.svelte";
+  import { prefixRunner, refreshRunners } from "#lib/stores/runners.ts";
+  import { games } from "#lib/stores/games.ts";
+  import { WINE_TOOLS, launchWineTool } from "#lib/stores/wineTools.ts";
+  import { backendError, pickMsg } from "#lib/i18n/index.svelte.ts";
 
   let { prefixPath }: { prefixPath: string } = $props();
 

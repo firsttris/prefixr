@@ -1,6 +1,6 @@
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
-  import Message from "$lib/components/Message.svelte";
+  import * as m from "#lib/paraglide/messages.js";
+  import Message from "#lib/components/Message.svelte";
   import { onMount } from "svelte";
   import {
     umuStatus,
@@ -8,8 +8,8 @@
     refreshUmuStatus,
     installUmu,
     checkUmuUpdate,
-  } from "$lib/stores/umu";
-  import { backendError } from "$lib/i18n/index.svelte";
+  } from "#lib/stores/umu.ts";
+  import { backendError } from "#lib/i18n/index.svelte.ts";
 
   let installing = $state(false);
   let error = $state<unknown>(null);

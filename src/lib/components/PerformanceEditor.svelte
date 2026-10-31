@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { msgGroup } from "$lib/i18n/msg-groups";
-  import SettingToggle from "$lib/components/SettingToggle.svelte";
-  import type { OverrideHooks } from "$lib/settings";
-  import type { PerformanceConfig } from "$lib/types";
-  import { pickMsg } from "$lib/i18n/index.svelte";
+  import { msgGroup } from "#lib/i18n/msg-groups.ts";
+  import SettingToggle from "#lib/components/SettingToggle.svelte";
+  import type { OverrideHooks } from "#lib/settings.ts";
+  import type { PerformanceConfig } from "#lib/types.ts";
+  import { pickMsg } from "#lib/i18n/index.svelte.ts";
 
   // Leistung — see settings.ts for how the editors are shared between the
   // global page and the game dialog.

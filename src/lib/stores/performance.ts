@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { writable } from "svelte/store";
-import type { PerformanceConfig } from "$lib/types";
+import type { PerformanceConfig } from "#lib/types.ts";
 
 export const performanceConfig = writable<PerformanceConfig | null>(null);
 

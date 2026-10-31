@@ -3,7 +3,7 @@
   on the cover, shown on hover or focus unless the game is a favorite.
 -->
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
+  import * as m from "#lib/paraglide/messages.js";
 
   let {
     favorite,

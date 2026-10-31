@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { writable } from "svelte/store";
-import type { MangoHudConfig } from "$lib/types";
+import type { MangoHudConfig } from "#lib/types.ts";
 
 export const mangoHudConfig = writable<MangoHudConfig | null>(null);
 

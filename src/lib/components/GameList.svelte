@@ -1,5 +1,5 @@
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
+  import * as m from "#lib/paraglide/messages.js";
   import { onDestroy, onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
@@ -13,7 +13,7 @@
     removeFromSteam,
     steamGameIds,
     refreshSteamGames,
-  } from "$lib/stores/games";
+  } from "#lib/stores/games.ts";
   import {
     storeGames,
     storeInstalls,
@@ -24,7 +24,7 @@
     cancelStoreInstall,
     dismissStoreInstallError,
     uninstallStoreGame,
-  } from "$lib/stores/gameStores";
+  } from "#lib/stores/gameStores.ts";
   import {
     compatibility,
     libraryMeta,
@@ -34,7 +34,7 @@
     setFavorite,
     TEST_STATUSES,
     testOf,
-  } from "$lib/stores/libraryMeta";
+  } from "#lib/stores/libraryMeta.ts";
   import {
     collectionCounts,
     entriesOf,
@@ -45,9 +45,9 @@
     type Entry,
     type SortBy,
     type Source,
-  } from "$lib/libraryView";
-  import { isNumberIn, isOneOf, isStringList, loadSetting, saveSetting } from "$lib/persisted";
-  import { backendError } from "$lib/i18n/index.svelte";
+  } from "#lib/libraryView.ts";
+  import { isNumberIn, isOneOf, isStringList, loadSetting, saveSetting } from "#lib/persisted.ts";
+  import { backendError } from "#lib/i18n/index.svelte.ts";
   import GameCard from "./GameCard.svelte";
   import GameListRow from "./GameListRow.svelte";
   import StoreGameCard from "./StoreGameCard.svelte";
@@ -56,7 +56,7 @@
   import NotesDialog from "./NotesDialog.svelte";
   import LibraryChips from "./LibraryChips.svelte";
   import GameDetails from "./GameDetails.svelte";
-  import type { Game, StoreGame, StoreKind } from "$lib/types";
+  import type { Game, StoreGame, StoreKind } from "#lib/types.ts";
   import type { GameFormTab } from "./GameForm.svelte";
 
   let {

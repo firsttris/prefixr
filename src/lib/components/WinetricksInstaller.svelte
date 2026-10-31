@@ -1,20 +1,20 @@
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
-  import RunnerSelect from "$lib/components/RunnerSelect.svelte";
-  import Message from "$lib/components/Message.svelte";
-  import { msgGroup } from "$lib/i18n/msg-groups";
+  import * as m from "#lib/paraglide/messages.js";
+  import RunnerSelect from "#lib/components/RunnerSelect.svelte";
+  import Message from "#lib/components/Message.svelte";
+  import { msgGroup } from "#lib/i18n/msg-groups.ts";
   import { onMount, untrack } from "svelte";
   import { SvelteSet } from "svelte/reactivity";
-  import { prefixRunner, refreshRunners } from "$lib/stores/runners";
-  import { games } from "$lib/stores/games";
+  import { prefixRunner, refreshRunners } from "#lib/stores/runners.ts";
+  import { games } from "#lib/stores/games.ts";
   import {
     WINETRICKS_VERBS,
     installWinetricksVerbs,
     listAllWinetricksVerbs,
     listInstalledWinetricksVerbs,
     type WinetricksVerbMeta,
-  } from "$lib/stores/winetricks";
-  import { backendError, pickMsg } from "$lib/i18n/index.svelte";
+  } from "#lib/stores/winetricks.ts";
+  import { backendError, pickMsg } from "#lib/i18n/index.svelte.ts";
 
   let { prefixPath, onShowLog }: { prefixPath: string; onShowLog: (path: string) => void } =
     $props();

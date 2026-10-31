@@ -1,5 +1,5 @@
-import type { Game, PrefixInfo, PrefixState } from "$lib/types";
-import { searchText } from "$lib/libraryView";
+import type { Game, PrefixInfo, PrefixState } from "#lib/types.ts";
+import { searchText } from "#lib/libraryView.ts";
 
 // What the prefixes page and the prefix pickers show: each prefix with the
 // games in it, its path shortened to what sets it apart from the others,

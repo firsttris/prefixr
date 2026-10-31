@@ -1,17 +1,21 @@
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
+  import * as m from "#lib/paraglide/messages.js";
   import { onMount } from "svelte";
-  import { loadAll } from "$lib/load";
-  import PerformanceEditor from "$lib/components/PerformanceEditor.svelte";
-  import SettingsPanel from "$lib/components/SettingsPanel.svelte";
+  import { loadAll } from "#lib/load.ts";
+  import PerformanceEditor from "#lib/components/PerformanceEditor.svelte";
+  import SettingsPanel from "#lib/components/SettingsPanel.svelte";
   import {
     performanceConfig,
     refreshPerformanceConfig,
     savePerformanceConfig,
-  } from "$lib/stores/performance";
-  import { maxMapCountStatus, refreshMaxMapCountStatus, fixMaxMapCount } from "$lib/stores/system";
-  import type { PerformanceConfig } from "$lib/types";
-  import { backendError, getLocale } from "$lib/i18n/index.svelte";
+  } from "#lib/stores/performance.ts";
+  import {
+    maxMapCountStatus,
+    refreshMaxMapCountStatus,
+    fixMaxMapCount,
+  } from "#lib/stores/system.ts";
+  import type { PerformanceConfig } from "#lib/types.ts";
+  import { backendError, getLocale } from "#lib/i18n/index.svelte.ts";
 
   let draft = $state<PerformanceConfig | null>(null);
   let saving = $state(false);

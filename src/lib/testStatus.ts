@@ -1,9 +1,9 @@
-import * as m from "$lib/paraglide/messages";
-import { getLocale } from "$lib/i18n/index.svelte";
-import { TEST_STATUSES, type GameTest } from "$lib/stores/libraryMeta";
+import * as m from "#lib/paraglide/messages.js";
+import { getLocale } from "#lib/i18n/index.svelte.ts";
+import { TEST_STATUSES, type GameTest } from "#lib/stores/libraryMeta.ts";
 
 export { TEST_STATUSES };
-import type { TestStatus } from "$lib/types";
+import type { TestStatus } from "#lib/types.ts";
 
 // How a test result reads: the symbol on a card, its name, and the line
 // that explains it (see `commands::library::TestResult`).

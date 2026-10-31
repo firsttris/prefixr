@@ -1,8 +1,8 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { writable } from "svelte/store";
-import { refreshGames } from "$lib/stores/games";
-import { refreshPrefixes } from "$lib/stores/prefixes";
+import { refreshGames } from "#lib/stores/games.ts";
+import { refreshPrefixes } from "#lib/stores/prefixes.ts";
 import type {
   Game,
   StoreAccount,
@@ -12,7 +12,7 @@ import type {
   StoreInstallOptions,
   StoreInstallProgressPayload,
   StoreKind,
-} from "$lib/types";
+} from "#lib/types.ts";
 
 // Store accounts (Epic, for now) and their games — see `commands::stores`.
 // "Store" here means a game store; the Svelte stores of this file are named

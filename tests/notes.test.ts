@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseNotes } from "$lib/notes";
+import { parseNotes } from "#lib/notes.ts";
 
 describe("parseNotes", () => {
   it("splits notes into text, headings and lists", () => {

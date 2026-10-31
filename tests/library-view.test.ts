@@ -4,8 +4,8 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(), convertFileSrc: (p: st
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn() }));
 
 const { entriesOf, libraryView, collectionCounts, sourceCounts, recentlyPlayed, searchText } =
-  await import("$lib/libraryView");
-import type { Game, LibraryConfig, StoreGame } from "$lib/types";
+  await import("#lib/libraryView.ts");
+import type { Game, LibraryConfig, StoreGame } from "#lib/types.ts";
 
 const game = (id: string, name: string, extra: Partial<Game> = {}) =>
   ({ id, name, runner_id: "wine", store: null, ...extra }) as Game;

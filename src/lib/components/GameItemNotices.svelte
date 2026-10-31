@@ -4,11 +4,11 @@
   lay the notices out differently (`inline` for the row).
 -->
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
-  import type { Game } from "$lib/types";
-  import type { GameRunState } from "$lib/stores/games";
-  import { showLog } from "$lib/logViewer";
-  import { backendError } from "$lib/i18n/index.svelte";
+  import * as m from "#lib/paraglide/messages.js";
+  import type { Game } from "#lib/types.ts";
+  import type { GameRunState } from "#lib/stores/games.ts";
+  import { showLog } from "#lib/logViewer.ts";
+  import { backendError } from "#lib/i18n/index.svelte.ts";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import type { GameItem } from "./gameItem.svelte";
 

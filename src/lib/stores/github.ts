@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { writable } from "svelte/store";
-import type { GitHubConfig } from "$lib/types";
+import type { GitHubConfig } from "#lib/types.ts";
 
 export const githubConfig = writable<GitHubConfig | null>(null);
 

@@ -1,12 +1,12 @@
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
-  import { msgGroup } from "$lib/i18n/msg-groups";
-  import SettingToggle from "$lib/components/SettingToggle.svelte";
-  import ExtensionHint from "$lib/components/ExtensionHint.svelte";
-  import { COLORS, POSITIONS, PRESETS, type MangoHudPreset } from "$lib/mangohudPresets";
-  import type { OverrideHooks } from "$lib/settings";
-  import type { MangoHudConfig, MangoHudLayout } from "$lib/types";
-  import { pickMsg } from "$lib/i18n/index.svelte";
+  import * as m from "#lib/paraglide/messages.js";
+  import { msgGroup } from "#lib/i18n/msg-groups.ts";
+  import SettingToggle from "#lib/components/SettingToggle.svelte";
+  import ExtensionHint from "#lib/components/ExtensionHint.svelte";
+  import { COLORS, POSITIONS, PRESETS, type MangoHudPreset } from "#lib/mangohudPresets.ts";
+  import type { OverrideHooks } from "#lib/settings.ts";
+  import type { MangoHudConfig, MangoHudLayout } from "#lib/types.ts";
+  import { pickMsg } from "#lib/i18n/index.svelte.ts";
 
   // Overlay — see settings.ts for how the editors are shared between the
   // global page and the game dialog. On/off and the look (`layout`) are

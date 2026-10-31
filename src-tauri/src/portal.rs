@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use zbus::zvariant::{OwnedObjectPath, Value};
+use zbus::{OwnedObjectPath, Variant};
 
 const PORTAL: &str = "org.freedesktop.portal.Desktop";
 const PORTAL_PATH: &str = "/org/freedesktop/portal/desktop";
@@ -16,7 +16,7 @@ const INHIBIT_SUSPEND_AND_IDLE: u32 = 4 | 8;
 /// the inhibition when the request is closed or the connection that made it
 /// goes away, so the connection is kept with it.
 pub struct Inhibition {
-    connection: zbus::blocking::Connection,
+    connection: zbus::Connection,
     handle: OwnedObjectPath,
 }
 
@@ -24,17 +24,18 @@ impl Inhibition {
     /// `None` when the portal isn't there or refuses: the game then simply
     /// runs without it, as natively without `systemd-inhibit`.
     pub fn new(reason: &str) -> Option<Self> {
-        let connection = zbus::blocking::Connection::session().ok()?;
-        let options: HashMap<&str, Value> = HashMap::from([("reason", Value::from(reason))]);
-        let reply = connection
-            .call_method(
-                Some(PORTAL),
-                PORTAL_PATH,
-                Some("org.freedesktop.portal.Inhibit"),
-                "Inhibit",
-                &("", INHIBIT_SUSPEND_AND_IDLE, options),
-            )
-            .ok()?;
+        // zbus 6 has no blocking API any more; block_on drives the connection on this thread
+        // and a helper thread of zbus's keeps it alive afterwards
+        let connection = zbus::block_on(zbus::Connection::session()).ok()?;
+        let options: HashMap<&str, Variant> = HashMap::from([("reason", Variant::from(reason))]);
+        let reply = zbus::block_on(connection.call_method(
+            Some(PORTAL),
+            PORTAL_PATH,
+            Some("org.freedesktop.portal.Inhibit"),
+            "Inhibit",
+            &("", INHIBIT_SUSPEND_AND_IDLE, options),
+        ))
+        .ok()?;
         let handle: OwnedObjectPath = reply.body().deserialize().ok()?;
         Some(Self { connection, handle })
     }
@@ -42,12 +43,12 @@ impl Inhibition {
 
 impl Drop for Inhibition {
     fn drop(&mut self) {
-        let _ = self.connection.call_method(
+        let _ = zbus::block_on(self.connection.call_method(
             Some(PORTAL),
             self.handle.as_str(),
             Some("org.freedesktop.portal.Request"),
             "Close",
             &(),
-        );
+        ));
     }
 }

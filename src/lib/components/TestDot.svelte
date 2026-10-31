@@ -4,8 +4,8 @@
   tested with. The whole result, its note too, is its tooltip.
 -->
 <script lang="ts">
-  import type { GameTest } from "$lib/stores/libraryMeta";
-  import { TEST_SYMBOL, testSummary } from "$lib/testStatus";
+  import type { GameTest } from "#lib/stores/libraryMeta.ts";
+  import { TEST_SYMBOL, testSummary } from "#lib/testStatus.ts";
 
   let { test, onImage = false }: { test: GameTest; onImage?: boolean } = $props();
 

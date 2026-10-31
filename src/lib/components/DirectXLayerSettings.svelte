@@ -1,12 +1,12 @@
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
+  import * as m from "#lib/paraglide/messages.js";
   import { onMount } from "svelte";
   import {
     directXLayers,
     refreshDirectXLayers,
     updateDirectXLayers,
-  } from "$lib/stores/directxLayers";
-  import { backendError } from "$lib/i18n/index.svelte";
+  } from "#lib/stores/directxLayers.ts";
+  import { backendError } from "#lib/i18n/index.svelte.ts";
 
   let updating = $state(false);
   let error = $state<unknown>(null);

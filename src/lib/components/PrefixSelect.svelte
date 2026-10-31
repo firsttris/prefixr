@@ -8,12 +8,12 @@
   `first` renders the options before them (a placeholder, "new prefix").
 -->
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
+  import * as m from "#lib/paraglide/messages.js";
   import { onMount, type Snippet } from "svelte";
   import { get } from "svelte/store";
-  import { prefixes } from "$lib/stores/prefixes";
-  import { games, refreshGames } from "$lib/stores/games";
-  import { listedPath, pickerFallback, prefixOptions } from "$lib/prefixView";
+  import { prefixes } from "#lib/stores/prefixes.ts";
+  import { games, refreshGames } from "#lib/stores/games.ts";
+  import { listedPath, pickerFallback, prefixOptions } from "#lib/prefixView.ts";
 
   let {
     value = $bindable(),

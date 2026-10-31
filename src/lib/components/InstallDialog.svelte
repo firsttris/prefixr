@@ -1,18 +1,18 @@
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
-  import RunnerSelect from "$lib/components/RunnerSelect.svelte";
-  import PrefixSelect from "$lib/components/PrefixSelect.svelte";
+  import * as m from "#lib/paraglide/messages.js";
+  import RunnerSelect from "#lib/components/RunnerSelect.svelte";
+  import PrefixSelect from "#lib/components/PrefixSelect.svelte";
   import { onMount } from "svelte";
-  import { loadAll } from "$lib/load";
+  import { loadAll } from "#lib/load.ts";
   import { open } from "@tauri-apps/plugin-dialog";
-  import { refreshPrefixes, addPrefix } from "$lib/stores/prefixes";
-  import { refreshRunners } from "$lib/stores/runners";
-  import { runInstaller } from "$lib/stores/games";
-  import { prettifyExeName } from "$lib/gameName";
-  import { showLog } from "$lib/logViewer";
+  import { refreshPrefixes, addPrefix } from "#lib/stores/prefixes.ts";
+  import { refreshRunners } from "#lib/stores/runners.ts";
+  import { runInstaller } from "#lib/stores/games.ts";
+  import { prettifyExeName } from "#lib/gameName.ts";
+  import { showLog } from "#lib/logViewer.ts";
   import GameForm from "./GameForm.svelte";
-  import type { DetectedShortcut } from "$lib/types";
-  import { backendError } from "$lib/i18n/index.svelte";
+  import type { DetectedShortcut } from "#lib/types.ts";
+  import { backendError } from "#lib/i18n/index.svelte.ts";
 
   let {
     exePath,

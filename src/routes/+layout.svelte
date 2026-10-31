@@ -2,7 +2,7 @@
   import "../app.css";
   import type { Snippet } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
-  import { getLocale } from "$lib/i18n/index.svelte";
+  import { getLocale } from "#lib/i18n/index.svelte.ts";
 
   let { children }: { children: Snippet } = $props();
 

@@ -1,9 +1,9 @@
 <!-- Renames and deletes the library's categories. -->
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
-  import type { Category } from "$lib/types";
-  import { createCategory, deleteCategory, renameCategory } from "$lib/stores/libraryMeta";
-  import { backendError } from "$lib/i18n/index.svelte";
+  import * as m from "#lib/paraglide/messages.js";
+  import type { Category } from "#lib/types.ts";
+  import { createCategory, deleteCategory, renameCategory } from "#lib/stores/libraryMeta.ts";
+  import { backendError } from "#lib/i18n/index.svelte.ts";
   import Modal from "./Modal.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
 

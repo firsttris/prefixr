@@ -8,8 +8,8 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn() }));
 
-const meta = await import("$lib/stores/libraryMeta");
-import type { Game, LibraryConfig } from "$lib/types";
+const meta = await import("#lib/stores/libraryMeta.ts");
+import type { Game, LibraryConfig } from "#lib/types.ts";
 
 const library = (favorites: string[]): LibraryConfig => ({
   categories: [{ id: "k", name: "Kinder", games: ["a"] }],

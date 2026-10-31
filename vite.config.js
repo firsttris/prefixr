@@ -1,5 +1,7 @@
 import { defineConfig } from "vite";
 import { sveltekit } from "@sveltejs/kit/vite";
+import adapter from "@sveltejs/adapter-static";
+import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import { paraglideVitePlugin } from "@inlang/paraglide-js";
 import process from "node:process";
 const host = process.env.TAURI_DEV_HOST;
@@ -14,7 +16,15 @@ export default defineConfig(() => ({
       outdir: "./src/lib/paraglide",
       strategy: ["baseLocale"],
     }),
-    sveltekit(),
+    // SvelteKit 3 takes its configuration here instead of svelte.config.js. Tauri has no Node.js
+    // server for SSR, so adapter-static with a fallback to index.html puts the site in SPA mode
+    // (https://svelte.dev/docs/kit/single-page-apps, https://v2.tauri.app/start/frontend/sveltekit/).
+    sveltekit({
+      preprocess: vitePreprocess(),
+      adapter: adapter({
+        fallback: "index.html",
+      }),
+    }),
   ],
 
   // Only the project's own tests: flatpak-builder keeps whole copies of the repo in

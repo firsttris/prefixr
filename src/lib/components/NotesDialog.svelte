@@ -1,7 +1,7 @@
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
-  import { parseNotes } from "$lib/notes";
-  import type { Game } from "$lib/types";
+  import * as m from "#lib/paraglide/messages.js";
+  import { parseNotes } from "#lib/notes.ts";
+  import type { Game } from "#lib/types.ts";
   import Modal from "./Modal.svelte";
 
   let {

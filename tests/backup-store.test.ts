@@ -21,7 +21,7 @@ globalThis.sessionStorage = {
 const reload = vi.fn();
 globalThis.location = { reload } as unknown as Location;
 
-const backup = await import("$lib/stores/backup");
+const backup = await import("#lib/stores/backup.ts");
 
 const info = { path: "/b/x.tar.gz", file_name: "x.tar.gz", created_at: 1, reason: "manual" };
 

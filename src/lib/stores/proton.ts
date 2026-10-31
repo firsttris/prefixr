@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { writable } from "svelte/store";
-import type { ProtonConfig, ProtonOption } from "$lib/types";
+import type { ProtonConfig, ProtonOption } from "#lib/types.ts";
 
 export const protonConfig = writable<ProtonConfig | null>(null);
 

@@ -1,7 +1,7 @@
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
+  import * as m from "#lib/paraglide/messages.js";
   import type { Snippet } from "svelte";
-  import { isTopLayer, openLayer, trapTab } from "$lib/layers";
+  import { isTopLayer, openLayer, trapTab } from "#lib/layers.ts";
 
   let {
     open,

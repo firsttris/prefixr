@@ -3,30 +3,30 @@
 </script>
 
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
-  import RunnerSelect from "$lib/components/RunnerSelect.svelte";
-  import PrefixSelect from "$lib/components/PrefixSelect.svelte";
-  import Message from "$lib/components/Message.svelte";
+  import * as m from "#lib/paraglide/messages.js";
+  import RunnerSelect from "#lib/components/RunnerSelect.svelte";
+  import PrefixSelect from "#lib/components/PrefixSelect.svelte";
+  import Message from "#lib/components/Message.svelte";
   import { onMount, untrack } from "svelte";
-  import { loadAll } from "$lib/load";
+  import { loadAll } from "#lib/load.ts";
   import { open } from "@tauri-apps/plugin-dialog";
-  import { runners, refreshRunners } from "$lib/stores/runners";
-  import { prefixes, refreshPrefixes } from "$lib/stores/prefixes";
-  import { addGame, updateGame } from "$lib/stores/games";
-  import { performanceConfig, refreshPerformanceConfig } from "$lib/stores/performance";
-  import { graphicsConfig, refreshGraphicsConfig } from "$lib/stores/graphics";
-  import { mangoHudConfig, refreshMangoHudConfig } from "$lib/stores/mangohud";
-  import { listProtonOptions, protonConfig, refreshProtonConfig } from "$lib/stores/proton";
-  import { prettifyExeName } from "$lib/gameName";
-  import { formatEnvVars, parseEnvVars } from "$lib/envVars";
-  import { PRESETS } from "$lib/mangohudPresets";
-  import { onOff, sameBlock, sameFields, type OverrideHooks } from "$lib/settings";
-  import { backendError } from "$lib/i18n/index.svelte";
-  import PerformanceEditor from "$lib/components/PerformanceEditor.svelte";
-  import GraphicsEditor from "$lib/components/GraphicsEditor.svelte";
-  import OverlayEditor from "$lib/components/OverlayEditor.svelte";
-  import ProtonEditor from "$lib/components/ProtonEditor.svelte";
-  import UmuIdPicker from "$lib/components/UmuIdPicker.svelte";
+  import { runners, refreshRunners } from "#lib/stores/runners.ts";
+  import { prefixes, refreshPrefixes } from "#lib/stores/prefixes.ts";
+  import { addGame, updateGame } from "#lib/stores/games.ts";
+  import { performanceConfig, refreshPerformanceConfig } from "#lib/stores/performance.ts";
+  import { graphicsConfig, refreshGraphicsConfig } from "#lib/stores/graphics.ts";
+  import { mangoHudConfig, refreshMangoHudConfig } from "#lib/stores/mangohud.ts";
+  import { listProtonOptions, protonConfig, refreshProtonConfig } from "#lib/stores/proton.ts";
+  import { prettifyExeName } from "#lib/gameName.ts";
+  import { formatEnvVars, parseEnvVars } from "#lib/envVars.ts";
+  import { PRESETS } from "#lib/mangohudPresets.ts";
+  import { onOff, sameBlock, sameFields, type OverrideHooks } from "#lib/settings.ts";
+  import { backendError } from "#lib/i18n/index.svelte.ts";
+  import PerformanceEditor from "#lib/components/PerformanceEditor.svelte";
+  import GraphicsEditor from "#lib/components/GraphicsEditor.svelte";
+  import OverlayEditor from "#lib/components/OverlayEditor.svelte";
+  import ProtonEditor from "#lib/components/ProtonEditor.svelte";
+  import UmuIdPicker from "#lib/components/UmuIdPicker.svelte";
   import type {
     Game,
     GameInput,
@@ -40,7 +40,7 @@
     PerformanceOverrides,
     ProtonOption,
     VkBasaltSettings,
-  } from "$lib/types";
+  } from "#lib/types.ts";
 
   let {
     existingGame,

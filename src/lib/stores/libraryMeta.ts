@@ -7,8 +7,8 @@ import type {
   StoreGame,
   TestResult,
   TestStatus,
-} from "$lib/types";
-import { storeGameKey } from "$lib/stores/gameStores";
+} from "#lib/types.ts";
+import { storeGameKey } from "#lib/stores/gameStores.ts";
 
 // How the library is organized (categories, favorites, hidden games),
 // played and tested (see `commands::library`), plus what's known about how well its

@@ -1,16 +1,16 @@
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
-  import InfoIcon from "$lib/components/InfoIcon.svelte";
-  import SettingToggle from "$lib/components/SettingToggle.svelte";
-  import ExtensionHint from "$lib/components/ExtensionHint.svelte";
-  import type { OverrideHooks } from "$lib/settings";
+  import * as m from "#lib/paraglide/messages.js";
+  import InfoIcon from "#lib/components/InfoIcon.svelte";
+  import SettingToggle from "#lib/components/SettingToggle.svelte";
+  import ExtensionHint from "#lib/components/ExtensionHint.svelte";
+  import type { OverrideHooks } from "#lib/settings.ts";
   import type {
     GamescopeSettings,
     GraphicsConfig,
     GraphicsOverrides,
     LaunchMonitor,
     VkBasaltSettings,
-  } from "$lib/types";
+  } from "#lib/types.ts";
 
   // Bild — see settings.ts for how the editors are shared between the global
   // page and the game dialog. gamescope and vkBasalt are each overridden as

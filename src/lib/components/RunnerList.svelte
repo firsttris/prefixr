@@ -1,18 +1,18 @@
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
-  import Message from "$lib/components/Message.svelte";
+  import * as m from "#lib/paraglide/messages.js";
+  import Message from "#lib/components/Message.svelte";
   import { onMount } from "svelte";
-  import { loadAll } from "$lib/load";
-  import { runners, refreshRunners, deleteRunner } from "$lib/stores/runners";
-  import { games, refreshGames } from "$lib/stores/games";
-  import type { Runner } from "$lib/types";
+  import { loadAll } from "#lib/load.ts";
+  import { runners, refreshRunners, deleteRunner } from "#lib/stores/runners.ts";
+  import { games, refreshGames } from "#lib/stores/games.ts";
+  import type { Runner } from "#lib/types.ts";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import Modal from "./Modal.svelte";
   import RunnerDownloads from "./RunnerDownloads.svelte";
   import GitHubSettings from "./GitHubSettings.svelte";
   import UmuSettings from "./UmuSettings.svelte";
   import DirectXLayerSettings from "./DirectXLayerSettings.svelte";
-  import { backendError } from "$lib/i18n/index.svelte";
+  import { backendError } from "#lib/i18n/index.svelte.ts";
 
   let showDownloads = $state(false);
   let deleting = $state<Runner | null>(null);
