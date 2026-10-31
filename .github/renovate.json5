@@ -1,21 +1,19 @@
 // Renovate (GitHub App, https://github.com/apps/renovate): a pull request for each new release of
-// what Prefixr builds on, plus the "Dependency Dashboard" issue listing what is open.
-// Only those: the store tools Prefixr downloads at pinned, checksum-verified versions (Legendary,
-// gogdl, Nile in src-tauri/src/commands/stores/helpers.rs), the GNOME runtime of the Flatpak
-// (manifests, CI image, docs), Flathub's shared-modules, the 7-Zip and cabextract the Flatpak
-// builds for winetricks, Bun (CI) and Tauri. Wine/Proton runners, umu-launcher and DXVK/VKD3D are
-// fetched by the app at runtime (newest release), so nothing is pinned for them. The other crates
-// and packages and the actions are not tracked here. A store tool's sha256 and the Flatpak's
-// offline sources cannot be made by Renovate: renovate-pins.yml adds them on the Renovate branch.
+// what Prefixr builds on, plus the "Dependency Dashboard" issue listing what is open. Their own
+// pull requests: the store tools Prefixr downloads at pinned, checksum-verified versions
+// (Legendary, gogdl, Nile in src-tauri/src/commands/stores/helpers.rs), the GNOME runtime of the
+// Flatpak (manifests, CI image, docs), Flathub's shared-modules, the 7-Zip and cabextract the
+// Flatpak builds for winetricks, Bun (CI) and Tauri. Wine/Proton runners, umu-launcher and
+// DXVK/VKD3D are fetched by the app at runtime (newest release), so nothing is pinned for them. A
+// store tool's sha256 and the Flatpak's offline sources cannot be made by Renovate:
+// renovate-pins.yml adds them on the Renovate branch.
+// Everything else (the other packages, the actions, the images) comes with the shared settings of
+// firsttris/workflows (renovate/default.json5): minor and patch updates once a month in one pull
+// request that merges itself when CI is green, majors on request in the dashboard.
 // Check with `npx --package renovate renovate-config-validator .github/renovate.json5`.
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
-  extends: ["config:recommended"],
-  enabledManagers: ["cargo", "bun", "git-submodules", "custom.regex"],
-  timezone: "Europe/Berlin",
-  labels: ["dependencies"],
-  // Nothing merges itself: each of these needs the checks in its pull request read by a person
-  automerge: false,
+  extends: ["github>firsttris/workflows//renovate/default.json5"],
   // flatpak/shared-modules (Renovate leaves submodules alone unless told)
   "git-submodules": {
     enabled: true,
@@ -76,17 +74,15 @@
   ],
   packageRules: [
     {
-      // From the package managers only Tauri (below)
-      matchManagers: ["cargo", "bun"],
-      enabled: false,
-    },
-    {
       matchPackageNames: ["Heroic-Games-Launcher/legendary"],
       groupName: "Legendary",
       commitMessageTopic: "Legendary",
       prBodyNotes: [
         "`renovate-pins.yml` sets the sha256 of both downloads on this branch. Before merging: read the release notes (Epic login, `launch --json`, install and uninstall); connect Epic in Settings → Stores with the build of this PR, install a small game, start it and uninstall it. The new version is downloaded on the next connect (one file per version in `helpers/`).",
       ],
+      schedule: ["at any time"],
+      automerge: false,
+      dependencyDashboardApproval: false,
     },
     {
       matchPackageNames: ["Heroic-Games-Launcher/heroic-gogdl"],
@@ -95,6 +91,9 @@
       prBodyNotes: [
         "`renovate-pins.yml` sets the sha256 of both downloads on this branch. Before merging: read the release notes (`auth`, `info`, `download` and its progress lines, which `gog.rs` parses); connect GOG with the build of this PR, install a game with DLCs, start it.",
       ],
+      schedule: ["at any time"],
+      automerge: false,
+      dependencyDashboardApproval: false,
     },
     {
       matchPackageNames: ["imLinguin/nile"],
@@ -103,6 +102,9 @@
       prBodyNotes: [
         "`renovate-pins.yml` sets the sha256 of both downloads on this branch. Before merging: read the release notes (login, library sync, install, `fuel.json`); connect Amazon Games with the build of this PR, install and start a game.",
       ],
+      schedule: ["at any time"],
+      automerge: false,
+      dependencyDashboardApproval: false,
     },
     {
       matchPackageNames: ["ghcr.io/flathub-infra/flatpak-github-actions"],
@@ -112,6 +114,9 @@
       prBodyNotes: [
         "The manifests, the image of the Flatpak workflow, docs/development.md and the comment in `flatpak_extensions.rs` move together. Before merging: if the new runtime is on a new freedesktop branch, change `26.08` with it by hand (both manifests' `add-extensions`, `EXTENSION_BRANCH` and the gamescope command in `flatpak_extensions.rs`, docs/development.md), and check that `org.freedesktop.Sdk.Extension.node24`, `rust-stable`, `Platform.Compat.i386`, `GL32` and the VulkanLayer extensions (MangoHud, gamescope, vkBasalt) exist for it. The Flatpak workflow of this PR builds the bundle; then start a game with Proton from it.",
       ],
+      schedule: ["at any time"],
+      automerge: false,
+      dependencyDashboardApproval: false,
     },
     {
       matchManagers: ["git-submodules"],
@@ -120,12 +125,19 @@
       prBodyNotes: [
         "libayatana-appindicator (tray icon) comes from here. The Flatpak workflow of this PR builds it; check the tray icon of the bundle.",
       ],
+      schedule: ["at any time"],
+      automerge: false,
+      dependencyDashboardApproval: false,
     },
     {
       matchPackageNames: ["ip7z/7zip", "kyz/libmspack"],
       prBodyNotes: [
         "winetricks uses it in the Flatpak. The Flatpak workflow of this PR builds it; with the bundle, run a winetricks verb that unpacks a cab or 7z (e.g. `vcrun2022`).",
       ],
+      groupName: "7zip",
+      schedule: ["at any time"],
+      automerge: false,
+      dependencyDashboardApproval: false,
     },
     {
       matchPackageNames: ["oven-sh/bun"],
@@ -134,6 +146,9 @@
       prBodyNotes: [
         "The Bun of CI, the release and the Flatpak workflow's source check (`lock-from-bun.py` reads `bun.lock`). If the source check fails, a new `bun.lock` format may need a change in `flatpak/lock-from-bun.py`.",
       ],
+      schedule: ["at any time"],
+      automerge: false,
+      dependencyDashboardApproval: false,
     },
     {
       // Tauri: the crates and the npm packages in one PR, since the CLI wants them on matching
@@ -146,6 +161,9 @@
       prBodyNotes: [
         "`renovate-pins.yml` regenerates `package-lock.json`, `flatpak/cargo-sources.json` and `node-sources.json` for the new lock files on this branch (flatpak/update-sources.sh) and starts CI and the Flatpak workflow. Before merging: try the tray, single instance, the dialogs and the remembered window in the AppImage or the bundle.",
       ],
+      schedule: ["at any time"],
+      automerge: false,
+      dependencyDashboardApproval: false,
     },
   ],
 }
