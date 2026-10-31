@@ -47,10 +47,10 @@ jobs:
     # `inputs` is empty outside workflow_call, and `null != false` is false in a workflow
     # expression, so the input is compared as text.
     if: ${{ !github.event.pull_request.draft && format('{0}', inputs.check-sources) != 'false' }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -58,9 +58,9 @@ jobs:
           bun-version: 1.4.4
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: 26
 
       - name: Install flatpak-builder-tools
         run: |
@@ -92,13 +92,13 @@ jobs:
   bundle:
     name: Build the Flatpak bundle
     if: ${{ !github.event.pull_request.draft }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-51
       options: --privileged
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           submodules: true
 
