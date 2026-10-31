@@ -23,6 +23,8 @@ on:
       - "mkdocs.yml"
       - "requirements-docs.txt"
       - ".github/workflows/docs.yml"
+  # On a Renovate branch after renovate-pins.yml committed (its push starts no workflow)
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -44,6 +46,8 @@ jobs:
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
