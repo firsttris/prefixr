@@ -59,7 +59,7 @@
       customType: "regex",
       managerFilePatterns: ["/^flatpak/[^/]+\\.ya?ml$/"],
       matchStrings: [
-        "url: https://github\\.com/(?<depName>[^/\\s]+/[^/\\s]+?)\\.git\\n\\s+tag: \"?(?<currentValue>[^\"\\n]+)\"?\\n\\s+commit: (?<currentDigest>[0-9a-f]{40})",
+        'url: https://github\\.com/(?<depName>[^/\\s]+/[^/\\s]+?)\\.git\\n\\s+tag: "?(?<currentValue>[^"\\n]+)"?\\n\\s+commit: (?<currentDigest>[0-9a-f]{40})',
       ],
       datasourceTemplate: "github-tags",
       versioningTemplate: "loose",
