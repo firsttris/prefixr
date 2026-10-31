@@ -1,0 +1,104 @@
+name: Renovate · pins and Flatpak sources
+
+# On a Renovate branch (.github/renovate.json5): Renovate changes versions and lock files only.
+# This sets the sha256 of a store tool's downloads (src-tauri/src/commands/stores/helpers.rs, which
+# Prefixr checks every download against) and regenerates package-lock.json and the Flatpak's
+# offline sources after a lock file changed (flatpak/update-sources.sh), commits them and starts CI
+# and the Flatpak workflow on the new commit. A commit pushed with the workflow's token starts no
+# workflow by itself, hence the explicit runs.
+on:
+  push:
+    branches: ["renovate/**"]
+    paths:
+      - "src-tauri/src/commands/stores/helpers.rs"
+      - "src-tauri/Cargo.lock"
+      - "bun.lock"
+      - "package.json"
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: renovate-pins-${{ github.ref }}
+
+jobs:
+  pins:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: What changed against main
+        id: changed
+        run: |
+          git fetch -q --depth 1 origin main
+          changed() { git diff --quiet FETCH_HEAD -- "$@" && echo false || echo true; }
+          echo "helpers=$(changed src-tauri/src/commands/stores/helpers.rs)" >> "$GITHUB_OUTPUT"
+          echo "locks=$(changed src-tauri/Cargo.lock bun.lock package.json)" >> "$GITHUB_OUTPUT"
+
+      - name: sha256 of the store tools' downloads
+        if: steps.changed.outputs.helpers == 'true'
+        run: |
+          python3 - <<'PY'
+          import hashlib, re, sys, urllib.request
+          path = "src-tauri/src/commands/stores/helpers.rs"
+          text = open(path).read()
+          pin = re.compile(r'(url: "(https://github\.com/[^"]+)",\s*sha256: ")([0-9a-f]{64})"')
+          def fresh(match):
+              url = match.group(2)
+              with urllib.request.urlopen(url) as response:
+                  sha = hashlib.sha256(response.read()).hexdigest()
+              print(url, sha)
+              return f'{match.group(1)}{sha}"'
+          new, count = pin.subn(fresh, text)
+          if count == 0:
+              sys.exit(f"no url/sha256 pairs in {path}")
+          open(path, "w").write(new)
+          PY
+
+      - uses: oven-sh/setup-bun@v2
+        if: steps.changed.outputs.locks == 'true'
+        with:
+          bun-version: 1.4.4
+
+      - uses: actions/setup-node@v4
+        if: steps.changed.outputs.locks == 'true'
+        with:
+          node-version: 24
+
+      - name: Install flatpak-builder-tools
+        if: steps.changed.outputs.locks == 'true'
+        run: |
+          set -euo pipefail
+          # The commit flatpak.yml checks the sources with, patched the same way
+          commit=$(sed -n 's/^  FBT_COMMIT: //p' .github/workflows/flatpak.yml)
+          git init -q "$RUNNER_TEMP/fbt"
+          git -C "$RUNNER_TEMP/fbt" fetch -q --depth 1 https://github.com/flatpak/flatpak-builder-tools.git "$commit"
+          git -C "$RUNNER_TEMP/fbt" checkout -q FETCH_HEAD
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install -q "$RUNNER_TEMP/fbt/node" aiohttp tomlkit PyYAML
+          sed -i 's#https://github.com/microsoft/playwright/raw/#https://raw.githubusercontent.com/microsoft/playwright/#' \
+            "$RUNNER_TEMP"/venv/lib/python3*/site-packages/flatpak_node_generator/providers/special.py
+          echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
+          echo "FBT=$RUNNER_TEMP/fbt" >> "$GITHUB_ENV"
+
+      - name: Regenerate the Flatpak sources
+        if: steps.changed.outputs.locks == 'true'
+        run: flatpak/update-sources.sh
+
+      - name: Commit and start CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # update-sources.sh installs node_modules; only tracked files are committed
+          if git diff --quiet; then
+            echo "sha256 and sources already match"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "Pins and Flatpak sources for the Renovate update"
+          git push
+          gh workflow run ci.yml --ref "$GITHUB_REF_NAME"
+          gh workflow run flatpak.yml --ref "$GITHUB_REF_NAME"

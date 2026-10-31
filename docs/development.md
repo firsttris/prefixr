@@ -268,7 +268,12 @@ The manifest builds from the checkout without network access, as Flathub require
   checksums from `bun.lock` and fails on any difference.
 - After changing `bun.lock` or `Cargo.lock`, run `flatpak/update-sources.sh` (with
   [flatpak-builder-tools](https://github.com/flatpak/flatpak-builder-tools) in `FBT`) and commit the
-  results. The `Flatpak` workflow checks that they match.
+  results. The `Flatpak` workflow checks that they match. On Renovate's branches
+  `renovate-pins.yml` does this by itself.
+- Renovate (`.github/renovate.json5`) opens the pull requests for a new GNOME runtime (manifests,
+  CI image, this page), the shared-modules submodule, 7-Zip, cabextract, Bun and Tauri, and for a
+  new Legendary, gogdl or Nile (their sha256 come from `renovate-pins.yml`); each lists what to
+  check before merging. unrar (rarlab.com) has no release feed Renovate reads: update it by hand.
 - `flatpak/spike/io.github.firsttris.Prefixr.yml` repackages a local `.deb` instead
   (`bun run tauri build --bundles deb` first). It's quicker for trying a change, not for releases.
 
