@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   tested:
-    uses: firsttris/workflows/.github/workflows/tested-on-main.yml@ccr-161f105b-9ns022
+    uses: firsttris/workflows/.github/workflows/tested-on-main.yml@v1
     permissions:
       actions: read
       contents: read
@@ -51,7 +51,7 @@ jobs:
       # The packages come from the Actions cache: the Ubuntu mirror is sometimes very slow (this
       # step once took 12 minutes)
       - name: Install Linux system dependencies for Tauri
-        uses: firsttris/workflows/actions/apt-install@ccr-161f105b-9ns022
+        uses: firsttris/workflows/actions/apt-install@v1
         with:
           packages: |
             libwebkit2gtk-4.1-dev
