@@ -398,7 +398,7 @@ fn compute_digest(path: &Path, algorithm: ChecksumAlgorithm) -> Result<String, S
                 }
                 hasher.update(&buf[..n]);
             }
-            format!("{:x}", hasher.finalize())
+            hex::encode(hasher.finalize())
         }};
     }
 

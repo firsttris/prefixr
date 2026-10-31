@@ -140,7 +140,7 @@ pub fn asset_for<'a>(helper: &'a Helper, arch: &str) -> Option<&'a HelperAsset> 
 
 /// Whether `bytes` are what `asset` pins.
 pub fn verify(asset: &HelperAsset, bytes: &[u8]) -> Result<(), String> {
-    let actual = format!("{:x}", Sha256::digest(bytes));
+    let actual = hex::encode(Sha256::digest(bytes));
     if actual.eq_ignore_ascii_case(asset.sha256) {
         Ok(())
     } else {
