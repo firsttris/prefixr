@@ -76,16 +76,16 @@ pub const LEGENDARY: Helper = Helper {
 pub const GOGDL: Helper = Helper {
     name: "gogdl",
     display_name: "gogdl",
-    version: "1.3.1",
+    version: "1.4.0",
     assets: &[
         HelperAsset {
             arch: "x86_64",
-            url: "https://github.com/Heroic-Games-Launcher/heroic-gogdl/releases/download/v1.3.1/gogdl_linux_x86_64",
+            url: "https://github.com/Heroic-Games-Launcher/heroic-gogdl/releases/download/v1.4.0/gogdl_linux_x86_64",
             sha256: "7a6f22da4943bdb4c00baf6250fcee7085c1104ba2ac401479e70ec96e722b59",
         },
         HelperAsset {
             arch: "aarch64",
-            url: "https://github.com/Heroic-Games-Launcher/heroic-gogdl/releases/download/v1.3.1/gogdl_linux_arm64",
+            url: "https://github.com/Heroic-Games-Launcher/heroic-gogdl/releases/download/v1.4.0/gogdl_linux_arm64",
             sha256: "9c70af33f5ca74d08236b4d50ca5f54262d9b4712d4a34c479e4263792fe55fc",
         },
     ],
