@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import * as m from "$lib/paraglide/messages";
-  import { loadMissingExtensions, missingExtensions } from "$lib/stores/flatpakExtensions";
+  import * as m from "#lib/paraglide/messages.js";
+  import { loadMissingExtensions, missingExtensions } from "#lib/stores/flatpakExtensions.ts";
 
   // Shown below an enabled tool whose Flathub extension the Flatpak lacks.
   let { tool, name }: { tool: "gamescope" | "mangohud" | "vkbasalt"; name: string } = $props();

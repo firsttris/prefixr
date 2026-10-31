@@ -6,11 +6,11 @@
   with the explanation of what a prefix is, as it only matters then.
 -->
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
-  import Message from "$lib/components/Message.svelte";
-  import Menu from "$lib/components/Menu.svelte";
+  import * as m from "#lib/paraglide/messages.js";
+  import Message from "#lib/components/Message.svelte";
+  import Menu from "#lib/components/Menu.svelte";
   import { onDestroy, onMount, tick } from "svelte";
-  import { loadAll } from "$lib/load";
+  import { loadAll } from "#lib/load.ts";
   import { open } from "@tauri-apps/plugin-dialog";
   import { revealItemInDir } from "@tauri-apps/plugin-opener";
   import {
@@ -20,14 +20,14 @@
     refreshPrefixStates,
     addPrefix,
     deletePrefix,
-  } from "$lib/stores/prefixes";
-  import { games, refreshGames } from "$lib/stores/games";
-  import { showLog } from "$lib/logViewer";
-  import Modal from "$lib/components/Modal.svelte";
-  import WinetricksInstaller from "$lib/components/WinetricksInstaller.svelte";
-  import WineToolsLauncher from "$lib/components/WineToolsLauncher.svelte";
-  import { backendError } from "$lib/i18n/index.svelte";
-  import { isOneOf, loadSetting, saveSetting } from "$lib/persisted";
+  } from "#lib/stores/prefixes.ts";
+  import { games, refreshGames } from "#lib/stores/games.ts";
+  import { showLog } from "#lib/logViewer.ts";
+  import Modal from "#lib/components/Modal.svelte";
+  import WinetricksInstaller from "#lib/components/WinetricksInstaller.svelte";
+  import WineToolsLauncher from "#lib/components/WineToolsLauncher.svelte";
+  import { backendError } from "#lib/i18n/index.svelte.ts";
+  import { isOneOf, loadSetting, saveSetting } from "#lib/persisted.ts";
   import {
     filterCounts,
     groupByRoot,
@@ -41,8 +41,8 @@
     type PrefixEntry,
     type PrefixFilter,
     type PrefixSort,
-  } from "$lib/prefixView";
-  import type { Game } from "$lib/types";
+  } from "#lib/prefixView.ts";
+  import type { Game } from "#lib/types.ts";
 
   let {
     focusPath = null,

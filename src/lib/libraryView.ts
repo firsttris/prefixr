@@ -1,5 +1,5 @@
-import type { Game, LibraryConfig, StoreGame, StoreKind, TestStatus } from "$lib/types";
-import { TEST_STATUSES, gameKey, storeEntryKey, testOf } from "$lib/stores/libraryMeta";
+import type { Game, LibraryConfig, StoreGame, StoreKind, TestStatus } from "#lib/types.ts";
+import { TEST_STATUSES, gameKey, storeEntryKey, testOf } from "#lib/stores/libraryMeta.ts";
 
 // What the library shows: every game, installed or not, filtered by the
 // toolbar's choices, sorted, and split into the installed ones and the

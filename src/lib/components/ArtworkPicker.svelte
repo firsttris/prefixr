@@ -1,7 +1,7 @@
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
+  import * as m from "#lib/paraglide/messages.js";
   import { onMount, untrack } from "svelte";
-  import type { ArtworkKind, Game, SteamGridDbGameMatch, SteamGridDbGrid } from "$lib/types";
+  import type { ArtworkKind, Game, SteamGridDbGameMatch, SteamGridDbGrid } from "#lib/types.ts";
   import {
     searchSteamGridDbGames,
     listSteamGridDbGrids,
@@ -13,9 +13,9 @@
     listSteamGridDbArtwork,
     setGameArtwork,
     removeGameArtwork,
-  } from "$lib/stores/steamgriddb";
-  import { prettifyExeName } from "$lib/gameName";
-  import { backendError } from "$lib/i18n/index.svelte";
+  } from "#lib/stores/steamgriddb.ts";
+  import { prettifyExeName } from "#lib/gameName.ts";
+  import { backendError } from "#lib/i18n/index.svelte.ts";
 
   let { game, onDone }: { game: Game; onDone: () => void } = $props();
 

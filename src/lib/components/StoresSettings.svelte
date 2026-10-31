@@ -3,7 +3,7 @@
   library, where they're installed like any other download.
 -->
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
+  import * as m from "#lib/paraglide/messages.js";
   import { onMount } from "svelte";
   import {
     storeAccounts,
@@ -14,10 +14,10 @@
     disconnectStore,
     syncStoreLibrary,
     storeName,
-  } from "$lib/stores/gameStores";
-  import { backendError } from "$lib/i18n/index.svelte";
+  } from "#lib/stores/gameStores.ts";
+  import { backendError } from "#lib/i18n/index.svelte.ts";
   import ConfirmDialog from "./ConfirmDialog.svelte";
-  import type { StoreAccount, StoreKind } from "$lib/types";
+  import type { StoreAccount, StoreKind } from "#lib/types.ts";
 
   let loading = $state(true);
   let loadError = $state<unknown>(null);

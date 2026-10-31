@@ -4,9 +4,9 @@
   to try again or dismiss.
 -->
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
+  import * as m from "#lib/paraglide/messages.js";
   import { untrack } from "svelte";
-  import type { StoreGame } from "$lib/types";
+  import type { StoreGame } from "#lib/types.ts";
   import {
     cancelStoreInstall,
     dismissStoreInstallError,
@@ -17,10 +17,10 @@
     storeInstallErrors,
     storeInstalls,
     storeName,
-  } from "$lib/stores/gameStores";
-  import { storeEntryKey } from "$lib/stores/libraryMeta";
-  import { addSample, estimate, formatDuration, type Sample } from "$lib/downloadRate";
-  import { backendError, getLocale } from "$lib/i18n/index.svelte";
+  } from "#lib/stores/gameStores.ts";
+  import { storeEntryKey } from "#lib/stores/libraryMeta.ts";
+  import { addSample, estimate, formatDuration, type Sample } from "#lib/downloadRate.ts";
+  import { backendError, getLocale } from "#lib/i18n/index.svelte.ts";
   import GameFallbackIcon from "./GameFallbackIcon.svelte";
 
   let { onInstallStoreGame }: { onInstallStoreGame: (game: StoreGame) => void } = $props();

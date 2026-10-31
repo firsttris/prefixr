@@ -37,16 +37,16 @@ impl GameControl {
 }
 
 /// The game's D-Bus name, owned for as long as this lives.
-pub struct GameName(#[allow(dead_code)] zbus::blocking::Connection);
+pub struct GameName(#[allow(dead_code)] zbus::Connection);
 
 /// Takes the game's D-Bus name for this process. `None` if the session bus
 /// isn't there or the name is taken; `game stop` then reports the game as
 /// running elsewhere, as before.
 pub fn serve(app: &AppHandle, app_id: &str, id: Uuid) -> Option<GameName> {
-    zbus::blocking::connection::Builder::session()
-        .ok()?
+    // zbus 6 has no blocking API any more: block_on builds the connection, and a helper thread
+    // of zbus's serves the interface while the connection lives (zbus::block_on's docs)
+    let builder = zbus::connection::Builder::session()
         .name(bus_name(app_id, id))
-        .ok()?
         // Never take the name from an instance that already runs the game
         // (zbus would by default), which `game stop` then couldn't reach.
         .replace_existing_names(false)
@@ -57,28 +57,26 @@ pub fn serve(app: &AppHandle, app_id: &str, id: Uuid) -> Option<GameName> {
                 app: app.clone(),
                 id,
             },
-        )
-        .ok()?
-        .build()
-        .ok()
-        .map(GameName)
+        );
+    zbus::block_on(builder.build()).ok().map(GameName)
 }
 
 /// Asks the Prefixr process that runs the game to stop it; whether one
 /// took the request.
 pub fn request_stop(app_id: &str, id: Uuid) -> bool {
-    let Ok(connection) = zbus::blocking::Connection::session() else {
-        return false;
-    };
-    connection
-        .call_method(
-            Some(bus_name(app_id, id).as_str()),
-            PATH,
-            Some(INTERFACE),
-            "Stop",
-            &(),
-        )
-        .is_ok()
+    zbus::block_on(async {
+        let connection = zbus::Connection::session().await?;
+        connection
+            .call_method(
+                Some(bus_name(app_id, id).as_str()),
+                PATH,
+                Some(INTERFACE),
+                "Stop",
+                &(),
+            )
+            .await
+    })
+    .is_ok()
 }
 
 #[cfg(test)]

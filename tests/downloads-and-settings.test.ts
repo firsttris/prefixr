@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { addSample, estimate, formatDuration } from "$lib/downloadRate";
-import { isNumberIn, isOneOf, isStringList, loadSetting, saveSetting } from "$lib/persisted";
+import { addSample, estimate, formatDuration } from "#lib/downloadRate.ts";
+import { isNumberIn, isOneOf, isStringList, loadSetting, saveSetting } from "#lib/persisted.ts";
 
 describe("download speed", () => {
   it("needs two samples a few seconds apart and a known size", () => {

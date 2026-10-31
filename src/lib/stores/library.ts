@@ -1,7 +1,7 @@
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { refreshGames, refreshSteamGames } from "$lib/stores/games";
-import { refreshPrefixes } from "$lib/stores/prefixes";
-import { refreshLibraryMeta } from "$lib/stores/libraryMeta";
+import { refreshGames, refreshSteamGames } from "#lib/stores/games.ts";
+import { refreshPrefixes } from "#lib/stores/prefixes.ts";
+import { refreshLibraryMeta } from "#lib/stores/libraryMeta.ts";
 
 // Listens for `config-changed`, fired when another Prefixr process (the
 // command line, mostly) changed the library while the window is open; the

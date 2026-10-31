@@ -1,9 +1,9 @@
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
-  import { msgGroup } from "$lib/i18n/msg-groups";
-  import { PROTON_OPTION_ORDER } from "$lib/protonOptions";
-  import type { ProtonOption } from "$lib/types";
-  import { pickMsg } from "$lib/i18n/index.svelte";
+  import * as m from "#lib/paraglide/messages.js";
+  import { msgGroup } from "#lib/i18n/msg-groups.ts";
+  import { PROTON_OPTION_ORDER } from "#lib/protonOptions.ts";
+  import type { ProtonOption } from "#lib/types.ts";
+  import { pickMsg } from "#lib/i18n/index.svelte.ts";
 
   // Proton — see settings.ts for how the editors are shared between the
   // global page and the game dialog. Unlike the other categories every

@@ -1,13 +1,13 @@
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
+  import * as m from "#lib/paraglide/messages.js";
   import { onMount } from "svelte";
   import {
     steamGridDbConfig,
     refreshSteamGridDbConfig,
     saveSteamGridDbConfig,
-  } from "$lib/stores/steamgriddb";
-  import type { SteamGridDbConfig } from "$lib/types";
-  import { backendError } from "$lib/i18n/index.svelte";
+  } from "#lib/stores/steamgriddb.ts";
+  import type { SteamGridDbConfig } from "#lib/types.ts";
+  import { backendError } from "#lib/i18n/index.svelte.ts";
 
   const FALLBACK: SteamGridDbConfig = { api_key: "" };
 

@@ -5,8 +5,8 @@
  * every text without a reload. It is also handed to Rust (set_ui_locale, see +layout.svelte) for
  * the few texts Rust renders itself from the same files (src-tauri/src/locale.rs).
  */
-import * as m from "$lib/paraglide/messages";
-import { overwriteGetLocale } from "$lib/paraglide/runtime";
+import * as m from "#lib/paraglide/messages.js";
+import { overwriteGetLocale } from "#lib/paraglide/runtime.js";
 
 export type Locale = "de" | "en";
 

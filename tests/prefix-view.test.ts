@@ -14,8 +14,8 @@ import {
   sharedRoots,
   sortPrefixes,
   type PrefixSort,
-} from "$lib/prefixView";
-import type { Game, PrefixInfo, PrefixState } from "$lib/types";
+} from "#lib/prefixView.ts";
+import type { Game, PrefixInfo, PrefixState } from "#lib/types.ts";
 
 const ROOT = "/mnt/games/Prefixr";
 

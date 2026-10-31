@@ -131,16 +131,19 @@ fn window_monitor_name(app: &AppHandle) -> Option<String> {
 /// The output KWin considers active: the one with the focused window (by
 /// default) or the mouse pointer. `None` outside KDE Plasma.
 fn kwin_active_output() -> Option<String> {
-    let connection = zbus::blocking::Connection::session().ok()?;
-    let reply = connection
-        .call_method(
-            Some("org.kde.KWin"),
-            "/KWin",
-            Some("org.kde.KWin"),
-            "activeOutputName",
-            &(),
-        )
-        .ok()?;
+    let reply = zbus::block_on(async {
+        let connection = zbus::Connection::session().await?;
+        connection
+            .call_method(
+                Some("org.kde.KWin"),
+                "/KWin",
+                Some("org.kde.KWin"),
+                "activeOutputName",
+                &(),
+            )
+            .await
+    })
+    .ok()?;
     let name: String = reply.body().deserialize().ok()?;
     Some(name).filter(|name| !name.is_empty())
 }

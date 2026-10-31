@@ -1,7 +1,7 @@
 <!-- A failed store install, under its card or row, with its log when there is one. -->
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
-  import { showLog } from "$lib/logViewer";
+  import * as m from "#lib/paraglide/messages.js";
+  import { showLog } from "#lib/logViewer.ts";
 
   let {
     message,

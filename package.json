@@ -3,6 +3,9 @@
   "version": "0.2.2",
   "description": "",
   "type": "module",
+  "imports": {
+    "#lib/*": "./src/lib/*"
+  },
   "scripts": {
     "i18n": "paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide",
     "dev": "bun run i18n && vite dev",

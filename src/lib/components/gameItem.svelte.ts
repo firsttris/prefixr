@@ -1,7 +1,7 @@
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { createDesktopShortcut, createMenuShortcut } from "$lib/stores/games";
-import { getGameCover } from "$lib/stores/steamgriddb";
-import type { Game } from "$lib/types";
+import { createDesktopShortcut, createMenuShortcut } from "#lib/stores/games.ts";
+import { getGameCover } from "#lib/stores/steamgriddb.ts";
+import type { Game } from "#lib/types.ts";
 
 export type ShortcutState = "idle" | "creating" | "done" | { error: unknown };
 

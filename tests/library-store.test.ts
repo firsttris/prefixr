@@ -12,10 +12,10 @@ vi.mock("@tauri-apps/api/event", () => ({
   },
 }));
 
-const { listenForConfigChanges } = await import("$lib/stores/library");
-const { games, steamGameIds } = await import("$lib/stores/games");
-const { prefixes } = await import("$lib/stores/prefixes");
-const { libraryMeta } = await import("$lib/stores/libraryMeta");
+const { listenForConfigChanges } = await import("#lib/stores/library.ts");
+const { games, steamGameIds } = await import("#lib/stores/games.ts");
+const { prefixes } = await import("#lib/stores/prefixes.ts");
+const { libraryMeta } = await import("#lib/stores/libraryMeta.ts");
 
 describe("config changes from another process", () => {
   it("reload the library", async () => {

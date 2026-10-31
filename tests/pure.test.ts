@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { prettifyExeName } from "$lib/gameName";
-import { formatEnvVars, parseEnvVars } from "$lib/envVars";
-import { sameBlock, sameFields } from "$lib/settings";
-import { loadAll } from "$lib/load";
-import { backendError, setLocale } from "$lib/i18n/index.svelte";
-import { prefixRunner } from "$lib/stores/runners";
-import type { Game } from "$lib/types";
+import { prettifyExeName } from "#lib/gameName.ts";
+import { formatEnvVars, parseEnvVars } from "#lib/envVars.ts";
+import { sameBlock, sameFields } from "#lib/settings.ts";
+import { loadAll } from "#lib/load.ts";
+import { backendError, setLocale } from "#lib/i18n/index.svelte.ts";
+import { prefixRunner } from "#lib/stores/runners.ts";
+import type { Game } from "#lib/types.ts";
 
 describe("prettifyExeName", () => {
   it("turns exe file names into titles", () => {

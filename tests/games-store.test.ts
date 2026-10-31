@@ -12,7 +12,7 @@ vi.mock("@tauri-apps/api/event", () => ({
   },
 }));
 
-const { gameRunState, initGameEvents, launchGame } = await import("$lib/stores/games");
+const { gameRunState, initGameEvents, launchGame } = await import("#lib/stores/games.ts");
 
 const emit = (name: string, payload: unknown) => listeners.get(name)!({ payload });
 const state = (id: string) => get(gameRunState)[id];

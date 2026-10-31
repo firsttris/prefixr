@@ -1,5 +1,5 @@
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
+  import * as m from "#lib/paraglide/messages.js";
   import { onMount } from "svelte";
   import {
     runners,
@@ -10,8 +10,8 @@
     runnerDownloadState,
     downloadRunner,
     initRunnerDownloadEvents,
-  } from "$lib/stores/runners";
-  import { backendError, getLocale } from "$lib/i18n/index.svelte";
+  } from "#lib/stores/runners.ts";
+  import { backendError, getLocale } from "#lib/i18n/index.svelte.ts";
 
   let loading = $state(true);
   let loadError = $state<unknown>(null);

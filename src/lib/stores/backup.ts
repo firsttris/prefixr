@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { BackupConfig, BackupInfo } from "$lib/types";
+import type { BackupConfig, BackupInfo } from "#lib/types.ts";
 
 // Backups of the library and its settings (see `commands::backup`).
 

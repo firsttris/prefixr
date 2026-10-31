@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { writable } from "svelte/store";
-import type { MissingExtension } from "$lib/bindings/MissingExtension";
+import type { MissingExtension } from "#lib/bindings/MissingExtension.ts";
 
 // In the Flatpak, the tools whose Flathub extension isn't installed (see
 // `commands::flatpak_extensions`); always empty natively. Read once: an

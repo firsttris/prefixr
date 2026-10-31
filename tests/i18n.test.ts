@@ -47,7 +47,7 @@ describe("messages/*.json", () => {
   it("every message is used, every used key exists", () => {
     // Message calls only count in files that import the Paraglide messages as m.
     const ui = files(join(root, "src"), /\.(svelte|ts)$/).filter((s) =>
-      s.includes("$lib/paraglide/messages"),
+      s.includes("#lib/paraglide/messages.js"),
     );
     const called = ui.flatMap((s) => [...s.matchAll(/\bm\.(\w+)\b/g)].map((x) => x[1]!));
     // Rust renders some texts itself (tray, native dialogs): text(locale, "key", …), or a key

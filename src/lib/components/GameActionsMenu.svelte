@@ -4,7 +4,7 @@
   file manager, shortcut and Steam entries (`full` off).
 -->
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
+  import * as m from "#lib/paraglide/messages.js";
   import type { Snippet } from "svelte";
   import Menu from "./Menu.svelte";
   import type { GameItem } from "./gameItem.svelte";

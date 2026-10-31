@@ -15,7 +15,7 @@ vi.mock("@tauri-apps/api/event", () => ({
   },
 }));
 
-const stores = await import("$lib/stores/gameStores");
+const stores = await import("#lib/stores/gameStores.ts");
 const {
   formatBytes,
   notInstalled,

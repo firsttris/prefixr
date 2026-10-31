@@ -1,10 +1,10 @@
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
-  import type { Compatibility, Game } from "$lib/types";
-  import { killGame, launchGame, type GameRunState } from "$lib/stores/games";
-  import { exeIconUrl } from "$lib/stores/steamgriddb";
-  import { storeName } from "$lib/stores/gameStores";
-  import type { GameTest } from "$lib/stores/libraryMeta";
+  import * as m from "#lib/paraglide/messages.js";
+  import type { Compatibility, Game } from "#lib/types.ts";
+  import { killGame, launchGame, type GameRunState } from "#lib/stores/games.ts";
+  import { exeIconUrl } from "#lib/stores/steamgriddb.ts";
+  import { storeName } from "#lib/stores/gameStores.ts";
+  import type { GameTest } from "#lib/stores/libraryMeta.ts";
   import GameActionsMenu from "./GameActionsMenu.svelte";
   import TestDot from "./TestDot.svelte";
   import CompatBadges from "./CompatBadges.svelte";

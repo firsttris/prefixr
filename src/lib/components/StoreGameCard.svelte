@@ -4,10 +4,10 @@
   progress while it runs. Laid out like GameCard, so both sit in one grid.
 -->
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
-  import type { Compatibility, StoreGame } from "$lib/types";
-  import { storeCoverUrl, storeName } from "$lib/stores/gameStores";
-  import { backendError } from "$lib/i18n/index.svelte";
+  import * as m from "#lib/paraglide/messages.js";
+  import type { Compatibility, StoreGame } from "#lib/types.ts";
+  import { storeCoverUrl, storeName } from "#lib/stores/gameStores.ts";
+  import { backendError } from "#lib/i18n/index.svelte.ts";
   import GameFallbackIcon from "./GameFallbackIcon.svelte";
   import CompatBadges from "./CompatBadges.svelte";
   import FavoriteStar from "./FavoriteStar.svelte";

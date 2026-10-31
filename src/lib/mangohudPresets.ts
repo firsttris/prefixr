@@ -1,4 +1,4 @@
-import type { MangoHudLayout, MangoHudPosition } from "$lib/types";
+import type { MangoHudLayout, MangoHudPosition } from "#lib/types.ts";
 
 // Starting points for the overlay's look — see OverlayEditor.svelte.
 // Labels/descriptions live in the i18n dictionaries under mangohud.presets.<key>.

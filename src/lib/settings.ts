@@ -1,4 +1,4 @@
-import * as m from "$lib/paraglide/messages";
+import * as m from "#lib/paraglide/messages.js";
 // Shared plumbing for the four settings categories (Leistung, Bild, Overlay,
 // Proton). Each has one editor component used in two places: the global
 // settings page, and the game dialog, where every value starts out

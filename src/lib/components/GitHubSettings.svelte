@@ -1,9 +1,9 @@
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
+  import * as m from "#lib/paraglide/messages.js";
   import { onMount } from "svelte";
-  import { githubConfig, refreshGitHubConfig, saveGitHubConfig } from "$lib/stores/github";
-  import type { GitHubConfig } from "$lib/types";
-  import { backendError } from "$lib/i18n/index.svelte";
+  import { githubConfig, refreshGitHubConfig, saveGitHubConfig } from "#lib/stores/github.ts";
+  import type { GitHubConfig } from "#lib/types.ts";
+  import { backendError } from "#lib/i18n/index.svelte.ts";
 
   let { open = false }: { open?: boolean } = $props();
 

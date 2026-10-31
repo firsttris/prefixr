@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { writable } from "svelte/store";
-import type { UmuMatch, UmuStatus } from "$lib/types";
+import type { UmuMatch, UmuStatus } from "#lib/types.ts";
 
 export const umuStatus = writable<UmuStatus | null>(null);
 

@@ -1,11 +1,15 @@
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
+  import * as m from "#lib/paraglide/messages.js";
   import { onMount } from "svelte";
-  import OverlayEditor from "$lib/components/OverlayEditor.svelte";
-  import SettingsPanel from "$lib/components/SettingsPanel.svelte";
-  import { mangoHudConfig, refreshMangoHudConfig, saveMangoHudConfig } from "$lib/stores/mangohud";
-  import type { MangoHudConfig } from "$lib/types";
-  import { backendError } from "$lib/i18n/index.svelte";
+  import OverlayEditor from "#lib/components/OverlayEditor.svelte";
+  import SettingsPanel from "#lib/components/SettingsPanel.svelte";
+  import {
+    mangoHudConfig,
+    refreshMangoHudConfig,
+    saveMangoHudConfig,
+  } from "#lib/stores/mangohud.ts";
+  import type { MangoHudConfig } from "#lib/types.ts";
+  import { backendError } from "#lib/i18n/index.svelte.ts";
 
   let draft = $state<MangoHudConfig | null>(null);
   let saving = $state(false);

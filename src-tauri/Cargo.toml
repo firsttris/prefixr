@@ -44,8 +44,8 @@ hex = "0.4"
 sha2 = "0.11"
 libc = "0.2"
 clap = { version = "4", features = ["derive"] }
-# Already in the tree through tauri-plugin-single-instance; used directly to
-# hand `prefixr game stop` to the window in a Flatpak (`single_instance`).
+# D-Bus: `prefixr game stop` in a Flatpak (game_control.rs), the portals and
+# UDisks2. tauri-plugin-single-instance still brings zbus 5 of its own.
 zbus = "6"
 # Already in the tree through Tauri's GTK; sets the program name, which
 # becomes the window's Wayland app_id and X11 WM_CLASS, in a Flatpak.

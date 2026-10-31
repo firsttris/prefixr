@@ -1,7 +1,7 @@
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
+  import * as m from "#lib/paraglide/messages.js";
   import type { Snippet } from "svelte";
-  import InfoIcon from "$lib/components/InfoIcon.svelte";
+  import InfoIcon from "#lib/components/InfoIcon.svelte";
 
   // One on/off setting with a label and description, plus optional details
   // shown below it (e.g. gamescope's resolution). `overridden`/`onReset` are

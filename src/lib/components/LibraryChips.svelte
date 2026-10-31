@@ -6,13 +6,13 @@
   dialog behind the gear.
 -->
 <script lang="ts">
-  import * as m from "$lib/paraglide/messages";
-  import type { Category } from "$lib/types";
-  import type { Collection } from "$lib/libraryView";
+  import * as m from "#lib/paraglide/messages.js";
+  import type { Category } from "#lib/types.ts";
+  import type { Collection } from "#lib/libraryView.ts";
   import { get } from "svelte/store";
-  import { createCategory, libraryMeta } from "$lib/stores/libraryMeta";
-  import { TEST_STATUSES, TEST_SYMBOL, testLabel } from "$lib/testStatus";
-  import { backendError } from "$lib/i18n/index.svelte";
+  import { createCategory, libraryMeta } from "#lib/stores/libraryMeta.ts";
+  import { TEST_STATUSES, TEST_SYMBOL, testLabel } from "#lib/testStatus.ts";
+  import { backendError } from "#lib/i18n/index.svelte.ts";
   import CategoryManager from "./CategoryManager.svelte";
 
   let {
