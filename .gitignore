@@ -21,3 +21,4 @@ vite.config.ts.timestamp-*
 /flatpak/repo
 /flatpak/spike/build-dir
 /flatpak/spike/repo
+**/project.inlang/cache/

@@ -14,6 +14,7 @@ export default defineConfig(() => ({
     paraglideVitePlugin({
       project: "./project.inlang",
       outdir: "./src/lib/paraglide",
+      outputStructure: "message-modules",
       strategy: ["baseLocale"],
     }),
     // SvelteKit 3 takes its configuration here instead of svelte.config.js. Tauri has no Node.js
