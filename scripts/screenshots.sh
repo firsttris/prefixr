@@ -4,4 +4,4 @@
 # The workflow "Screenshots" runs it in the Playwright image and commits the pictures.
 set -euo pipefail
 bun run build
-node scripts/screenshots.mjs docs
+bun scripts/screenshots.mjs docs

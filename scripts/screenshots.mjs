@@ -1,6 +1,6 @@
 // Takes the screenshots in docs/ from the demo library (scripts/screenshots-demo.mjs), in English.
 //   bun run screenshots (scripts/screenshots.sh builds the frontend and runs this script), or by hand:
-//   bun run build && node scripts/screenshots.mjs [docs]
+//   bun run build && bun scripts/screenshots.mjs [docs]
 // The frontend runs in a plain browser: a stand-in for Tauri's IPC answers its commands, and a small
 // server here serves build/ and the demo covers. CHROMIUM_PATH picks another Chromium.
 

@@ -3,19 +3,20 @@
   "version": "0.2.2",
   "description": "",
   "type": "module",
+  "packageManager": "bun@1.4.4",
   "imports": {
     "#lib/*": "./src/lib/*"
   },
   "scripts": {
     "i18n": "paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide",
-    "dev": "bun run i18n && vite dev",
+    "dev": "bun run i18n && bun --bun vite dev",
     "build": "paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide && vite build",
-    "preview": "vite preview",
+    "preview": "bun --bun vite preview",
     "prepare": "svelte-kit sync || echo ''",
     "check": "bun run i18n && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "tauri": "tauri",
-    "test": "bun run i18n && vitest run",
+    "test": "bun run i18n && bun --bun vitest run",
     "lint": "prettier --check . && eslint .",
     "format": "prettier --write .",
     "screenshots": "bash scripts/screenshots.sh"
