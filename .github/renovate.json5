@@ -3,14 +3,14 @@
 // pull requests: the store tools Prefixr downloads at pinned, checksum-verified versions
 // (Legendary, gogdl, Nile in src-tauri/src/commands/stores/helpers.rs), the GNOME runtime of the
 // Flatpak (manifests, CI image, docs), Flathub's shared-modules, the 7-Zip and cabextract the
-// Flatpak builds for winetricks, Bun (CI) and Tauri. Wine/Proton runners, umu-launcher and
+// Flatpak builds for winetricks, Bun (packageManager) and Tauri. Wine/Proton runners, umu-launcher and
 // DXVK/VKD3D are fetched by the app at runtime (newest release), so nothing is pinned for them. A
 // store tool's sha256 and the Flatpak's offline sources cannot be made by Renovate:
 // renovate-pins.yml adds them on the Renovate branch.
 // Everything else (the other packages, the actions, the images) comes with the shared settings of
 // firsttris/workflows (renovate/default.json5): minor and patch updates once a month in one pull
 // request that merges itself when CI is green, majors on request in the dashboard.
-// Check with `npx --package renovate renovate-config-validator .github/renovate.json5`.
+// Check with `bunx --package renovate renovate-config-validator .github/renovate.json5`.
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
   extends: ["github>firsttris/workflows//renovate/default.json5"],
@@ -68,15 +68,6 @@
       ],
       datasourceTemplate: "github-tags",
       versioningTemplate: "loose",
-    },
-    {
-      // The Bun of the workflows (bun.lock's format and lock-from-bun.py depend on it)
-      customType: "regex",
-      managerFilePatterns: ["/^\\.github/workflows/[^/]+\\.ya?ml$/"],
-      matchStrings: ["bun-version: (?<currentValue>\\d+\\.\\d+\\.\\d+)"],
-      depNameTemplate: "oven-sh/bun",
-      datasourceTemplate: "github-releases",
-      extractVersionTemplate: "^bun-v(?<version>.+)$",
     },
   ],
   packageRules: [
@@ -147,11 +138,15 @@
       dependencyDashboardApproval: false,
     },
     {
-      matchPackageNames: ["oven-sh/bun"],
+      // "packageManager": "bun@x.y.z" in package.json, the Bun of every workflow (setup-bun's
+      // bun-version-file, npm in the Playwright image of the screenshots); bun.lock's format and
+      // lock-from-bun.py depend on it. The bun manager reads it as the dependency `bun`, so it
+      // needs no manager of its own.
+      matchPackageNames: ["bun"],
       groupName: "Bun",
       sourceUrl: "https://github.com/oven-sh/bun",
       prBodyNotes: [
-        "The Bun of CI, the release and the Flatpak workflow's source check (`lock-from-bun.py` reads `bun.lock`). If the source check fails, a new `bun.lock` format may need a change in `flatpak/lock-from-bun.py`.",
+        "`packageManager` in package.json: the Bun of CI, the release, the screenshots, renovate-pins.yml and the Flatpak workflow's source check (`lock-from-bun.py` reads `bun.lock`). If the source check fails, a new `bun.lock` format may need a change in `flatpak/lock-from-bun.py`.",
       ],
       schedule: ["at any time"],
       automerge: false,
