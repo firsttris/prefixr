@@ -31,7 +31,7 @@ nav:
   - For contributors:
       - Development: development.md
       - Rust test coverage: rust-test-coverage.md
-      - "Ideas: upscaling": roadmap.md
+      - Roadmap: roadmap.md
 
 theme:
   name: material
