@@ -17,6 +17,48 @@ const PLUGIN: &str = "prefixr-launch-monitor";
 /// How many running games the loaded script is for.
 static GAMES: Mutex<usize> = Mutex::new(0);
 
+/// The bus connection owning `owner_name()` while this process's script is
+/// loaded. Another Prefixr (a Steam shortcut's `--run` is a process of its
+/// own) then leaves the script alone at its start, and doesn't load its own.
+static OWNER: Mutex<Option<zbus::Connection>> = Mutex::new(None);
+
+/// Below the app ID: a Flatpak may own those names.
+fn owner_name() -> String {
+    let app_id =
+        crate::host_env::flatpak_id().unwrap_or_else(|| "io.github.firsttris.Prefixr".into());
+    format!("{app_id}.LaunchMonitor")
+}
+
+/// Takes `owner_name()` for this process. `None` if another one holds it.
+fn hold_owner_name() -> Option<()> {
+    let builder = zbus::connection::Builder::session()
+        .name(owner_name())
+        .replace_existing_names(false)
+        .allow_name_replacements(false);
+    let connection = zbus::block_on(builder.build()).ok()?;
+    *OWNER.lock().unwrap_or_else(|e| e.into_inner()) = Some(connection);
+    Some(())
+}
+
+fn release_owner_name() {
+    let owner = OWNER.lock().unwrap_or_else(|e| e.into_inner()).take();
+    if let Some(connection) = owner {
+        let _ = zbus::block_on(connection.release_name(owner_name()));
+    }
+}
+
+/// Whether a Prefixr process (this one or another) holds the script.
+/// `true` if that can't be told, so nothing is unloaded on a guess.
+fn owner_running() -> bool {
+    zbus::block_on(async {
+        let connection = zbus::Connection::session().await?;
+        let dbus = zbus::fdo::DBusProxy::new(&connection).await?;
+        let name = zbus::names::BusName::try_from(owner_name())?;
+        dbus.name_has_owner(name).await
+    })
+    .unwrap_or(true)
+}
+
 /// The KWin script for moving windows to the first of `targets` (a monitor's
 /// connector name, e.g. `DP-2`, or its model) that KWin knows.
 pub(super) fn script(targets: &[String]) -> String {
@@ -79,6 +121,7 @@ impl Drop for Guard {
         *games = games.saturating_sub(1);
         if *games == 0 {
             let _ = unload();
+            release_owner_name();
         }
     }
 }
@@ -88,18 +131,30 @@ impl Drop for Guard {
 /// host). `None` if KWin isn't there or refused it.
 pub(super) fn move_game_windows(dir: &Path, targets: &[String]) -> Option<Guard> {
     let mut games = GAMES.lock().unwrap_or_else(|e| e.into_inner());
+    if *games == 0 {
+        hold_owner_name()?;
+    }
+    let loaded = load_script(dir, targets, *games > 0);
+    if loaded.is_none() && *games == 0 {
+        release_owner_name();
+    }
+    loaded?;
+    *games += 1;
+    Some(Guard)
+}
+
+/// Writes the script and loads it, replacing a loaded one if `replace`.
+fn load_script(dir: &Path, targets: &[String], replace: bool) -> Option<()> {
     fs::create_dir_all(dir).ok()?;
     let path = dir.join(format!("{PLUGIN}.js"));
     fs::write(&path, script(targets)).ok()?;
     // A later launch's monitor wins, for the windows still to come.
-    if *games > 0 {
+    if replace {
         let _ = unload();
     }
     // On a refusal the running games keep their guards, and so their count:
     // the last of them unloads whatever is loaded by then.
-    load(&path)?;
-    *games += 1;
-    Some(Guard)
+    load(&path)
 }
 
 fn load(path: &Path) -> Option<()> {
@@ -153,7 +208,10 @@ fn unload() -> Option<()> {
     })
 }
 
-/// Unloads a script a crashed Prefixr left loaded, at start.
+/// Unloads a script a crashed Prefixr left loaded, at start: one no running
+/// Prefixr holds.
 pub fn unload_leftover() {
-    let _ = unload();
+    if !owner_running() {
+        let _ = unload();
+    }
 }
