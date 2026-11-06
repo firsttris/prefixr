@@ -209,6 +209,9 @@ pub fn run() {
             // dialogs could already have fired. It calls `set_ui_locale`
             // once it's up, correcting this guess for everything after.
             app.manage(LocaleState::default());
+            // A KWin script a crashed Prefixr left loaded would go on moving
+            // every Wine window to its monitor.
+            std::thread::spawn(primary_output::unload_leftover_kwin_script);
             let startup_locale = app.state::<LocaleState>().get();
 
             if running_as_root() {
