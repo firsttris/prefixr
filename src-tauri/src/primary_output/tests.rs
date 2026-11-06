@@ -183,3 +183,28 @@ fn a_refused_kwin_script_keeps_the_count_of_running_games() {
     assert!(!bus.state.lock().unwrap().loaded);
     let _ = std::fs::remove_dir_all(dir);
 }
+
+// A Prefixr starting next to one that runs a game (a Steam shortcut's
+// `--run` is a process of its own) mustn't take the running game's script
+// away as a crashed one's leftover.
+#[test]
+fn a_starting_prefixr_keeps_the_kwin_script_of_a_running_one() {
+    let (_one, bus) = fake_kwin::start();
+    let dir = std::env::temp_dir().join(format!("prefixr-kwin-leftover-{}", std::process::id()));
+
+    let game = kwin::move_game_windows(&dir, &["DP-2".to_string()]).expect("launch");
+    // What another Prefixr process does at its start.
+    kwin::unload_leftover();
+    assert!(
+        bus.state.lock().unwrap().loaded,
+        "the running game's script was unloaded as a leftover"
+    );
+    drop(game);
+    assert!(!bus.state.lock().unwrap().loaded);
+
+    // A crashed one's leftover still goes.
+    bus.state.lock().unwrap().loaded = true;
+    kwin::unload_leftover();
+    assert!(!bus.state.lock().unwrap().loaded);
+    let _ = std::fs::remove_dir_all(dir);
+}
