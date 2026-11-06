@@ -95,16 +95,11 @@ pub(super) fn move_game_windows(dir: &Path, targets: &[String]) -> Option<Guard>
     if *games > 0 {
         let _ = unload();
     }
-    match load(&path) {
-        Some(()) => {
-            *games += 1;
-            Some(Guard)
-        }
-        None => {
-            *games = 0;
-            None
-        }
-    }
+    // On a refusal the running games keep their guards, and so their count:
+    // the last of them unloads whatever is loaded by then.
+    load(&path)?;
+    *games += 1;
+    Some(Guard)
 }
 
 fn load(path: &Path) -> Option<()> {
