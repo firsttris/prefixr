@@ -67,3 +67,119 @@ fn the_kwin_script_names_its_monitors_as_json() {
     assert!(script.contains(r#"const targets = ["DP-2","Odyssey \"G7\""];"#));
     assert!(script.contains("workspace.windowAdded.connect"));
 }
+
+/// A stand-in for KWin's scripting on a private session bus.
+mod fake_kwin {
+    use std::io::{BufRead, BufReader};
+    use std::process::{Child, Command, Stdio};
+    use std::sync::{Arc, Mutex};
+
+    #[derive(Default)]
+    pub struct State {
+        /// Whether loadScript refuses, as KWin does for a broken script.
+        pub refuse: bool,
+        /// Whether Prefixr's script is loaded.
+        pub loaded: bool,
+        next_id: i32,
+    }
+
+    struct Scripting(Arc<Mutex<State>>);
+
+    #[zbus::interface(name = "org.kde.kwin.Scripting")]
+    impl Scripting {
+        #[zbus(name = "loadScript")]
+        fn load_script(&self, _path: String, _plugin: String) -> i32 {
+            let mut state = self.0.lock().unwrap();
+            if state.refuse || state.loaded {
+                return -1;
+            }
+            state.loaded = true;
+            state.next_id += 1;
+            state.next_id % 8
+        }
+
+        #[zbus(name = "unloadScript")]
+        fn unload_script(&self, _plugin: String) -> bool {
+            std::mem::replace(&mut self.0.lock().unwrap().loaded, false)
+        }
+    }
+
+    struct Script;
+
+    #[zbus::interface(name = "org.kde.kwin.Script")]
+    impl Script {
+        #[zbus(name = "run")]
+        fn run(&self) {}
+    }
+
+    pub struct Bus {
+        daemon: Child,
+        _kwin: zbus::Connection,
+        pub state: Arc<Mutex<State>>,
+    }
+
+    impl Drop for Bus {
+        fn drop(&mut self) {
+            let _ = self.daemon.kill();
+        }
+    }
+
+    /// Starts a session bus with the fake KWin on it, and points
+    /// `DBUS_SESSION_BUS_ADDRESS` at it.
+    pub fn start() -> (std::sync::MutexGuard<'static, ()>, Bus) {
+        // One bus at a time: the address is process-wide, as is the count
+        // of running games.
+        static ONE: Mutex<()> = Mutex::new(());
+        let one = ONE.lock().unwrap_or_else(|e| e.into_inner());
+        let mut daemon = Command::new("dbus-daemon")
+            .args(["--session", "--nofork", "--print-address=1"])
+            .stdout(Stdio::piped())
+            .spawn()
+            .expect("dbus-daemon");
+        let mut address = String::new();
+        BufReader::new(daemon.stdout.take().unwrap())
+            .read_line(&mut address)
+            .unwrap();
+        std::env::set_var("DBUS_SESSION_BUS_ADDRESS", address.trim());
+        let state = Arc::new(Mutex::new(State::default()));
+        let mut builder = zbus::connection::Builder::address(address.trim())
+            .name("org.kde.KWin")
+            .serve_at("/Scripting", Scripting(state.clone()));
+        for id in 0..8 {
+            builder = builder.serve_at(format!("/Scripting/Script{id}"), Script);
+        }
+        let kwin = zbus::block_on(builder.build()).unwrap();
+        (
+            one,
+            Bus {
+                daemon,
+                _kwin: kwin,
+                state,
+            },
+        )
+    }
+}
+
+// A launch KWin refused in between mustn't make the first game's exit
+// unload the script a later game still runs with.
+#[test]
+fn a_refused_kwin_script_keeps_the_count_of_running_games() {
+    let (_one, bus) = fake_kwin::start();
+    let dir = std::env::temp_dir().join(format!("prefixr-kwin-refused-{}", std::process::id()));
+    let targets = ["DP-2".to_string()];
+
+    let first = kwin::move_game_windows(&dir, &targets).expect("first launch");
+    bus.state.lock().unwrap().refuse = true;
+    assert!(kwin::move_game_windows(&dir, &targets).is_none());
+    bus.state.lock().unwrap().refuse = false;
+    let third = kwin::move_game_windows(&dir, &targets).expect("third launch");
+
+    drop(first);
+    assert!(
+        bus.state.lock().unwrap().loaded,
+        "the script was unloaded while the third game still runs"
+    );
+    drop(third);
+    assert!(!bus.state.lock().unwrap().loaded);
+    let _ = std::fs::remove_dir_all(dir);
+}
