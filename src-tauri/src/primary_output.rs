@@ -6,6 +6,9 @@
 //! Only X11 clients see that primary: a Wayland desktop's own panels stay
 //! where they are. Best-effort throughout: without an X server, libXrandr
 //! or a monitor to go by, nothing changes.
+//!
+//! KWin on Wayland resets that primary right away, so there the game's
+//! windows are moved instead: see `kwin`.
 
 use std::ffi::CStr;
 use std::ptr;
@@ -20,10 +23,32 @@ use x11_dl::xrandr::{RROutput, RR_Connected, Xrandr};
 pub struct PrimaryOutputSwitch {
     /// The output's name, e.g. `DP-2`, for the launch log.
     pub name: String,
+    /// KWin moving the windows, rather than the X11 primary switched.
+    kwin: Option<kwin::Guard>,
+}
+
+impl PrimaryOutputSwitch {
+    /// The launch log's line about it.
+    pub fn log_note(&self) -> String {
+        if self.kwin.is_some() {
+            format!(
+                "[prefixr] KWin moves the game's windows to {} while the game runs\n",
+                self.name
+            )
+        } else {
+            format!(
+                "[prefixr] {} is the primary monitor while the game runs\n",
+                self.name
+            )
+        }
+    }
 }
 
 impl Drop for PrimaryOutputSwitch {
     fn drop(&mut self) {
+        if self.kwin.is_some() {
+            return;
+        }
         let mut switched = SWITCHED.lock().unwrap_or_else(|e| e.into_inner());
         let _ = with_display(|x| {
             if let Some(output) = end(&mut switched, x.primary()) {
@@ -99,6 +124,21 @@ fn end(switched: &mut Option<Switched>, current: RROutput) -> Option<RROutput> {
 pub fn switch_to_active_output(app: &AppHandle) -> Option<PrimaryOutputSwitch> {
     let window_monitor = window_monitor_name(app);
     let kwin_output = kwin_active_output();
+    // KWin as the Wayland compositor: it would set the primary back.
+    if kwin_output.is_some() && std::env::var_os("WAYLAND_DISPLAY").is_some() {
+        // KWin's name first: the connector, where GDK on Wayland has the
+        // model (ambiguous with two of the same monitor).
+        let targets: Vec<String> = [kwin_output, window_monitor]
+            .into_iter()
+            .flatten()
+            .collect();
+        let dir = app.path().app_cache_dir().ok()?;
+        let guard = kwin::move_game_windows(&dir, &targets)?;
+        return Some(PrimaryOutputSwitch {
+            name: targets[0].clone(),
+            kwin: Some(guard),
+        });
+    }
     let mut switched = SWITCHED.lock().unwrap_or_else(|e| e.into_inner());
     with_display(|x| {
         let outputs = x.connected_outputs();
@@ -114,7 +154,7 @@ pub fn switch_to_active_output(app: &AppHandle) -> Option<PrimaryOutputSwitch> {
         if let Some(output) = change {
             x.set_primary(output);
         }
-        takes_part.then_some(PrimaryOutputSwitch { name })
+        takes_part.then_some(PrimaryOutputSwitch { name, kwin: None })
     })
     .flatten()
 }
@@ -215,6 +255,9 @@ fn with_display<T>(f: impl FnOnce(&X11) -> T) -> Option<T> {
     unsafe { (x.xlib.XCloseDisplay)(x.display) };
     Some(result)
 }
+
+mod kwin;
+pub use kwin::unload_leftover as unload_leftover_kwin_script;
 
 #[cfg(test)]
 mod tests;

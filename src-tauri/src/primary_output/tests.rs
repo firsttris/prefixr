@@ -60,3 +60,10 @@ fn a_primary_picked_meanwhile_stays() {
     end(&mut switched, DP1);
     assert_eq!(end(&mut switched, DP1), Some(HDMI));
 }
+
+#[test]
+fn the_kwin_script_names_its_monitors_as_json() {
+    let script = kwin::script(&["DP-2".into(), "Odyssey \"G7\"".into()]);
+    assert!(script.contains(r#"const targets = ["DP-2","Odyssey \"G7\""];"#));
+    assert!(script.contains("workspace.windowAdded.connect"));
+}

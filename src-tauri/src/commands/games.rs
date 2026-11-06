@@ -1858,10 +1858,7 @@ async fn run_game(
         None
     };
     if let Some(switch) = &primary_switch {
-        let note = format!(
-            "[prefixr] {} is the primary monitor while the game runs\n",
-            switch.name
-        );
+        let note = switch.log_note();
         let _ = fs::OpenOptions::new()
             .append(true)
             .open(log_path)

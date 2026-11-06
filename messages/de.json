@@ -427,7 +427,7 @@
   "graphicsEditor_monitorDescription": "Bei mehreren Monitoren: wo sich Spiele im Vollbild öffnen.",
   "graphicsEditor_monitorPrimary": "Hauptbildschirm",
   "graphicsEditor_monitorPrefixr": "Monitor von Prefixr",
-  "graphicsEditor_monitorInfo": "Wine öffnet Spiele im Vollbild auf dem Hauptbildschirm. Mit „Monitor von Prefixr“ wird der Monitor, auf dem Prefixr gerade ist, für X11-Programme zum Hauptbildschirm, solange ein Spiel läuft, und danach wieder zurückgestellt; die Leisten deines Desktops bleiben, wo sie sind. Unter KDE Plasma zählt bei verstecktem Prefixr-Fenster der Monitor des aktiven Fensters. Gilt für alle Spiele. Mit Protons Wayland-Treiber wirkt es nicht.",
+  "graphicsEditor_monitorInfo": "Wine öffnet Spiele im Vollbild auf dem Hauptbildschirm. Mit „Monitor von Prefixr“ startet das Spiel stattdessen auf dem Monitor, auf dem Prefixr gerade ist: Unter KDE Plasma mit Wayland verschiebt KWin die Fenster des Spiels dorthin (bei Monitoren mit gleicher Auflösung), sonst wird der Monitor für X11-Programme zum Hauptbildschirm, solange ein Spiel läuft. Die Leisten deines Desktops bleiben, wo sie sind. Unter KDE Plasma zählt bei verstecktem Prefixr-Fenster der Monitor des aktiven Fensters. Gilt für alle Spiele.",
   "overlaySettings_title": "Overlay",
   "overlaySettings_hint": "Das MangoHud-Overlay im Spiel. An/Aus und Aussehen gelten für alle Spiele und lassen sich pro Spiel überschreiben (Spiel bearbeiten → Overlay).",
   "mangohud_presets_minimal_label": "Minimal",
