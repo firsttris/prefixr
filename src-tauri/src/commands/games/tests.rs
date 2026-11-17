@@ -657,3 +657,45 @@ fn shortcuts_start_the_appimage_by_its_path_as_before() {
     assert_eq!(desktop_exec_prefix(&launch), "\"/opt/Prefixr.AppImage\"");
     assert_eq!(launch.start_dir, PathBuf::from("/opt"));
 }
+
+fn run_with_time<F: std::future::Future>(future: F) -> F::Output {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+        .unwrap()
+        .block_on(future)
+}
+
+#[test]
+fn a_step_that_never_answers_stops_holding_the_launch_after_its_limit() {
+    // Like a D-Bus or GTK call that never gets a reply: it only returns once
+    // the test lets it, long after the limit.
+    let (release, blocked) = std::sync::mpsc::channel::<()>();
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+        .unwrap();
+    let started = Instant::now();
+    let result = runtime.block_on(within_time_limit(Duration::from_millis(200), move || {
+        let _ = blocked.recv();
+        "switched"
+    }));
+    assert_eq!(result, None);
+    assert!(started.elapsed() < Duration::from_secs(2));
+    // Dropping a runtime waits for its blocking threads: let this one end.
+    drop(release);
+}
+
+#[test]
+fn a_step_that_answers_in_time_gives_its_result() {
+    let result = run_with_time(within_time_limit(Duration::from_secs(5), || "switched"));
+    assert_eq!(result, Some("switched"));
+}
+
+#[test]
+fn a_step_that_panics_gives_nothing_instead_of_failing_the_launch() {
+    let result: Option<()> = run_with_time(within_time_limit(Duration::from_secs(5), || {
+        panic!("no display")
+    }));
+    assert_eq!(result, None);
+}
