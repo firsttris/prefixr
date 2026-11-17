@@ -34,20 +34,20 @@ fn backup_commands_parse_and_take_the_lock_only_inside_a_restore() {
         other => panic!("not a backup command: {other:?}"),
     };
     assert!(matches!(
-        parse("prefixr backup create --with-secrets"),
+        parse("laufzeit backup create --with-secrets"),
         BackupCommand::Create {
             path: None,
             with_secrets: true
         }
     ));
     assert!(matches!(
-        parse("prefixr backup restore 1"),
+        parse("laufzeit backup restore 1"),
         BackupCommand::Restore { .. }
     ));
-    assert!(!changes_config(&parse("prefixr backup restore 1")));
-    assert!(!changes_config(&parse("prefixr backup list")));
+    assert!(!changes_config(&parse("laufzeit backup restore 1")));
+    assert!(!changes_config(&parse("laufzeit backup list")));
     assert!(super::super::is_cli(&[
-        "prefixr".to_string(),
+        "laufzeit".to_string(),
         "backup".to_string()
     ]));
 }

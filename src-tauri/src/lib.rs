@@ -8,6 +8,7 @@ mod host_env;
 mod http;
 mod locale;
 mod lock;
+mod migration;
 mod models;
 mod portal;
 mod primary_output;
@@ -114,7 +115,7 @@ fn find_run_arg(args: &[String]) -> Option<String> {
 }
 
 /// Looks for `--install <exe-path>` among the process args, as invoked by the
-/// "Mit Prefixr installieren" file-manager context menu entry (see
+/// "Mit Laufzeit installieren" file-manager context menu entry (see
 /// `ensure_install_desktop_entry`).
 fn find_install_arg(args: &[String]) -> Option<String> {
     find_flag_arg(args, "--install")
@@ -132,6 +133,12 @@ pub fn run() {
     // Generated once: it embeds the frontend, which a second expansion would
     // put into the binary twice.
     let context = tauri::generate_context!();
+    // Before anything reads the config, from the window, a shortcut, Steam
+    // or the command line alike. Not as root, which would move root's own.
+    if !running_as_root() {
+        migration::migrate_from_prefixr(&env::process);
+        migration::migrate_skill(&env::process);
+    }
     if cli::is_cli(&args) {
         cli::run(&args, context);
     }
@@ -145,12 +152,12 @@ pub fn run() {
     }
 
     let mut builder = tauri::Builder::default();
-    // A `--run` game runs in a process of its own, next to an open Prefixr,
+    // A `--run` game runs in a process of its own, next to an open Laufzeit,
     // so it stays out of the single-instance handoff.
     if run_game_id.is_none() {
         // Must be the first plugin registered (see tauri-plugin-single-instance's
-        // own docs) — this is what makes a second "Mit Prefixr installieren"
-        // click or a desktop shortcut, while Prefixr is already running, hand
+        // own docs) — this is what makes a second "Mit Laufzeit installieren"
+        // click or a desktop shortcut, while Laufzeit is already running, hand
         // its `--install <path>` or `--launch <id>` off to this instance
         // instead of opening a second window.
         //
@@ -180,7 +187,7 @@ pub fn run() {
                 rebuild_tray_menu(app);
             });
         // In a Flatpak, a name below the app ID: an app may only own those, and
-        // the default (the Tauri identifier, `com.tristan.prefixr`) isn't one, so
+        // the default (the Tauri identifier, `com.tristan.laufzeit`) isn't one, so
         // a second start opened a second window (seen in the Flatpak spike).
         let single_instance = match flatpak_id() {
             Some(id) => single_instance.dbus_id(id),
@@ -209,7 +216,7 @@ pub fn run() {
             // dialogs could already have fired. It calls `set_ui_locale`
             // once it's up, correcting this guess for everything after.
             app.manage(LocaleState::default());
-            // A KWin script a crashed Prefixr left loaded would go on moving
+            // A KWin script a crashed Laufzeit left loaded would go on moving
             // every Wine window to its monitor.
             std::thread::spawn(primary_output::unload_leftover_kwin_script);
             let startup_locale = app.state::<LocaleState>().get();
@@ -281,6 +288,10 @@ pub fn run() {
             let handle = app.handle().clone();
             tauri::async_runtime::spawn_blocking(move || {
                 let _ = ensure_install_desktop_entry(&handle);
+                // Shortcuts made by Prefixr, the name Laufzeit had before.
+                let games = handle.state::<config::ConfigState>().locked().games.clone();
+                commands::games::relink_legacy_shortcuts(&handle, &games);
+                commands::steam::relink_legacy_shortcuts(&games);
             });
             Ok(())
         })

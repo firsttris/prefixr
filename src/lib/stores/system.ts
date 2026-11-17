@@ -14,7 +14,7 @@ export async function fixMaxMapCount(): Promise<void> {
   await refreshMaxMapCountStatus();
 }
 
-// The running Prefixr's version, shown at the bottom of the sidebar.
+// The running Laufzeit's version, shown at the bottom of the sidebar.
 export const appVersion = writable<string | null>(null);
 
 export async function refreshAppVersion(): Promise<void> {

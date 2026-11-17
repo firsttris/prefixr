@@ -1,4 +1,4 @@
-//! `prefixr backup …`: back up the library and its settings, list the
+//! `laufzeit backup …`: back up the library and its settings, list the
 //! automatic backups, and restore one; for an agent, a safe point before a
 //! larger change (see `commands::backup`).
 
@@ -17,7 +17,7 @@ use crate::error::AppError;
 pub(super) enum BackupCommand {
     /// Back up the library, its settings, categories, play times and artwork
     Create {
-        /// Where to write it; prefixr-backup-<date>.tar.gz in this folder otherwise
+        /// Where to write it; laufzeit-backup-<date>.tar.gz in this folder otherwise
         path: Option<PathBuf>,
         /// Also back up the SteamGridDB API key and the GitHub token
         #[arg(long)]
@@ -52,7 +52,7 @@ pub(crate) fn resolve(query: &str, automatic: &[PathBuf]) -> Result<PathBuf, App
         return automatic
             .get(number.wrapping_sub(1))
             .cloned()
-            .ok_or_else(|| format!("No backup {number}; see `prefixr backup list`").into());
+            .ok_or_else(|| format!("No backup {number}; see `laufzeit backup list`").into());
     }
     absolute(std::path::Path::new(query))
 }
@@ -127,7 +127,7 @@ pub(super) async fn backup_command(
             let info = restore(app, &path)?;
             out.print(&info, || {
                 format!(
-                    "Restored {}. What was before is in `prefixr backup list` as number 1.",
+                    "Restored {}. What was before is in `laufzeit backup list` as number 1.",
                     describe(&info)
                 )
             })

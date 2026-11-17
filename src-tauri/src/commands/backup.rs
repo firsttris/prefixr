@@ -1,11 +1,11 @@
-//! Backups of everything Prefixr keeps about the library, and restoring
+//! Backups of everything Laufzeit keeps about the library, and restoring
 //! one: `config.json` (the games, the prefix list, every setting, the
 //! categories and play times), the chosen artwork and the exe icons, in one
 //! `.tar.gz`. Not in it: the prefixes and the games' own files (far too big,
 //! and they stay where they are), the store logins, and unless asked for,
 //! the SteamGridDB API key and the GitHub token.
 //!
-//! Prefixr also backs up by itself, into `backups/` under the data dir or
+//! Laufzeit also backs up by itself, into `backups/` under the data dir or
 //! the folder the user picked: before every restore, so a restore can
 //! always be undone, and when the user turned automatic backups on, every
 //! few days when the window opens. The newest few of those are kept (see
@@ -32,7 +32,7 @@ use crate::host_env::{host_config_home, is_flatpak};
 use crate::lock::LockExt;
 use crate::models::BackupConfig;
 
-/// The archive layout's version; a backup from a newer Prefixr with a
+/// The archive layout's version; a backup from a newer Laufzeit with a
 /// higher one is refused rather than half understood.
 const FORMAT: u32 = 1;
 const MANIFEST: &str = "manifest.json";
@@ -163,7 +163,7 @@ fn backup_config(config: &AppConfig, include_secrets: bool) -> AppConfig {
     config
 }
 
-/// A file name for a backup made now: `prefixr-backup-2026-10-18-0930.tar.gz`
+/// A file name for a backup made now: `laufzeit-backup-2026-10-18-0930.tar.gz`
 /// for one of the user's, `daily-…`/`before-restore-…` for the automatic ones.
 pub fn file_name(reason: BackupReason, at: SystemTime) -> String {
     let secs = at
@@ -171,7 +171,7 @@ pub fn file_name(reason: BackupReason, at: SystemTime) -> String {
         .map_or(0, |d| d.as_secs());
     let (year, month, day, hour, minute, second) = civil(secs);
     let prefix = match reason {
-        BackupReason::Manual => "prefixr-backup",
+        BackupReason::Manual => "laufzeit-backup",
         BackupReason::Daily => "daily",
         BackupReason::BeforeRestore => "before-restore",
     };
@@ -291,7 +291,7 @@ fn open(path: &Path) -> Result<tar::Archive<GzDecoder<fs::File>>, String> {
 }
 
 fn not_a_backup(path: &Path) -> String {
-    format!("{} is not a Prefixr backup", path.display())
+    format!("{} is not a Laufzeit backup", path.display())
 }
 
 /// Reads a backup's manifest and config without unpacking the rest; checks
@@ -333,13 +333,21 @@ fn read_backup(path: &Path) -> Result<(Manifest, AppConfig), String> {
     };
     if manifest.format > FORMAT {
         return Err(format!(
-            "{} was made by a newer Prefixr ({}); update Prefixr to restore it",
+            "{} was made by a newer Laufzeit ({}); update Laufzeit to restore it",
             path.display(),
             manifest.app_version
         ));
     }
-    let config: AppConfig = serde_json::from_slice(&config)
-        .map_err(|e| format!("The config in {} is invalid: {e}", path.display()))?;
+    let invalid =
+        |e: serde_json::Error| format!("The config in {} is invalid: {e}", path.display());
+    let mut config: serde_json::Value = serde_json::from_slice(&config).map_err(invalid)?;
+    // A backup Prefixr made, the name Laufzeit had before, has its paths
+    // into Prefixr's folders (see `migration`).
+    crate::migration::rewrite_paths(
+        &mut config,
+        &crate::migration::moved_paths(&crate::env::process),
+    );
+    let config: AppConfig = serde_json::from_value(config).map_err(invalid)?;
     Ok((manifest, config))
 }
 
@@ -716,7 +724,7 @@ pub fn list_backups(app: AppHandle) -> Result<Vec<BackupInfo>, AppError> {
         .collect())
 }
 
-/// The native build's config file (AppImage, .deb, .rpm), when Prefixr
+/// The native build's config file (AppImage, .deb, .rpm), when Laufzeit
 /// runs as a Flatpak and that file exists on the host: the Flatpak keeps its
 /// library in `~/.var/app/<id>` and starts empty, so the empty library says
 /// how to bring the native one over with a backup. `None` natively.
@@ -725,10 +733,16 @@ pub fn native_library(app: AppHandle) -> Option<String> {
     if !is_flatpak() {
         return None;
     }
-    let identifier = &app.config().identifier;
-    native_config_file(&crate::env::process, identifier)
-        .filter(|path| path.is_file())
-        .map(|path| path.to_string_lossy().into_owned())
+    // Or Prefixr's, the name Laufzeit had before, if the native build hasn't
+    // been started under the new name yet.
+    [
+        app.config().identifier.as_str(),
+        crate::migration::LEGACY_IDENTIFIER,
+    ]
+    .into_iter()
+    .filter_map(|identifier| native_config_file(&crate::env::process, identifier))
+    .find(|path| path.is_file())
+    .map(|path| path.to_string_lossy().into_owned())
 }
 
 fn native_config_file(env: crate::env::Env, identifier: &str) -> Option<PathBuf> {

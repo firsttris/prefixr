@@ -1,18 +1,18 @@
-# Prefixr as a Flatpak, built from source without network access (docs/development.md#flatpak).
+# Laufzeit as a Flatpak, built from source without network access (docs/development.md#flatpak).
 #
 #   flatpak-builder --user --install --force-clean flatpak/build-dir \
-#     flatpak/io.github.firsttris.Prefixr.yml
+#     flatpak/io.github.firsttris.Laufzeit.yml
 #
 # cargo-sources.json and node-sources.json come from Cargo.lock and package-lock.json; regenerate
 # them with flatpak/update-sources.sh whenever either lock file changes.
-id: io.github.firsttris.Prefixr
+id: io.github.firsttris.Laufzeit
 runtime: org.gnome.Platform
 runtime-version: "51"
 sdk: org.gnome.Sdk
 sdk-extensions:
   - org.freedesktop.Sdk.Extension.node24
   - org.freedesktop.Sdk.Extension.rust-stable
-command: prefixr
+command: laufzeit
 
 finish-args:
   - --share=ipc
@@ -35,7 +35,7 @@ finish-args:
   - --filesystem=xdg-run/gamescope-0
   - --talk-name=org.kde.StatusNotifierWatcher
   - --talk-name=org.freedesktop.Notifications
-  # "Prefixr's monitor" for games: KWin's active monitor and its scripting.
+  # "Laufzeit's monitor" for games: KWin's active monitor and its scripting.
   - --talk-name=org.kde.KWin
   - --system-talk-name=org.freedesktop.UDisks2
   - --env=XDG_DATA_DIRS=/app/share:/usr/lib/extensions/vulkan/share:/usr/share:/usr/share/runtime/share:/run/host/user-share:/run/host/share:/usr/lib/pressure-vessel/overrides/share
@@ -119,15 +119,15 @@ modules:
         url: https://www.rarlab.com/rar/unrarsrc-7.3.1.tar.gz
         sha256: 634900842a3737d9cc15bbcc71d4c74cc713437e0bca296a573424fe5f2660ab
 
-  - name: prefixr
+  - name: laufzeit
     buildsystem: simple
     build-options:
       append-path: /usr/lib/sdk/node24/bin:/usr/lib/sdk/rust-stable/bin
       env:
-        CARGO_HOME: /run/build/prefixr/cargo
+        CARGO_HOME: /run/build/laufzeit/cargo
         CARGO_NET_OFFLINE: "true"
-        XDG_CACHE_HOME: /run/build/prefixr/flatpak-node/cache
-        npm_config_cache: /run/build/prefixr/flatpak-node/npm-cache
+        XDG_CACHE_HOME: /run/build/laufzeit/flatpak-node/cache
+        npm_config_cache: /run/build/laufzeit/flatpak-node/npm-cache
         npm_config_offline: "true"
     sources:
       # The checkout this manifest is in. Flathub would use a git source with the release tag.
@@ -148,11 +148,11 @@ modules:
       - cargo --offline fetch --manifest-path src-tauri/Cargo.toml
       # tauri.conf.json builds the frontend with bun, which the SDK doesn't have.
       - npx tauri build --no-bundle --config '{"build":{"beforeBuildCommand":"npm run build"}}'
-      - install -Dm755 src-tauri/target/release/prefixr /app/bin/prefixr
-      - install -Dm644 src-tauri/icons/32x32.png /app/share/icons/hicolor/32x32/apps/io.github.firsttris.Prefixr.png
-      - install -Dm644 src-tauri/icons/64x64.png /app/share/icons/hicolor/64x64/apps/io.github.firsttris.Prefixr.png
-      - install -Dm644 src-tauri/icons/128x128.png /app/share/icons/hicolor/128x128/apps/io.github.firsttris.Prefixr.png
-      - install -Dm644 src-tauri/icons/128x128@2x.png /app/share/icons/hicolor/256x256/apps/io.github.firsttris.Prefixr.png
-      - install -Dm644 src-tauri/icons/icon.png /app/share/icons/hicolor/512x512/apps/io.github.firsttris.Prefixr.png
-      - install -Dm644 flatpak/io.github.firsttris.Prefixr.desktop -t /app/share/applications
-      - install -Dm644 flatpak/io.github.firsttris.Prefixr.metainfo.xml -t /app/share/metainfo
+      - install -Dm755 src-tauri/target/release/laufzeit /app/bin/laufzeit
+      - install -Dm644 src-tauri/icons/32x32.png /app/share/icons/hicolor/32x32/apps/io.github.firsttris.Laufzeit.png
+      - install -Dm644 src-tauri/icons/64x64.png /app/share/icons/hicolor/64x64/apps/io.github.firsttris.Laufzeit.png
+      - install -Dm644 src-tauri/icons/128x128.png /app/share/icons/hicolor/128x128/apps/io.github.firsttris.Laufzeit.png
+      - install -Dm644 src-tauri/icons/128x128@2x.png /app/share/icons/hicolor/256x256/apps/io.github.firsttris.Laufzeit.png
+      - install -Dm644 src-tauri/icons/icon.png /app/share/icons/hicolor/512x512/apps/io.github.firsttris.Laufzeit.png
+      - install -Dm644 flatpak/io.github.firsttris.Laufzeit.desktop -t /app/share/applications
+      - install -Dm644 flatpak/io.github.firsttris.Laufzeit.metainfo.xml -t /app/share/metainfo

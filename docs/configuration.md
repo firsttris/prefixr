@@ -1,7 +1,7 @@
 # Configuration & files
 
-Everything Prefixr stores, the command-line options it understands, and what a game launch sets up.
-Prefixr's app ID is `com.tristan.prefixr`, so its folders follow the XDG base directories under that
+Everything Laufzeit stores, the command-line options it understands, and what a game launch sets up.
+Laufzeit's app ID is `com.tristan.laufzeit`, so its folders follow the XDG base directories under that
 name.
 
 - [Configuration file](#configuration-file)
@@ -14,33 +14,33 @@ name.
 
 ## Configuration file
 
-`~/.config/com.tristan.prefixr/config.json` holds the library and all settings: the games, the prefix
+`~/.config/com.tristan.laufzeit/config.json` holds the library and all settings: the games, the prefix
 list, the global Performance, Graphics, Overlay and Proton settings, the SteamGridDB API key, the
 GitHub token, under `library` your categories, favorites, hidden games and play times, and under
 `backup` the automatic backups' settings.
 
-Prefixr saves it atomically (written to a temporary file, then renamed), so a crash or a full disk
-never leaves half a file. If the file can't be read when Prefixr starts, Prefixr shows the error and
+Laufzeit saves it atomically (written to a temporary file, then renamed), so a crash or a full disk
+never leaves half a file. If the file can't be read when Laufzeit starts, Laufzeit shows the error and
 quits **without touching it**, rather than starting empty and overwriting your library on the next
 save. Fix the JSON or move the file away to start fresh.
 
-Several Prefixr processes can use the file at once: the window, the command line, and the one Steam
+Several Laufzeit processes can use the file at once: the window, the command line, and the one Steam
 starts for a game. A command line call that changes the library holds `config.json.lock` while it
 runs. Anything that takes long (a store install or uninstall, a game's first launch with its
 prerequisites, recording play time, a restore) writes its result into the file as it is on disk
 by then, under that lock, so changes made meanwhile in the window or by another command stay.
 
-The runners folder is the one setting without a UI: `runners_dir` in `config.json`. Quit Prefixr
+The runners folder is the one setting without a UI: `runners_dir` in `config.json`. Quit Laufzeit
 before editing the file.
 
 ## Data
 
-`~/.local/share/com.tristan.prefixr/` holds everything Prefixr downloads or generates:
+`~/.local/share/com.tristan.laufzeit/` holds everything Laufzeit downloads or generates:
 
 | Path | Contents |
 | --- | --- |
 | `runners/` | Downloaded runners, one folder each. Any Proton or Wine build you put or symlink here is listed too. |
-| `umu-launcher/` | Prefixr's own copy of umu-launcher, with its version. |
+| `umu-launcher/` | Laufzeit's own copy of umu-launcher, with its version. |
 | `directx-layers/` | DXVK and VKD3D-Proton for Wine runners, with their versions, and the cached wine-mono installers. |
 | `winetricks/` | The winetricks script, refreshed weekly. |
 | `artwork/` | Images chosen from SteamGridDB, named after the game's ID, and the covers of store games (`store-epic-<app>.jpg`, `store-gog-<id>.jpg`, `store-amazon-<id>.jpg`). |
@@ -56,36 +56,61 @@ before editing the file.
 | `logs/<game-id>/` | The last 10 launch logs of each game. |
 | `logs/prefixes/<prefix>/` | The last 10 logs of setup programs, winetricks and Wine tools run in a prefix. |
 | `logs/stores/<store>/<app>/` | The last 10 install logs of each store game. |
-| `shortcut-icons/` | The icon of the *Install Prefixr* file-manager entry. |
+| `shortcut-icons/` | The icon of the *Install Laufzeit* file-manager entry. |
 | `WebKitCache/`, `storage/`, `localstorage/` | The window's own browser data (see [Troubleshooting](troubleshooting.md#clearing-the-webkit-cache)). |
 
-`~/.cache/com.tristan.prefixr/umu-database.json` caches the umu database for the protonfixes search
+`~/.cache/com.tristan.laufzeit/umu-database.json` caches the umu database for the protonfixes search
 and the library's umu fix badges for a day, and `protondb.json` the games' ProtonDB ratings for a
 week.
 
-Your prefixes live wherever you created or found them; Prefixr only remembers their paths.
+Your prefixes live wherever you created or found them; Laufzeit only remembers their paths.
 
 ## Elsewhere on your system
 
 | Path | Written when |
 | --- | --- |
 | `~/.local/share/umu/` | umu-launcher downloads the Steam Linux Runtime there, shared with other umu-based launchers. Follows `UMU_FOLDERS_PATH` and `XDG_DATA_HOME` as umu does. |
-| `~/.local/share/applications/com.tristan.prefixr.install.desktop` | On every start, to register *Install Prefixr* in your file manager's *Open With* menu for `.exe` files. Hidden from the app menu. |
+| `~/.local/share/applications/com.tristan.laufzeit.install.desktop` | On every start, to register *Install Laufzeit* in your file manager's *Open With* menu for `.exe` files. Hidden from the app menu. |
 | `~/.local/share/applications/<game>-<id>.desktop` | **To start menu** on a game. |
-| Your desktop folder | **To desktop** on a game. Prefixr honors a localized `XDG_DESKTOP_DIR`, such as `~/Schreibtisch`. |
+| Your desktop folder | **To desktop** on a game. Laufzeit honors a localized `XDG_DESKTOP_DIR`, such as `~/Schreibtisch`. |
 | `~/.steam/root/userdata/<user>/config/shortcuts.vdf` and `grid/` | **Add to Steam**, **Update in Steam** and **Remove from Steam**. The previous file is kept as `shortcuts.vdf.bak`. |
-| `$XDG_RUNTIME_DIR/prefixr/<game-id>.lock` | While a game launches or runs, so two Prefixr processes (an open window and one Steam started) never start the same game twice. |
-| `~/.claude/skills/prefixr/SKILL.md` | Only when you run `prefixr skill install`: the [Prefixr skill](cli.md#the-prefixr-skill) for Claude Code. |
-| `/etc/sysctl.d/99-prefixr-max-map-count.conf` | Only when you click **Increase now** for `vm.max_map_count`, after a password prompt. |
+| `$XDG_RUNTIME_DIR/laufzeit/<game-id>.lock` | While a game launches or runs, so two Laufzeit processes (an open window and one Steam started) never start the same game twice. |
+| `~/.claude/skills/laufzeit/SKILL.md` | Only when you run `laufzeit skill install`: the [Laufzeit skill](cli.md#the-laufzeit-skill) for Claude Code. |
+| `/etc/sysctl.d/99-laufzeit-max-map-count.conf` | Only when you click **Increase now** for `vm.max_map_count`, after a password prompt. |
+
+## Coming from Prefixr
+
+Laufzeit was called Prefixr until version 0.2. The first start under the new name, from the window,
+a shortcut, Steam or the command line, carries everything over:
+
+- `~/.config/com.tristan.prefixr/`, `~/.local/share/com.tristan.prefixr/` and
+  `~/.cache/com.tristan.prefixr/` move to the `com.tristan.laufzeit` folders, and the paths in
+  `config.json` that pointed into them are changed to match. A folder that already exists under the
+  new name is left alone. `~/.local/share/com.tristan.prefixr` stays behind as a symlink to the new
+  folder, so whatever else points into it (a prefix's own files, the store tools' install lists)
+  keeps working.
+- Desktop and start menu shortcuts and Steam entries that start a game through Prefixr are rewritten
+  to start it through Laufzeit. Steam's are rewritten only while Steam is closed (in the Flatpak
+  always), so start Laufzeit once with Steam closed. *Install Prefixr* leaves the file manager's
+  *Open With* menu.
+- An installed Prefixr skill (`~/.claude/skills/prefixr`) is replaced by the Laufzeit skill.
+- A backup Prefixr made restores as one of Laufzeit's.
+- The `.deb` and `.rpm` packages replace the `prefixr` package.
+- The Flatpak's app ID is now `io.github.firsttris.Laufzeit`. Its `.desktop` file names the old one
+  in `X-Flatpak-RenamedFrom`, so Flatpak moves `~/.var/app/io.github.firsttris.Prefixr` over on
+  the first start. Uninstall the old Flatpak afterwards with
+  `flatpak uninstall io.github.firsttris.Prefixr`. Should the library still come up empty, make a
+  backup in the old Flatpak and restore it in Laufzeit (see [Backing up and
+  resetting](#backing-up-and-resetting)).
 
 ## Command-line options
 
 | Option | Effect |
 | --- | --- |
-| `prefixr --launch <game-id>` | Starts the game. If Prefixr is already open, that window starts it instead. Desktop and menu shortcuts use this. |
-| `prefixr --run <game-id>` | Starts the game without any window and exits when the game does. A failure before the game starts is shown in a dialog. Steam uses this for games added to it. |
-| `prefixr --install <path/to/setup.exe>` | Opens the install dialog for that setup program. The *Install Prefixr* file-manager entry uses this. |
-| `prefixr game …`, `library …`, `category …`, `store …`, `prefix …`, `runner …`, `umu …`, `backup …`, `skill …` | The command line: everything the window does, from a terminal or a script. See [Command line & AI agents](cli.md). |
+| `laufzeit --launch <game-id>` | Starts the game. If Laufzeit is already open, that window starts it instead. Desktop and menu shortcuts use this. |
+| `laufzeit --run <game-id>` | Starts the game without any window and exits when the game does. A failure before the game starts is shown in a dialog. Steam uses this for games added to it. |
+| `laufzeit --install <path/to/setup.exe>` | Opens the install dialog for that setup program. The *Install Laufzeit* file-manager entry uses this. |
+| `laufzeit game …`, `library …`, `category …`, `store …`, `prefix …`, `runner …`, `umu …`, `backup …`, `skill …` | The command line: everything the window does, from a terminal or a script. See [Command line & AI agents](cli.md). |
 
 A game's ID is the `id` of its entry in `config.json`. It also appears in the `Exec=` line of the
 game's shortcuts.
@@ -123,7 +148,7 @@ For reference when reading a game's log or reproducing a launch by hand.
 | `WINEDEBUG` | `-all` for a Wine runner, which keeps Wine's debug output from slowing games down |
 | `MANGOHUD`, `MANGOHUD_CONFIGFILE` | With the overlay enabled |
 | `ENABLE_VKBASALT`, `VKBASALT_CONFIG_FILE` | With vkBasalt enabled |
-| `LD_PRELOAD` | `libgamemodeauto.so.0` with GameMode. An `LD_PRELOAD` Prefixr itself was started with (such as Steam's overlay) is kept. |
+| `LD_PRELOAD` | `libgamemodeauto.so.0` with GameMode. An `LD_PRELOAD` Laufzeit itself was started with (such as Steam's overlay) is kept. |
 
 With Gamescope, the MangoHud and vkBasalt variables only go to the game inside it, so they don't
 apply to Gamescope's own output a second time.
@@ -131,22 +156,22 @@ apply to Gamescope's own output a second time.
 The game's own environment variables come last and win, except `WINEDLLOVERRIDES` and `LD_PRELOAD`,
 which are appended to.
 
-Before a Proton game's first launch, Prefixr creates the prefix with umu's `createprefix` so the
+Before a Proton game's first launch, Laufzeit creates the prefix with umu's `createprefix` so the
 download of the Steam Runtime shows as *Starting…*. Before a Wine game's first launch, it runs
 `wineboot`, installs the wine-mono version that Wine build expects, and links in DXVK and
 VKD3D-Proton.
 
 ## Backing up and resetting
 
-- **To back up your library**, use **Backup** in the sidebar or `prefixr backup create` (see
+- **To back up your library**, use **Backup** in the sidebar or `laufzeit backup create` (see
   [Backup and restore](user-guide.md#backup-and-restore)): one file with `config.json`, the artwork
-  and the exe icons. Copying `~/.config/com.tristan.prefixr/config.json` and
-  `~/.local/share/com.tristan.prefixr/artwork/` by hand works too. Save games live in the prefixes,
+  and the exe icons. Copying `~/.config/com.tristan.laufzeit/config.json` and
+  `~/.local/share/com.tristan.laufzeit/artwork/` by hand works too. Save games live in the prefixes,
   so back those up separately.
 - **Automatic backups** are off until you turn them on under **Backup**. They go to
-  `~/.local/share/com.tristan.prefixr/backups/` unless you pick another folder there: one every few
+  `~/.local/share/com.tristan.laufzeit/backups/` unless you pick another folder there: one every few
   days (daily by default), and one before every restore; the newest 7 are kept unless you set
   another number.
-- **To start over**, quit Prefixr and remove `~/.config/com.tristan.prefixr/`. To free the space
-  runners and caches take, also remove `~/.local/share/com.tristan.prefixr/`. Neither touches your
+- **To start over**, quit Laufzeit and remove `~/.config/com.tristan.laufzeit/`. To free the space
+  runners and caches take, also remove `~/.local/share/com.tristan.laufzeit/`. Neither touches your
   prefixes or games.

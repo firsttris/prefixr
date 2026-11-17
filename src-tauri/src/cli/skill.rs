@@ -1,7 +1,7 @@
-//! `prefixr skill …`: the Agent Skill that teaches an AI agent (Claude Code
+//! `laufzeit skill …`: the Agent Skill that teaches an AI agent (Claude Code
 //! and others that read `SKILL.md` files) how to run the library through
 //! this command line. It's built into the binary, so the one installed
-//! always matches the commands this Prefixr has.
+//! always matches the commands this Laufzeit has.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -10,14 +10,14 @@ use super::Out;
 use crate::error::AppError;
 use crate::host_env::flatpak_id;
 
-pub(crate) const SKILL: &str = include_str!("../../../skills/prefixr/SKILL.md");
+pub(crate) const SKILL: &str = include_str!("../../../skills/laufzeit/SKILL.md");
 
 #[derive(clap::Subcommand, Debug)]
 pub(super) enum SkillCommand {
-    /// Install the skill for Claude Code (~/.claude/skills/prefixr), or into
+    /// Install the skill for Claude Code (~/.claude/skills/laufzeit), or into
     /// another agent's skills folder
     Install {
-        /// The folder to put SKILL.md in, instead of ~/.claude/skills/prefixr
+        /// The folder to put SKILL.md in, instead of ~/.claude/skills/laufzeit
         #[arg(long)]
         dir: Option<PathBuf>,
     },
@@ -29,7 +29,7 @@ pub(super) enum SkillCommand {
 fn default_dir() -> Result<PathBuf, AppError> {
     std::env::var_os("HOME")
         .filter(|home| !home.is_empty())
-        .map(|home| PathBuf::from(home).join(".claude/skills/prefixr"))
+        .map(|home| PathBuf::from(home).join(".claude/skills/laufzeit"))
         .ok_or_else(|| "HOME is not set; pass --dir".to_string().into())
 }
 
@@ -44,18 +44,18 @@ pub(crate) fn install(dir: &Path) -> Result<PathBuf, String> {
 
 /// The skill, for a Flatpak with a note right below its title: there the
 /// command is `flatpak run <app ID>`, and an agent should use that from the
-/// start rather than find out that `prefixr` isn't on PATH.
+/// start rather than find out that `laufzeit` isn't on PATH.
 fn skill_text(flatpak_id: Option<&str>) -> String {
     let Some(id) = flatpak_id else {
         return SKILL.to_string();
     };
     let note = format!(
-        "\n> **This Prefixr is a Flatpak.** Run `flatpak run {id}` wherever this file says \
-         `prefixr`, e.g. `flatpak run {id} game list --json`.\n"
+        "\n> **This Laufzeit is a Flatpak.** Run `flatpak run {id}` wherever this file says \
+         `laufzeit`, e.g. `flatpak run {id} game list --json`.\n"
     );
-    match SKILL.find("\n# Prefixr\n") {
+    match SKILL.find("\n# Laufzeit\n") {
         Some(title) => {
-            let end = title + "\n# Prefixr\n".len();
+            let end = title + "\n# Laufzeit\n".len();
             format!("{}{note}{}", &SKILL[..end], &SKILL[end..])
         }
         None => format!("{SKILL}{note}"),
@@ -82,7 +82,7 @@ pub(super) fn skill_command(out: Out, command: SkillCommand) -> Result<(), AppEr
             };
             out.print(&installed, || {
                 format!(
-                    "Installed the Prefixr skill to {}. Agents started from now on pick it up.",
+                    "Installed the Laufzeit skill to {}. Agents started from now on pick it up.",
                     installed.path
                 )
             })

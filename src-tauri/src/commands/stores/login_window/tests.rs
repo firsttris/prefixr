@@ -52,7 +52,7 @@ fn amazon_ends_on_an_amazon_address_with_the_code() {
 #[test]
 fn epic_hands_its_code_over_through_the_script() {
     assert!(EPIC_SCRIPT.contains(&format!("https://{EPIC_CODE_HOST}/epic?code=")));
-    let done = url("https://prefixr-login.invalid/epic?code=0123456789abcdef0123456789abcdef");
+    let done = url("https://laufzeit-login.invalid/epic?code=0123456789abcdef0123456789abcdef");
     let code = login_result(StoreKind::Epic, &done).unwrap();
     assert_eq!(
         crate::commands::stores::epic::auth_code(&code).as_deref(),
@@ -62,8 +62,8 @@ fn epic_hands_its_code_over_through_the_script() {
         "https://legendary.gl/epiclogin",
         "https://www.epicgames.com/id/login",
         "https://www.epicgames.com/id/api/redirect?clientId=x&responseType=code",
-        "https://prefixr-login.invalid/epic?code=",
-        "https://prefixr-login.invalid/other?code=abc",
+        "https://laufzeit-login.invalid/epic?code=",
+        "https://laufzeit-login.invalid/other?code=abc",
     ] {
         assert_eq!(
             login_result(StoreKind::Epic, &url(going_on)),

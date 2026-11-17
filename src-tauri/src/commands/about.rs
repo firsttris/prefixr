@@ -5,7 +5,7 @@ use crate::host_env::xdg_open;
 
 /// The GitHub release of `version`, with what changed in it.
 pub(crate) fn release_url(version: &str) -> String {
-    format!("https://github.com/firsttris/prefixr/releases/tag/v{version}")
+    format!("https://github.com/firsttris/laufzeit/releases/tag/v{version}")
 }
 
 /// Opens the release notes of the running version in the browser.

@@ -1,5 +1,5 @@
 [package]
-name = "prefixr"
+name = "laufzeit"
 version = "0.2.2"
 description = "A native Linux app for managing Wine and Proton prefixes to run Windows games"
 authors = ["Tristan Teufel"]
@@ -14,7 +14,7 @@ rust-version = "1.89"
 # The `_lib` suffix may seem redundant but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
-name = "prefixr_lib"
+name = "laufzeit_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
@@ -44,14 +44,14 @@ hex = "0.4"
 sha2 = "0.11"
 libc = "0.2"
 clap = { version = "4", features = ["derive"] }
-# D-Bus: `prefixr game stop` in a Flatpak (game_control.rs), the portals and
+# D-Bus: `laufzeit game stop` in a Flatpak (game_control.rs), the portals and
 # UDisks2. tauri-plugin-single-instance still brings zbus 5 of its own.
 zbus = "6"
 # Already in the tree through Tauri's GTK; sets the program name, which
 # becomes the window's Wayland app_id and X11 WM_CLASS, in a Flatpak.
 glib = "0.20"
 # Already in the tree through Tauri's tao; switches the X11 primary output so
-# a game starts on Prefixr's monitor (`primary_output`).
+# a game starts on Laufzeit's monitor (`primary_output`).
 x11-dl = "2"
 
 [dev-dependencies]

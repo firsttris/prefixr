@@ -46,7 +46,7 @@ const MAX_MAP_COUNT_PATH: &str = "/proc/sys/vm/max_map_count";
 /// already has in there. `sysctl --system` (see `fix_max_map_count`) reads
 /// every `/etc/sysctl.d/*.conf` file, this one included, so writing it here
 /// is enough for it to take effect on the next `sysctl --system`/reboot too.
-const SYSCTL_DROPIN_PATH: &str = "/etc/sysctl.d/99-prefixr-max-map-count.conf";
+const SYSCTL_DROPIN_PATH: &str = "/etc/sysctl.d/99-laufzeit-max-map-count.conf";
 
 fn parse_max_map_count(raw: Option<&str>) -> u64 {
     raw.and_then(|value| value.trim().parse::<u64>().ok())

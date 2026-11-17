@@ -1,6 +1,6 @@
 name: Flatpak
 
-# Builds the Flatpak bundle from source (flatpak/io.github.firsttris.Prefixr.yml, see
+# Builds the Flatpak bundle from source (flatpak/io.github.firsttris.Laufzeit.yml, see
 # docs/development.md#flatpak) and checks that package-lock.json and the offline sources still match bun.lock
 # and Cargo.lock (regenerate them with flatpak/update-sources.sh). Runs on pull requests that touch
 # the Flatpak or a lock file, by hand, and from release.yml, which attaches the bundle.
@@ -106,12 +106,12 @@ jobs:
         id: name
         run: |
           version=$(sed -n 's/^  "version": "\(.*\)",$/\1/p' package.json)
-          echo "bundle=prefixr_${version}_x86_64.flatpak" >> "$GITHUB_OUTPUT"
+          echo "bundle=laufzeit_${version}_x86_64.flatpak" >> "$GITHUB_OUTPUT"
 
       - name: Build
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
-          manifest-path: flatpak/io.github.firsttris.Prefixr.yml
+          manifest-path: flatpak/io.github.firsttris.Laufzeit.yml
           bundle: ${{ steps.name.outputs.bundle }}
           artifact-name: ${{ inputs.artifact-name || 'flatpak-bundle' }}
           cache-key: flatpak-builder-${{ hashFiles('flatpak/**', 'package-lock.json', 'src-tauri/Cargo.lock') }}

@@ -1,6 +1,6 @@
 # Ideas: upscaling
 
-Features Prefixr doesn't have yet but could, collected so they aren't forgotten. Each one says what
+Features Laufzeit doesn't have yet but could, collected so they aren't forgotten. Each one says what
 it would do, how it could work, and what to watch out for. Nothing here is promised; pull requests
 are welcome.
 
@@ -16,7 +16,7 @@ are welcome.
 integer or nearest-neighbour scaling. That helps games that only offer a few fixed resolutions,
 ports that run poorly at native resolution, and pixel-art games that should stay sharp.
 
-**How:** Prefixr already wraps a game in Gamescope (*Graphics* settings: width, height, FPS limit,
+**How:** Laufzeit already wraps a game in Gamescope (*Graphics* settings: width, height, FPS limit,
 fullscreen). Gamescope tells the game's resolution (`-w`/`-h`) apart from the output resolution
 (`-W`/`-H`) and takes a scaling filter (`-F fsr|nis|linear|nearest|pixel`) and a sharpness
 (`--sharpness`). The *Graphics* settings would get:
@@ -30,7 +30,7 @@ fullscreen). Gamescope tells the game's resolution (`-w`/`-h`) apart from the ou
 are overridable per game, an old game can get integer scaling while the rest keep native resolution.
 
 **Watch out:** Gamescope only scales what the game renders. A game that ignores the resolution it
-is told still renders at its own. Inside Steam's Game Mode, Prefixr already skips Gamescope; the
+is told still renders at its own. Inside Steam's Game Mode, Laufzeit already skips Gamescope; the
 session's own scaling applies there.
 
 ## The FSR 4 upgrade in Proton
@@ -39,7 +39,7 @@ session's own scaling applies there.
 looks considerably better at the same resolution. Recent Proton builds can swap the upscaler when
 asked to through an environment variable.
 
-**How:** Prefixr already lists every `PROTON_*` switch a runner's `proton` script understands (the
+**How:** Laufzeit already lists every `PROTON_*` switch a runner's `proton` script understands (the
 *Proton* settings and tab), so a runner that supports the upgrade offers it there today. What's
 missing is making it discoverable:
 
@@ -49,7 +49,7 @@ missing is making it discoverable:
 
 **Watch out:** FSR 4 officially needs an RDNA 4 GPU (Radeon RX 9000 series). Ways to run it on
 RDNA 3 exist in some Proton builds but are unofficial and slower. The switch names have changed
-between Proton releases, which is why Prefixr reads them from the runner instead of hard-coding
+between Proton releases, which is why Laufzeit reads them from the runner instead of hard-coding
 them.
 
 ## OptiScaler
@@ -61,7 +61,7 @@ setups add frame generation. It works under Proton.
 
 **How:** a per-game option that
 
-1. downloads OptiScaler's latest release (like Prefixr already does for runners, umu and DXVK,
+1. downloads OptiScaler's latest release (like Laufzeit already does for runners, umu and DXVK,
    checksum-verified) and caches it,
 2. copies it into the game's folder under the name the game loads (usually `dxgi.dll`, sometimes
    `winmm.dll` or another proxy DLL), keeping a game file of that name aside,

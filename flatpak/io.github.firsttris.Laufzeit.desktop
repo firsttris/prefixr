@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Laufzeit
+Comment=Manage Wine and Proton prefixes to run Windows games
+Comment[de]=Wine- und Proton-Prefixe verwalten, um Windows-Spiele zu spielen
+Exec=laufzeit
+Icon=io.github.firsttris.Laufzeit
+Terminal=false
+Categories=Game;
+Keywords=wine;proton;umu;windows;games;prefix;prefixr;
+StartupWMClass=io.github.firsttris.Laufzeit
+# Prefixr's app ID, the name Laufzeit had before: Flatpak carries its ~/.var/app folder over.
+X-Flatpak-RenamedFrom=io.github.firsttris.Prefixr.desktop;

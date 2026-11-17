@@ -1,6 +1,6 @@
 # User guide
 
-A tour of everything Prefixr does. New to Prefixr? Start with [Getting started](getting-started.md).
+A tour of everything Laufzeit does. New to Laufzeit? Start with [Getting started](getting-started.md).
 
 - [The library](#the-library)
 - [Adding and editing games](#adding-and-editing-games)
@@ -26,7 +26,7 @@ A tour of everything Prefixr does. New to Prefixr? Start with [Getting started](
 The **Library** shows your games as cover cards (grid view) or as a compact list (list view);
 switch with the two buttons at the right of the toolbar, and set the size of the cards with the
 slider next to them. Search filters by name (`/` jumps to it). You can sort by name, by when you last
-played, by when a game was added, by play time, or by runner. Prefixr remembers the view, the sort,
+played, by when a game was added, by play time, or by runner. Laufzeit remembers the view, the sort,
 the filters and the card size.
 
 The library has up to three sections: **Continue playing** (the games you played last), **Installed**
@@ -112,7 +112,7 @@ The **⋮** menu on a card or in a list row (where editing, artwork and removing
 | **Program (.exe)** | The game's executable. Its embedded icon becomes the game's icon. |
 | **Prefix** | Which prefix the game runs in. See [Prefixes](#prefixes). |
 | **Runner** | Proton or Wine build to run it with. See [Runners](#runners). |
-| **Environment variables** | `KEY=VALUE`, one per line. These win over every switch in the other tabs. `WINEDLLOVERRIDES` and `LD_PRELOAD` are added to what Prefixr sets, not replaced. |
+| **Environment variables** | `KEY=VALUE`, one per line. These win over every switch in the other tabs. `WINEDLLOVERRIDES` and `LD_PRELOAD` are added to what Laufzeit sets, not replaced. |
 | **Launch arguments** | Passed to the game's `.exe`, for example `--launcher-skip -dx11`. Quote arguments with spaces: `-path "C:\My Game"`. |
 | **Notes** (own tab) | Anything worth remembering about the game: an offline login, why a setting is needed, where its config file lives. **Show notes** in the game's **⋮** menu opens them to read in full, copy from, or go on to edit. A line ending in `:` shows as a heading, lines starting with `- ` as a list. They're stored as plain text in `config.json`, so keep real passwords out. |
 
@@ -123,33 +123,33 @@ override the global settings for this game only. See [Game settings](#game-setti
 
 For games that come as an installer:
 
-1. Right-click the setup `.exe` in your file manager → **Open With** → **Install Prefixr**.
-   Prefixr opens the **Install with Prefixr** dialog. If Prefixr is already running, the existing
+1. Right-click the setup `.exe` in your file manager → **Open With** → **Install Laufzeit**.
+   Laufzeit opens the **Install with Laufzeit** dialog. If Laufzeit is already running, the existing
    window takes over.
 2. Choose a prefix (or create one with **+**) and a runner, then click **Run setup**. The prefix is
    prepared first, exactly as for a game.
 3. Go through the installer. While it runs, the dialog stays open.
-4. When the installer exits, Prefixr scans the prefix's desktop and start menu for shortcuts the
+4. When the installer exits, Laufzeit scans the prefix's desktop and start menu for shortcuts the
    installer created. Pick the one that starts the game, or choose the `.exe` yourself.
 5. The game dialog opens with everything filled in. Check it and click **Add**.
 
 If no shortcut is found or setup failed, **Show setup log** shows what the installer printed.
 
-From a terminal, or for an AI agent, [`prefixr game install`](cli.md#installing-from-a-setup-file-or-a-disc)
+From a terminal, or for an AI agent, [`laufzeit game install`](cli.md#installing-from-a-setup-file-or-a-disc)
 does the same in one step, also from a disc image (`.iso`).
 
 ## Stores (Epic Games, GOG, Amazon)
 
-Prefixr can install and start the games of your **Epic Games Store**, **GOG** and **Amazon Games**
+Laufzeit can install and start the games of your **Epic Games Store**, **GOG** and **Amazon Games**
 (Prime Gaming) accounts. They appear in the library next to the games you added yourself and run
 with the same prefixes, runners and settings.
 
-Prefixr talks to each store through the command line tool the
+Laufzeit talks to each store through the command line tool the
 [Heroic Games Launcher](https://heroicgameslauncher.com/) uses for it:
 [Legendary](https://github.com/Heroic-Games-Launcher/legendary) for Epic and
 [gogdl](https://github.com/Heroic-Games-Launcher/heroic-gogdl) for GOG and
 [Nile](https://github.com/imLinguin/nile) for Amazon. A tool is downloaded when you connect its
-store, at a version pinned in Prefixr and checked against its SHA-256, and deleted again when you
+store, at a version pinned in Laufzeit and checked against its SHA-256, and deleted again when you
 disconnect. Like umu-launcher, Legendary and gogdl need **Python 3**, which almost every
 distribution has installed; Nile brings its own.
 
@@ -157,16 +157,16 @@ distribution has installed; Nile brings its own.
 
 Open **Stores** in the sidebar. There are two ways to sign in:
 
-- **Connect** opens the store's login page in a window of Prefixr's own. Sign in there; the window
+- **Connect** opens the store's login page in a window of Laufzeit's own. Sign in there; the window
   takes the code by itself, closes, and the store is connected. Nothing to copy. The window keeps no
-  cookies, and the pages in it can't reach Prefixr itself. Password managers built into your
+  cookies, and the pages in it can't reach Laufzeit itself. Password managers built into your
   browser and "Sign in with Google" don't work in it, though (Google refuses embedded windows).
 - **Connect in the browser** signs you in in your own browser, with your password manager and any
   sign-in option, and you copy the code back:
 
 1. Click **Connect in the browser** next to the store. Your browser opens the store's login page.
    Sign in.
-2. Bring the login back to Prefixr and click **Sign in**:
+2. Bring the login back to Laufzeit and click **Sign in**:
    - **Epic** then shows a short page of text. Copy all of it (or only the value of
      `authorizationCode`).
    - **GOG** then shows an almost empty page whose address contains `on_login_success?…code=…`.
@@ -179,7 +179,7 @@ Open **Stores** in the sidebar. There are two ways to sign in:
 
 Either way, you sign in once: the store's tool renews the login by itself after that.
 
-Prefixr then loads your game list and the covers. **Refresh library** loads it again, for example
+Laufzeit then loads your game list and the covers. **Refresh library** loads it again, for example
 after you bought a game. **Disconnect** signs you out; the games you installed stay installed.
 
 ### Installing a game
@@ -190,7 +190,7 @@ has everything filled in:
 | Field | Default |
 | --- | --- |
 | **Install folder** | `~/Games/Epic`, `~/Games/GOG` or `~/Games/Amazon` on a store's first install, after that the folder you used last for that store. The game gets a folder of its own in it. |
-| **Prefix** | A new prefix for this game alone (recommended), under Prefixr's data folder. Any of your prefixes works too. |
+| **Prefix** | A new prefix for this game alone (recommended), under Laufzeit's data folder. Any of your prefixes works too. |
 | **Runner** | Your newest Proton runner. |
 
 The download runs in the background; the card shows its progress and has a **Cancel** button.
@@ -207,7 +207,7 @@ An **Epic** game's start asks Legendary for its command line first, because onli
 fresh login tokens on it. Without a connection, a game that can run offline still starts. A game's
 **launch arguments** go between the game's own arguments and the account's, as in Epic's launcher.
 
-A **GOG** game needs no login to start: Prefixr starts the program the game's own
+A **GOG** game needs no login to start: Laufzeit starts the program the game's own
 `goggame-<id>.info` names as its main one, with its arguments and working folder, just as GOG
 Galaxy does. Games are installed in English; most let you switch the language in their settings.
 
@@ -217,7 +217,7 @@ Gaming games that ask for it start without the Amazon Games app.
 
 On its first start, a game installs what it lists as prerequisites (Visual C++ runtimes, DirectX
 and the like) into its prefix. For GOG these are GOG's shared redistributables, downloaded once
-into Prefixr's data folder for all GOG games; for Amazon, the installers its `fuel.json` lists
+into Laufzeit's data folder for all GOG games; for Amazon, the installers its `fuel.json` lists
 under `PostInstall`. That runs once per game; the launch log shows what
 happened.
 
@@ -239,7 +239,7 @@ programs, separate from your Linux system and from other prefixes.
 
 The **Prefixes** page lists every prefix by the games that use it. A click on a game's name opens
 its settings, and a prefix no game uses says *Unused*. Prefixes that sit in the same folder (say
-`/mnt/games/Prefixr/<game>/prefix` for each game) are grouped under that folder, shown once as a
+`/mnt/games/Laufzeit/<game>/prefix` for each game) are grouped under that folder, shown once as a
 heading, so each row only shows the part of the path that sets it apart. Hover over it for the
 full path.
 
@@ -265,7 +265,7 @@ Click **+ Add prefix**, choose a folder and click **Add prefix**:
   runs in it.
 - **An existing prefix** (a folder with a `drive_c` inside) is used as it is. That works for
   prefixes from Lutris, Bottles, PortProton, Heroic or plain Wine.
-- **A Steam `compatdata/<appid>` folder** works too: Prefixr uses the `pfx` folder inside it.
+- **A Steam `compatdata/<appid>` folder** works too: Laufzeit uses the `pfx` folder inside it.
 
 A folder that already contains other files is refused, so a prefix never ends up mixed into
 unrelated data.
@@ -304,12 +304,12 @@ The packages go into the prefix, so they apply to every game using it.
 
 ### Removing a prefix
 
-**Remove** (in a prefix's **⋮** menu) only takes a prefix off Prefixr's list. The folder, its programs and save games stay on
+**Remove** (in a prefix's **⋮** menu) only takes a prefix off Laufzeit's list. The folder, its programs and save games stay on
 disk, and games that use it keep working. A prefix whose game is running can't be removed.
 
 ## Runners
 
-The **Runners** page lists the runners Prefixr found in its runners folder, each with the number of
+The **Runners** page lists the runners Laufzeit found in its runners folder, each with the number of
 games using it.
 
 ### Downloading runners
@@ -330,17 +330,17 @@ loses the link.
 ### umu-launcher
 
 Proton runners start through [umu-launcher](https://github.com/Open-Wine-Components/umu-launcher).
-Prefixr keeps its own copy, downloaded the first time a Proton game starts, and shows its version in
+Laufzeit keeps its own copy, downloaded the first time a Proton game starts, and shows its version in
 the **umu-launcher** section. When a newer release exists, the section offers the update.
 
 The Steam Linux Runtime, which umu downloads on first use (a few hundred MB), is shared with Lutris,
-Heroic and other umu-based launchers. If one of them already downloaded it, Prefixr reuses it.
+Heroic and other umu-based launchers. If one of them already downloaded it, Laufzeit reuses it.
 
 ### DXVK and VKD3D-Proton
 
 Plain Wine builds don't include [DXVK](https://github.com/doitsujin/dxvk) (Direct3D 8 to 11 on
 Vulkan) or [VKD3D-Proton](https://github.com/HansKristian-Work/vkd3d-proton) (Direct3D 12 on
-Vulkan). Prefixr downloads the latest release of each the first time a Wine game starts and links
+Vulkan). Laufzeit downloads the latest release of each the first time a Wine game starts and links
 them into the prefix on every launch. The **DXVK / VKD3D-Proton** section shows the versions in use
 and updates both on request. Proton runners bring their own.
 
@@ -370,7 +370,7 @@ game launches. Each game can override any of them in the matching tab of its gam
 | **Prevent sleep** | Keeps the system and screen from sleeping while the game runs | systemd-inhibit |
 
 If a scheduler daemon that manages process priorities is active (ananicy, ananicy-cpp, scx,
-scx_loader or falcond), GameMode would fight it over the same settings. Prefixr then skips GameMode
+scx_loader or falcond), GameMode would fight it over the same settings. Laufzeit then skips GameMode
 and uses the performance power profile instead, and notes that in the game's log.
 
 The page also checks `vm.max_map_count`. Some games and anti-cheat systems (Easy Anti-Cheat titles,
@@ -382,20 +382,20 @@ Steam's value permanently through a `/etc/sysctl.d` file (with a password prompt
 ### Graphics
 
 **Gamescope** runs the game in its own nested compositor. You can set the width and height it renders
-at, an FPS limit, and force fullscreen. It's skipped when Gamescope isn't installed or when Prefixr
+at, an FPS limit, and force fullscreen. It's skipped when Gamescope isn't installed or when Laufzeit
 itself already runs inside a Gamescope session (as in Steam's Game Mode).
 
 **vkBasalt** adds post-processing: **Sharpen (CAS)**, with adjustable strength, and **Anti-aliasing
 (SMAA)**. Sharpening costs almost nothing and helps when rendering below native resolution.
 
 **Monitor for games** is for setups with several monitors. Wine opens fullscreen games on the
-**Primary monitor** (the default), wherever Prefixr's window is. With **Prefixr's monitor**, the game
-starts on the monitor Prefixr is on instead. On KDE Plasma with Wayland, a KWin script moves the
+**Primary monitor** (the default), wherever Laufzeit's window is. With **Laufzeit's monitor**, the game
+starts on the monitor Laufzeit is on instead. On KDE Plasma with Wayland, a KWin script moves the
 game's windows there while it runs (KWin would reset a changed primary monitor right away); as Wine
 still thinks the game is on the primary monitor, this is for monitors with the same resolution.
-Elsewhere, the monitor Prefixr is on becomes the primary one for X11 programs (Xwayland included)
+Elsewhere, the monitor Laufzeit is on becomes the primary one for X11 programs (Xwayland included)
 while the game runs, and the previous one comes back when it exits; Proton's Wayland driver ignores
-that. A Wayland desktop's panels don't move. On KDE Plasma, when Prefixr's window is hidden, e.g.
+that. A Wayland desktop's panels don't move. On KDE Plasma, when Laufzeit's window is hidden, e.g.
 for a launch from the tray or the command line, the monitor with the active window counts. The
 choice applies to all games.
 
@@ -417,7 +417,7 @@ Gamescope's own overlay (`--mangoapp`) when available.
 
 ### Proton
 
-These are the switches Proton reads from the environment (`PROTON_*`). Prefixr reads them from the
+These are the switches Proton reads from the environment (`PROTON_*`). Laufzeit reads them from the
 selected runner's own `proton` script, so you only see what that runner supports. Each switch has
 three states: **Default** leaves the decision to Proton and protonfixes, **On** and **Off** force it.
 
@@ -440,12 +440,12 @@ the **SteamGridDB** page, **Select artwork** finds images for a game:
 
 | Kind | Used for |
 | --- | --- |
-| **Cover** | The card in Prefixr's library, and the portrait cover in Steam |
+| **Cover** | The card in Laufzeit's library, and the portrait cover in Steam |
 | **Icon** | Desktop and menu shortcuts, and the icon in Steam |
 | **Wide cover**, **Hero**, **Logo** | Steam only: the wide grid image, the banner on the game's page, and the logo on it |
 
 Search for the game, pick the matching entry, then pick an image for each kind. Images are downloaded
-once and kept locally. **Remove** clears one kind again. Prefixr remembers the matched game, so the
+once and kept locally. **Remove** clears one kind again. Laufzeit remembers the matched game, so the
 next time the picker opens straight on its images.
 
 ## Steam integration
@@ -454,43 +454,43 @@ next time the picker opens straight on its images.
 artwork. It then appears in your Steam library, in Big Picture and in the Steam Deck's Game Mode.
 **Update in Steam** writes changes (a new name, new artwork) to the same entry without touching what
 you changed in Steam itself, such as collections or your own launch options. **Remove from Steam**
-takes it out again, and removing a game from Prefixr removes it from Steam as well.
+takes it out again, and removing a game from Laufzeit removes it from Steam as well.
 
-When Steam starts the game, it runs Prefixr with `--run <game-id>`: the game launches without
-Prefixr's window, and that Prefixr exits with the game, so Steam shows the game as running exactly as
-long as it is. This works even while Prefixr is open, and the open window won't start the game a
+When Steam starts the game, it runs Laufzeit with `--run <game-id>`: the game launches without
+Laufzeit's window, and that Laufzeit exits with the game, so Steam shows the game as running exactly as
+long as it is. This works even while Laufzeit is open, and the open window won't start the game a
 second time.
 
 Steam has to be closed while its shortcuts are changed, because a running Steam would overwrite
-them. If it's running, Prefixr asks whether to quit it; Steam is started again afterwards. Prefixr
+them. If it's running, Laufzeit asks whether to quit it; Steam is started again afterwards. Laufzeit
 keeps the previous `shortcuts.vdf` as `shortcuts.vdf.bak`.
 
-Prefixr works with the native Steam package. The Flatpak version of Steam can't start programs
-outside its sandbox, so it can't launch games through Prefixr.
+Laufzeit works with the native Steam package. The Flatpak version of Steam can't start programs
+outside its sandbox, so it can't launch games through Laufzeit.
 
 ## Shortcuts
 
 **To desktop** puts a launcher for the game on your desktop; **To start menu** adds it to your
 desktop environment's application menu. Both start the game directly (through
-`prefixr --launch <game-id>`), opening Prefixr if it isn't running yet. They use the game's
+`laufzeit --launch <game-id>`), opening Laufzeit if it isn't running yet. They use the game's
 SteamGridDB icon if it has one, otherwise the icon from its `.exe`. Creating a shortcut again
 replaces the old one, and removing the game removes its shortcuts.
 
 ## The tray icon
 
-While Prefixr runs, its tray icon offers:
+While Laufzeit runs, its tray icon offers:
 
 - **Show window** / **Hide window**
 - **Quit "*game*" (force)** for every running game, to end one that hangs
 - **Quit**, which asks first if games are still running, since quitting ends them
 
-Closing the window only hides it to the tray, so running games stay under Prefixr's control. On a
-desktop without a tray (GNOME without the AppIndicator extension), closing quits Prefixr instead,
+Closing the window only hides it to the tray, so running games stay under Laufzeit's control. On a
+desktop without a tray (GNOME without the AppIndicator extension), closing quits Laufzeit instead,
 except while a game runs, when the window is minimized.
 
 ## Logs
 
-Every game launch writes a log of everything the game and Wine/Proton print. Prefixr keeps the last
+Every game launch writes a log of everything the game and Wine/Proton print. Laufzeit keeps the last
 10 per game. Setup programs, winetricks and Wine tools write logs per prefix, also the last 10. Open
 the latest with **Show log** after an error. All logs are plain text files; see
 [Configuration & files](configuration.md#data) for where they are.
@@ -504,11 +504,11 @@ back those up separately), nor are your store logins.
 
 - **Create backup…** saves one to a file you pick, to keep or to take to another computer. The
   SteamGridDB API key and the GitHub token only go in when you tick the box.
-- **Restore from file…** replaces the library and all settings with a backup's. Prefixr shows what's
+- **Restore from file…** replaces the library and all settings with a backup's. Laufzeit shows what's
   in it first and asks.
-- **Automatic backups** are off by default. Turned on, Prefixr backs up by itself when it starts,
+- **Automatic backups** are off by default. Turned on, Laufzeit backs up by itself when it starts,
   once the last backup is old enough (every day by default, or every few days as you set it) and
-  something changed since. You can also set how many are kept and the folder they go to. Prefixr
+  something changed since. You can also set how many are kept and the folder they go to. Laufzeit
   always backs up right before a restore, even with automatic backups off. They're listed with
   **Restore**, so a restore, or a change an agent made, can be undone. Each takes about as much space
   as your covers and icons together.
@@ -519,8 +519,8 @@ games have to be at the same paths for the games to start, and the stores need c
 
 ## Language
 
-Prefixr is available in English and German. Switch with **DE** / **EN** at the bottom of the
-sidebar; the tray menu follows. On first start, Prefixr uses your system language.
+Laufzeit is available in English and German. Switch with **DE** / **EN** at the bottom of the
+sidebar; the tray menu follows. On first start, Laufzeit uses your system language.
 
-Below the language switch, the sidebar shows Prefixr's version. Click it to see what changed in that
+Below the language switch, the sidebar shows Laufzeit's version. Click it to see what changed in that
 version on GitHub.

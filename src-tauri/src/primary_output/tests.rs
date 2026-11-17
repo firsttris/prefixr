@@ -78,7 +78,7 @@ mod fake_kwin {
     pub struct State {
         /// Whether loadScript refuses, as KWin does for a broken script.
         pub refuse: bool,
-        /// Whether Prefixr's script is loaded.
+        /// Whether Laufzeit's script is loaded.
         pub loaded: bool,
         next_id: i32,
     }
@@ -165,7 +165,7 @@ mod fake_kwin {
 #[test]
 fn a_refused_kwin_script_keeps_the_count_of_running_games() {
     let (_one, bus) = fake_kwin::start();
-    let dir = std::env::temp_dir().join(format!("prefixr-kwin-refused-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("laufzeit-kwin-refused-{}", std::process::id()));
     let targets = ["DP-2".to_string()];
 
     let first = kwin::move_game_windows(&dir, &targets).expect("first launch");
@@ -184,16 +184,16 @@ fn a_refused_kwin_script_keeps_the_count_of_running_games() {
     let _ = std::fs::remove_dir_all(dir);
 }
 
-// A Prefixr starting next to one that runs a game (a Steam shortcut's
+// A Laufzeit starting next to one that runs a game (a Steam shortcut's
 // `--run` is a process of its own) mustn't take the running game's script
 // away as a crashed one's leftover.
 #[test]
-fn a_starting_prefixr_keeps_the_kwin_script_of_a_running_one() {
+fn a_starting_laufzeit_keeps_the_kwin_script_of_a_running_one() {
     let (_one, bus) = fake_kwin::start();
-    let dir = std::env::temp_dir().join(format!("prefixr-kwin-leftover-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("laufzeit-kwin-leftover-{}", std::process::id()));
 
     let game = kwin::move_game_windows(&dir, &["DP-2".to_string()]).expect("launch");
-    // What another Prefixr process does at its start.
+    // What another Laufzeit process does at its start.
     kwin::unload_leftover();
     assert!(
         bus.state.lock().unwrap().loaded,

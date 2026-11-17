@@ -1,4 +1,4 @@
-//! `prefixr game install`: runs a game's installer in a prefix and adds the
+//! `laufzeit game install`: runs a game's installer in a prefix and adds the
 //! game it installed, in one step, so an agent can set a game up from a
 //! setup file or a disc image the way the window's **Run installer** does.
 //! A disc image is mounted with udisks for the install and unmounted after.
@@ -34,7 +34,7 @@ pub(super) struct InstallGame {
     /// The installer: a setup .exe or .msi, or a disc image (.iso) whose
     /// installer is run
     installer: PathBuf,
-    /// The prefix to install into; one Prefixr doesn't know yet is added (and created)
+    /// The prefix to install into; one Laufzeit doesn't know yet is added (and created)
     #[arg(long)]
     prefix: PathBuf,
     /// The runner's id; the newest Proton otherwise
@@ -211,7 +211,7 @@ fn pick_shortcut(
     runner_id: &str,
 ) -> Result<(PathBuf, Option<String>), String> {
     let add_hint = format!(
-        "Add the game with `prefixr game add --exe <exe> --prefix {} --runner {runner_id}`.",
+        "Add the game with `laufzeit game add --exe <exe> --prefix {} --runner {runner_id}`.",
         prefix.display()
     );
     match shortcuts {

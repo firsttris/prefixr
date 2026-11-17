@@ -50,12 +50,12 @@ fn launch_lock_dir_prefers_xdg_runtime_dir() {
     let env = crate::env::fake(&[("XDG_RUNTIME_DIR", "/run/user/1000")]);
     assert_eq!(
         launch_lock_dir(&env),
-        PathBuf::from("/run/user/1000/prefixr")
+        PathBuf::from("/run/user/1000/laufzeit")
     );
 
     // SAFETY: getuid(2) can't fail and has no preconditions.
     let uid = unsafe { libc::getuid() };
-    let fallback = std::env::temp_dir().join(format!("prefixr-{uid}"));
+    let fallback = std::env::temp_dir().join(format!("laufzeit-{uid}"));
     assert_eq!(launch_lock_dir(&crate::env::fake(&[])), fallback);
 }
 #[test]
@@ -163,11 +163,11 @@ fn applications_directory_falls_back_to_local_share() {
 #[test]
 fn applications_directory_in_a_flatpak_is_the_hosts() {
     let env = crate::env::fake(&[
-        ("FLATPAK_ID", "io.github.firsttris.Prefixr"),
+        ("FLATPAK_ID", "io.github.firsttris.Laufzeit"),
         ("HOME", "/home/u"),
         (
             "XDG_DATA_HOME",
-            "/home/u/.var/app/io.github.firsttris.Prefixr/data",
+            "/home/u/.var/app/io.github.firsttris.Laufzeit/data",
         ),
     ]);
     assert_eq!(
@@ -177,10 +177,10 @@ fn applications_directory_in_a_flatpak_is_the_hosts() {
 }
 #[test]
 fn own_executable_path_prefers_appimage_env() {
-    let env = crate::env::fake(&[("APPIMAGE", "/opt/Prefixr.AppImage")]);
+    let env = crate::env::fake(&[("APPIMAGE", "/opt/Laufzeit.AppImage")]);
     assert_eq!(
         own_executable_path(&env).unwrap(),
-        PathBuf::from("/opt/Prefixr.AppImage")
+        PathBuf::from("/opt/Laufzeit.AppImage")
     );
     assert_eq!(
         own_executable_path(&crate::env::fake(&[])).unwrap(),
@@ -371,7 +371,7 @@ fn finds_a_games_shortcuts_by_their_launch_argument() {
     let dir = TestDir::new("dir");
     fs::create_dir_all(&dir).unwrap();
     let (id, other) = (Uuid::new_v4(), Uuid::new_v4());
-    let entry = |id: Uuid| format!("[Desktop Entry]\nName=X\nExec=\"/a/prefixr\" --launch {id}\n");
+    let entry = |id: Uuid| format!("[Desktop Entry]\nName=X\nExec=\"/a/laufzeit\" --launch {id}\n");
     fs::write(dir.join("X.desktop"), entry(id)).unwrap();
     fs::write(dir.join("X-12345678.desktop"), entry(other)).unwrap();
     fs::write(dir.join("notes.txt"), entry(id)).unwrap();
@@ -387,8 +387,8 @@ fn desktop_entries_are_escaped() {
         r#""/Apps/100%% \\"Pre\\$fixr\\"/a\\\\b.AppImage""#
     );
     assert_eq!(
-        desktop_exec_arg(Path::new("/opt/prefixr")),
-        "\"/opt/prefixr\""
+        desktop_exec_arg(Path::new("/opt/laufzeit")),
+        "\"/opt/laufzeit\""
     );
 }
 
@@ -639,21 +639,21 @@ fn handed_over_stop_waits_longer_than_the_longest_stop() {
 #[test]
 fn shortcuts_start_the_flatpak_through_flatpak_run() {
     let env = crate::env::fake(&[
-        ("FLATPAK_ID", "io.github.firsttris.Prefixr"),
+        ("FLATPAK_ID", "io.github.firsttris.Laufzeit"),
         ("HOME", "/home/u"),
     ]);
     let launch = own_launch(&env).unwrap();
     assert_eq!(
         desktop_exec_prefix(&launch),
-        "\"flatpak\" \"run\" \"io.github.firsttris.Prefixr\""
+        "\"flatpak\" \"run\" \"io.github.firsttris.Laufzeit\""
     );
     assert_eq!(launch.start_dir, PathBuf::from("/home/u"));
 }
 
 #[test]
 fn shortcuts_start_the_appimage_by_its_path_as_before() {
-    let env = crate::env::fake(&[("APPIMAGE", "/opt/Prefixr.AppImage")]);
+    let env = crate::env::fake(&[("APPIMAGE", "/opt/Laufzeit.AppImage")]);
     let launch = own_launch(&env).unwrap();
-    assert_eq!(desktop_exec_prefix(&launch), "\"/opt/Prefixr.AppImage\"");
+    assert_eq!(desktop_exec_prefix(&launch), "\"/opt/Laufzeit.AppImage\"");
     assert_eq!(launch.start_dir, PathBuf::from("/opt"));
 }

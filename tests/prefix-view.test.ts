@@ -17,7 +17,7 @@ import {
 } from "#lib/prefixView.ts";
 import type { Game, PrefixInfo, PrefixState } from "#lib/types.ts";
 
-const ROOT = "/mnt/games/Prefixr";
+const ROOT = "/mnt/games/Laufzeit";
 
 const game = (id: string, name: string, prefix_path: string) => ({ id, name, prefix_path }) as Game;
 

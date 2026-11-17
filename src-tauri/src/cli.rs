@@ -1,6 +1,6 @@
-//! The command line: `prefixr game add …`, `prefixr prefix winetricks …` and
+//! The command line: `laufzeit game add …`, `laufzeit prefix winetricks …` and
 //! so on, for scripts and AI agents. Each subcommand runs the same Tauri
-//! commands the window calls, in a Prefixr without a window (as `--run`
+//! commands the window calls, in a Laufzeit without a window (as `--run`
 //! does), so a game added or launched here behaves exactly like one from the
 //! window. An open window picks up the changes (see
 //! `config::watch_config_file`).
@@ -52,12 +52,14 @@ mod install;
 mod library;
 mod skill;
 mod store;
+
 use backup::BackupCommand;
 use library::{CategoryCommand, LibraryCommand};
+pub(crate) use skill::install as install_skill;
 use skill::SkillCommand;
 use store::StoreCommand;
 
-/// The first arguments that make Prefixr a command line program rather than
+/// The first arguments that make Laufzeit a command line program rather than
 /// open its window. Everything else, including `--launch`, `--run` and
 /// `--install`, is left to the app as before.
 const CLI_ARGS: &[&str] = &[
@@ -78,7 +80,7 @@ const CLI_ARGS: &[&str] = &[
 ];
 
 pub fn is_cli(args: &[String]) -> bool {
-    // `--json` goes anywhere, also before the subcommand: `prefixr --json
+    // `--json` goes anywhere, also before the subcommand: `laufzeit --json
     // game list` is the command line too, not the window.
     args.iter()
         .skip(1)
@@ -88,10 +90,10 @@ pub fn is_cli(args: &[String]) -> bool {
 
 #[derive(Parser, Debug)]
 #[command(
-    name = "prefixr",
+    name = "laufzeit",
     version,
-    about = "Prefixr from the command line: manage the library, prefixes and runners, and launch games.",
-    after_help = "Without a subcommand, Prefixr opens its window. Games are named by their id, \
+    about = "Laufzeit from the command line: manage the library, prefixes and runners, and launch games.",
+    after_help = "Without a subcommand, Laufzeit opens its window. Games are named by their id, \
                   the start of it, or their name."
 )]
 struct Cli {
@@ -193,10 +195,10 @@ struct AddGame {
     /// The name in the library; made from the exe's file name if left out
     #[arg(long)]
     name: Option<String>,
-    /// The prefix folder; one Prefixr doesn't know yet is added (and created)
+    /// The prefix folder; one Laufzeit doesn't know yet is added (and created)
     #[arg(long)]
     prefix: PathBuf,
-    /// The runner's id, as `prefixr runner list` shows it
+    /// The runner's id, as `laufzeit runner list` shows it
     #[arg(long)]
     runner: String,
     #[command(flatten)]
@@ -210,7 +212,7 @@ struct EditGame {
     name: Option<String>,
     #[arg(long)]
     exe: Option<PathBuf>,
-    /// One Prefixr doesn't know yet is added (and created)
+    /// One Laufzeit doesn't know yet is added (and created)
     #[arg(long)]
     prefix: Option<PathBuf>,
     #[arg(long)]
@@ -239,7 +241,7 @@ struct GameSettings {
     #[arg(long)]
     notes: Option<String>,
     /// The protonfixes match, e.g. umu-1091500 or a Steam app id ("" for none);
-    /// see `prefixr umu search`
+    /// see `laufzeit umu search`
     #[arg(long)]
     umu_id: Option<String>,
     /// The store of the UMU id: gog, egs, …
@@ -316,7 +318,7 @@ enum PrefixCommand {
     List,
     /// Add a prefix: an empty or new folder, or an existing prefix
     Add { path: PathBuf },
-    /// Remove a prefix from Prefixr; the folder stays
+    /// Remove a prefix from Laufzeit; the folder stays
     Remove { path: PathBuf },
     /// Install winetricks packages, or list the installed ones when none are given
     Winetricks {
@@ -750,7 +752,7 @@ fn check_runner(app: &AppHandle, runner_id: &str) -> Result<RunnerKind, AppError
             format!(
                 "Runner '{runner_id}' not found. Installed: {}",
                 if installed.is_empty() {
-                    "none (see `prefixr runner download`)".to_string()
+                    "none (see `laufzeit runner download`)".to_string()
                 } else {
                     installed.join(", ")
                 }
@@ -759,7 +761,7 @@ fn check_runner(app: &AppHandle, runner_id: &str) -> Result<RunnerKind, AppError
         })
 }
 
-/// The prefix at `path`, added to Prefixr first if it doesn't know it yet.
+/// The prefix at `path`, added to Laufzeit first if it doesn't know it yet.
 fn ensure_prefix(app: &AppHandle, out: Out, path: &Path) -> Result<PathBuf, AppError> {
     let path = absolute(path)?;
     let known = {
@@ -1017,7 +1019,7 @@ fn steam_result(out: Out, change: SteamChange, done: &str) -> Result<(), AppErro
              Quit it, or pass --restart-steam."
             .to_string()
             .into()),
-        SteamChange::CloseSteamFirst => Err("Prefixr can't see or quit Steam from its Flatpak, \
+        SteamChange::CloseSteamFirst => Err("Laufzeit can't see or quit Steam from its Flatpak, \
              and a running Steam would overwrite the change. Close Steam, then pass \
              --restart-steam."
             .to_string()

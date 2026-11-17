@@ -15,6 +15,7 @@ use crate::config::ConfigState;
 use crate::env;
 use crate::host_env::{host_data_home, is_flatpak};
 use crate::lock::LockExt;
+use crate::migration::mentions_prefixr;
 use crate::models::{ArtworkKind, Game};
 
 /// How long `steam -shutdown` gets before the export gives up.
@@ -128,7 +129,7 @@ async fn stop_steam() -> Result<(), AppError> {
 }
 
 /// Starts Steam again after `stop_steam`, in its own process group so it
-/// doesn't go down with Prefixr. Best-effort: the export itself is done.
+/// doesn't go down with Laufzeit. Best-effort: the export itself is done.
 fn start_steam() {
     let _ = crate::host_env::host_command("steam")
         .stdin(Stdio::null())
@@ -149,7 +150,7 @@ fn shortcut_app_id(game_id: Uuid) -> u32 {
 }
 
 /// `--run` rather than a desktop shortcut's `--launch`: the game runs in a
-/// windowless Prefixr that exits with it, so Steam sees when it ends. After
+/// windowless Laufzeit that exits with it, so Steam sees when it ends. After
 /// the arguments of `launch` itself (`run <app ID>` in a Flatpak).
 fn launch_options(launch: &OwnLaunch, game_id: Uuid) -> String {
     launch
@@ -189,7 +190,7 @@ fn quoted(path: &Path) -> String {
 }
 
 /// Adds the game's shortcut or updates the one from an earlier export. An
-/// update only touches the fields Prefixr owns, so what the user changed in
+/// update only touches the fields Laufzeit owns, so what the user changed in
 /// Steam (collections, hidden, own launch settings) stays.
 fn upsert_shortcut(
     shortcuts: &mut Map,
@@ -375,6 +376,61 @@ fn remove_shortcut(game_id: Uuid, user: &SteamUser) -> Result<(), AppError> {
     Ok(())
 }
 
+/// Points the games' entries that start them through Prefixr, the name
+/// Laufzeit had before (see `migration`), at this Laufzeit. Only their
+/// program and launch options change. Returns whether any did.
+fn relink_entries(shortcuts: &mut Map, games: &[Game], launch: &OwnLaunch) -> bool {
+    let mut changed = false;
+    for game in games {
+        let Some(index) = find_shortcut(shortcuts, game.id) else {
+            continue;
+        };
+        let Value::Map(fields) = &mut shortcuts[index].1 else {
+            continue;
+        };
+        let legacy = ["Exe", "LaunchOptions"].iter().any(|key| {
+            matches!(binary_vdf::get(fields, key), Some(Value::String(value)) if mentions_prefixr(value))
+        });
+        if !legacy {
+            continue;
+        }
+        binary_vdf::set(fields, "Exe", Value::String(quoted(&launch.program)));
+        binary_vdf::set(fields, "StartDir", Value::String(quoted(&launch.start_dir)));
+        binary_vdf::set(
+            fields,
+            "LaunchOptions",
+            Value::String(launch_options(launch, game.id)),
+        );
+        changed = true;
+    }
+    changed
+}
+
+/// Rewrites Steam's entries for these games that Prefixr made, so Steam
+/// starts them through this Laufzeit. Best-effort, on every start of the
+/// window; finds nothing once they're rewritten. Natively only while Steam
+/// is closed, which would otherwise write its own copy back: the next start
+/// tries again. In a Flatpak, which can't see Steam, always; a running
+/// Steam may write its copy back the same way.
+pub fn relink_legacy_shortcuts(games: &[Game]) {
+    if !is_flatpak() && steam_running() {
+        return;
+    }
+    let (Ok(user), Ok(launch)) = (SteamUser::find(), own_launch(&env::process)) else {
+        return;
+    };
+    if !user.shortcuts_path.exists() {
+        return;
+    }
+    let Ok(mut file) = read_shortcuts_file(&user.shortcuts_path) else {
+        return;
+    };
+    let shortcuts = binary_vdf::map_entry(&mut file, "shortcuts");
+    if relink_entries(shortcuts, games, &launch) {
+        let _ = write_shortcuts_file(&user.shortcuts_path, &file);
+    }
+}
+
 #[derive(Debug, Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS), ts(export))]
 #[serde(tag = "status", rename_all = "snake_case")]
@@ -383,7 +439,7 @@ pub enum SteamChange {
     Done { restarted_steam: bool },
     /// Steam runs and `shutdown_steam` wasn't set; nothing was changed.
     SteamRunning,
-    /// In a Flatpak, where Prefixr can neither see Steam's process nor run
+    /// In a Flatpak, where Laufzeit can neither see Steam's process nor run
     /// `steam` to quit it, and `shutdown_steam` wasn't set: the user is asked
     /// to close Steam. Called again with it set, that means Steam is closed.
     CloseSteamFirst,

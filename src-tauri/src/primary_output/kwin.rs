@@ -12,20 +12,20 @@ use std::path::Path;
 use std::sync::Mutex;
 
 /// The script's name in KWin. One at a time: a later launch replaces it.
-const PLUGIN: &str = "prefixr-launch-monitor";
+const PLUGIN: &str = "laufzeit-launch-monitor";
 
 /// How many running games the loaded script is for.
 static GAMES: Mutex<usize> = Mutex::new(0);
 
 /// The bus connection owning `owner_name()` while this process's script is
-/// loaded. Another Prefixr (a Steam shortcut's `--run` is a process of its
+/// loaded. Another Laufzeit (a Steam shortcut's `--run` is a process of its
 /// own) then leaves the script alone at its start, and doesn't load its own.
 static OWNER: Mutex<Option<zbus::Connection>> = Mutex::new(None);
 
 /// Below the app ID: a Flatpak may own those names.
 fn owner_name() -> String {
     let app_id =
-        crate::host_env::flatpak_id().unwrap_or_else(|| "io.github.firsttris.Prefixr".into());
+        crate::host_env::flatpak_id().unwrap_or_else(|| "io.github.firsttris.Laufzeit".into());
     format!("{app_id}.LaunchMonitor")
 }
 
@@ -47,7 +47,7 @@ fn release_owner_name() {
     }
 }
 
-/// Whether a Prefixr process (this one or another) holds the script.
+/// Whether a Laufzeit process (this one or another) holds the script.
 /// `true` if that can't be told, so nothing is unloaded on a guess.
 fn owner_running() -> bool {
     zbus::block_on(async {
@@ -64,7 +64,7 @@ fn owner_running() -> bool {
 pub(super) fn script(targets: &[String]) -> String {
     let targets = serde_json::to_string(targets).unwrap_or_else(|_| "[]".into());
     format!(
-        r#"// Written by Prefixr while games run: moves them to the monitor Prefixr is on.
+        r#"// Written by Laufzeit while games run: moves them to the monitor Laufzeit is on.
 const targets = {targets};
 
 function target() {{
@@ -208,8 +208,8 @@ fn unload() -> Option<()> {
     })
 }
 
-/// Unloads a script a crashed Prefixr left loaded, at start: one no running
-/// Prefixr holds.
+/// Unloads a script a crashed Laufzeit left loaded, at start: one no running
+/// Laufzeit holds.
 pub fn unload_leftover() {
     if !owner_running() {
         let _ = unload();

@@ -60,7 +60,7 @@ fn tells_a_login_from_the_file_alone() {
 fn reads_the_username() {
     assert_eq!(
         parse_username(include_str!("fixtures/user.json")).as_deref(),
-        Some("PrefixrTester")
+        Some("LaufzeitTester")
     );
     assert_eq!(parse_username(r#"{"username": " "}"#), None);
 }

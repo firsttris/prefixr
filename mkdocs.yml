@@ -1,18 +1,18 @@
-# The documentation as a website: https://firsttris.github.io/prefixr/
+# The documentation as a website: https://firsttris.github.io/laufzeit/
 # Source is docs/, built with MkDocs Material (.github/workflows/docs.yml).
 # Locally: pip install -r requirements-docs.txt && mkdocs serve
-site_name: Prefixr
+site_name: Laufzeit
 site_description: >-
   The agentic game launcher for Linux: let an AI agent add, fix and organize
   your Windows games on Wine and Proton, or do it yourself in a few clicks.
   Prefix manager with Proton-GE downloads, umu-launcher, MangoHud, Gamescope
   and Steam integration.
-site_url: https://firsttris.github.io/prefixr/
-repo_url: https://github.com/firsttris/prefixr
-repo_name: firsttris/prefixr
+site_url: https://firsttris.github.io/laufzeit/
+repo_url: https://github.com/firsttris/laufzeit
+repo_name: firsttris/laufzeit
 edit_uri: edit/main/docs/
 copyright: >-
-  MIT License · Prefixr is not affiliated with Valve, Steam, WineHQ,
+  MIT License · Laufzeit is not affiliated with Valve, Steam, WineHQ,
   CodeWeavers or SteamGridDB.
 
 docs_dir: docs
@@ -107,8 +107,8 @@ markdown_extensions:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/firsttris/prefixr
+      link: https://github.com/firsttris/laufzeit
       name: Source code on GitHub
     - icon: material/download
-      link: https://github.com/firsttris/prefixr/releases/latest
+      link: https://github.com/firsttris/laufzeit/releases/latest
       name: Download the latest release

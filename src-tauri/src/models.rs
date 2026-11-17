@@ -112,7 +112,7 @@ pub struct Game {
     #[serde(default)]
     pub overrides: GameOverrides,
     /// The store this game was installed from (see `commands::stores`), for
-    /// a game Prefixr installed from a connected store account. Its launch
+    /// a game Laufzeit installed from a connected store account. Its launch
     /// then asks the store's tool for the command line (online games need
     /// the account's tokens on it), and removing it uninstalls its files.
     /// `None` for a game added by hand.
@@ -120,7 +120,7 @@ pub struct Game {
     pub store: Option<StoreLink>,
 }
 
-/// A store Prefixr can install games from. Each one is driven by a command
+/// A store Laufzeit can install games from. Each one is driven by a command
 /// line tool from the Heroic Games Launcher project (see
 /// `commands::stores::helpers`); a new store is a new variant here plus a
 /// module of its own under `commands::stores`.
@@ -527,9 +527,10 @@ pub enum LaunchMonitor {
     /// The primary monitor, where Wine puts a fullscreen game by itself.
     #[default]
     Primary,
-    /// The one Prefixr's window is on, made the X11 primary while the game
-    /// runs. See `primary_output`.
-    Prefixr,
+    /// The one Laufzeit's window is on, made the X11 primary while the game
+    /// runs. See `primary_output`. Saved as `prefixr` before the rename.
+    #[serde(alias = "prefixr")]
+    Laufzeit,
 }
 
 /// Wraps the game in `gamescope`, giving it its own nested compositor

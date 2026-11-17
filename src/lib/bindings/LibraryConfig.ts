@@ -17,7 +17,7 @@ categories: Array<Category>, favorites: Array<string>,
  */
 hidden: Array<string>, activity: { [key in string]: GameActivity }, 
 /**
- * What testing a game found, by the user or an agent (`prefixr library
+ * What testing a game found, by the user or an agent (`laufzeit library
  * test-status`). Untested games have no entry.
  */
 tested: { [key in string]: TestResult }, };

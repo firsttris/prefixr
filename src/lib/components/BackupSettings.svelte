@@ -1,6 +1,6 @@
 <!--
   Backing up and restoring the library: a backup to a file of the user's,
-  restoring one from a file, and the automatic backups Prefixr makes itself
+  restoring one from a file, and the automatic backups Laufzeit makes itself
   (every few days when turned on, and before every restore) to restore with
   one click.
 -->
@@ -42,7 +42,7 @@
     }
   }
 
-  // Also when Prefixr made one meanwhile: the daily one right after the
+  // Also when Laufzeit made one meanwhile: the daily one right after the
   // start, or the one before a restore that then failed.
   onMount(() => {
     refresh();

@@ -12,7 +12,7 @@ const NOT_LOGGED_IN: &str = include_str!("fixtures/list_not_logged_in.stderr");
 fn reads_the_account_from_status() {
     assert_eq!(
         account_name(include_str!("fixtures/status_logged_in.json")).unwrap(),
-        Some("PrefixrTester".to_string())
+        Some("LaufzeitTester".to_string())
     );
     // The real output of a Legendary nobody has logged into.
     assert_eq!(
@@ -134,7 +134,7 @@ fn orders_the_launch_like_legendary() {
         launch.working_dir,
         PathBuf::from("/home/user/Games/Epic/HollowLantern/Binaries/Win64")
     );
-    // The prefix stays Prefixr's.
+    // The prefix stays Laufzeit's.
     assert_eq!(launch.env, [("DXVK_HUD".to_string(), "0".to_string())]);
 }
 

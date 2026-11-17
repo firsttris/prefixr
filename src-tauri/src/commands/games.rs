@@ -147,8 +147,8 @@ pub struct WineSession {
 /// which can take a while without any window showing up.
 ///
 /// Each claim also holds a lock file per game (see `lock_launch_file`),
-/// which is what makes it visible to other Prefixr processes: a game Steam
-/// started via `--run` runs in a windowless Prefixr of its own, and the
+/// which is what makes it visible to other Laufzeit processes: a game Steam
+/// started via `--run` runs in a windowless Laufzeit of its own, and the
 /// open one must neither start it a second time nor delete its prefix.
 #[derive(Default)]
 pub struct LaunchingGames(Mutex<HashSet<Uuid>>);
@@ -191,13 +191,13 @@ pub(crate) struct LaunchGuard<'a> {
 }
 
 /// Where the per-game lock files live: the user's runtime directory, which
-/// every Prefixr process of the same user shares, including one started by
+/// every Laufzeit process of the same user shares, including one started by
 /// Steam.
 fn launch_lock_dir(env: Env) -> PathBuf {
     match env("XDG_RUNTIME_DIR") {
-        Some(dir) => PathBuf::from(dir).join("prefixr"),
+        Some(dir) => PathBuf::from(dir).join("laufzeit"),
         // SAFETY: getuid(2) can't fail and has no preconditions.
-        None => std::env::temp_dir().join(format!("prefixr-{}", unsafe { libc::getuid() })),
+        None => std::env::temp_dir().join(format!("laufzeit-{}", unsafe { libc::getuid() })),
     }
 }
 
@@ -364,7 +364,7 @@ fn pkill_pattern(text: &str) -> String {
 ///
 /// `stop_game_gracefully` whenever the game's processes can be seen by
 /// their marker (`GAME_ID_VAR`), so natively and in a Flatpak. Otherwise —
-/// a game whose processes run on the host while Prefixr runs in a distrobox,
+/// a game whose processes run on the host while Laufzeit runs in a distrobox,
 /// where their environment can't be read — the hard kills below:
 ///
 /// 1. `kill_process_tree` on the process `launch_game` spawned — for a
@@ -401,7 +401,7 @@ pub async fn kill_running_game(running: &RunningGames, id: Uuid) -> Result<(), S
 }
 
 /// Steps 2 and 3 of `kill_running_game`'s fallback, which need nothing from
-/// the process that started the game: also how `prefixr game stop` ends a
+/// the process that started the game: also how `laufzeit game stop` ends a
 /// game whose processes it can't see.
 pub async fn end_game_session(
     wineserver: &Path,
@@ -448,7 +448,7 @@ pub async fn end_game_session(
 /// in a Flatpak, pressure-vessel's container runs below the Flatpak portal,
 /// not below umu-run, and wine's daemons below the sandbox's PID 1. The
 /// same as Lutris' `LUTRIS_GAME_UUID`.
-pub(crate) const GAME_ID_VAR: &str = "PREFIXR_GAME_ID";
+pub(crate) const GAME_ID_VAR: &str = "LAUFZEIT_GAME_ID";
 
 /// The game's running processes, by `GAME_ID_VAR` in their environment.
 fn marked_processes(id: Uuid) -> Vec<u32> {
@@ -499,7 +499,7 @@ const END_WINE_SESSION_TIMEOUT: Duration = Duration::from_secs(10);
 const GRACEFUL_STOP_MAX: Duration =
     END_WINE_SESSION_TIMEOUT.saturating_add(STOP_STEP.saturating_mul(3));
 
-/// How long `prefixr game stop` waits for the instance that runs the game to
+/// How long `laufzeit game stop` waits for the instance that runs the game to
 /// finish a stop it handed over: the longest stop, plus time for that
 /// instance's `run_game` to see the game's process exit, record the session
 /// and release the lock.
@@ -551,7 +551,7 @@ pub async fn stop_game_gracefully(id: Uuid, session: &WineSession, log_path: Opt
             .open(log_path)
             .and_then(|mut f| {
                 use std::io::Write;
-                writeln!(f, "[prefixr] Stop: {text}")
+                writeln!(f, "[laufzeit] Stop: {text}")
             });
     };
     note(format!(
@@ -614,7 +614,7 @@ async fn end_wine_session(session: &WineSession, log_path: Option<&Path>) {
     let _ = tokio::time::timeout(END_WINE_SESSION_TIMEOUT, command.status()).await;
 }
 
-/// The wine session of `game` under `runner`, for `prefixr game stop`,
+/// The wine session of `game` under `runner`, for `laufzeit game stop`,
 /// which didn't start the game itself: the same values `run_game` uses.
 pub async fn game_wine_session(
     app: &AppHandle,
@@ -644,20 +644,20 @@ pub async fn game_wine_session(
     })
 }
 
-/// Whether another Prefixr process holds the game's lock file, i.e. is
+/// Whether another Laufzeit process holds the game's lock file, i.e. is
 /// launching or running it.
 fn launch_locked_elsewhere(id: Uuid) -> bool {
     lock_launch_file(id).is_err()
 }
 
-/// `prefixr game stop` in a Flatpak, for a game whose processes it can't
+/// `laufzeit game stop` in a Flatpak, for a game whose processes it can't
 /// see: every `flatpak run` is its own PID namespace. The game's lock file
-/// tells whether another Prefixr process runs it. That process owns the
+/// tells whether another Laufzeit process runs it. That process owns the
 /// game's D-Bus name (see `game_control`), whether it's the window, a CLI
 /// `game launch` or a Steam `--run`; it gets the stop, and this waits until
 /// the game's lock is released. Instead of reporting a stop that didn't
 /// happen, says so when the game isn't running, or when its process didn't
-/// take the stop (still preparing the launch, or an older Prefixr).
+/// take the stop (still preparing the launch, or an older Laufzeit).
 pub async fn stop_game_in_other_instance(id: Uuid, game_name: &str) -> Result<(), AppError> {
     let game_name = game_name.to_string();
     if !launch_locked_elsewhere(id) {
@@ -681,7 +681,7 @@ pub async fn stop_game_in_other_instance(id: Uuid, game_name: &str) -> Result<()
     Err(AppError::GameRunsInOtherInstance { game_name })
 }
 
-/// A game this Prefixr is launching or running, for the frontend to pick
+/// A game this Laufzeit is launching or running, for the frontend to pick
 /// its state back up after the webview reloaded (the launch events it
 /// tracks that state from are gone by then).
 #[derive(Serialize)]
@@ -730,8 +730,8 @@ pub fn take_pending_launch(state: State<PendingLaunch>) -> Option<String> {
 
 /// Holds a `--install <exe-path>` argument found at startup, or forwarded by
 /// a second app instance (see `tauri_plugin_single_instance` in `lib.rs`) —
-/// the "Install with Prefixr" file-manager context menu entry launches
-/// Prefixr this way. The frontend picks it up once (via
+/// the "Install with Laufzeit" file-manager context menu entry launches
+/// Laufzeit this way. The frontend picks it up once (via
 /// `take_pending_install`, on startup and again on every `pending-install`
 /// event a second instance triggers while the app is already running) and
 /// opens the installer dialog with this exe path pre-filled.
@@ -969,13 +969,13 @@ pub fn update_game(
     Ok(updated)
 }
 
-/// Removes a game from the library along with everything Prefixr made for
+/// Removes a game from the library along with everything Laufzeit made for
 /// it: its configs, icon and artwork, logs, and its desktop and menu
 /// shortcuts, which would otherwise launch a game that no longer exists.
 /// Its prefix stays, which other games may share. Best-effort past the
 /// config itself: a leftover file is no reason to keep the game.
 ///
-/// Refused while the game is launching or running (here or in a Prefixr
+/// Refused while the game is launching or running (here or in a Laufzeit
 /// Steam started), which still writes to its logs; the claim also keeps it
 /// from being started while it's removed.
 #[tauri::command(async)]
@@ -1754,9 +1754,9 @@ async fn run_game(
             "--profile".to_string(),
             "performance".to_string(),
             "--reason".to_string(),
-            "Prefixr: game running".to_string(),
+            "Laufzeit: game running".to_string(),
             "--appid".to_string(),
-            "prefixr".to_string(),
+            "laufzeit".to_string(),
         ];
         wrapped.append(&mut launch_chain);
         launch_chain = wrapped;
@@ -1772,7 +1772,7 @@ async fn run_game(
         let mut wrapped = vec![
             "systemd-inhibit".to_string(),
             "--mode=block".to_string(),
-            "--who=Prefixr".to_string(),
+            "--who=Laufzeit".to_string(),
             "--why=A game is running".to_string(),
             "--what=idle:sleep".to_string(),
             "--".to_string(),
@@ -1837,9 +1837,9 @@ async fn run_game(
 
     if scheduler_conflict {
         let note = if use_power_profile {
-            "[prefixr] GameMode skipped: a competing scheduler daemon is active, using the performance power profile instead\n"
+            "[laufzeit] GameMode skipped: a competing scheduler daemon is active, using the performance power profile instead\n"
         } else {
-            "[prefixr] GameMode skipped: a competing scheduler daemon is active, and powerprofilesctl is not available\n"
+            "[laufzeit] GameMode skipped: a competing scheduler daemon is active, and powerprofilesctl is not available\n"
         };
         let _ = fs::OpenOptions::new()
             .append(true)
@@ -1848,7 +1848,7 @@ async fn run_game(
     }
 
     // Before the game starts: Wine reads the primary output once, at start.
-    let primary_switch = if graphics.launch_monitor == LaunchMonitor::Prefixr {
+    let primary_switch = if graphics.launch_monitor == LaunchMonitor::Laufzeit {
         let app = app.clone();
         tokio::task::spawn_blocking(move || primary_output::switch_to_active_output(&app))
             .await
@@ -1882,7 +1882,7 @@ async fn run_game(
         .stdout(log_out)
         .stderr(log_err)
         // Detaches the game from this app's own process group, so e.g. a
-        // Ctrl+C on a dev server running Prefixr doesn't also hit the game.
+        // Ctrl+C on a dev server running Laufzeit doesn't also hit the game.
         .process_group(0)
         .spawn()
         .map_err(|e| format!("Could not start game: {e}"))?;
@@ -1906,7 +1906,7 @@ async fn run_game(
         },
     );
     rebuild_tray_menu(app);
-    // In a Flatpak, so `prefixr game stop` from another instance reaches it.
+    // In a Flatpak, so `laufzeit game stop` from another instance reaches it.
     let game_name = match flatpak_id() {
         Some(app_id) => {
             let app = app.clone();
@@ -1988,7 +1988,7 @@ async fn run_store_prerequisites(
         let _ = fs::OpenOptions::new()
             .append(true)
             .open(log_path)
-            .and_then(|mut f| writeln!(f, "[prefixr] {text}"));
+            .and_then(|mut f| writeln!(f, "[laufzeit] {text}"));
     };
     // Shared redistributables have a path of their own; a game's own
     // installer is inside its install folder.
@@ -2046,7 +2046,7 @@ fn store_install_dir(game_exe: &Path, relative: &str) -> Option<PathBuf> {
 /// The folder a game starts in: its exe's own, as Windows starts a program
 /// from a shortcut. Plenty of games read files next to the exe by a
 /// relative path — Age of Empires IV its `App.ini`, without which it quits
-/// right away — so starting them from wherever Prefixr itself runs breaks
+/// right away — so starting them from wherever Laufzeit itself runs breaks
 /// them. `None` for an exe whose folder is gone (the launch reports that).
 fn working_dir(exe: &Path) -> Option<&Path> {
     exe.parent().filter(|dir| dir.is_dir())
@@ -2078,7 +2078,7 @@ fn add_game_env(env: &mut Vec<(String, String)>, game_vars: &HashMap<String, Str
     }
 }
 
-/// Appends the `LD_PRELOAD` Prefixr itself was started with to the one set up
+/// Appends the `LD_PRELOAD` Laufzeit itself was started with to the one set up
 /// for the launch, which would otherwise replace it. That's how Steam
 /// injects its overlay into a game it started via `--run`, so without this
 /// GameMode (or a game's own `LD_PRELOAD`) would switch the overlay off. A
@@ -2180,10 +2180,10 @@ pub(crate) fn own_executable_path(env: Env) -> Result<PathBuf, String> {
     std::env::current_exe().map_err(|e| format!("Could not resolve own executable path: {e}"))
 }
 
-/// How a shortcut (desktop, start menu, "Open with", Steam) starts Prefixr.
+/// How a shortcut (desktop, start menu, "Open with", Steam) starts Laufzeit.
 pub(crate) struct OwnLaunch {
     pub program: PathBuf,
-    /// Arguments before Prefixr's own (`--launch <id>` and the like).
+    /// Arguments before Laufzeit's own (`--launch <id>` and the like).
     pub args: Vec<String>,
     /// The folder Steam starts the program in.
     pub start_dir: PathBuf,
@@ -2191,7 +2191,7 @@ pub(crate) struct OwnLaunch {
 
 /// `OwnLaunch` for this build. Natively its own executable (see
 /// `own_executable_path`). In a Flatpak `flatpak run <app ID>`, as Lutris,
-/// Bottles, Faugus and Heroic write theirs: `/app/bin/prefixr` doesn't exist
+/// Bottles, Faugus and Heroic write theirs: `/app/bin/laufzeit` doesn't exist
 /// on the host.
 pub(crate) fn own_launch(env: Env) -> Result<OwnLaunch, String> {
     if let Some(id) = env("FLATPAK_ID").and_then(|id| id.into_string().ok()) {
@@ -2216,7 +2216,7 @@ pub(crate) fn own_launch(env: Env) -> Result<OwnLaunch, String> {
 }
 
 /// The start of an `Exec=` line for `launch`: the program and its arguments,
-/// each quoted (see `desktop_exec_arg`). Prefixr's own arguments follow.
+/// each quoted (see `desktop_exec_arg`). Laufzeit's own arguments follow.
 fn desktop_exec_prefix(launch: &OwnLaunch) -> String {
     std::iter::once(desktop_exec_arg(&launch.program))
         .chain(
@@ -2309,11 +2309,16 @@ fn write_game_shortcut(
             .cloned()
             .ok_or_else(|| format!("No game with id {id}"))?
     };
+    write_shortcut_file(app, &game, target_dir)
+}
 
+/// Writes the game's `.desktop` file into `target_dir`, replacing the
+/// game's earlier ones there.
+fn write_shortcut_file(app: &AppHandle, game: &Game, target_dir: &Path) -> Result<(), String> {
     fs::create_dir_all(target_dir)
         .map_err(|e| format!("Could not access {}: {e}", target_dir.display()))?;
 
-    let icon_path = write_shortcut_icon(app, &game)?;
+    let icon_path = write_shortcut_icon(app, game)?;
     let launch = own_launch(&env::process)?;
 
     let mut contents = String::new();
@@ -2362,6 +2367,43 @@ fn write_game_shortcut(
     Ok(())
 }
 
+/// Whether a game's `.desktop` file starts it through Prefixr, the name
+/// Laufzeit had before (see `migration`).
+fn calls_prefixr(path: &Path) -> bool {
+    fs::read_to_string(path).is_ok_and(|contents| {
+        contents
+            .lines()
+            .any(|line| line.starts_with("Exec=") && crate::migration::mentions_prefixr(line))
+    })
+}
+
+/// Rewrites the desktop and menu shortcuts that still start a game through
+/// Prefixr, so they start it through this Laufzeit. Best-effort, on every
+/// start of the window; finds nothing once they're rewritten.
+pub fn relink_legacy_shortcuts(app: &AppHandle, games: &[Game]) {
+    let dirs = [
+        desktop_directory(&env::process),
+        applications_directory(&env::process),
+    ];
+    let mut menu_changed = false;
+    for (index, dir) in dirs.iter().enumerate() {
+        let Ok(dir) = dir else { continue };
+        for game in games {
+            let legacy = game_shortcuts(dir, game.id)
+                .iter()
+                .any(|path| calls_prefixr(path));
+            if legacy && write_shortcut_file(app, game, dir).is_ok() {
+                menu_changed |= index == 1;
+            }
+        }
+    }
+    if let (true, Ok(applications_dir)) = (menu_changed, &dirs[1]) {
+        let _ = host_std_command("update-desktop-database")
+            .arg(applications_dir)
+            .status();
+    }
+}
+
 /// Creates a `.desktop` shortcut on the user's Desktop that launches this
 /// game directly.
 #[tauri::command(async)]
@@ -2406,12 +2448,12 @@ const APP_ICON_PNG: &[u8] = include_bytes!("../../icons/128x128.png");
 const EXE_MIME_TYPES: &str = "application/x-ms-dos-executable;application/x-msdownload;application/vnd.microsoft.portable-executable;";
 
 /// Writes (idempotently overwrites) a second, hidden `.desktop` entry that
-/// registers Prefixr as a handler for Windows executables — this is what
-/// makes "Mit Prefixr installieren" show up when right-clicking an `.exe` in
+/// registers Laufzeit as a handler for Windows executables — this is what
+/// makes "Mit Laufzeit installieren" show up when right-clicking an `.exe` in
 /// a file manager's "Öffnen mit" menu, the same mechanism PortProton uses for
 /// its own "Install with PortProton" entry. `NoDisplay=true` keeps it out of
 /// the application menu/launcher, where the main `.desktop` entry (created by
-/// the platform installer/bundler) already covers opening Prefixr itself.
+/// the platform installer/bundler) already covers opening Laufzeit itself.
 /// Best-effort and re-run on every startup so it self-heals and stays in
 /// sync with the app's own executable path (relevant for an AppImage, whose
 /// mount path can move between updates).
@@ -2427,7 +2469,7 @@ pub fn ensure_install_desktop_entry(app: &AppHandle) -> Result<(), String> {
         .join("shortcut-icons");
     fs::create_dir_all(&icons_dir)
         .map_err(|e| format!("Could not create shortcut icons directory: {e}"))?;
-    let icon_path = icons_dir.join("prefixr-install.png");
+    let icon_path = icons_dir.join("laufzeit-install.png");
     fs::write(&icon_path, APP_ICON_PNG)
         .map_err(|e| format!("Could not write install icon: {e}"))?;
 
@@ -2437,11 +2479,11 @@ pub fn ensure_install_desktop_entry(app: &AppHandle) -> Result<(), String> {
     contents.push_str("Type=Application\n");
     // No leading "Mit"/"with": file managers that build their own "Open
     // With %s" wrapper (e.g. GNOME Files) would otherwise double it up into
-    // "Mit Mit Prefixr installieren öffnen" / "Open With Install with
-    // Prefixr". Leaving the verb out of the name lets each file manager
+    // "Mit Mit Laufzeit installieren öffnen" / "Open With Install with
+    // Laufzeit". Leaving the verb out of the name lets each file manager
     // compose its own sentence around it, same as every other app's entry.
-    contents.push_str("Name=Prefixr installieren\n");
-    contents.push_str("Name[en]=Install Prefixr\n");
+    contents.push_str("Name=Laufzeit installieren\n");
+    contents.push_str("Name[en]=Install Laufzeit\n");
     contents.push_str(&format!(
         "Exec={} --install %f\n",
         desktop_exec_prefix(&launch)
@@ -2458,9 +2500,20 @@ pub fn ensure_install_desktop_entry(app: &AppHandle) -> Result<(), String> {
     // `host_data_home`); each keeps its own entry.
     let entry_name = match flatpak_id() {
         Some(id) => format!("{id}.install.desktop"),
-        None => "com.tristan.prefixr.install.desktop".to_string(),
+        None => "com.tristan.laufzeit.install.desktop".to_string(),
     };
     let desktop_path = applications_dir.join(entry_name);
+    // Prefixr's entry, from before the rename: it would offer to install
+    // with a program that's gone.
+    for legacy in [
+        format!("{}.install.desktop", crate::migration::LEGACY_IDENTIFIER),
+        format!("{}.install.desktop", crate::migration::LEGACY_FLATPAK_ID),
+    ] {
+        let legacy = applications_dir.join(legacy);
+        if calls_prefixr(&legacy) {
+            let _ = fs::remove_file(legacy);
+        }
+    }
     fs::write(&desktop_path, contents)
         .map_err(|e| format!("Could not write install desktop entry: {e}"))?;
 

@@ -214,8 +214,8 @@
   // game out of Steam before removing it from the library.
   type SteamAction = "export" | "remove" | "remove-game";
 
-  // `closeFirst`: in the Flatpak, where Prefixr can't see or quit Steam, the
-  // user closes it instead of Prefixr restarting it.
+  // `closeFirst`: in the Flatpak, where Laufzeit can't see or quit Steam, the
+  // user closes it instead of Laufzeit restarting it.
   let steamConfirm = $state<{ game: Game; action: SteamAction; closeFirst: boolean } | null>(null);
   let steamNotice = $state<{ text: string; kind: "busy" | "done" | "error" } | null>(null);
   let noticeTimer: ReturnType<typeof setTimeout> | undefined;
