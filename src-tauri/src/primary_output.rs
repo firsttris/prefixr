@@ -1,7 +1,7 @@
 //! Starting a game on the monitor the user is working on. Wine puts a
 //! fullscreen game on the X11 primary output (its first display adapter),
-//! also under Xwayland, whatever monitor Prefixr's window is on. So for a
-//! launch, the output Prefixr's window is on (or, if that can't be told, the
+//! also under Xwayland, whatever monitor Laufzeit's window is on. So for a
+//! launch, the output Laufzeit's window is on (or, if that can't be told, the
 //! one KWin calls active) becomes the X11 primary until the game exits.
 //! Only X11 clients see that primary: a Wayland desktop's own panels stay
 //! where they are. Best-effort throughout: without an X server, libXrandr
@@ -32,12 +32,12 @@ impl PrimaryOutputSwitch {
     pub fn log_note(&self) -> String {
         if self.kwin.is_some() {
             format!(
-                "[prefixr] KWin moves the game's windows to {} while the game runs\n",
+                "[laufzeit] KWin moves the game's windows to {} while the game runs\n",
                 self.name
             )
         } else {
             format!(
-                "[prefixr] {} is the primary monitor while the game runs\n",
+                "[laufzeit] {} is the primary monitor while the game runs\n",
                 self.name
             )
         }
@@ -159,7 +159,7 @@ pub fn switch_to_active_output(app: &AppHandle) -> Option<PrimaryOutputSwitch> {
     .flatten()
 }
 
-/// The monitor Prefixr's window is on, while it's shown.
+/// The monitor Laufzeit's window is on, while it's shown.
 fn window_monitor_name(app: &AppHandle) -> Option<String> {
     let window = app.get_webview_window("main")?;
     if !window.is_visible().unwrap_or(false) || window.is_minimized().unwrap_or(false) {

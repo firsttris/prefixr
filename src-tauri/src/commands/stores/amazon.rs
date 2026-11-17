@@ -2,7 +2,7 @@
 //!
 //! Nile is the Amazon Games client the Heroic Games Launcher uses. It keeps
 //! its login, library and installed games as JSON files in its config folder
-//! (`NILE_CONFIG_PATH`), which Prefixr reads directly where Nile has no JSON
+//! (`NILE_CONFIG_PATH`), which Laufzeit reads directly where Nile has no JSON
 //! output for them. A login takes two steps: Nile makes a login request
 //! (`auth --login --non-interactive`), the user signs in on its address, and
 //! the address Amazon sends them to afterwards carries the code Nile
@@ -26,7 +26,7 @@ use super::{StoreInstallInfo, StoreLaunch, StoreLibraryEntry};
 use crate::host_env::host_command;
 use crate::models::StorePrerequisites;
 
-/// Runs Nile with Prefixr's own config folder, apart from a Nile or Heroic
+/// Runs Nile with Laufzeit's own config folder, apart from a Nile or Heroic
 /// the user may have installed.
 pub struct Nile {
     pub binary: PathBuf,

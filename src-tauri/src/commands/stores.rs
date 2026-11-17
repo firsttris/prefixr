@@ -1,7 +1,7 @@
 //! Store accounts: games from a connected store show up in the library,
 //! can be installed from there, and run like any other game.
 //!
-//! Prefixr does the part it is good at — the prefix, the runner, the launch
+//! Laufzeit does the part it is good at — the prefix, the runner, the launch
 //! — and leaves the store's own protocol to a command line tool that's made
 //! for it (`helpers`): logging in, listing the account's games, downloading
 //! and installing them, and the account's arguments every launch of an
@@ -55,7 +55,7 @@ pub struct StoreLibraryEntry {
     /// The store's id for it.
     pub app_name: String,
     pub title: String,
-    /// The store's cover image, if it has one Prefixr can use.
+    /// The store's cover image, if it has one Laufzeit can use.
     #[serde(default)]
     pub cover_url: Option<String>,
 }
@@ -83,10 +83,10 @@ pub struct StoreAccount {
     pub account_name: Option<String>,
     /// How many games the last library sync found.
     pub game_count: u32,
-    /// The version of the store's tool Prefixr downloads.
+    /// The version of the store's tool Laufzeit downloads.
     pub tool_name: String,
     pub tool_version: String,
-    /// Where the tool's source is (it's GPL-3.0, like Prefixr).
+    /// Where the tool's source is (it's GPL-3.0, like Laufzeit).
     pub tool_source_url: String,
     /// Whether the tool runs on the system's Python 3.
     pub tool_needs_python: bool,
@@ -168,7 +168,7 @@ fn data_dir(app: &AppHandle) -> Result<PathBuf, String> {
         .map_err(|e| format!("Could not resolve data directory: {e}"))
 }
 
-/// A store's own folder under the data dir: its tool's config and Prefixr's
+/// A store's own folder under the data dir: its tool's config and Laufzeit's
 /// cache of its library.
 fn store_dir(app: &AppHandle, store: StoreKind) -> Result<PathBuf, String> {
     Ok(data_dir(app)?.join("stores").join(store.slug()))
@@ -509,7 +509,7 @@ pub async fn open_store_login(app: AppHandle, store: StoreKind) -> Result<(), Ap
     Ok(())
 }
 
-/// Signs in in a window of Prefixr's own, which takes the code itself (see
+/// Signs in in a window of Laufzeit's own, which takes the code itself (see
 /// `login_window`); `None` when the user closed the window.
 #[tauri::command]
 pub async fn login_store_in_app(
@@ -998,7 +998,7 @@ fn install_prefix(
 }
 
 /// Adds an installed store game to the library, unless a game from the
-/// same store entry got there meanwhile (installed by another Prefixr).
+/// same store entry got there meanwhile (installed by another Laufzeit).
 pub(crate) fn add_installed(config: &mut AppConfig, game: &Game) -> Result<(), String> {
     if let Some(link) = &game.store {
         if installed_games(&config.games).contains_key(&(link.store, link.app_name.as_str())) {
@@ -1063,7 +1063,7 @@ fn claim_store_install(
     }
 }
 
-/// The game another Prefixr is installing from this store, if one is.
+/// The game another Laufzeit is installing from this store, if one is.
 fn store_install_elsewhere(app: &AppHandle, store: StoreKind) -> Option<String> {
     let path = install_lock_path(app, store).ok()?;
     if !path.exists() {
@@ -1352,8 +1352,10 @@ async fn install_gog(
         let redist_dir = store_dir(app, StoreKind::Gog)?.join("redist");
         // gogdl deletes what it downloaded before for ids it isn't asked
         // for again, so it gets every id any installed game needed.
-        let ids_file = redist_dir.join("prefixr-ids.json");
+        let ids_file = redist_dir.join("laufzeit-ids.json");
+        // Or the list Prefixr, the name Laufzeit had before, kept.
         let mut ids: Vec<String> = fs::read(&ids_file)
+            .or_else(|_| fs::read(redist_dir.join("prefixr-ids.json")))
             .ok()
             .and_then(|raw| serde_json::from_slice(&raw).ok())
             .unwrap_or_default();
@@ -1376,7 +1378,7 @@ async fn install_gog(
                 use std::io::Write;
                 let reason = result.err().unwrap_or_else(|| "no manifest".to_string());
                 if let Ok(mut log) = fs::OpenOptions::new().append(true).open(log_path) {
-                    let _ = writeln!(log, "[prefixr] Redistributables not downloaded: {reason}");
+                    let _ = writeln!(log, "[laufzeit] Redistributables not downloaded: {reason}");
                 }
             }
         }

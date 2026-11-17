@@ -24,13 +24,13 @@ pub enum AppError {
     GameAlreadyRunning,
     /// games::remove_game — the game is still starting or running.
     GameRunning,
-    /// games::stop_game_in_other_instance — another Prefixr process runs the
+    /// games::stop_game_in_other_instance — another Laufzeit process runs the
     /// game (in a Flatpak, out of sight of this one) and didn't take the stop:
-    /// it's still preparing the launch, or it's an older Prefixr.
+    /// it's still preparing the launch, or it's an older Laufzeit.
     GameRunsInOtherInstance {
         game_name: String,
     },
-    /// games::stop_game_in_other_instance — no Prefixr process runs the game.
+    /// games::stop_game_in_other_instance — no Laufzeit process runs the game.
     GameNotRunning {
         game_name: String,
     },
@@ -38,13 +38,13 @@ pub enum AppError {
     PrefixInUse {
         game_name: String,
     },
-    /// steam::stop_steam — the `steam` binary isn't on PATH, so Prefixr
+    /// steam::stop_steam — the `steam` binary isn't on PATH, so Laufzeit
     /// can't ask a running Steam to quit for the shortcuts change.
     SteamCommandNotFound,
     /// steam::stop_steam — Steam didn't quit within `SHUTDOWN_TIMEOUT`.
     SteamShutdownTimedOut,
     /// steam::steam_root — only a Flatpak install was found, which can't be
-    /// asked to run an outside program (Prefixr) in its sandbox.
+    /// asked to run an outside program (Laufzeit) in its sandbox.
     SteamOnlyFlatpak,
     /// steam::steam_root — no Steam install found at all.
     SteamNotFound,

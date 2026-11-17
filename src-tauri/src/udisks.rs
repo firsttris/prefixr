@@ -1,7 +1,7 @@
 //! Mounting a disc image through UDisks2 over D-Bus, in a Flatpak, where
 //! there's no `udisksctl`. The Flatpak may talk to UDisks2
 //! (`--system-talk-name=org.freedesktop.UDisks2`, as Lutris, Heroic, Bottles
-//! and Faugus have); natively Prefixr runs `udisksctl` as before
+//! and Faugus have); natively Laufzeit runs `udisksctl` as before
 //! (`cli/install.rs`).
 
 use std::collections::HashMap;

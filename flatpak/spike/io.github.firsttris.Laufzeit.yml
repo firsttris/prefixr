@@ -4,14 +4,14 @@
 # Flatpak guide. Build and install:
 #
 #   flatpak-builder --user --install --force-clean flatpak/spike/build-dir \
-#     flatpak/spike/io.github.firsttris.Prefixr.yml
+#     flatpak/spike/io.github.firsttris.Laufzeit.yml
 #
 # Left out on purpose: cabextract, 7zip and unrar (phase 1).
-id: io.github.firsttris.Prefixr
+id: io.github.firsttris.Laufzeit
 runtime: org.gnome.Platform
 runtime-version: "51"
 sdk: org.gnome.Sdk
-command: prefixr
+command: laufzeit
 
 finish-args:
   - --share=ipc
@@ -74,18 +74,18 @@ modules:
 
   - ../shared-modules/libayatana-appindicator/libayatana-appindicator-gtk3.json
 
-  - name: prefixr
+  - name: laufzeit
     buildsystem: simple
     sources:
       - type: file
-        path: ../../src-tauri/target/release/bundle/deb/prefixr_0.1.10_amd64.deb
-        dest-filename: prefixr.deb
+        path: ../../src-tauri/target/release/bundle/deb/laufzeit_0.1.10_amd64.deb
+        dest-filename: laufzeit.deb
     build-commands:
-      - ar -x prefixr.deb
+      - ar -x laufzeit.deb
       - tar -xf data.tar.*
-      - install -Dm755 usr/bin/prefixr /app/bin/prefixr
-      - install -Dm644 usr/share/icons/hicolor/32x32/apps/prefixr.png /app/share/icons/hicolor/32x32/apps/io.github.firsttris.Prefixr.png
-      - install -Dm644 usr/share/icons/hicolor/128x128/apps/prefixr.png /app/share/icons/hicolor/128x128/apps/io.github.firsttris.Prefixr.png
-      - install -Dm644 usr/share/icons/hicolor/256x256@2/apps/prefixr.png /app/share/icons/hicolor/256x256/apps/io.github.firsttris.Prefixr.png
-      - install -Dm644 usr/share/applications/prefixr.desktop /app/share/applications/io.github.firsttris.Prefixr.desktop
-      - desktop-file-edit --set-icon=io.github.firsttris.Prefixr --set-name=Prefixr --set-key=StartupWMClass --set-value=io.github.firsttris.Prefixr /app/share/applications/io.github.firsttris.Prefixr.desktop
+      - install -Dm755 usr/bin/laufzeit /app/bin/laufzeit
+      - install -Dm644 usr/share/icons/hicolor/32x32/apps/laufzeit.png /app/share/icons/hicolor/32x32/apps/io.github.firsttris.Laufzeit.png
+      - install -Dm644 usr/share/icons/hicolor/128x128/apps/laufzeit.png /app/share/icons/hicolor/128x128/apps/io.github.firsttris.Laufzeit.png
+      - install -Dm644 usr/share/icons/hicolor/256x256@2/apps/laufzeit.png /app/share/icons/hicolor/256x256/apps/io.github.firsttris.Laufzeit.png
+      - install -Dm644 usr/share/applications/laufzeit.desktop /app/share/applications/io.github.firsttris.Laufzeit.desktop
+      - desktop-file-edit --set-icon=io.github.firsttris.Laufzeit --set-name=Laufzeit --set-key=StartupWMClass --set-value=io.github.firsttris.Laufzeit /app/share/applications/io.github.firsttris.Laufzeit.desktop

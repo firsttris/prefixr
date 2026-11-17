@@ -3,7 +3,7 @@
 // commands from this data. Nothing here reads the real library or config.
 
 const HOME = "/home/player";
-const DATA = `${HOME}/.local/share/com.tristan.prefixr`;
+const DATA = `${HOME}/.local/share/com.tristan.laufzeit`;
 const ART = `${DATA}/artwork`;
 
 // Seconds since the Unix epoch, for a fixed day in 2026.
@@ -338,7 +338,7 @@ export function demoData(version) {
  * logs "demo: no answer for <command>" and gets an empty value, so a missing fixture shows up.
  */
 export function installDemo(data) {
-  localStorage.setItem("prefixr:locale", "en");
+  localStorage.setItem("laufzeit:locale", "en");
 
   const callbacks = new Map();
   let nextCallback = 1;

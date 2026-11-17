@@ -21,7 +21,7 @@ use crate::models::{
 const CONFIG_FILE_NAME: &str = "config.json";
 
 /// The full persisted application state, stored as a single JSON file in the
-/// platform config directory (e.g. `~/.config/prefixr/config.json`).
+/// platform config directory (e.g. `~/.config/laufzeit/config.json`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
     pub runners_dir: PathBuf,
@@ -279,7 +279,7 @@ pub fn update_config<T>(
 }
 
 /// When and how big `config.json` was, to tell a change by another process
-/// (the command line, a `--run` Prefixr) from this process's own writes.
+/// (the command line, a `--run` Laufzeit) from this process's own writes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FileStamp {
     modified: SystemTime,

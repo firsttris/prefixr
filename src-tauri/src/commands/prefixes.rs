@@ -29,7 +29,7 @@ pub fn effective_prefix_path(path: &Path) -> PathBuf {
     }
 }
 
-/// `path` as a prefix Prefixr knows: one in its list, or one a game uses
+/// `path` as a prefix Laufzeit knows: one in its list, or one a game uses
 /// (a prefix removed from the list is still that game's own). The commands
 /// that run something in a prefix (winetricks, Wine's tools, an installer)
 /// only take those, rather than create and write to any directory they're

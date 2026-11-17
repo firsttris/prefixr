@@ -1,4 +1,4 @@
-//! `prefixr library …` and `prefixr category …`: the whole library,
+//! `laufzeit library …` and `laufzeit category …`: the whole library,
 //! store games not installed yet included, and how it's organized —
 //! categories, favorites, hidden games. Made for an agent sorting a library
 //! into categories: `library list --json` gives every game's key, and
@@ -501,7 +501,7 @@ pub(super) async fn category_command(
             let categories = config(app).library.categories;
             out.print(&categories, || {
                 if categories.is_empty() {
-                    return "No categories yet; add one with `prefixr category add <name>`"
+                    return "No categories yet; add one with `laufzeit category add <name>`"
                         .to_string();
                 }
                 let rows: Vec<Vec<String>> = categories

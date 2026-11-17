@@ -35,7 +35,7 @@ pub struct LibraryConfig {
     pub hidden: Vec<String>,
     #[serde(default)]
     pub activity: BTreeMap<String, GameActivity>,
-    /// What testing a game found, by the user or an agent (`prefixr library
+    /// What testing a game found, by the user or an agent (`laufzeit library
     /// test-status`). Untested games have no entry.
     #[serde(default)]
     pub tested: BTreeMap<String, TestResult>,
@@ -292,7 +292,7 @@ impl LibraryConfig {
 }
 
 /// Records a session of a game that just ended, in the config as it is on
-/// disk (see `update_config`): the Prefixr Steam started a game through
+/// disk (see `update_config`): the Laufzeit Steam started a game through
 /// (`--run`) has held its copy since the game started, and the window or
 /// the command line may well have changed the library meanwhile.
 /// Best-effort, a lost session is no reason to fail the game's exit.

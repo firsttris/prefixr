@@ -40,7 +40,7 @@ fn the_skill_says_what_it_is_for() {
         .and_then(|rest| rest.split_once("\n---\n"))
         .map(|(front, _)| front)
         .expect("SKILL.md starts with front matter");
-    assert!(front.lines().any(|l| l == "name: prefixr"));
+    assert!(front.lines().any(|l| l == "name: laufzeit"));
     let description = front
         .lines()
         .find_map(|l| l.strip_prefix("description: "))
@@ -50,7 +50,7 @@ fn the_skill_says_what_it_is_for() {
 }
 
 /// The commands in the skill's examples: the lines of its code blocks, and
-/// the inline `prefixr …` ones without a placeholder such as `<game>`.
+/// the inline `laufzeit …` ones without a placeholder such as `<game>`.
 fn examples() -> Vec<String> {
     let mut found = Vec::new();
     let mut in_block = false;
@@ -58,13 +58,13 @@ fn examples() -> Vec<String> {
         if line.starts_with("```") {
             in_block = !in_block;
         } else if in_block {
-            if let Some(command) = line.strip_prefix("prefixr ") {
+            if let Some(command) = line.strip_prefix("laufzeit ") {
                 found.push(command.trim_end_matches('&').trim().to_string());
             }
         } else {
             for (i, span) in line.split('`').enumerate() {
                 let inline = i % 2 == 1;
-                if let Some(command) = span.strip_prefix("prefixr ").filter(|_| inline) {
+                if let Some(command) = span.strip_prefix("laufzeit ").filter(|_| inline) {
                     if !command.contains('<') && !command.contains('…') {
                         found.push(command.trim_end_matches('&').trim().to_string());
                     }
@@ -75,7 +75,7 @@ fn examples() -> Vec<String> {
     found
 }
 
-/// Every command in the skill's examples is one this Prefixr has, with
+/// Every command in the skill's examples is one this Laufzeit has, with
 /// options it takes: an agent copying one never gets a usage error.
 #[test]
 fn every_example_in_the_skill_parses() {
@@ -87,13 +87,13 @@ fn every_example_in_the_skill_parses() {
         examples.len()
     );
     for command in examples {
-        let mut args = vec!["prefixr".to_string()];
+        let mut args = vec!["laufzeit".to_string()];
         args.extend(words(&command));
         match super::super::Cli::try_parse_from(&args) {
             Ok(_) => {}
             // `--help` "fails" with the help text: a working example too.
             Err(e) if e.kind() == clap::error::ErrorKind::DisplayHelp => {}
-            Err(e) => panic!("`prefixr {command}` in SKILL.md doesn't parse: {e}"),
+            Err(e) => panic!("`laufzeit {command}` in SKILL.md doesn't parse: {e}"),
         }
     }
 }
@@ -101,7 +101,7 @@ fn every_example_in_the_skill_parses() {
 #[test]
 fn installing_writes_the_skill_and_replaces_an_older_one() {
     let dir = TestDir::new("skill-install");
-    let target = dir.join("skills/prefixr");
+    let target = dir.join("skills/laufzeit");
     fs::create_dir_all(&target).unwrap();
     fs::write(target.join("SKILL.md"), "old").unwrap();
     let path = install(&target).unwrap();
@@ -112,21 +112,21 @@ fn installing_writes_the_skill_and_replaces_an_older_one() {
 #[test]
 fn skill_commands_parse_and_make_it_a_command_line() {
     use clap::Parser;
-    assert!(super::super::is_cli(&["prefixr".into(), "skill".into()]));
-    for line in ["prefixr skill show", "prefixr skill install --dir /tmp/x"] {
+    assert!(super::super::is_cli(&["laufzeit".into(), "skill".into()]));
+    for line in ["laufzeit skill show", "laufzeit skill install --dir /tmp/x"] {
         super::super::Cli::try_parse_from(line.split(' ')).unwrap();
     }
 }
 
 #[test]
 fn a_flatpak_skill_says_how_to_run_it() {
-    let text = skill_text(Some("io.github.firsttris.Prefixr"));
-    let title_end = SKILL.find("\n# Prefixr\n").unwrap() + "\n# Prefixr\n".len();
+    let text = skill_text(Some("io.github.firsttris.Laufzeit"));
+    let title_end = SKILL.find("\n# Laufzeit\n").unwrap() + "\n# Laufzeit\n".len();
     // Right below the title, with the rest of the skill unchanged.
     assert!(text.starts_with(&SKILL[..title_end]));
-    assert!(text[title_end..].starts_with("\n> **This Prefixr is a Flatpak.**"));
+    assert!(text[title_end..].starts_with("\n> **This Laufzeit is a Flatpak.**"));
     assert!(text.ends_with(&SKILL[title_end..]));
-    assert!(text.contains("`flatpak run io.github.firsttris.Prefixr game list --json`"));
+    assert!(text.contains("`flatpak run io.github.firsttris.Laufzeit game list --json`"));
 }
 
 #[test]

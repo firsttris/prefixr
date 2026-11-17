@@ -46,7 +46,7 @@ export function listedPath(path: string, prefixes: PrefixInfo[]): string | null 
 /**
  * For each path, the deepest folder above it that holds another of the
  * paths too ("" when only "/" does). One agent's
- * `/mnt/games/Prefixr/<game>/prefix` all get `/mnt/games/Prefixr`, so the
+ * `/mnt/games/Laufzeit/<game>/prefix` all get `/mnt/games/Laufzeit`, so the
  * page can say that once and show just `<game>/prefix` below it.
  */
 export function sharedRoots(paths: string[]): Map<string, string> {

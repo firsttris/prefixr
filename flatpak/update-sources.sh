@@ -1,5 +1,5 @@
 #!/bin/sh
-# Regenerates package-lock.json and the offline sources for flatpak/io.github.firsttris.Prefixr.yml
+# Regenerates package-lock.json and the offline sources for flatpak/io.github.firsttris.Laufzeit.yml
 # from bun.lock and src-tauri/Cargo.lock. Run it whenever either lock file changes; CI checks that
 # the committed files match.
 #

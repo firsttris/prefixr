@@ -35,7 +35,7 @@
 
   const monitorChoices: { value: LaunchMonitor; label: string }[] = [
     { value: "primary", label: m.graphicsEditor_monitorPrimary() },
-    { value: "prefixr", label: m.graphicsEditor_monitorPrefixr() },
+    { value: "laufzeit", label: m.graphicsEditor_monitorLaufzeit() },
   ];
 
   // Emptied number inputs read as NaN; 0 is no valid size or limit either.

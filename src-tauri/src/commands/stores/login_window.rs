@@ -1,4 +1,4 @@
-//! Signing in to a store in a window of Prefixr's own instead of the
+//! Signing in to a store in a window of Laufzeit's own instead of the
 //! browser, so nobody has to copy a code: the window watches where the
 //! store's login goes and takes the code from there. GOG and Amazon end on
 //! an address carrying it; Epic ends on a JSON page holding it, which
@@ -22,7 +22,7 @@ use crate::models::StoreKind;
 
 /// Where `EPIC_SCRIPT` sends the code: a name that never resolves, so the
 /// window only ever sees it as a navigation to stop.
-const EPIC_CODE_HOST: &str = "prefixr-login.invalid";
+const EPIC_CODE_HOST: &str = "laufzeit-login.invalid";
 
 /// Run on every page in Epic's login window: on the page Epic's login
 /// ends on (`{"authorizationCode": "…", …}`), it goes on to the address
@@ -33,7 +33,7 @@ const EPIC_SCRIPT: &str = r#"
   document.addEventListener("DOMContentLoaded", () => {
     try {
       const code = JSON.parse(document.body.innerText).authorizationCode;
-      if (code) location.replace("https://prefixr-login.invalid/epic?code=" + encodeURIComponent(code));
+      if (code) location.replace("https://laufzeit-login.invalid/epic?code=" + encodeURIComponent(code));
     } catch (_) {}
   });
 })();

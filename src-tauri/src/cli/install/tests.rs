@@ -110,7 +110,7 @@ fn no_shortcut_or_several_say_how_to_add_the_game() {
     let none = pick_shortcut(&[], Path::new("/p"), "GE-Proton10-7").unwrap_err();
     assert!(none.contains("/p/drive_c"), "{none}");
     assert!(
-        none.contains("prefixr game add --exe <exe> --prefix /p --runner GE-Proton10-7"),
+        none.contains("laufzeit game add --exe <exe> --prefix /p --runner GE-Proton10-7"),
         "{none}"
     );
 
@@ -141,7 +141,7 @@ fn only_iso_files_are_disc_images() {
 #[test]
 fn what_follows_the_double_dash_goes_to_the_installer() {
     let cli = Cli::try_parse_from([
-        "prefixr",
+        "laufzeit",
         "game",
         "install",
         "/g/setup.exe",

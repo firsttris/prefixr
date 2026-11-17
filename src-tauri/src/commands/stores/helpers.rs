@@ -1,15 +1,15 @@
-//! The command line tools Prefixr drives a store with.
+//! The command line tools Laufzeit drives a store with.
 //!
 //! Each store is reached through a tool from the Heroic Games Launcher
 //! project (Legendary for Epic, gogdl for GOG, Nile for Amazon), which keeps up with the stores' APIs, download formats and login
-//! flows. Prefixr doesn't bundle them: a tool is downloaded the first time
+//! flows. Laufzeit doesn't bundle them: a tool is downloaded the first time
 //! its store is connected, from a release pinned here by version and SHA-256,
 //! so an update is a reviewed change to this file rather than whatever a
 //! release page serves that day. Disconnecting the store deletes it again.
 //!
 //! Legendary's and gogdl's Linux builds are Python zipapps (a single file
 //! starting with `#!/usr/bin/env python3`, its dependencies inside), just
-//! like the umu-launcher Prefixr already uses, so they need nothing but a
+//! like the umu-launcher Laufzeit already uses, so they need nothing but a
 //! system Python 3. Nile's is a self-contained PyInstaller executable,
 //! which brings its own Python.
 
@@ -42,7 +42,7 @@ pub struct Helper {
     pub version: &'static str,
     pub assets: &'static [HelperAsset],
     /// The tool's source, linked from the docs and the about notice (the
-    /// tools are GPL-3.0, like Prefixr).
+    /// tools are GPL-3.0, like Laufzeit).
     pub source_url: &'static str,
     /// Whether it runs on the system's Python (a zipapp).
     pub needs_python: bool,

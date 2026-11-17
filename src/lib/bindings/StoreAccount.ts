@@ -14,11 +14,11 @@ connected: boolean, account_name: string | null,
  */
 game_count: number, 
 /**
- * The version of the store's tool Prefixr downloads.
+ * The version of the store's tool Laufzeit downloads.
  */
 tool_name: string, tool_version: string, 
 /**
- * Where the tool's source is (it's GPL-3.0, like Prefixr).
+ * Where the tool's source is (it's GPL-3.0, like Laufzeit).
  */
 tool_source_url: string, 
 /**

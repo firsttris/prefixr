@@ -10,7 +10,7 @@ pub struct TestDir(tempfile::TempDir);
 impl TestDir {
     pub fn new(name: &str) -> Self {
         let dir = tempfile::Builder::new()
-            .prefix(&format!("prefixr-test-{name}-"))
+            .prefix(&format!("laufzeit-test-{name}-"))
             .tempdir()
             .expect("temporary directory");
         TestDir(dir)

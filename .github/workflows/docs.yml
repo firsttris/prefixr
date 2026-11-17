@@ -1,5 +1,5 @@
 # Builds docs/ with MkDocs Material and publishes it on GitHub Pages:
-# https://firsttris.github.io/prefixr/
+# https://firsttris.github.io/laufzeit/
 # Needs, once: Settings → Pages → Source "GitHub Actions" (configure-pages
 # with enablement tries to switch that on by itself on the first run).
 name: Docs

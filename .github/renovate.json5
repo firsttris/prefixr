@@ -1,6 +1,6 @@
 // Renovate (GitHub App, https://github.com/apps/renovate): a pull request for each new release of
-// what Prefixr builds on, plus the "Dependency Dashboard" issue listing what is open. Their own
-// pull requests: the store tools Prefixr downloads at pinned, checksum-verified versions
+// what Laufzeit builds on, plus the "Dependency Dashboard" issue listing what is open. Their own
+// pull requests: the store tools Laufzeit downloads at pinned, checksum-verified versions
 // (Legendary, gogdl, Nile in src-tauri/src/commands/stores/helpers.rs), the GNOME runtime of the
 // Flatpak (manifests, CI image, docs), Flathub's shared-modules, the 7-Zip and cabextract the
 // Flatpak builds for winetricks, Bun (packageManager) and Tauri. Wine/Proton runners, umu-launcher and

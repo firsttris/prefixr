@@ -2,7 +2,7 @@ name: Renovate · pins and Flatpak sources
 
 # On a Renovate branch (.github/renovate.json5): Renovate changes versions and lock files only.
 # This sets the sha256 of a store tool's downloads (src-tauri/src/commands/stores/helpers.rs, which
-# Prefixr checks every download against) and regenerates package-lock.json and the Flatpak's
+# Laufzeit checks every download against) and regenerates package-lock.json and the Flatpak's
 # offline sources after a lock file changed (flatpak/update-sources.sh), commits them and starts CI
 # and the Flatpak workflow on the new commit. A commit pushed with the workflow's token starts no
 # workflow by itself, hence the explicit runs.

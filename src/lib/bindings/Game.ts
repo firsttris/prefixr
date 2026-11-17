@@ -85,7 +85,7 @@ umu_store: string | null,
 overrides: GameOverrides, 
 /**
  * The store this game was installed from (see `commands::stores`), for
- * a game Prefixr installed from a connected store account. Its launch
+ * a game Laufzeit installed from a connected store account. Its launch
  * then asks the store's tool for the command line (online games need
  * the account's tokens on it), and removing it uninstalls its files.
  * `None` for a game added by hand.

@@ -34,7 +34,7 @@ pub const LOGIN_URL: &str = "https://auth.gog.com/auth?client_id=468999770962156
 /// it, and a game's other languages can still be picked in-game for most.
 pub const LANGUAGE: &str = "en-US";
 
-/// Runs gogdl with Prefixr's own login file and manifests folder, apart
+/// Runs gogdl with Laufzeit's own login file and manifests folder, apart
 /// from a Heroic the user may have installed.
 pub struct Gogdl {
     pub binary: PathBuf,
@@ -194,7 +194,7 @@ pub fn parse_library_page(json: &str) -> Result<(Vec<String>, Option<String>), S
 /// A game's library entry from GOG's game database
 /// (`gamesdb.gog.com/platforms/gog/external_releases/<id>`): its title and
 /// portrait cover. `None` for what the library doesn't show (DLC, hidden
-/// items) and for games without a Windows version, which Prefixr can't run.
+/// items) and for games without a Windows version, which Laufzeit can't run.
 pub fn parse_gamesdb(json: &str) -> Option<StoreLibraryEntry> {
     let value: Value = serde_json::from_str(json).ok()?;
     let game = value.get("game")?;

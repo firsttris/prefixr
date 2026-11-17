@@ -121,7 +121,7 @@ fn umu_local_dir_in_a_flatpak_is_the_hosts() {
         ("container", "flatpak"),
         (
             "XDG_DATA_HOME",
-            "/home/u/.var/app/io.github.firsttris.Prefixr/data",
+            "/home/u/.var/app/io.github.firsttris.Laufzeit/data",
         ),
         ("HOME", "/home/u"),
     ]);

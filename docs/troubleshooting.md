@@ -29,32 +29,32 @@
    **Disable NVAPI**.
 7. **Look the game up on [ProtonDB](https://www.protondb.com/).** Other players' reports often name
    the exact runner, switches or launch arguments that work. Most of them translate directly into a
-   game's settings in Prefixr.
+   game's settings in Laufzeit.
 
 ## Common messages
 
 | Message | What to do |
 | --- | --- |
-| *Don't run Prefixr as root* | Start Prefixr as your normal user. Files in a prefix used as root belong to root, and your session can't use them afterwards. |
-| *Could not read the configuration* | `config.json` is damaged. Prefixr left it untouched; fix the JSON or move the file away (see [Configuration file](configuration.md#configuration-file)). |
-| *The game is already starting or running* | The game runs, possibly in a Prefixr that Steam started. Use **Stop**, or end it from Steam. |
+| *Don't run Laufzeit as root* | Start Laufzeit as your normal user. Files in a prefix used as root belong to root, and your session can't use them afterwards. |
+| *Could not read the configuration* | `config.json` is damaged. Laufzeit left it untouched; fix the JSON or move the file away (see [Configuration file](configuration.md#configuration-file)). |
+| *The game is already starting or running* | The game runs, possibly in a Laufzeit that Steam started. Use **Stop**, or end it from Steam. |
 | *GitHub's rate limit for unauthenticated requests is exhausted* | Add a GitHub token on the Runners page (see [GitHub token](user-guide.md#github-token)) or wait an hour. |
-| *… already contains files but doesn't look like a Wine or Proton prefix* | Prefixr only adds empty folders or existing prefixes (with a `drive_c` inside). Choose an empty folder or the prefix folder itself. |
+| *… already contains files but doesn't look like a Wine or Proton prefix* | Laufzeit only adds empty folders or existing prefixes (with a `drive_c` inside). Choose an empty folder or the prefix folder itself. |
 | *Steam is only installed as a Flatpak* | The Flatpak Steam can't start programs outside its sandbox. Install Steam from your distribution's packages to add games to Steam. |
-| *Restart Steam?* | Steam must be closed while Prefixr changes its shortcuts. Confirm to let Prefixr quit and restart it (a running Steam game closes too), or quit Steam yourself first. |
+| *Restart Steam?* | Steam must be closed while Laufzeit changes its shortcuts. Confirm to let Laufzeit quit and restart it (a running Steam game closes too), or quit Steam yourself first. |
 | *vm.max_map_count too low* | Click **Increase now** on the Performance page, or run the command shown there. |
 | *Python 3 wasn't found* | Legendary and gogdl (Epic, GOG) are Python programs. Install your distribution's `python3` package. |
 | *The sign-in window shows an error or a captcha that won't go away* | Close it and use **Connect in the browser** instead. |
-| *The sign-in didn't work* | The code is valid once and for a few minutes. Open the login page again (**Open it again**) and paste the new page (Epic) or address (GOG, Amazon). For Amazon, the login has to start from **Connect in the browser** or **Open it again** in this Prefixr: the address only works with the login request made there. |
+| *The sign-in didn't work* | The code is valid once and for a few minutes. Open the login page again (**Open it again**) and paste the new page (Epic) or address (GOG, Amazon). For Amazon, the login has to start from **Connect in the browser** or **Open it again** in this Laufzeit: the address only works with the login request made there. |
 | *… isn't connected or the login has expired* | Connect the store again under **Stores**. Installed games stay; a game that can run offline starts without a login. |
 | *… is still installing* | Disconnecting waits for the store's installs: cancel the install or let it finish first. |
 | *The install failed: …* | **Show log** under the card has the store tool's full output. Not enough disk space is the most common cause. |
 
-**The overlay, Gamescope or vkBasalt don't show up.** Prefixr leaves each of them out at launch when
-the tool isn't installed. Gamescope is also left out when Prefixr itself runs inside a Gamescope
+**The overlay, Gamescope or vkBasalt don't show up.** Laufzeit leaves each of them out at launch when
+the tool isn't installed. Gamescope is also left out when Laufzeit itself runs inside a Gamescope
 session, as in the Steam Deck's Game Mode.
 
-**GameMode seems to have no effect.** If a scheduler daemon such as ananicy or scx runs, Prefixr
+**GameMode seems to have no effect.** If a scheduler daemon such as ananicy or scx runs, Laufzeit
 skips GameMode on purpose and uses the performance power profile instead. The game's log says so.
 
 ## The app itself
@@ -77,14 +77,14 @@ versions. Neither `WEBKIT_DISABLE_DMABUF_RENDERER=1`, `WEBKIT_DISABLE_COMPOSITIN
 the window stays white.
 
 **Workaround:** Use the `.deb` or `.rpm` package where your distribution supports it, or build
-Prefixr yourself. Both link against your system's WebKitGTK, which renders normally on the same
+Laufzeit yourself. Both link against your system's WebKitGTK, which renders normally on the same
 machine:
 
 ```bash
 bun install
 bun run tauri build   # not "cargo build --release": that doesn't embed the frontend,
                       # and the app then tries to reach the dev server
-./src-tauri/target/release/prefixr
+./src-tauri/target/release/laufzeit
 ```
 
 See [Building from source](development.md#building-from-source) for the build requirements.
@@ -98,13 +98,13 @@ On crashing, the process sometimes stays behind as a zombie and has to be ended 
 ### Clearing the WebKit cache
 
 The window is a WebKitGTK webview, whose cache lives in
-`~/.local/share/com.tristan.prefixr/WebKitCache/`. Next to it are `CacheStorage/` (Cache API),
+`~/.local/share/com.tristan.laufzeit/WebKitCache/`. Next to it are `CacheStorage/` (Cache API),
 `storage/` (IndexedDB) and `localstorage/` (LocalStorage).
 
-Quit Prefixr first (otherwise WebKit writes the files back on exit), then:
+Quit Laufzeit first (otherwise WebKit writes the files back on exit), then:
 
 ```bash
-rm -rf ~/.local/share/com.tristan.prefixr/WebKitCache
+rm -rf ~/.local/share/com.tristan.laufzeit/WebKitCache
 ```
 
 Deleting `localstorage/` as well resets the remembered language and library view. Your library and
@@ -113,19 +113,19 @@ settings are not stored there and stay.
 ### No tray icon
 
 GNOME shows no tray icons without the
-[AppIndicator extension](https://extensions.gnome.org/extension/615/appindicator-support/). Prefixr
-notices that: closing the window then quits Prefixr, or only minimizes it while a game is running,
+[AppIndicator extension](https://extensions.gnome.org/extension/615/appindicator-support/). Laufzeit
+notices that: closing the window then quits Laufzeit, or only minimizes it while a game is running,
 so you can always get back to it to stop the game.
 
 ## FAQ
 
-**Is Prefixr a replacement for Steam's own Proton?**
-No. For games you own on Steam, Steam's Proton integration is the simplest choice. Prefixr is for
+**Is Laufzeit a replacement for Steam's own Proton?**
+No. For games you own on Steam, Steam's Proton integration is the simplest choice. Laufzeit is for
 everything else: GOG, Epic, itch.io, EA, Ubisoft and Battle.net installers, standalone games and old
-CD games. You can still add those to Steam through Prefixr.
+CD games. You can still add those to Steam through Laufzeit.
 
 **Can I use my existing prefixes from Lutris, Bottles, Heroic or PortProton?**
-Yes. Add the prefix folder under **Prefixes** and point the game at it. Prefixr uses the prefix as it
+Yes. Add the prefix folder under **Prefixes** and point the game at it. Laufzeit uses the prefix as it
 is and doesn't move or convert anything.
 
 **Proton or Wine: which runner should I use?**
@@ -133,24 +133,24 @@ Start with Proton-GE. It runs through umu in the Steam Linux Runtime, gets proto
 most compatibility reports refer to. Use a plain Wine build for games or tools that misbehave under
 Proton, or when you need a specific Wine version.
 
-**Does Prefixr work on the Steam Deck?**
-Prefixr is a desktop app. On SteamOS, use the AppImage in Desktop Mode, then add your games to Steam
+**Does Laufzeit work on the Steam Deck?**
+Laufzeit is a desktop app. On SteamOS, use the AppImage in Desktop Mode, then add your games to Steam
 to play them in Game Mode.
 
-**Does Prefixr send any data anywhere?**
+**Does Laufzeit send any data anywhere?**
 Only what its features need: release lookups and downloads from GitHub (runners, umu, DXVK,
 VKD3D-Proton, winetricks), wine-mono from WineHQ, the umu database for the protonfixes search, and
 SteamGridDB searches and images when you set an API key. There is no telemetry.
 
 **Where are my save games?**
 Inside the game's prefix, usually in `drive_c/users/steamuser/` (`Documents`, `AppData`,
-`Saved Games`). Removing a game or a prefix from Prefixr never deletes them.
+`Saved Games`). Removing a game or a prefix from Laufzeit never deletes them.
 
 ## Reporting a bug
 
-[Open an issue](https://github.com/firsttris/prefixr/issues) with:
+[Open an issue](https://github.com/firsttris/laufzeit/issues) with:
 
 - your distribution and GPU,
-- how you installed Prefixr (AppImage, .deb, .rpm or built from source) and its version,
+- how you installed Laufzeit (AppImage, .deb, .rpm or built from source) and its version,
 - the runner and the game,
 - the log from **Show log**, if a game is involved.

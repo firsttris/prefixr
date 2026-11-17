@@ -91,7 +91,7 @@ fn prune_logs(dir: &Path, keep: usize) {
 /// `path` as a log under `root`, with symlinks and `..` resolved — the only
 /// files `open_log` opens.
 fn log_file_in(root: &Path, path: &Path) -> Result<PathBuf, String> {
-    let not_a_log = || format!("Not a Prefixr log: {}", path.display());
+    let not_a_log = || format!("Not a Laufzeit log: {}", path.display());
     let root = fs::canonicalize(root).map_err(|_| not_a_log())?;
     let path = fs::canonicalize(path).map_err(|_| not_a_log())?;
     if path.starts_with(&root) && path.is_file() {

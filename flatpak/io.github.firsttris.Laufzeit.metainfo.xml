@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>io.github.firsttris.Prefixr</id>
-  <name>Prefixr</name>
+  <id>io.github.firsttris.Laufzeit</id>
+  <name>Laufzeit</name>
+  <!-- The name Laufzeit had before -->
+  <replaces>
+    <id>io.github.firsttris.Prefixr</id>
+  </replaces>
   <summary>Run Windows games with Wine and Proton</summary>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-only</project_license>
@@ -10,7 +14,7 @@
   </developer>
   <description>
     <p>
-      Prefixr manages Wine and Proton prefixes for Windows games on Linux: add a game, pick a
+      Laufzeit manages Wine and Proton prefixes for Windows games on Linux: add a game, pick a
       runner, and start it. It downloads Proton-GE, Wine and umu-launcher itself, applies the
       game's protonfixes, and sets up DXVK, MangoHud, Gamescope and GameMode per game.
     </p>
@@ -24,33 +28,33 @@
   <screenshots>
     <screenshot type="default">
       <caption>The library with covers, categories and compatibility badges</caption>
-      <image>https://raw.githubusercontent.com/firsttris/prefixr/main/docs/screenshot-library.png</image>
+      <image>https://raw.githubusercontent.com/firsttris/laufzeit/main/docs/screenshot-library.png</image>
     </screenshot>
     <screenshot>
       <caption>A game's details: play time, runner, prefix and test result</caption>
-      <image>https://raw.githubusercontent.com/firsttris/prefixr/main/docs/screenshot-game.png</image>
+      <image>https://raw.githubusercontent.com/firsttris/laufzeit/main/docs/screenshot-game.png</image>
     </screenshot>
     <screenshot>
       <caption>The installed Proton and Wine runners</caption>
-      <image>https://raw.githubusercontent.com/firsttris/prefixr/main/docs/screenshot-runners.png</image>
+      <image>https://raw.githubusercontent.com/firsttris/laufzeit/main/docs/screenshot-runners.png</image>
     </screenshot>
     <screenshot>
       <caption>Downloading a new Proton-GE release</caption>
-      <image>https://raw.githubusercontent.com/firsttris/prefixr/main/docs/screenshot-runner-downloads.png</image>
+      <image>https://raw.githubusercontent.com/firsttris/laufzeit/main/docs/screenshot-runner-downloads.png</image>
     </screenshot>
     <screenshot>
       <caption>Store games downloading from Epic Games and GOG</caption>
-      <image>https://raw.githubusercontent.com/firsttris/prefixr/main/docs/screenshot-downloads.png</image>
+      <image>https://raw.githubusercontent.com/firsttris/laufzeit/main/docs/screenshot-downloads.png</image>
     </screenshot>
     <screenshot>
       <caption>The MangoHud overlay settings with a live preview</caption>
-      <image>https://raw.githubusercontent.com/firsttris/prefixr/main/docs/screenshot-settings.png</image>
+      <image>https://raw.githubusercontent.com/firsttris/laufzeit/main/docs/screenshot-settings.png</image>
     </screenshot>
   </screenshots>
-  <launchable type="desktop-id">io.github.firsttris.Prefixr.desktop</launchable>
-  <url type="homepage">https://github.com/firsttris/prefixr</url>
-  <url type="bugtracker">https://github.com/firsttris/prefixr/issues</url>
-  <url type="vcs-browser">https://github.com/firsttris/prefixr</url>
+  <launchable type="desktop-id">io.github.firsttris.Laufzeit.desktop</launchable>
+  <url type="homepage">https://github.com/firsttris/laufzeit</url>
+  <url type="bugtracker">https://github.com/firsttris/laufzeit/issues</url>
+  <url type="vcs-browser">https://github.com/firsttris/laufzeit</url>
   <categories>
     <category>Game</category>
   </categories>

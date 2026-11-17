@@ -29,7 +29,7 @@
     logo: m.artworkPicker_kindLogo(),
   });
 
-  // Only Steam shows these; Prefixr itself uses the cover and icon.
+  // Only Steam shows these; Laufzeit itself uses the cover and icon.
   const steamOnlyHints: Partial<Record<Kind, string>> = $derived({
     wide: m.artworkPicker_hintWide(),
     hero: m.artworkPicker_hintHero(),

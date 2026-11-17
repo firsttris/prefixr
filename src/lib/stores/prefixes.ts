@@ -25,7 +25,7 @@ export async function addPrefix(path: string): Promise<string> {
   return added;
 }
 
-// Removes the prefix from Prefixr only; the directory on disk is left as-is.
+// Removes the prefix from Laufzeit only; the directory on disk is left as-is.
 export async function deletePrefix(path: string): Promise<void> {
   await invoke("delete_prefix", { path });
   await refreshPrefixes();

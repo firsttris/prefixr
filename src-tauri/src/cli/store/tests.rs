@@ -86,13 +86,13 @@ fn no_store_command_holds_the_config_lock_from_the_start() {
         super::super::Command::Store(command) => command,
         other => panic!("not a store command: {other:?}"),
     };
-    assert!(!changes_config(&parse("prefixr store uninstall doom")));
+    assert!(!changes_config(&parse("laufzeit store uninstall doom")));
     assert!(!changes_config(&parse(
-        "prefixr store install doom --runner GE-Proton10-4"
+        "laufzeit store install doom --runner GE-Proton10-4"
     )));
-    assert!(!changes_config(&parse("prefixr store connect epic abc")));
-    assert!(!changes_config(&parse("prefixr store sync gog")));
-    assert!(!changes_config(&parse("prefixr store list")));
+    assert!(!changes_config(&parse("laufzeit store connect epic abc")));
+    assert!(!changes_config(&parse("laufzeit store sync gog")));
+    assert!(!changes_config(&parse("laufzeit store list")));
 }
 
 #[test]

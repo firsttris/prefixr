@@ -35,12 +35,12 @@ fn locations(dir: &Path) -> Locations {
 fn a_backup_holds_the_config_and_the_artwork_and_says_what_it_is() {
     let dir = TestDir::new("backup-write");
     let at = locations(&dir);
-    let dest = dir.join("out/prefixr-backup.tar.gz");
+    let dest = dir.join("out/laufzeit-backup.tar.gz");
     let info = write_backup(&dest, &config(), &at, false, BackupReason::Manual, "0.1.6").unwrap();
     assert_eq!((info.games, info.categories), (1, 1));
     assert!(!info.secrets_included && info.size_bytes > 0);
-    assert_eq!(info.file_name, "prefixr-backup.tar.gz");
-    assert!(!dir.join("out/prefixr-backup.partial").exists());
+    assert_eq!(info.file_name, "laufzeit-backup.tar.gz");
+    assert!(!dir.join("out/laufzeit-backup.partial").exists());
 
     let (manifest, restored) = read_backup(&dest).unwrap();
     assert_eq!(manifest.reason, BackupReason::Manual);
@@ -151,13 +151,13 @@ fn files_that_arent_backups_are_refused() {
     fs::write(&plain, b"not even gzip").unwrap();
     assert!(read_backup(&plain)
         .unwrap_err()
-        .contains("not a Prefixr backup"));
+        .contains("not a Laufzeit backup"));
 
     let no_manifest = dir.join("no-manifest.tar.gz");
     write_raw_archive(&no_manifest, &[("config.json", b"{}")]);
     assert!(read_backup(&no_manifest)
         .unwrap_err()
-        .contains("not a Prefixr backup"));
+        .contains("not a Laufzeit backup"));
 
     let newer = dir.join("newer.tar.gz");
     let manifest = br#"{"format":99,"app_version":"9.0.0","created_at":1,"reason":"manual","games":0,"categories":0,"secrets_included":false}"#;
@@ -170,7 +170,7 @@ fn files_that_arent_backups_are_refused() {
     );
     assert!(read_backup(&newer)
         .unwrap_err()
-        .contains("newer Prefixr (9.0.0)"));
+        .contains("newer Laufzeit (9.0.0)"));
 
     let bad_config = dir.join("bad-config.tar.gz");
     let manifest = br#"{"format":1,"app_version":"0.1.6","created_at":1,"reason":"manual","games":0,"categories":0,"secrets_included":false}"#;
@@ -252,10 +252,10 @@ fn automatic_backups_are_off_unless_turned_on_and_go_where_the_user_says() {
     let data = Path::new("/data");
     assert_eq!(backups_dir(data, &defaults), Path::new("/data/backups"));
     let custom = BackupConfig {
-        dir: Some(PathBuf::from("/mnt/nas/prefixr")),
+        dir: Some(PathBuf::from("/mnt/nas/laufzeit")),
         ..defaults.clone()
     };
-    assert_eq!(backups_dir(data, &custom), Path::new("/mnt/nas/prefixr"));
+    assert_eq!(backups_dir(data, &custom), Path::new("/mnt/nas/laufzeit"));
 }
 
 #[test]
@@ -281,7 +281,7 @@ fn backup_files_are_named_by_reason_and_utc_time() {
     let at = SystemTime::UNIX_EPOCH + Duration::from_secs(1_792_312_200); // 2026-10-18 08:30:00 UTC
     assert_eq!(
         file_name(BackupReason::Manual, at),
-        "prefixr-backup-2026-10-18-083000.tar.gz"
+        "laufzeit-backup-2026-10-18-083000.tar.gz"
     );
     assert_eq!(
         file_name(BackupReason::Daily, at),

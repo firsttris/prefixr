@@ -42,7 +42,7 @@ export async function restoreBackup(path: string): Promise<BackupInfo> {
   return info;
 }
 
-const RESTORED_KEY = "prefixr-restored-backup";
+const RESTORED_KEY = "laufzeit-restored-backup";
 
 /**
  * The backup just restored, once, after the reload the restore did: for the
@@ -63,8 +63,8 @@ export function listenForBackups(onChange: () => void): Promise<UnlistenFn> {
   return listen("backups-changed", onChange);
 }
 
-/** A file name for a backup made now, in local time: prefixr-backup-2026-10-18.tar.gz. */
+/** A file name for a backup made now, in local time: laufzeit-backup-2026-10-18.tar.gz. */
 export function defaultBackupName(now: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `prefixr-backup-${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}.tar.gz`;
+  return `laufzeit-backup-${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}.tar.gz`;
 }

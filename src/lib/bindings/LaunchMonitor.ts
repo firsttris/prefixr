@@ -3,4 +3,4 @@
 /**
  * The monitor a game starts on.
  */
-export type LaunchMonitor = "primary" | "prefixr";
+export type LaunchMonitor = "primary" | "laufzeit";

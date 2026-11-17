@@ -150,7 +150,7 @@ fn an_installed_store_game_is_added_once() {
     add_installed(&mut config, &first).unwrap();
     assert_eq!(config.games.len(), 1);
     assert!(config.library.activity["gog:1"].added_at.is_some());
-    // The same store entry, installed by another Prefixr meanwhile.
+    // The same store entry, installed by another Laufzeit meanwhile.
     let second = game(
         "9b0e8a11-0000-4000-8000-000000000001",
         Some((StoreKind::Gog, "1")),

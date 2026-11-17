@@ -14,12 +14,12 @@ fn fix(fixes: &[EnvFix], key: &str) -> Option<Option<String>> {
         .map(|(_, value)| value.as_ref().map(|v| v.to_string_lossy().into_owned()))
 }
 
-/// What an AppImage built by Tauri starts Prefixr with (seen on a real
+/// What an AppImage built by Tauri starts Laufzeit with (seen on a real
 /// system).
 fn appimage_env() -> Vec<(OsString, OsString)> {
     vars(&[
         ("APPDIR", "/tmp/.mount_prefixAbc"),
-        ("APPIMAGE", "/home/u/AppImages/prefixr.appimage"),
+        ("APPIMAGE", "/home/u/AppImages/laufzeit.appimage"),
         ("PYTHONHOME", "/tmp/.mount_prefixAbc/usr/"),
         ("PYTHONPATH", "/tmp/.mount_prefixAbc/usr/share/pyshared/:"),
         (
@@ -114,7 +114,7 @@ fn outside_an_appimage_a_command_keeps_the_environment() {
 fn is_flatpak_in_reads_flatpak_id_or_container() {
     assert!(is_flatpak_in(&crate::env::fake(&[(
         "FLATPAK_ID",
-        "io.github.firsttris.Prefixr"
+        "io.github.firsttris.Laufzeit"
     )])));
     assert!(is_flatpak_in(&crate::env::fake(&[(
         "container",
@@ -148,10 +148,10 @@ fn host_data_home_natively_is_xdg_data_home() {
 fn host_data_home_in_a_flatpak_skips_the_apps_own_data_dir() {
     // What `flatpak run` sets up on a host that sets XDG_DATA_HOME.
     let env = crate::env::fake(&[
-        ("FLATPAK_ID", "io.github.firsttris.Prefixr"),
+        ("FLATPAK_ID", "io.github.firsttris.Laufzeit"),
         (
             "XDG_DATA_HOME",
-            "/home/u/.var/app/io.github.firsttris.Prefixr/data",
+            "/home/u/.var/app/io.github.firsttris.Laufzeit/data",
         ),
         ("HOST_XDG_DATA_HOME", "/home/u/data"),
         ("HOME", "/home/u"),
@@ -159,10 +159,10 @@ fn host_data_home_in_a_flatpak_skips_the_apps_own_data_dir() {
     assert_eq!(host_data_home(&env), Some(PathBuf::from("/home/u/data")));
     // ... and on one that doesn't (Bazzite, seen in the spike).
     let env = crate::env::fake(&[
-        ("FLATPAK_ID", "io.github.firsttris.Prefixr"),
+        ("FLATPAK_ID", "io.github.firsttris.Laufzeit"),
         (
             "XDG_DATA_HOME",
-            "/home/u/.var/app/io.github.firsttris.Prefixr/data",
+            "/home/u/.var/app/io.github.firsttris.Laufzeit/data",
         ),
         ("HOME", "/home/u"),
     ]);
@@ -175,28 +175,28 @@ fn host_data_home_in_a_flatpak_skips_the_apps_own_data_dir() {
 #[test]
 fn flatpak_shared_runtime_dir_is_below_the_app_id() {
     let env = crate::env::fake(&[
-        ("FLATPAK_ID", "io.github.firsttris.Prefixr"),
+        ("FLATPAK_ID", "io.github.firsttris.Laufzeit"),
         ("XDG_RUNTIME_DIR", "/run/user/1000"),
     ]);
     assert_eq!(
         flatpak_shared_runtime_dir(&env),
         Some(PathBuf::from(
-            "/run/user/1000/app/io.github.firsttris.Prefixr"
+            "/run/user/1000/app/io.github.firsttris.Laufzeit"
         ))
     );
     let native = crate::env::fake(&[("XDG_RUNTIME_DIR", "/run/user/1000")]);
     assert_eq!(flatpak_shared_runtime_dir(&native), None);
-    let no_runtime_dir = crate::env::fake(&[("FLATPAK_ID", "io.github.firsttris.Prefixr")]);
+    let no_runtime_dir = crate::env::fake(&[("FLATPAK_ID", "io.github.firsttris.Laufzeit")]);
     assert_eq!(flatpak_shared_runtime_dir(&no_runtime_dir), None);
 }
 
 #[test]
 fn host_config_home_in_a_flatpak_is_the_hosts() {
     let env = crate::env::fake(&[
-        ("FLATPAK_ID", "io.github.firsttris.Prefixr"),
+        ("FLATPAK_ID", "io.github.firsttris.Laufzeit"),
         (
             "XDG_CONFIG_HOME",
-            "/home/u/.var/app/io.github.firsttris.Prefixr/config",
+            "/home/u/.var/app/io.github.firsttris.Laufzeit/config",
         ),
         ("HOME", "/home/u"),
     ]);

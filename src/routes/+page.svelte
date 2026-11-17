@@ -83,7 +83,7 @@
 
   // If the app was started via a desktop shortcut (--launch <id>), jump
   // straight into starting that game instead of just showing the library.
-  // If it was started via the "Mit Prefixr installieren" context menu entry
+  // If it was started via the "Mit Laufzeit installieren" context menu entry
   // (--install <exe-path>) — or a second such click handed its path off to
   // this already-running instance — open the install dialog instead.
   // The listeners go in first: a handoff arriving while the startup
@@ -123,7 +123,7 @@
 
 <div class="shell">
   <nav class="sidebar">
-    <div class="brand">Prefixr</div>
+    <div class="brand">Laufzeit</div>
     <button
       type="button"
       class="nav-item"

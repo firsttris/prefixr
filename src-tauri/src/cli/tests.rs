@@ -35,13 +35,13 @@ fn the_command_line_is_well_formed() {
 
 #[test]
 fn only_subcommands_and_help_make_it_a_command_line() {
-    assert!(is_cli(&args("prefixr game list")));
-    assert!(is_cli(&args("prefixr --help")));
-    assert!(is_cli(&args("prefixr --version")));
-    assert!(!is_cli(&args("prefixr")));
-    assert!(!is_cli(&args("prefixr --launch 6f2c1a3e")));
-    assert!(!is_cli(&args("prefixr --run 6f2c1a3e")));
-    assert!(!is_cli(&args("prefixr --install /x/setup.exe")));
+    assert!(is_cli(&args("laufzeit game list")));
+    assert!(is_cli(&args("laufzeit --help")));
+    assert!(is_cli(&args("laufzeit --version")));
+    assert!(!is_cli(&args("laufzeit")));
+    assert!(!is_cli(&args("laufzeit --launch 6f2c1a3e")));
+    assert!(!is_cli(&args("laufzeit --run 6f2c1a3e")));
+    assert!(!is_cli(&args("laufzeit --install /x/setup.exe")));
 }
 
 #[test]
@@ -188,7 +188,7 @@ fn a_new_umu_id_drops_the_old_store() {
 #[test]
 fn parses_a_game_add() {
     let cli = Cli::try_parse_from([
-        "prefixr",
+        "laufzeit",
         "game",
         "add",
         "--exe",
@@ -218,7 +218,7 @@ fn parses_a_game_add() {
 #[test]
 fn passes_a_program_its_own_arguments() {
     let cli = Cli::try_parse_from(args(
-        "prefixr prefix run /p --runner R regedit /S /tmp/fix.reg",
+        "laufzeit prefix run /p --runner R regedit /S /tmp/fix.reg",
     ))
     .unwrap();
     let Command::Prefix(PrefixCommand::Run {
@@ -237,7 +237,7 @@ fn passes_a_program_its_own_arguments() {
 
 #[test]
 fn takes_a_list_of_artwork_kinds() {
-    let cli = Cli::try_parse_from(args("prefixr game artwork quake --kinds cover,icon")).unwrap();
+    let cli = Cli::try_parse_from(args("laufzeit game artwork quake --kinds cover,icon")).unwrap();
     let Command::Game(GameCommand::Artwork(artwork)) = cli.command else {
         panic!("not artwork");
     };
@@ -278,49 +278,51 @@ fn picks_the_runner_the_prefix_games_share() {
 fn only_commands_that_change_the_config_lock_it() {
     let changes = |line: &str| changes_config(&Cli::try_parse_from(args(line)).unwrap().command);
     assert!(changes(
-        "prefixr game add --exe /g.exe --prefix /p --runner r"
+        "laufzeit game add --exe /g.exe --prefix /p --runner r"
     ));
-    assert!(changes("prefixr game edit quake --name Q"));
-    assert!(changes("prefixr game remove quake"));
-    assert!(changes("prefixr game artwork quake"));
-    assert!(changes("prefixr prefix add /p"));
-    assert!(changes("prefixr prefix remove /p"));
-    assert!(!changes("prefixr game list"));
-    assert!(!changes("prefixr game launch quake"));
+    assert!(changes("laufzeit game edit quake --name Q"));
+    assert!(changes("laufzeit game remove quake"));
+    assert!(changes("laufzeit game artwork quake"));
+    assert!(changes("laufzeit prefix add /p"));
+    assert!(changes("laufzeit prefix remove /p"));
+    assert!(!changes("laufzeit game list"));
+    assert!(!changes("laufzeit game launch quake"));
     assert!(!changes(
-        "prefixr game install /g/setup.exe --prefix /p -- /VERYSILENT"
+        "laufzeit game install /g/setup.exe --prefix /p -- /VERYSILENT"
     ));
-    assert!(!changes("prefixr prefix winetricks /p vcrun2022"));
-    assert!(!changes("prefixr runner download proton-ge"));
-    assert!(changes("prefixr library favorite quake"));
-    assert!(changes("prefixr library hide quake --off"));
-    assert!(changes("prefixr library test-status quake works --note ok"));
-    assert!(!changes("prefixr library list --tested broken"));
-    assert!(changes("prefixr category add Kinder"));
-    assert!(changes("prefixr category rename Kinder Kids"));
-    assert!(changes("prefixr category remove Kinder"));
+    assert!(!changes("laufzeit prefix winetricks /p vcrun2022"));
+    assert!(!changes("laufzeit runner download proton-ge"));
+    assert!(changes("laufzeit library favorite quake"));
+    assert!(changes("laufzeit library hide quake --off"));
     assert!(changes(
-        "prefixr category assign Kinder quake epic:Fortnite"
+        "laufzeit library test-status quake works --note ok"
     ));
-    assert!(changes("prefixr category unassign Kinder quake"));
-    assert!(!changes("prefixr library list --category Kinder"));
-    assert!(!changes("prefixr category list"));
+    assert!(!changes("laufzeit library list --tested broken"));
+    assert!(changes("laufzeit category add Kinder"));
+    assert!(changes("laufzeit category rename Kinder Kids"));
+    assert!(changes("laufzeit category remove Kinder"));
+    assert!(changes(
+        "laufzeit category assign Kinder quake epic:Fortnite"
+    ));
+    assert!(changes("laufzeit category unassign Kinder quake"));
+    assert!(!changes("laufzeit library list --category Kinder"));
+    assert!(!changes("laufzeit category list"));
 }
 
 #[test]
 fn library_and_category_commands_are_a_command_line() {
-    assert!(is_cli(&args("prefixr library list")));
-    assert!(is_cli(&args("prefixr category list")));
+    assert!(is_cli(&args("laufzeit library list")));
+    assert!(is_cli(&args("laufzeit category list")));
     assert!(
-        Cli::try_parse_from(args("prefixr category assign Kinder")).is_err(),
+        Cli::try_parse_from(args("laufzeit category assign Kinder")).is_err(),
         "needs a game"
     );
     assert!(
-        Cli::try_parse_from(args("prefixr library favorite")).is_err(),
+        Cli::try_parse_from(args("laufzeit library favorite")).is_err(),
         "needs a game"
     );
     let cli =
-        Cli::try_parse_from(args("prefixr library list --favorites --hidden --json")).unwrap();
+        Cli::try_parse_from(args("laufzeit library list --favorites --hidden --json")).unwrap();
     assert!(cli.json);
     assert!(matches!(
         cli.command,
@@ -363,14 +365,14 @@ fn finds_the_latest_log() {
 
 #[test]
 fn json_before_the_subcommand_is_the_command_line_too() {
-    assert!(is_cli(&args("prefixr --json game list")));
-    assert!(is_cli(&args("prefixr --json --json library list")));
-    assert!(is_cli(&args("prefixr game list --json")));
+    assert!(is_cli(&args("laufzeit --json game list")));
+    assert!(is_cli(&args("laufzeit --json --json library list")));
+    assert!(is_cli(&args("laufzeit game list --json")));
     // Alone, or before the window's own options, it opens the window as before.
-    assert!(!is_cli(&args("prefixr --json")));
-    assert!(!is_cli(&args("prefixr --json --launch 1234")));
+    assert!(!is_cli(&args("laufzeit --json")));
+    assert!(!is_cli(&args("laufzeit --json --launch 1234")));
     assert!(
-        Cli::try_parse_from(args("prefixr --json game list"))
+        Cli::try_parse_from(args("laufzeit --json game list"))
             .unwrap()
             .json
     );

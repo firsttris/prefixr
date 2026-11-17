@@ -10,11 +10,13 @@ import { overwriteGetLocale } from "#lib/paraglide/runtime.js";
 
 export type Locale = "de" | "en";
 
-const STORAGE_KEY = "prefixr:locale";
+const STORAGE_KEY = "laufzeit:locale";
+/** Where Prefixr, the name Laufzeit had before, kept the choice. */
+const LEGACY_STORAGE_KEY = "prefixr:locale";
 
 function detectLocale(): Locale {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
     if (stored === "de" || stored === "en") return stored;
   } catch {
     // localStorage unavailable (private mode, etc.) — fall through to

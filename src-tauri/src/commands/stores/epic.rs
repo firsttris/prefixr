@@ -4,7 +4,7 @@
 //! Legendary prints, so it's tested against Legendary's real output
 //! (`epic/fixtures/`) without an Epic account. Legendary keeps its own state
 //! (login, library metadata, installed games) in a config folder of
-//! Prefixr's (`LEGENDARY_CONFIG_PATH`), apart from a Legendary or Heroic the
+//! Laufzeit's (`LEGENDARY_CONFIG_PATH`), apart from a Legendary or Heroic the
 //! user may have installed themselves.
 
 use std::collections::HashMap;
@@ -27,7 +27,7 @@ pub const LOGIN_URL: &str = "https://legendary.gl/epiclogin";
 /// What `legendary status` reports as the account when nobody is logged in.
 const NOT_LOGGED_IN: &str = "<not logged in>";
 
-/// Runs Legendary with Prefixr's own config folder.
+/// Runs Legendary with Laufzeit's own config folder.
 pub struct Legendary {
     pub binary: PathBuf,
     pub config_dir: PathBuf,
@@ -242,7 +242,7 @@ pub fn parse_progress(line: &str) -> Option<f64> {
     percent.is_finite().then_some(percent.clamp(0.0, 100.0))
 }
 
-/// What Prefixr keeps about an installed game, from `legendary
+/// What Laufzeit keeps about an installed game, from `legendary
 /// list-installed --json` (and its GOG counterpart, see `gog`).
 #[derive(Debug, Clone, PartialEq)]
 pub struct InstalledGame {
@@ -303,7 +303,7 @@ pub fn launch_args(app_name: &str, offline: bool) -> Vec<String> {
         "launch".to_string(),
         app_name.to_string(),
         "--json".to_string(),
-        // Prefixr doesn't update games yet; an outdated install should
+        // Laufzeit doesn't update games yet; an outdated install should
         // still start rather than be refused.
         "--skip-version-check".to_string(),
     ];
@@ -342,8 +342,8 @@ pub fn parse_launch(json: &str) -> Result<StoreLaunch, String> {
     } else {
         PathBuf::from(&params.working_directory)
     };
-    // The prefix is Prefixr's to choose; Legendary only names one when it's
-    // configured to, which Prefixr's own Legendary isn't.
+    // The prefix is Laufzeit's to choose; Legendary only names one when it's
+    // configured to, which Laufzeit's own Legendary isn't.
     let mut env: Vec<(String, String)> = params
         .environment
         .into_iter()

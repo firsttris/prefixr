@@ -115,7 +115,7 @@ export async function launchGame(id: string): Promise<void> {
   } catch (e) {
     // A failed launch is already surfaced via the game-launch-error event;
     // this only covers a refused one, which sends none — e.g. because Steam
-    // already runs the game in a Prefixr of its own.
+    // already runs the game in a Laufzeit of its own.
     const failed = get(gameRunState)[id]?.error;
     patchRunState(id, { initializing: false, error: failed ?? e });
   }
@@ -136,7 +136,7 @@ export async function takePendingLaunch(): Promise<string | null> {
 }
 
 // Listens for a `pending-launch` event, fired when a desktop shortcut is
-// used while Prefixr is already running: that second instance hands its
+// used while Laufzeit is already running: that second instance hands its
 // game id off to this one instead. The id waits in the backend until it's
 // taken, so a webview that wasn't listening yet still finds it on startup.
 export function listenForPendingLaunch(callback: (id: string) => void): Promise<UnlistenFn> {
@@ -146,16 +146,16 @@ export function listenForPendingLaunch(callback: (id: string) => void): Promise<
   });
 }
 
-// Checks whether the app was started via the "Mit Prefixr installieren"
+// Checks whether the app was started via the "Mit Laufzeit installieren"
 // file-manager context menu entry's `--install <exe-path>` argument; returns
 // the exe path once, then clears it. A second instance launched the same way
-// while Prefixr is already running instead delivers the path via the
+// while Laufzeit is already running instead delivers the path via the
 // `pending-install` event (see `listenForPendingInstall`).
 export async function takePendingInstall(): Promise<string | null> {
   return await invoke<string | null>("take_pending_install");
 }
 
-// Listens for a `pending-install` event, fired when a second "Mit Prefixr
+// Listens for a `pending-install` event, fired when a second "Mit Laufzeit
 // installieren" click hands its exe path off to this already-running
 // instance instead of opening a new one.
 export function listenForPendingInstall(callback: (exePath: string) => void): Promise<UnlistenFn> {

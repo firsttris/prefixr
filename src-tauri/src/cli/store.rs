@@ -1,4 +1,4 @@
-//! `prefixr store …`: the store accounts (Epic Games, GOG, Amazon Games)
+//! `laufzeit store …`: the store accounts (Epic Games, GOG, Amazon Games)
 //! from the command line, so an agent can connect them, refresh their game
 //! lists and install or uninstall their games like the window does. Logging
 //! in still takes a person: `store login` opens the store's page in the
@@ -137,10 +137,10 @@ pub(super) fn runner_or_default(
 ) -> Result<String, AppError> {
     match runner {
         Some(id) if runners.iter().any(|r| r.id == id) => Ok(id),
-        Some(id) => Err(format!("No runner {id}; see `prefixr runner list`").into()),
+        Some(id) => Err(format!("No runner {id}; see `laufzeit runner list`").into()),
         None => Ok(default_runner(runners)
             .ok_or_else(|| {
-                "No runner installed yet; download one with `prefixr runner download proton-ge`"
+                "No runner installed yet; download one with `laufzeit runner download proton-ge`"
                     .to_string()
             })?
             .id
@@ -249,7 +249,7 @@ pub(super) async fn store_command(
                 }
             };
             let next = format!(
-                "Log in, then run: prefixr store connect {} <code>  \
+                "Log in, then run: laufzeit store connect {} <code>  \
                  (the code the page shows, or the whole page or address)",
                 store.slug()
             );
@@ -271,7 +271,7 @@ pub(super) async fn store_command(
                 Ok(games) => games.len().to_string(),
                 Err(e) => {
                     out.note(&format!(
-                        "Connected, but the game list failed: {}. Try `prefixr store sync {}`.",
+                        "Connected, but the game list failed: {}. Try `laufzeit store sync {}`.",
                         e.localized(crate::locale::Locale::En),
                         store.slug()
                     ));

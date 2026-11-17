@@ -1,4 +1,4 @@
-//! In a Flatpak, MangoHud, Gamescope and vkBasalt aren't part of Prefixr:
+//! In a Flatpak, MangoHud, Gamescope and vkBasalt aren't part of Laufzeit:
 //! they come as Flathub extensions the user installs
 //! (`org.freedesktop.Platform.VulkanLayer.<Name>`), and without one the
 //! setting silently does nothing. The settings show the install command for
@@ -93,7 +93,7 @@ mod tests {
     /// extension names the same one.
     #[test]
     fn branch_matches_the_manifest() {
-        let manifest = include_str!("../../../flatpak/spike/io.github.firsttris.Prefixr.yml");
+        let manifest = include_str!("../../../flatpak/spike/io.github.firsttris.Laufzeit.yml");
         assert!(manifest.contains(&format!("version: \"{EXTENSION_BRANCH}\"")));
     }
 }

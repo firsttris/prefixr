@@ -34,14 +34,14 @@ fn kill_menu_ids_parse_only_valid_uuid_entries() {
 fn quit_dialog_copy_varies_by_count_and_locale() {
     let (message_de, title_de, confirm_de, cancel_de) = quit_dialog_copy(1, Locale::De);
     assert!(message_de.contains("Ein Spiel läuft noch oder wird gerade gestartet."));
-    assert_eq!(title_de, "Prefixr beenden?");
-    assert_eq!(confirm_de, "Spiele und Prefixr beenden");
+    assert_eq!(title_de, "Laufzeit beenden?");
+    assert_eq!(confirm_de, "Spiele und Laufzeit beenden");
     assert_eq!(cancel_de, "Abbrechen");
 
     let (message_en, title_en, confirm_en, cancel_en) = quit_dialog_copy(3, Locale::En);
     assert!(message_en.contains("3 games are still running or starting."));
-    assert_eq!(title_en, "Quit Prefixr?");
-    assert_eq!(confirm_en, "Quit games and Prefixr");
+    assert_eq!(title_en, "Quit Laufzeit?");
+    assert_eq!(confirm_en, "Quit games and Laufzeit");
     assert_eq!(cancel_en, "Cancel");
 }
 

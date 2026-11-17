@@ -127,7 +127,7 @@ fn removes_only_stale_files_for_the_requested_kind() {
 
 #[test]
 fn remove_stale_asset_files_ignores_missing_directories() {
-    let dir = std::env::temp_dir().join(format!("prefixr-missing-artwork-{}", Uuid::new_v4()));
+    let dir = std::env::temp_dir().join(format!("laufzeit-missing-artwork-{}", Uuid::new_v4()));
 
     assert!(remove_stale_asset_files(&dir, Uuid::new_v4(), "_icon").is_ok());
 }

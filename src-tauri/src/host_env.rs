@@ -1,12 +1,12 @@
-//! The environment of the programs Prefixr starts.
+//! The environment of the programs Laufzeit starts.
 //!
-//! Run as an AppImage, Prefixr itself starts with an environment its
+//! Run as an AppImage, Laufzeit itself starts with an environment its
 //! `AppRun` set up for the libraries bundled in the AppImage: `PYTHONHOME`,
 //! `PYTHONPATH`, `LD_LIBRARY_PATH`, `PERLLIB`, `GTK_PATH` and others, all
 //! pointing into the AppImage's mount. Inherited as they are, they break what
-//! Prefixr starts: umu-run's Python can't find its own standard library
+//! Laufzeit starts: umu-run's Python can't find its own standard library
 //! ("No module named 'encodings'"), and Wine, Steam or winetricks load the
-//! AppImage's libraries instead of the system's. So every program Prefixr
+//! AppImage's libraries instead of the system's. So every program Laufzeit
 //! starts gets the environment without them, through `host_command`.
 //!
 //! The same goes for variables that only mean something on Windows: Wine
@@ -20,7 +20,7 @@ use std::sync::OnceLock;
 
 use crate::env::{self, Env};
 
-/// Whether Prefixr runs as a Flatpak. Every Flatpak-specific branch goes
+/// Whether Laufzeit runs as a Flatpak. Every Flatpak-specific branch goes
 /// through this (or `is_flatpak_in`), so the native builds (AppImage, .deb,
 /// .rpm) keep behaving exactly as before.
 pub fn is_flatpak() -> bool {
@@ -36,7 +36,7 @@ pub fn is_flatpak_in(env: Env) -> bool {
         || env("container").is_some_and(|value| value == "flatpak")
 }
 
-/// The Flatpak's app ID, e.g. `io.github.firsttris.Prefixr`; `None` outside
+/// The Flatpak's app ID, e.g. `io.github.firsttris.Laufzeit`; `None` outside
 /// a Flatpak.
 pub fn flatpak_id() -> Option<String> {
     env::process("FLATPAK_ID")
@@ -115,7 +115,7 @@ pub fn windows_fixes(vars: impl IntoIterator<Item = (OsString, OsString)>) -> Ve
 /// The changes that take an AppImage's setup back out of `vars`: every
 /// entry of a variable that points into the AppImage's mount (`APPDIR`) is
 /// dropped from it, a variable left without entries is removed, and so are
-/// the runtime's own variables. Nothing without `APPDIR`, i.e. when Prefixr
+/// the runtime's own variables. Nothing without `APPDIR`, i.e. when Laufzeit
 /// doesn't run as an AppImage.
 pub fn appimage_fixes(vars: impl IntoIterator<Item = (OsString, OsString)>) -> Vec<EnvFix> {
     let vars: Vec<(OsString, OsString)> = vars.into_iter().collect();
@@ -173,7 +173,7 @@ fn process_fixes() -> &'static [EnvFix] {
     })
 }
 
-/// A command for `program` with the environment Prefixr itself was started
+/// A command for `program` with the environment Laufzeit itself was started
 /// in (see the module's docs). Variables the caller sets on it afterwards
 /// still win.
 pub fn host_command(program: impl AsRef<OsStr>) -> tokio::process::Command {

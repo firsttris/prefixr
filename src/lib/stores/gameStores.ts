@@ -80,7 +80,7 @@ export async function openStoreLogin(store: StoreKind): Promise<void> {
 }
 
 /**
- * Signs in in a window of Prefixr's own that takes the code itself, then
+ * Signs in in a window of Laufzeit's own that takes the code itself, then
  * fetches the account's games. False when the user closed the window.
  */
 export async function loginStoreInApp(store: StoreKind): Promise<boolean> {

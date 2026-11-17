@@ -28,7 +28,7 @@ fn app_id_is_stable_and_marked_non_steam() {
 
 fn native_launch() -> OwnLaunch {
     OwnLaunch {
-        program: PathBuf::from("/apps/prefixr"),
+        program: PathBuf::from("/apps/laufzeit"),
         args: Vec::new(),
         start_dir: PathBuf::from("/apps"),
     }
@@ -37,7 +37,7 @@ fn native_launch() -> OwnLaunch {
 #[test]
 fn a_flatpak_shortcut_runs_flatpak() {
     let env = crate::env::fake(&[
-        ("FLATPAK_ID", "io.github.firsttris.Prefixr"),
+        ("FLATPAK_ID", "io.github.firsttris.Laufzeit"),
         ("HOME", "/home/u"),
     ]);
     let launch = own_launch(&env).unwrap();
@@ -52,7 +52,7 @@ fn a_flatpak_shortcut_runs_flatpak() {
     assert_eq!(string(fields, "StartDir"), "\"/home/u\"");
     assert_eq!(
         string(fields, "LaunchOptions"),
-        "run io.github.firsttris.Prefixr --run 6f2c1a3e-0000-4000-8000-000000000001"
+        "run io.github.firsttris.Laufzeit --run 6f2c1a3e-0000-4000-8000-000000000001"
     );
     // Found again by its id, also after an export from the native build.
     assert_eq!(find_shortcut(&shortcuts, g.id), Some(0));
@@ -70,7 +70,7 @@ fn adds_then_updates_the_same_entry() {
     assert_eq!(shortcuts[0].0, "0");
     assert_eq!(shortcuts[1].0, "1");
 
-    // The user hid it in Steam; a rename in Prefixr keeps that.
+    // The user hid it in Steam; a rename in Laufzeit keeps that.
     let Value::Map(fields) = &mut shortcuts[1].1 else {
         panic!()
     };
@@ -90,7 +90,7 @@ fn adds_then_updates_the_same_entry() {
         panic!()
     };
     assert_eq!(string(fields, "AppName"), "New");
-    assert_eq!(string(fields, "Exe"), "\"/apps/prefixr\"");
+    assert_eq!(string(fields, "Exe"), "\"/apps/laufzeit\"");
     assert_eq!(string(fields, "StartDir"), "\"/apps\"");
     assert_eq!(string(fields, "icon"), "/i.png");
     assert_eq!(
@@ -112,4 +112,45 @@ fn removes_only_the_games_entry() {
     assert_eq!(shortcuts.len(), 1);
     assert_eq!(shortcuts[0].0, "0");
     assert_eq!(remove_entry(&mut shortcuts, g.id), None);
+}
+
+#[test]
+fn relinks_only_entries_prefixr_made() {
+    let g = game("Quake");
+    let mut other = game("Other");
+    other.id = Uuid::parse_str("6f2c1a3e-0000-4000-8000-000000000002").unwrap();
+    let prefixr = OwnLaunch {
+        program: PathBuf::from("flatpak"),
+        args: vec!["run".into(), "io.github.firsttris.Prefixr".into()],
+        start_dir: PathBuf::from("/home/u"),
+    };
+    let mut shortcuts = Map::new();
+    upsert_shortcut(&mut shortcuts, &g, 42, &prefixr, None);
+    upsert_shortcut(&mut shortcuts, &other, 43, &native_launch(), None);
+    if let Value::Map(fields) = &mut shortcuts[0].1 {
+        binary_vdf::set(fields, "AppName", Value::String("Renamed in Steam".into()));
+    }
+
+    assert!(relink_entries(
+        &mut shortcuts,
+        &[g.clone(), other.clone()],
+        &native_launch()
+    ));
+
+    let Value::Map(fields) = &shortcuts[0].1 else {
+        panic!()
+    };
+    assert_eq!(string(fields, "Exe"), "\"/apps/laufzeit\"");
+    assert_eq!(string(fields, "StartDir"), "\"/apps\"");
+    assert_eq!(
+        string(fields, "LaunchOptions"),
+        "--run 6f2c1a3e-0000-4000-8000-000000000001"
+    );
+    assert_eq!(string(fields, "AppName"), "Renamed in Steam");
+    // Nothing left to do.
+    assert!(!relink_entries(
+        &mut shortcuts,
+        &[g, other],
+        &native_launch()
+    ));
 }

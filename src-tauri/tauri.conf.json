@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "prefixr",
+  "productName": "laufzeit",
   "version": "0.2.2",
-  "identifier": "com.tristan.prefixr",
+  "identifier": "com.tristan.laufzeit",
   "build": {
     "beforeDevCommand": "bun run dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "prefixr",
+        "title": "laufzeit",
         "create": false,
         "width": 1180,
         "height": 780,
@@ -39,6 +39,15 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "linux": {
+      "deb": {
+        "conflicts": ["prefixr"],
+        "replaces": ["prefixr"]
+      },
+      "rpm": {
+        "obsoletes": ["prefixr"]
+      }
+    }
   }
 }

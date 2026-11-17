@@ -1,6 +1,6 @@
 # Development
 
-How to build Prefixr, how the code is organized, and what CI checks before a change is merged.
+How to build Laufzeit, how the code is organized, and what CI checks before a change is merged.
 
 - [Building from source](#building-from-source)
 - [Everyday commands](#everyday-commands)
@@ -14,7 +14,7 @@ How to build Prefixr, how the code is organized, and what CI checks before a cha
 
 ## Building from source
 
-Prefixr is a [Tauri 2](https://v2.tauri.app/) app: a Rust backend with a
+Laufzeit is a [Tauri 2](https://v2.tauri.app/) app: a Rust backend with a
 [SvelteKit](https://svelte.dev/docs/kit) frontend (Svelte 5, TypeScript) rendered by WebKitGTK.
 
 **You need:**
@@ -43,7 +43,7 @@ bun run tauri dev     # development build with hot reload
 bun run tauri build   # release binary and bundles
 ```
 
-`bun run tauri build` writes the binary to `src-tauri/target/release/prefixr` and the AppImage,
+`bun run tauri build` writes the binary to `src-tauri/target/release/laufzeit` and the AppImage,
 `.deb` and `.rpm` to `src-tauri/target/release/bundle/`. Use it rather than
 `cargo build --release`, which doesn't embed the frontend.
 
@@ -82,11 +82,11 @@ src/
     i18n/               Locale switching and backendError()
     types.ts            Re-exports the generated types
 tests/                  Vitest tests
-skills/prefixr/         The Agent Skill (SKILL.md) built into `prefixr skill install`
+skills/laufzeit/         The Agent Skill (SKILL.md) built into `laufzeit skill install`
 src-tauri/
   src/
     lib.rs              App setup, single-instance handoff, command registration
-    cli.rs              The command line (`prefixr game …`), with its tests in cli/tests.rs;
+    cli.rs              The command line (`laufzeit game …`), with its tests in cli/tests.rs;
                         library, store, backup and skill commands in cli/<name>.rs
     commands/           One module per area, each with its tests in commands/<name>/tests.rs
     config.rs           Loading, migrating and atomically saving config.json
@@ -123,13 +123,13 @@ src-tauri/
 `LockExt::locked()`, which also accepts a poisoned lock, and never hold it across an `.await`.
 Every change is saved to `config.json` with a write to a temporary file and a rename.
 
-**Command line.** `prefixr game …`, `library …`, `prefix …`, `store …` and the rest are parsed with
+**Command line.** `laufzeit game …`, `library …`, `prefix …`, `store …` and the rest are parsed with
 [clap](https://docs.rs/clap) in `cli.rs`. They start the app without a window, as `--run` does
 (all but `skill`, which needs no app), and call the same Tauri command functions the frontend
 invokes, passing `app.state()` for their `State` parameters, so there is no second implementation
 to keep in sync. Progress comes from the same events the frontend listens to. To add a command, add
 a variant to the matching subcommand enum and call the existing command function. When you add,
-rename or change a command an agent uses, update `skills/prefixr/SKILL.md` too: a test parses
+rename or change a command an agent uses, update `skills/laufzeit/SKILL.md` too: a test parses
 every example command in it. The window's process watches `config.json` (`watch_config_file`):
 when another process changed it, the config is reloaded and the frontend gets `config-changed` and
 refreshes the library.
@@ -149,7 +149,7 @@ value waits in the backend until the frontend takes it, so it isn't lost before 
 a Wine tool, so a fresh prefix ends up identical whichever comes first. `run_game` then builds the
 wrapper chain (see [What a launch sets up](configuration.md#what-a-launch-sets-up)), spawns it in
 its own process group, and tracks it in `RunningGames`. A game in progress is claimed in
-`LaunchingGames`, which also holds a lock file in `$XDG_RUNTIME_DIR`, so a Prefixr that Steam started
+`LaunchingGames`, which also holds a lock file in `$XDG_RUNTIME_DIR`, so a Laufzeit that Steam started
 and the open window never start the same game twice. Stopping a game ends its process tree, the umu
 session and the wineserver.
 
@@ -161,7 +161,7 @@ them missing.
 **Security.** The webview runs under a Content Security Policy (`tauri.conf.json`) that allows only
 the app's own scripts, IPC, and images from the app, the asset protocol and SteamGridDB. Covers and
 icons load through the asset protocol, scoped to `artwork/` and `exe-icons/`. Commands that run
-something in a prefix only accept prefixes Prefixr knows, and artwork downloads only come from
+something in a prefix only accept prefixes Laufzeit knows, and artwork downloads only come from
 SteamGridDB.
 
 **Frontend.** A single-page SvelteKit app (`adapter-static`) with Svelte 5 runes. Each backend area
@@ -243,8 +243,8 @@ that changed.
 
 ## Flatpak
 
-Prefixr is also built as a Flatpak, `io.github.firsttris.Prefixr`, on the GNOME 51 runtime.
-`release.yml` attaches `prefixr_<version>_x86_64.flatpak` to every release. The launchers already
+Laufzeit is also built as a Flatpak, `io.github.firsttris.Laufzeit`, on the GNOME 51 runtime.
+`release.yml` attaches `laufzeit_<version>_x86_64.flatpak` to every release. The launchers already
 on Flathub ([Lutris](https://github.com/flathub/net.lutris.Lutris),
 [Heroic](https://github.com/flathub/com.heroicgameslauncher.hgl),
 [Bottles](https://github.com/flathub/com.usebottles.bottles)) were the model for every decision
@@ -256,7 +256,7 @@ builds (AppImage, `.deb`, `.rpm`) must keep working as before: Flatpak-only beha
 
 ```bash
 flatpak run org.flatpak.Builder --user --install --force-clean --disable-rofiles-fuse \
-  flatpak/build-dir flatpak/io.github.firsttris.Prefixr.yml
+  flatpak/build-dir flatpak/io.github.firsttris.Laufzeit.yml
 ```
 
 (`flatpak-builder` instead of `flatpak run org.flatpak.Builder` where it's installed on the host.)
@@ -274,28 +274,28 @@ The manifest builds from the checkout without network access, as Flathub require
   CI image, this page), the shared-modules submodule, 7-Zip, cabextract, Bun and Tauri, and for a
   new Legendary, gogdl or Nile (their sha256 come from `renovate-pins.yml`); each lists what to
   check before merging. unrar (rarlab.com) has no release feed Renovate reads: update it by hand.
-- `flatpak/spike/io.github.firsttris.Prefixr.yml` repackages a local `.deb` instead
+- `flatpak/spike/io.github.firsttris.Laufzeit.yml` repackages a local `.deb` instead
   (`bun run tauri build --bundles deb` first). It's quicker for trying a change, not for releases.
 
-Running it: `flatpak run io.github.firsttris.Prefixr`, and the CLI as
-`flatpak run io.github.firsttris.Prefixr game list`.
+Running it: `flatpak run io.github.firsttris.Laufzeit`, and the CLI as
+`flatpak run io.github.firsttris.Laufzeit game list`.
 
 ### What works differently in the sandbox
 
-- **Paths:** the library and settings live in `~/.var/app/io.github.firsttris.Prefixr`. umu's
+- **Paths:** the library and settings live in `~/.var/app/io.github.firsttris.Laufzeit`. umu's
   runtime, the app menu and Steam are the host's (`host_data_home`). With an empty library, the
-  window points to a native library in `~/.config/com.tristan.prefixr` and explains moving it over
+  window points to a native library in `~/.config/com.tristan.laufzeit` and explains moving it over
   with *Backup*.
 - **Stopping games:** pressure-vessel's container runs below the Flatpak portal, in the app's PID
-  namespace, so the `PPid` chain from umu-run breaks. Every game gets `PREFIXR_GAME_ID` in its
+  namespace, so the `PPid` chain from umu-run breaks. Every game gets `LAUFZEIT_GAME_ID` in its
   environment, and `stop_game_gracefully` ends its marked processes as Lutris does:
   `umu-run wineboot -k` or `wineserver -k`, then SIGTERM, then SIGKILL. The native build does the
   same wherever it can see the marked processes. Hard kills (`pkill -9`, `wineserver -k9`) left hung
   games and orphaned Wine services behind.
 - **Other instances:** every `flatpak run` is its own PID namespace. The window owns the
   single-instance name below the app ID (`--launch`, `--install`), and whichever instance runs a
-  game owns `io.github.firsttris.Prefixr.Game.g<id>`, whose `Stop` method `game stop` calls.
-- **No host commands:** the Flatpak doesn't get `--talk-name=org.freedesktop.Flatpak`. So Prefixr
+  game owns `io.github.firsttris.Laufzeit.Game.g<id>`, whose `Stop` method `game stop` calls.
+- **No host commands:** the Flatpak doesn't get `--talk-name=org.freedesktop.Flatpak`. So Laufzeit
   asks the user to close Steam before changing its shortcuts, and shows the `sysctl` command for
   `vm.max_map_count` instead of running `pkexec`. A user can add the permission with
   `flatpak override`.
@@ -303,7 +303,7 @@ Running it: `flatpak run io.github.firsttris.Prefixr`, and the CLI as
   mounting a disc image through UDisks2. MangoHud and Gamescope are Flathub extensions
   (`org.freedesktop.Platform.VulkanLayer.<Name>//26.08`); the settings show the install command
   when one is missing. vkBasalt has no 26.08 build on Flathub yet.
-- **Desktop:** shortcuts and the Steam entry run `flatpak run io.github.firsttris.Prefixr`. The tray
+- **Desktop:** shortcuts and the Steam entry run `flatpak run io.github.firsttris.Laufzeit`. The tray
   icon goes to `$XDG_RUNTIME_DIR/app/<id>`, the one folder with the same path on the host, and the
   program name is the app ID, so the window matches the desktop file.
 
@@ -312,7 +312,7 @@ Running it: `flatpak run io.github.firsttris.Prefixr`, and the CLI as
 - Flathub: a `<release>` entry in the metainfo per version, then the submission (screenshots come
   from `bun run screenshots`).
 - Not tested yet: GNOME, NVIDIA, the Steam Deck, GameMode with `gamemoded`, and what Steam does when
-  it stops a Prefixr shortcut (ending the outer `flatpak run` doesn't reach Prefixr inside).
+  it stops a Laufzeit shortcut (ending the outer `flatpak run` doesn't reach Laufzeit inside).
 
 ## Releases
 
@@ -326,14 +326,14 @@ Releases are built by CI from a tag `vX.Y.Z`, with the shared workflows from
    since the release commit only changes versions), builds the AppImage, `.deb` and `.rpm` on
    Ubuntu 24.04, and attaches them to a GitHub release.
 
-The AppImage is published as `prefixr_<version>_amd64.AppImage` (up to 0.1.10 as
+The AppImage is published as `laufzeit_<version>_amd64.AppImage` (up to 0.1.10 as
 `…_amd64-ubuntu-compat.AppImage`). It bundles WebKitGTK from its build environment, which can clash
 with very new graphics drivers; see
 [Troubleshooting](troubleshooting.md#appimage-crashes-egl_bad_parameter-or-shows-a-blank-window).
 
 ## Documentation website
 
-These pages are published at [firsttris.github.io/prefixr](https://firsttris.github.io/prefixr/),
+These pages are published at [firsttris.github.io/laufzeit](https://firsttris.github.io/laufzeit/),
 built from `docs/` with [MkDocs Material](https://squidfunk.github.io/mkdocs-material/). The
 navigation and theme are in `mkdocs.yml`.
 

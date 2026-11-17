@@ -36,7 +36,7 @@ impl WindowVisible {
 /// Whether a tray host is there to show the tray icon. GNOME without the
 /// AppIndicator extension has none: the icon then silently doesn't appear,
 /// and a window closed "into the tray" could only be brought back by
-/// starting Prefixr again. See `lib.rs`'s close handling.
+/// starting Laufzeit again. See `lib.rs`'s close handling.
 ///
 /// Assumed until `check_tray_host` has the answer, which can take a moment
 /// on a slow session bus, and startup doesn't wait for that.
@@ -73,7 +73,7 @@ fn sorted_running_games(mut games: Vec<(Uuid, String)>) -> Vec<(Uuid, String)> {
 }
 
 /// Asks the session bus whether a StatusNotifier host (what Tauri's tray
-/// icon registers with) is running. `gdbus` ships with GLib, which Prefixr
+/// icon registers with) is running. `gdbus` ships with GLib, which Laufzeit
 /// needs anyway; if it can't answer, a tray is assumed as before.
 fn tray_host_available() -> bool {
     let output = crate::host_env::host_std_command("gdbus")
@@ -276,9 +276,9 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
     }
 }
 
-/// Quits Prefixr — after asking, while games are launching or running.
+/// Quits Laufzeit — after asking, while games are launching or running.
 /// They'd keep running without it (each in a process group of its own), but
-/// a restarted Prefixr wouldn't know about them anymore and so couldn't end
+/// a restarted Laufzeit wouldn't know about them anymore and so couldn't end
 /// them either; confirming ends them first.
 fn quit(app: &AppHandle) {
     let active = app.state::<LaunchingGames>().ids().len();
@@ -316,7 +316,7 @@ fn quit(app: &AppHandle) {
 pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     let icon = app.default_window_icon().cloned();
     let mut builder = TrayIconBuilder::with_id(TRAY_ID)
-        .tooltip("Prefixr")
+        .tooltip("Laufzeit")
         .menu(&build_menu(app)?)
         .show_menu_on_left_click(true)
         .on_menu_event(|app, event| {

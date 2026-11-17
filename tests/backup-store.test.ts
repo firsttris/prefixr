@@ -54,8 +54,8 @@ describe("backups", () => {
     expect(backup.takeRestoredBackup()).toBe("x.tar.gz");
     expect(backup.takeRestoredBackup()).toBeNull();
 
-    invoke.mockRejectedValueOnce(new Error("not a Prefixr backup"));
-    await expect(backup.restoreBackup("/b/y.tar.gz")).rejects.toThrow("not a Prefixr backup");
+    invoke.mockRejectedValueOnce(new Error("not a Laufzeit backup"));
+    await expect(backup.restoreBackup("/b/y.tar.gz")).rejects.toThrow("not a Laufzeit backup");
     expect(reload).toHaveBeenCalledOnce();
   });
 
@@ -68,13 +68,15 @@ describe("backups", () => {
     expect(invoke).toHaveBeenLastCalledWith("save_backup_config", { config: settings });
   });
 
-  it("tell the page when Prefixr made one", async () => {
+  it("tell the page when Laufzeit made one", async () => {
     const onChange = vi.fn();
     await backup.listenForBackups(onChange);
     expect(listen).toHaveBeenCalledWith("backups-changed", onChange);
   });
 
   it("get a dated default name", () => {
-    expect(backup.defaultBackupName(new Date(2026, 9, 8))).toBe("prefixr-backup-2026-10-08.tar.gz");
+    expect(backup.defaultBackupName(new Date(2026, 9, 8))).toBe(
+      "laufzeit-backup-2026-10-08.tar.gz",
+    );
   });
 });

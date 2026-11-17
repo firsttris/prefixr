@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    prefixr_lib::run()
+    laufzeit_lib::run()
 }

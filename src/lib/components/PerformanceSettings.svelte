@@ -78,7 +78,7 @@
         {#if !$maxMapCountStatus.can_fix}
           <code
             >sudo sh -c 'echo "vm.max_map_count = {$maxMapCountStatus.recommended}" &gt;
-            /etc/sysctl.d/99-prefixr-max-map-count.conf && sysctl --system'</code
+            /etc/sysctl.d/99-laufzeit-max-map-count.conf && sysctl --system'</code
           >
         {/if}
       </div>

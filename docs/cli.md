@@ -1,8 +1,8 @@
 # Command line & AI agents
 
-Most of what you do in Prefixr's window can also be done from a terminal: add and edit games,
+Most of what you do in Laufzeit's window can also be done from a terminal: add and edit games,
 create prefixes, install winetricks packages, download runners, pick artwork, launch games, connect
-store accounts and install their games, and sort the library into categories. That makes Prefixr scriptable, and it lets an AI coding agent
+store accounts and install their games, and sort the library into categories. That makes Laufzeit scriptable, and it lets an AI coding agent
 such as [Claude Code](https://claude.com/claude-code) run your library for you: you say what you
 want, the agent does it, and you play.
 
@@ -18,35 +18,35 @@ want, the agent does it, and you play.
 
 ## How it works
 
-Call Prefixr with a command instead of no arguments:
+Call Laufzeit with a command instead of no arguments:
 
 ```bash
-prefixr game list
-prefixr prefix list
-prefixr runner list
-prefixr --help            # every command
-prefixr game add --help   # one command's options
+laufzeit game list
+laufzeit prefix list
+laufzeit runner list
+laufzeit --help            # every command
+laufzeit game add --help   # one command's options
 ```
 
-With the AppImage, that's `./prefixr_*.AppImage game list`. With the Flatpak, it's
-`flatpak run io.github.firsttris.Prefixr game list`; an alias saves typing it:
+With the AppImage, that's `./laufzeit_*.AppImage game list`. With the Flatpak, it's
+`flatpak run io.github.firsttris.Laufzeit game list`; an alias saves typing it:
 
 ```bash
-alias prefixr='flatpak run io.github.firsttris.Prefixr'
+alias laufzeit='flatpak run io.github.firsttris.Laufzeit'
 ```
 
-`prefixr skill install` from the Flatpak writes that form into the skill, so an agent uses it from
+`laufzeit skill install` from the Flatpak writes that form into the skill, so an agent uses it from
 the start.
 
 The commands do exactly what the matching buttons do: the same checks, the same prefix setup, the
-same launch. They work while Prefixr's window is open, too. The window notices the change within a
+same launch. They work while Laufzeit's window is open, too. The window notices the change within a
 second and shows it, so you can watch a script fill your library.
 
-Prefixr runs without a window for these commands, but it still needs your desktop session (as for
+Laufzeit runs without a window for these commands, but it still needs your desktop session (as for
 any launch), so run them in a terminal on your desktop rather than over SSH.
 
-A game is named by its ID (`prefixr game list` shows the first 8 characters, which are enough), by
-its name, or by a part of its name that only one game has: `prefixr game launch quake`.
+A game is named by its ID (`laufzeit game list` shows the first 8 characters, which are enough), by
+its name, or by a part of its name that only one game has: `laufzeit game launch quake`.
 
 ## Games
 
@@ -54,7 +54,7 @@ its name, or by a part of its name that only one game has: `prefixr game launch 
 | --- | --- |
 | `game list` | Lists the games with ID, runner, UMU ID and prefix |
 | `game show <game>` | Shows all of a game's settings |
-| `game add --exe <exe> --prefix <dir> --runner <id> [settings]` | Adds a game. A prefix Prefixr doesn't know yet is added (and created) first. Without `--name`, the name comes from the `.exe` |
+| `game add --exe <exe> --prefix <dir> --runner <id> [settings]` | Adds a game. A prefix Laufzeit doesn't know yet is added (and created) first. Without `--name`, the name comes from the `.exe` |
 | `game install <installer> --prefix <dir> [--runner <id>] [--name] [--exe] [--setup] [settings] [-- <installer args>…]` | Runs a game's installer in a prefix and adds the game it installed. The installer is a setup `.exe` or `.msi`, or a disc image (`.iso`). Without `--runner`, the newest Proton. See [Installing from a setup file or a disc](#installing-from-a-setup-file-or-a-disc) |
 | `game edit <game> [--name] [--exe] [--prefix] [--runner] [--clear-env] [settings]` | Changes a game. Whatever you don't pass stays as it is |
 | `game remove <game>` | Removes the game from the library, like **Remove** in the window. Prefix and game files stay |
@@ -79,7 +79,7 @@ The settings `game add`, `game install` and `game edit` take:
 For example, Fallout 4 with Proton-GE, its protonfixes, and the frame rate cap its physics need:
 
 ```bash
-prefixr game add --name "Fallout 4" \
+laufzeit game add --name "Fallout 4" \
   --exe "/games/Fallout 4/Fallout4.exe" \
   --prefix ~/Games/prefixes/fallout4 \
   --runner GE-Proton10-30 \
@@ -91,7 +91,7 @@ prefixr game add --name "Fallout 4" \
 
 `game install` does what **Run installer** does in the window, in one step:
 
-1. It adds the prefix if Prefixr doesn't know it yet.
+1. It adds the prefix if Laufzeit doesn't know it yet.
 2. A disc image is mounted read-only with `udisksctl` (no root needed) and unmounted again at the
    end. The installer on it is the one its `autorun.inf` starts, else its `setup.exe` or
    `install.exe`; `--setup <path on the disc>` picks another.
@@ -100,9 +100,9 @@ prefixr game add --name "Fallout 4" \
    is given.
 
 ```bash
-prefixr game install ~/Downloads/setup_game_1.0.exe --prefix ~/Games/prefixes/game \
+laufzeit game install ~/Downloads/setup_game_1.0.exe --prefix ~/Games/prefixes/game \
   -- /VERYSILENT /SUPPRESSMSGBOXES /DIR="C:\Games\Game"
-prefixr game install ~/ISOs/GAME_DISC1.iso --prefix ~/Games/prefixes/game --umu-id umu-12345
+laufzeit game install ~/ISOs/GAME_DISC1.iso --prefix ~/Games/prefixes/game --umu-id umu-12345
 ```
 
 Everything after `--` goes to the installer. Many installers run without a window when told to:
@@ -149,8 +149,8 @@ A store game keeps its categories, favorite mark and play time when it's install
 and installed again.
 
 Sorting a whole library into categories is a job for an agent: *"Create the categories Kinder,
-Koop and Rennspiele, and sort my games into them."* It reads `prefixr library list --json`, decides
-per game, and calls `prefixr category assign Kinder epic:Fortnite gog:1207658924 …`.
+Koop and Rennspiele, and sort my games into them."* It reads `laufzeit library list --json`, decides
+per game, and calls `laufzeit category assign Kinder epic:Fortnite gog:1207658924 …`.
 
 ## Stores
 
@@ -213,16 +213,16 @@ Without `--runner`, a prefix command uses the runner all of the prefix's games u
 
 | Command | Does |
 | --- | --- |
-| `backup create [<file>] [--with-secrets]` | Backs up the library, all settings, categories, play times and artwork to one file: the one given, or `prefixr-backup-<UTC date>-<time>.tar.gz` in the current folder. The API keys only with `--with-secrets` |
+| `backup create [<file>] [--with-secrets]` | Backs up the library, all settings, categories, play times and artwork to one file: the one given, or `laufzeit-backup-<UTC date>-<time>.tar.gz` in the current folder. The API keys only with `--with-secrets` |
 | `backup list` | Lists the automatic backups (when turned on under **Backup**, and before every restore), newest first and numbered. A `backup create` file isn't among them |
-| `backup restore <file or number>` | Restores a backup: a file, or a number from `backup list`. What is now is backed up first, so `prefixr backup restore 1` undoes it |
+| `backup restore <file or number>` | Restores a backup: a file, or a number from `backup list`. What is now is backed up first, so `laufzeit backup restore 1` undoes it |
 
 See [Backup and restore](user-guide.md#backup-and-restore) for what a backup holds.
 
 ## JSON output and exit codes
 
 Add `--json` to any command to get its result as JSON on stdout, for example
-`prefixr game list --json` (or `prefixr --json game list`). Messages for people (progress, notes) always go to stderr, so they
+`laufzeit game list --json` (or `laufzeit --json game list`). Messages for people (progress, notes) always go to stderr, so they
 never mix into it.
 
 A command exits with `0` on success, `1` when it fails (the error is printed to stderr), and `2`
@@ -233,40 +233,40 @@ when its arguments are wrong. `game launch` exits with `1` when the game exits w
 
 The command line is made to be driven by an AI coding agent like
 [Claude Code](https://claude.com/claude-code). Start the agent in a terminal on your desktop, tell
-it to use `prefixr` (it finds every command with `prefixr --help`), and keep Prefixr's window
+it to use `laufzeit` (it finds every command with `laufzeit --help`), and keep Laufzeit's window
 open: it shows each change within a second, so you see what the agent does and can try a game
 right away.
 
-### The Prefixr skill
+### The Laufzeit skill
 
-Prefixr comes with an [Agent Skill](https://docs.claude.com/en/docs/claude-code/skills): a
-`SKILL.md` that teaches an agent how to work with Prefixr. It covers the commands, `--json`, backing
+Laufzeit comes with an [Agent Skill](https://docs.claude.com/en/docs/claude-code/skills): a
+`SKILL.md` that teaches an agent how to work with Laufzeit. It covers the commands, `--json`, backing
 up first, one game at a time, reading the logs, protonfixes, test results and notes. With it
 installed, the agent picks it up by itself whenever you talk about your games.
 
 | Command | Does |
 | --- | --- |
-| `skill install [--dir <dir>]` | Installs the skill for Claude Code, in `~/.claude/skills/prefixr/`. `--dir` puts `SKILL.md` into another folder, for an agent that reads skills from elsewhere |
+| `skill install [--dir <dir>]` | Installs the skill for Claude Code, in `~/.claude/skills/laufzeit/`. `--dir` puts `SKILL.md` into another folder, for an agent that reads skills from elsewhere |
 | `skill show` | Prints the skill, to read it or paste it into an agent that doesn't read skill files |
 
 ```bash
-prefixr skill install
+laufzeit skill install
 ```
 
-Run it again after updating Prefixr: the skill is built into Prefixr, so the installed one then
+Run it again after updating Laufzeit: the skill is built into Laufzeit, so the installed one then
 matches the new version's commands. Neither command needs the desktop session, so they work over
 SSH too. The skill is also in the repository, at
-[`skills/prefixr/SKILL.md`](https://github.com/firsttris/prefixr/blob/main/skills/prefixr/SKILL.md).
+[`skills/laufzeit/SKILL.md`](https://github.com/firsttris/laufzeit/blob/main/skills/laufzeit/SKILL.md).
 
 What you can hand over:
 
 | Task | For example |
 | --- | --- |
-| **Set games up** | *"Add every game under `~/Games` to Prefixr, with Proton-GE, one prefix per game, the right protonfixes match and artwork."* |
+| **Set games up** | *"Add every game under `~/Games` to Laufzeit, with Proton-GE, one prefix per game, the right protonfixes match and artwork."* |
 | **Install from a setup file or disc** | *"Install the game from `~/ISOs/GAME.iso` into its own prefix, then find its protonfixes match and artwork."* |
 | **Install from your stores** | *"Connect my GOG account and install all my GOG games that are rated Gold or better on ProtonDB."* |
-| **Move games over** | *"These games come with their own Wine and start scripts. Move each game out of its bundled prefix, add it to Prefixr with Proton, and carry over the fixes from the scripts and my save games."* |
-| **Fix games** | *"Fallout 4 crashes on start. Read its latest Prefixr log and fix it."* |
+| **Move games over** | *"These games come with their own Wine and start scripts. Move each game out of its bundled prefix, add it to Laufzeit with Proton, and carry over the fixes from the scripts and my save games."* |
+| **Fix games** | *"Fallout 4 crashes on start. Read its latest Laufzeit log and fix it."* |
 | **Test games** | *"Add all games under `/mnt/games/` and check whether each one starts."* (needs a computer-use tool, see [Testing games on screen](#testing-games-on-screen)) |
 | **Organize the library** | *"Create the categories Kids and Adults and sort all my games into them. Hide the store giveaways I've never played."* |
 | **Tidy up** | *"Give every game without artwork a cover, and add my favorites to Steam."* |
@@ -274,16 +274,16 @@ What you can hand over:
 ### Organizing the library
 
 The agent reads the whole library, store games not installed yet included, with
-`prefixr library list --json`: each game's `key`, name, source, categories and play time. Then it
+`laufzeit library list --json`: each game's `key`, name, source, categories and play time. Then it
 creates the categories it needs and sorts the games in by key:
 
 ```bash
-prefixr category add Kids
-prefixr category add Adults
-prefixr category assign Kids epic:Fortnite gog:1207658924
-prefixr category assign Adults "Fallout 4"
-prefixr library favorite "Fallout 4"
-prefixr library hide amazon:amzn1.adg.product.1234
+laufzeit category add Kids
+laufzeit category add Adults
+laufzeit category assign Kids epic:Fortnite gog:1207658924
+laufzeit category assign Adults "Fallout 4"
+laufzeit library favorite "Fallout 4"
+laufzeit library hide amazon:amzn1.adg.product.1234
 ```
 
 It can decide by the names it knows, or look games up first (their age ratings, genres, co-op
@@ -303,13 +303,13 @@ it: an MCP server that gives the agent screenshots, mouse and keyboard. For exam
 
 With one connected, the agent can test a whole library on its own:
 
-1. Start a game in the background: `prefixr game launch <game> &` (it waits until the game exits).
+1. Start a game in the background: `laufzeit game launch <game> &` (it waits until the game exits).
 2. Wait a little, then take a screenshot and judge it: the game's menu, a launcher window to click
    through, a black screen, an error dialog.
-3. Stop it with `prefixr game stop <game>` and read `prefixr game log <game> --print` if it looked
+3. Stop it with `laufzeit game stop <game>` and read `laufzeit game log <game> --print` if it looked
    wrong.
 4. Fix the setup and try again.
-5. Note the result: `prefixr library test-status <game> works`, `issues --note "Videos stay
+5. Note the result: `laufzeit library test-status <game> works`, `issues --note "Videos stay
    black"` or `broken --note "Crashes on start with VK_ERROR_DEVICE_LOST; tried WINED3D"`.
 
 A result belongs to the runner and exe the game had when tested. Once either changes, the window
@@ -322,17 +322,17 @@ login or a controller still need you.
 
 ### Setting games up
 
-**Back up first.** Before a larger change, have the agent run `prefixr backup create`. If
-something goes wrong, `prefixr backup restore <file>` brings everything back (and a restore can be
+**Back up first.** Before a larger change, have the agent run `laufzeit backup create`. If
+something goes wrong, `laufzeit backup restore <file>` brings everything back (and a restore can be
 undone too).
 
 A good way to work with an agent:
 
 1. **One game at a time.** The agent adds a game; you start it from the window and say whether it
    works. The window shows the changes right away.
-2. **Let it read the logs.** `prefixr game log <game> --print` shows the agent what Wine and Proton
+2. **Let it read the logs.** `laufzeit game log <game> --print` shows the agent what Wine and Proton
    printed, which is usually where the fix is.
-3. **Protonfixes first.** With the right `--umu-id` (`prefixr umu search <name>`), umu applies the
+3. **Protonfixes first.** With the right `--umu-id` (`laufzeit umu search <name>`), umu applies the
    fixes known for that game automatically. Many games then need nothing else.
 4. **Carry over what other launchers set.** Launch scripts and other launchers often set
    environment variables (`DXVK_FRAME_RATE`, `WINEDLLOVERRIDES`, …), winetricks packages or
@@ -345,7 +345,7 @@ A good way to work with an agent:
    saves from the old prefix's `drive_c/users/…` (`Documents`, `Saved Games`, `AppData`) into the
    new one's `drive_c/users/steamuser/…`.
 
-Moving and copying files is up to the agent's own tools; Prefixr's command line takes over from
+Moving and copying files is up to the agent's own tools; Laufzeit's command line takes over from
 there. Nothing an agent does through it deletes game files or prefixes, with one exception:
 `store uninstall` deletes a store game's files, as **Uninstall** in the window does (the game can be
-installed again from the store). Removing a game or a prefix only takes it off Prefixr's lists.
+installed again from the store). Removing a game or a prefix only takes it off Laufzeit's lists.
