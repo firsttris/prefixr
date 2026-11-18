@@ -5215,14 +5215,14 @@
     {
         "type": "archive",
         "archive-type": "tar-gzip",
-        "url": "https://static.crates.io/crates/tauri-plugin-opener/tauri-plugin-opener-2.7.2.crate",
-        "sha256": "53810be1b4fed22bb6ac3f4cab5a2b80d9391d1af436bda145607532bc0bb219",
-        "dest": "cargo/vendor/tauri-plugin-opener-2.7.2"
+        "url": "https://static.crates.io/crates/tauri-plugin-opener/tauri-plugin-opener-2.7.3.crate",
+        "sha256": "54592c6718b42ab198bf11bda6a428a3553ca2f2f8e506df56f6a063ec328331",
+        "dest": "cargo/vendor/tauri-plugin-opener-2.7.3"
     },
     {
         "type": "inline",
-        "contents": "{\"package\": \"53810be1b4fed22bb6ac3f4cab5a2b80d9391d1af436bda145607532bc0bb219\", \"files\": {}}",
-        "dest": "cargo/vendor/tauri-plugin-opener-2.7.2",
+        "contents": "{\"package\": \"54592c6718b42ab198bf11bda6a428a3553ca2f2f8e506df56f6a063ec328331\", \"files\": {}}",
+        "dest": "cargo/vendor/tauri-plugin-opener-2.7.3",
         "dest-filename": ".cargo-checksum.json"
     },
     {
