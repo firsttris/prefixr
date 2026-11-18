@@ -487,6 +487,35 @@ pub fn game_processes_visible(id: Uuid) -> bool {
     !marked_processes(id).is_empty()
 }
 
+/// The longest a launch waits for `primary_output::switch_to_active_output`.
+/// It asks GTK for the window's monitor, KWin over D-Bus and X11, none of
+/// which has a timeout of its own; one that never answers would otherwise
+/// hold the launch, and with it the game's lock, until Prefixr is killed.
+const PRIMARY_SWITCH_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Runs `work` on a blocking thread and gives its result, or `None` if it
+/// panicked or didn't finish within `limit`. A thread that is still stuck
+/// is left behind; whatever it returns later is dropped there, which for a
+/// `PrimaryOutputSwitch` puts the primary output back right away.
+pub(crate) async fn within_time_limit<T: Send + 'static>(
+    limit: Duration,
+    work: impl FnOnce() -> T + Send + 'static,
+) -> Option<T> {
+    tokio::time::timeout(limit, tokio::task::spawn_blocking(work))
+        .await
+        .ok()?
+        .ok()
+}
+
+/// Appends a `[prefixr]` note to a game's log; a log that can't be written
+/// to only loses the note.
+fn append_log_note(log_path: &Path, note: &str) {
+    let _ = fs::OpenOptions::new()
+        .append(true)
+        .open(log_path)
+        .and_then(|mut f| std::io::Write::write_all(&mut f, note.as_bytes()));
+}
+
 /// How long each step of `stop_game_gracefully` gives the game to end.
 const STOP_STEP: Duration = Duration::from_secs(5);
 
@@ -1841,28 +1870,32 @@ async fn run_game(
         } else {
             "[laufzeit] GameMode skipped: a competing scheduler daemon is active, and powerprofilesctl is not available\n"
         };
-        let _ = fs::OpenOptions::new()
-            .append(true)
-            .open(log_path)
-            .and_then(|mut f| std::io::Write::write_all(&mut f, note.as_bytes()));
+        append_log_note(log_path, note);
     }
 
     // Before the game starts: Wine reads the primary output once, at start.
     let primary_switch = if graphics.launch_monitor == LaunchMonitor::Laufzeit {
         let app = app.clone();
-        tokio::task::spawn_blocking(move || primary_output::switch_to_active_output(&app))
-            .await
-            .ok()
-            .flatten()
+        within_time_limit(PRIMARY_SWITCH_TIMEOUT, move || {
+            primary_output::switch_to_active_output(&app)
+        })
+        .await
+        .unwrap_or_else(|| {
+            append_log_note(
+                log_path,
+                &format!(
+                    "[prefixr] Choosing the game's monitor didn't finish within {} s; \
+                     the game starts without it\n",
+                    PRIMARY_SWITCH_TIMEOUT.as_secs()
+                ),
+            );
+            None
+        })
     } else {
         None
     };
     if let Some(switch) = &primary_switch {
-        let note = switch.log_note();
-        let _ = fs::OpenOptions::new()
-            .append(true)
-            .open(log_path)
-            .and_then(|mut f| std::io::Write::write_all(&mut f, note.as_bytes()));
+        append_log_note(log_path, &switch.log_note());
     }
 
     let (log_out, log_err) = log_stdio(log_path)?;
